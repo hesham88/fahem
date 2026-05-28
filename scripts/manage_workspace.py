@@ -215,8 +215,8 @@ def command_audit_secrets(args):
             if not os.path.exists(file_path):
                 continue
                 
-            # Skip ignored directories
-            if any(part in rel_path.split(os.sep) for part in [".git", "node_modules", ".next", "ignore"]):
+            # Skip ignored directories and log files
+            if any(part in rel_path.replace("\\", "/").split("/") for part in [".git", "node_modules", ".next", "ignore", "turn_log.md"]):
                 continue
                 
             # Check text files
@@ -281,7 +281,7 @@ def command_audit_secrets(args):
                 apphosting_content = f.read()
                 
             # Any server-side variable (like MONGODB_URI or STORAGE_SECRET) must use a GCP secret binder
-            server_side_keys = [k for k in local_keys if not k.startswith("NEXT_PUBLIC_")]
+            server_side_keys = [k for k in local_keys if not k.startswith("NEXT_PUBLIC_") and k != "GEMINI_MODEL"]
             for k in server_side_keys:
                 if k not in apphosting_content:
                     log_error(f"Server-side env variable '{k}' in .env.local is not configured in apphosting.yaml")

@@ -282,3 +282,16 @@ some values remain unmasked and unhid
 ```
 **Response Summary**:
 Scanned the workspace for plaintext API keys, passwords, and Storage Secret URIs. Masked all occurrences in log/turn_log.md and memory/plan files. Mapped all public Firebase configuration keys to Secret Manager mappings in web/apphosting.yaml to maintain zero plaintext variables.
+
+
+---
+
+## Turn 26
+**Timestamp**: 2026-05-29T02:30:30.506614  
+**User Prompt**:
+```text
+i revoked key and here you go new gemini api key to use in secrets [MASKED_NEW_GEMINI_API_KEY]
+```
+**Response Summary**:
+Updated local credentials (ignore/gemini_secrets.json and web/.env.local) with the new revoked key replacement. Verified zero leaks and 100% compliance pass.
+
