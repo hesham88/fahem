@@ -23,12 +23,12 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<string[]>([]);
   const [finalResult, setFinalResult] = useState("");
   const [stats, setStats] = useState({
-    databaseName: "fahem",
-    collectionsCount: "1",
-    collectionList: "users",
-    storageSize: "4 KB",
-    indexCount: "1",
-    status: "Connected"
+    databaseName: "...",
+    collectionsCount: "...",
+    collectionList: "...",
+    storageSize: "...",
+    indexCount: "...",
+    status: "Connecting..."
   });
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -56,13 +56,28 @@ export default function Dashboard() {
     }
   ];
 
-  // Auth Guard
+  const fetchMetadata = async () => {
+    try {
+      const response = await fetch("/api/db-metadata");
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      } else {
+        setStats((prev) => ({ ...prev, status: "Error fetching metadata" }));
+      }
+    } catch (error) {
+      setStats((prev) => ({ ...prev, status: "Disconnected" }));
+    }
+  };
+
+  // Auth Guard & Initial Load
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         router.push("/");
       } else {
         setUser(currentUser);
+        fetchMetadata(); // Fetch live database metadata on mount
       }
       setLoadingUser(false);
     });
@@ -136,15 +151,8 @@ export default function Dashboard() {
       
       setFinalResult(cleanResult || "Query completed successfully. Please check the logs console for output details.");
 
-      if (queryText.toLowerCase().includes("stats") || queryText.toLowerCase().includes("list")) {
-        setStats((prev) => ({
-          ...prev,
-          storageSize: "4.09 KB",
-          collectionsCount: "1",
-          collectionList: "users",
-          status: "Connected"
-        }));
-      }
+      // Retrieve fresh live database stats after query execution completes
+      await fetchMetadata();
 
     } catch (error: any) {
       setLogs((prev) => [...prev, `[ERROR] Stream failure: ${error.message}`]);
@@ -188,7 +196,7 @@ export default function Dashboard() {
             <option value="fr">Français</option>
             <option value="de">Deutsch</option>
             <option value="zh">中文</option>
-            <option value="ja">日本語</option>
+            <option value="it">Italiano</option>
           </select>
           {user && (
             <div className="user-profile">
