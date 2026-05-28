@@ -30,3 +30,7 @@ Thumbs.db
 agy.exe
 *.exe
 
+# Debug logs
+*.log
+firebase-debug.log
+
