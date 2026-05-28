@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { auth, googleProvider } from "../lib/firebase";
 import { signInWithPopup, onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "../context/LanguageContext";
 
 export default function LandingPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -11,6 +12,7 @@ export default function LandingPage() {
   const [signingIn, setSigningIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
+  const { language, setLanguage, t, dir } = useTranslation();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -44,7 +46,7 @@ export default function LandingPage() {
   if (loading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
-        <div style={{ fontSize: "1.5rem", color: "var(--primary)" }}>Loading ambient environment...</div>
+        <div style={{ fontSize: "1.5rem", color: "var(--primary)" }}>{t("loading_ambient")}</div>
       </div>
     );
   }
@@ -61,17 +63,32 @@ export default function LandingPage() {
       {/* Glassmorphic Navbar */}
       <nav className="glass-nav">
         <div className="glass-nav-logo">
-          <span>🧠</span> Fahem
+          <span>🧠</span> {t("dashboard_title")}
         </div>
         <ul className="glass-nav-links">
           <li>
-            <a href="#overview" className="glass-nav-link">Overview</a>
+            <a href="#overview" className="glass-nav-link">{t("nav_overview")}</a>
           </li>
           <li>
-            <a href="#toolkit" className="glass-nav-link">Agent Toolkit</a>
+            <a href="#toolkit" className="glass-nav-link">{t("nav_toolkit")}</a>
           </li>
           <li>
-            <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link">GitHub</a>
+            <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link">{t("nav_github")}</a>
+          </li>
+          <li>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as any)}
+              className="language-select"
+            >
+              <option value="en">English</option>
+              <option value="ar">العربية</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+            </select>
           </li>
           <li>
             <button
@@ -79,7 +96,7 @@ export default function LandingPage() {
               disabled={signingIn}
               className="btn btn-primary btn-nav-signin"
             >
-              {signingIn ? "Signing In..." : "Sign In"}
+              {signingIn ? t("nav_signing_in") : t("nav_signin")}
             </button>
           </li>
         </ul>
@@ -89,23 +106,21 @@ export default function LandingPage() {
       <main className="glass-hero-section">
         <div className="glass-card">
           <div className="glass-card-icon">🔑</div>
-          <h2>Welcome to Fahem</h2>
-          <p>
-            An intelligent AI assistant console programmatically powered by the Google Agent Development Kit (ADK) and MongoDB MCP toolsets.
-          </p>
+          <h2>{t("welcome_to_fahem")}</h2>
+          <p>{t("hero_subtitle")}</p>
 
           <div className="feature-bullets">
             <div className="feature-bullet-item">
               <span className="feature-bullet-icon">✦</span>
-              <span>Exposes custom MongoDB Schema wrappers</span>
+              <span>{t("bullet_1")}</span>
             </div>
             <div className="feature-bullet-item">
               <span className="feature-bullet-icon">✦</span>
-              <span>Pipes real-time execution logs from Python ADK</span>
+              <span>{t("bullet_2")}</span>
             </div>
             <div className="feature-bullet-item">
               <span className="feature-bullet-icon">✦</span>
-              <span>Fully sandboxed and secure database diagnostics</span>
+              <span>{t("bullet_3")}</span>
             </div>
           </div>
 
@@ -130,13 +145,13 @@ export default function LandingPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
-            <span>{signingIn ? "Connecting to Google..." : "Sign in with Google"}</span>
+            <span>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
           </button>
         </div>
       </main>
 
       <footer className="metadata-footer" style={{ zIndex: 2, paddingBottom: "2rem" }}>
-        <p>Fahem Project Console &bull; Google Cloud Rapid Agent Hackathon</p>
+        <p>{t("footer_landing")}</p>
       </footer>
     </div>
   );

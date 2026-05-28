@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { auth } from "../../lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "../../context/LanguageContext";
 
 interface PresetQuery {
   title: string;
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const router = useRouter();
+  const { language, setLanguage, t } = useTranslation();
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,23 +35,23 @@ export default function Dashboard() {
 
   const presets: PresetQuery[] = [
     {
-      title: "List Databases",
-      description: "Discovers all available databases and lists their basic metrics.",
+      title: t("preset_list_db_title"),
+      description: t("preset_list_db_desc"),
       query: "List the databases, list collections for 'fahem' database, and retrieve database stats."
     },
     {
-      title: "Get Database Stats",
-      description: "Retrieves storage size, index counts, and document stats for 'fahem'.",
+      title: t("preset_get_stats_title"),
+      description: t("preset_get_stats_desc"),
       query: "Analyze database statistics for the 'fahem' database and summarize storage size and index metrics."
     },
     {
-      title: "Analyze Collection Schema",
-      description: "Samples documents from 'users' collection to derive its schema.",
+      title: t("preset_schema_title"),
+      description: t("preset_schema_desc"),
       query: "Get the collection schema for the 'users' collection inside the 'fahem' database and describe its fields."
     },
     {
-      title: "List Collections",
-      description: "Lists all collections in the 'fahem' database.",
+      title: t("preset_list_col_title"),
+      description: t("preset_list_col_desc"),
       query: "List all collections present in the 'fahem' database."
     }
   ];
@@ -161,7 +163,7 @@ export default function Dashboard() {
   if (loadingUser) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
-        <div style={{ fontSize: "1.5rem", color: "var(--primary)" }}>Verifying session...</div>
+        <div style={{ fontSize: "1.5rem", color: "var(--primary)" }}>{t("loading_session")}</div>
       </div>
     );
   }
@@ -171,10 +173,23 @@ export default function Dashboard() {
       {/* Header Bar */}
       <header className="header">
         <div className="title-section">
-          <h1>Fahem</h1>
-          <p>Google ADK & MongoDB MCP Assistant Console</p>
+          <h1>{t("dashboard_title")}</h1>
+          <p>{t("dashboard_subtitle")}</p>
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as any)}
+            className="language-select"
+          >
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="zh">中文</option>
+            <option value="ja">日本語</option>
+          </select>
           {user && (
             <div className="user-profile">
               {user.photoURL && (
@@ -185,13 +200,13 @@ export default function Dashboard() {
                 onClick={handleLogout} 
                 className="btn btn-secondary btn-signout"
               >
-                Sign Out
+                {t("btn_signout")}
               </button>
             </div>
           )}
           <div className="status-badge" id="mcp-status-badge">
             <span className="status-dot"></span>
-            <span>MongoDB Atlas Cluster: {stats.status}</span>
+            <span>{t("cluster_status")}</span>
           </div>
         </div>
       </header>
@@ -204,7 +219,7 @@ export default function Dashboard() {
           {/* Custom Prompt Box */}
           <section className="panel-card" id="agent-input-panel">
             <h2>
-              <span>⚡</span> Ask the MongoDB Agent
+              <span>⚡</span> {t("ask_agent_header")}
             </h2>
             
             {/* Presets Row */}
@@ -235,7 +250,7 @@ export default function Dashboard() {
                   className="prompt-textarea"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Enter a custom database request (e.g. 'Analyze collections and show stats for fahem database')"
+                  placeholder={t("input_placeholder")}
                   disabled={loading}
                 />
               </div>
@@ -246,7 +261,7 @@ export default function Dashboard() {
                   disabled={loading || !prompt.trim()}
                   id="btn-submit-prompt"
                 >
-                  {loading ? "Streaming Output..." : "Execute Agent"}
+                  {loading ? t("btn_executing") : t("btn_execute")}
                 </button>
                 <button 
                   type="button" 
@@ -255,7 +270,7 @@ export default function Dashboard() {
                   disabled={loading}
                   id="btn-clear-prompt"
                 >
-                  Clear
+                  {t("btn_clear")}
                 </button>
               </div>
             </form>
@@ -264,12 +279,12 @@ export default function Dashboard() {
           {/* Execution Stream Output Console */}
           <section className="panel-card" id="agent-output-panel">
             <h2>
-              <span>📜</span> Execution Stream Logs
+              <span>📜</span> {t("logs_header")}
             </h2>
             
             <div className="logs-console" id="logs-console-window">
               {logs.length === 0 ? (
-                <span style={{ color: "#6a7c88" }}>Console idle. Awaiting command execution...</span>
+                <span style={{ color: "#6a7c88" }}>{t("logs_idle")}</span>
               ) : (
                 logs.map((log, idx) => {
                   let styleClass = "log-info";
@@ -289,7 +304,7 @@ export default function Dashboard() {
 
             {finalResult && (
               <div className="agent-response-box" id="agent-final-response">
-                <h3>Agent Response:</h3>
+                <h3>{t("agent_response_header")}</h3>
                 <div style={{ whiteSpace: "pre-wrap" }}>{finalResult}</div>
               </div>
             )}
@@ -302,23 +317,23 @@ export default function Dashboard() {
           {/* Cluster Health Panel */}
           <section className="panel-card" id="mongodb-health-panel">
             <h2>
-              <span>📊</span> Cluster Metadata
+              <span>📊</span> {t("metadata_header")}
             </h2>
             <div className="stats-grid">
               <div className="stat-item">
-                <span className="stat-label">Active Database</span>
+                <span className="stat-label">{t("meta_active_db")}</span>
                 <span className="stat-value">{stats.databaseName}</span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Collections</span>
+                <span className="stat-label">{t("meta_collections")}</span>
                 <span className="stat-value">{stats.collectionsCount}</span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Collection Names</span>
+                <span className="stat-label">{t("meta_col_names")}</span>
                 <span className="stat-value" style={{ fontSize: "1.1rem" }}>{stats.collectionList}</span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Storage Size</span>
+                <span className="stat-label">{t("meta_storage_size")}</span>
                 <span className="stat-value">{stats.storageSize}</span>
               </div>
             </div>
@@ -327,23 +342,23 @@ export default function Dashboard() {
           {/* Model & Agent Settings */}
           <section className="panel-card" id="agent-config-panel">
             <h2>
-              <span>⚙️</span> Agent Core Config
+              <span>⚙️</span> {t("config_header")}
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem", fontSize: "0.95rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
-                <span style={{ fontWeight: 600 }}>Gemini Model:</span>
+                <span style={{ fontWeight: 600 }}>{t("config_model")}</span>
                 <code style={{ background: "#faf8f5", padding: "2px 6px", borderRadius: "4px" }}>gemini-3.1-flash-lite</code>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
-                <span style={{ fontWeight: 600 }}>Orchestrator Framework:</span>
+                <span style={{ fontWeight: 600 }}>{t("config_framework")}</span>
                 <span style={{ color: "var(--primary)" }}>google-adk (Python)</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
-                <span style={{ fontWeight: 600 }}>MCP Connection:</span>
+                <span style={{ fontWeight: 600 }}>{t("config_mcp")}</span>
                 <span style={{ color: "var(--accent-orange)" }}>@mongodb-js/mongodb-mcp-server</span>
               </div>
               <div>
-                <span style={{ fontWeight: 600, display: "block", marginBottom: "0.5rem" }}>Exposed Tools:</span>
+                <span style={{ fontWeight: 600, display: "block", marginBottom: "0.5rem" }}>{t("config_tools")}</span>
                 <ul style={{ paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.25rem", color: "#4a5560" }}>
                   <li><code>get_database_stats</code></li>
                   <li><code>list_database_collections</code></li>
@@ -358,9 +373,9 @@ export default function Dashboard() {
 
       {/* Footer Info */}
       <footer className="metadata-footer">
-        <p>Fahem Console Dashboard | Hackathon MongoDB Track Partner Integration</p>
+        <p>{t("footer_dashboard_line1")}</p>
         <p style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "#b0c0cb" }}>
-          Running on Firebase App Hosting &bull; Secure Google Cloud Secret Manager Environment
+          {t("footer_dashboard_line2")}
         </p>
       </footer>
     </div>
