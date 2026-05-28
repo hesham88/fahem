@@ -4,6 +4,10 @@
 ignore/
 .ignore/
 
+# Ignore Python compilation cache
+__pycache__/
+*.pyc
+
 # Ignore node modules and build outputs
 node_modules/
 dist/

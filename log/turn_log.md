@@ -295,3 +295,15 @@ i revoked key and here you go new gemini api key to use in secrets [MASKED_NEW_G
 **Response Summary**:
 Updated local credentials (ignore/gemini_secrets.json and web/.env.local) with the new revoked key replacement. Verified zero leaks and 100% compliance pass.
 
+
+
+---
+
+## Turn 27
+**Timestamp**: 2026-05-29T02:37:35.961983  
+**User Prompt**:
+```text
+let's test the agent that use mongodb mcp tool to communicte with our fahem database and ask it to list all collections in our database
+```
+**Response Summary**:
+Executed the Python ADK agent with the prompt to list collections. The agent successfully spawned the MongoDB MCP server, connected to the Atlas cluster, and returned the list of collections: users.
