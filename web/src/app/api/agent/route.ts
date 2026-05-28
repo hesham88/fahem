@@ -16,17 +16,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine the absolute path to agents/main.py
+    const localPath = path.join(process.cwd(), "agents/main.py");
+    const parentPath = path.join(process.cwd(), "../agents/main.py");
+    
+    let scriptPath = localPath;
     let rootDir = process.cwd();
-    if (!fs.existsSync(path.join(rootDir, "agents", "main.py")) && fs.existsSync(path.join(rootDir, "..", "agents", "main.py"))) {
-      rootDir = path.join(rootDir, "..");
-    }
-
-    const scriptPath = path.join(rootDir, "agents", "main.py");
-    if (!fs.existsSync(scriptPath)) {
-      return new Response(JSON.stringify({ error: `Script not found at: ${scriptPath}` }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
+    
+    if (fs.existsSync(localPath)) {
+      scriptPath = localPath;
+      rootDir = process.cwd();
+    } else if (fs.existsSync(parentPath)) {
+      scriptPath = parentPath;
+      rootDir = path.join(process.cwd(), "..");
+    } else {
+      // Standalone build folder resolution fallback
+      const standalonePath = path.join(process.cwd(), ".next/standalone/agents/main.py");
+      if (fs.existsSync(standalonePath)) {
+        scriptPath = standalonePath;
+        rootDir = path.join(process.cwd(), ".next/standalone");
+      } else {
+        return new Response(JSON.stringify({ error: `Script not found at any expected path (local: ${localPath}, parent: ${parentPath})` }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
 
     const encoder = new TextEncoder();

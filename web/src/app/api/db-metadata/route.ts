@@ -8,17 +8,30 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     // Determine the absolute path to agents/get_metadata.py
+    const localPath = path.join(process.cwd(), "agents/get_metadata.py");
+    const parentPath = path.join(process.cwd(), "../agents/get_metadata.py");
+    
+    let scriptPath = localPath;
     let rootDir = process.cwd();
-    if (!fs.existsSync(path.join(rootDir, "agents", "get_metadata.py")) && fs.existsSync(path.join(rootDir, "..", "agents", "get_metadata.py"))) {
-      rootDir = path.join(rootDir, "..");
-    }
-
-    const scriptPath = path.join(rootDir, "agents", "get_metadata.py");
-    if (!fs.existsSync(scriptPath)) {
-      return new Response(JSON.stringify({ error: `Metadata script not found at: ${scriptPath}` }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
+    
+    if (fs.existsSync(localPath)) {
+      scriptPath = localPath;
+      rootDir = process.cwd();
+    } else if (fs.existsSync(parentPath)) {
+      scriptPath = parentPath;
+      rootDir = path.join(process.cwd(), "..");
+    } else {
+      // Standalone build folder resolution fallback
+      const standalonePath = path.join(process.cwd(), ".next/standalone/agents/get_metadata.py");
+      if (fs.existsSync(standalonePath)) {
+        scriptPath = standalonePath;
+        rootDir = path.join(process.cwd(), ".next/standalone");
+      } else {
+        return new Response(JSON.stringify({ error: `Metadata script not found at any expected path (local: ${localPath}, parent: ${parentPath})` }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
 
     let pythonCmd = "python";

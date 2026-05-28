@@ -367,3 +367,15 @@ enhance font and design use elegant fonts and styling...
 ```
 **Response Summary**:
 Re-configured font loading in RootLayout layout.tsx using Google Fonts: Playfair Display for displays/headings, Plus Jakarta Sans for UI/body text, and JetBrains Mono for logs. Enhanced globals.css with these variables, set global body line-height to 1.65, added letter-spacing of -0.01em, and optimized logs console formatting to JetBrains Mono with 1.55 line height and 0.9rem size for reading comfort.
+
+
+---
+
+## Turn 33
+**Timestamp**: 2026-05-29T02:59:32.829990  
+**User Prompt**:
+```text
+Fix Next.js compilation issues with outputFileTracingIncludes...
+```
+**Response Summary**:
+Fixed Next.js build compilation error by moving outputFileTracingIncludes to the root config object of next.config.ts. Rewrote path checking logic in both /api/agent and /api/db-metadata API routes to use statically scoped path checks (e.g. process.cwd() joined with static subfolder strings), resolving Turbopack dynamic tracing warnings. Compiled local Next.js project successfully.
