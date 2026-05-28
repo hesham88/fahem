@@ -1,0 +1,40 @@
+# Settings for the underlying Cloud Run service
+runConfig:
+  minInstances: 0
+  maxInstances: 5
+  cpu: 1
+  memory: 512Mi
+
+# Environment variables exposed to the app at build/run time
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: fahem_firebase_api_key
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    secret: fahem_firebase_auth_domain
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    secret: fahem_firebase_project_id
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    secret: fahem_firebase_storage_bucket
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    secret: fahem_firebase_messaging_sender_id
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: fahem_firebase_app_id
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    secret: fahem_firebase_measurement_id
+
+  
+  # For MongoDB, we will reference a Google Cloud Secret Manager secret in production
+  - variable: MONGODB_URI
+    secret: fahem_mongodb_uri
+  
+  # For Firebase Storage, we will reference a Google Cloud Secret Manager secret in production
+  - variable: STORAGE_SECRET
+    secret: fahem_storage_secret
+
+  # For Gemini model execution, we will reference Google Cloud Secret Manager secrets
+  - variable: GEMINI_API_KEY
+    secret: fahem_gemini_api_key
+  - variable: GEMINI_MODEL
+    secret: fahem_gemini_model
+
+

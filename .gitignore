@@ -1,0 +1,28 @@
+# Git Ignore rules for Fahem project
+
+# Ignore local temporary/sensitive files
+ignore/
+.ignore/
+
+# Ignore node modules and build outputs
+node_modules/
+dist/
+.next/
+out/
+build/
+
+# Ignore local environment files that contain secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Executables and large binaries
+agy.exe
+*.exe
+

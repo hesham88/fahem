@@ -1,0 +1,96 @@
+import os
+import json
+
+# Monkeypatch BSON types for Pydantic V2 serialization compatibility inside ADK logging
+try:
+    import bson.timestamp
+    import bson.objectid
+    from pydantic_core import core_schema
+    
+    def patch_bson_type(cls):
+        if not hasattr(cls, "__get_pydantic_core_schema__"):
+            cls.__get_pydantic_core_schema__ = classmethod(
+                lambda c, source_type, handler: core_schema.no_info_after_validator_function(
+                    lambda v: str(v),
+                    core_schema.any_schema()
+                )
+            )
+            
+    patch_bson_type(bson.timestamp.Timestamp)
+    patch_bson_type(bson.objectid.ObjectId)
+    if hasattr(bson, "decimal128"):
+        patch_bson_type(bson.decimal128.Decimal128)
+except Exception:
+    pass
+
+from mcp import StdioServerParameters
+from google.adk.tools.mcp_tool import StdioConnectionParams, McpToolset
+from google.adk import Agent
+
+try:
+    from tools import get_database_stats, list_database_collections, get_collection_schema, get_mongodb_uri
+except ImportError:
+    from agents.tools import get_database_stats, list_database_collections, get_collection_schema, get_mongodb_uri
+
+def get_model_name() -> str:
+    """Resolves model name dynamically based on environment or configuration."""
+    model = os.environ.get("GEMINI_MODEL")
+    if model:
+        return model
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        secrets_path = os.path.join(base_dir, "ignore", "gemini_secrets.json")
+        if os.path.exists(secrets_path):
+            with open(secrets_path, "r") as f:
+                data = json.load(f)
+                val = data.get("GEMINI_MODEL", "")
+                if val:
+                    return val
+    except Exception:
+        pass
+    try:
+        env_path = os.path.join(base_dir, "web", ".env.local")
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                for line in f:
+                    if line.startswith("GEMINI_MODEL="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val
+    except Exception:
+        pass
+    return "gemini-3.1-flash-lite"
+
+# 1. Determine platform-specific npx executable to avoid spawning failure on Windows vs GCloud Containers
+cmd = "npx.cmd" if os.name == "nt" else "npx"
+
+# 2. Configure MongoDB MCP server parameters
+server_params = StdioServerParameters(
+    command=cmd,
+    args=["-y", "@mongodb-js/mongodb-mcp-server"],
+    env={"MDB_MCP_CONNECTION_STRING": get_mongodb_uri()}
+)
+
+# 3. Create the ADK-compatible MCP Toolset client wrapper
+connection_params = StdioConnectionParams(server_params=server_params)
+mcp_toolset = McpToolset(connection_params=connection_params)
+
+# 4. Construct the Python-based ADK Agent with integrated MCP and native tools
+mongodb_agent = Agent(
+    name="FahemMongoDBAgent",
+    model=get_model_name(),
+    instruction="""
+        You are the Fahem MongoDB Database Agent.
+        You assist the user in inspecting database collections, examining schemas, and running diagnostics.
+        You have direct access to:
+        1. Local custom tools (get_database_stats, list_database_collections, get_collection_schema).
+        2. Official MongoDB MCP server tools (atlas-list-clusters, list-databases, find, aggregate, etc.).
+        Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
+    """,
+    tools=[
+        mcp_toolset,
+        get_database_stats,
+        list_database_collections,
+        get_collection_schema
+    ]
+)
