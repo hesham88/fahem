@@ -1,14 +1,5 @@
 import { NextRequest } from "next/server";
-import { MongoClient } from "mongodb";
-import dns from "dns";
-
-// Ensure DNS SRV queries resolve correctly in production and local environments
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4"]);
-  dns.setDefaultResultOrder("ipv4first");
-} catch (e) {
-  console.warn("Failed to set DNS servers:", e);
-}
+import { StdioMcpClient } from "../mcp-client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,20 +12,57 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const client = new MongoClient(uri);
+  const client = new StdioMcpClient();
   try {
-    await client.connect();
-    const dbName = "fahem"; // Target database name
+    const dbName = "fahem";
     
-    // 1. Get Collections
-    const collections = await client.db(dbName).listCollections().toArray();
-    const collectionsCount = collections.length;
-    const collectionList = collections.map(c => c.name).join(", ") || "None";
+    // 1. Connect to MongoDB using the connect tool
+    await client.callTool("connect", { connectionString: uri });
 
-    // 2. Get Stats
-    const stats = await client.db(dbName).command({ dbStats: 1 });
-    const dataSize = stats.dataSize || 0;
-    const indexCount = stats.indexes || 0;
+    // 2. Get Collections using list-collections
+    const collectionsRes = await client.callTool("list-collections", { database: dbName });
+    
+    let collectionsList: string[] = [];
+    if (collectionsRes && Array.isArray(collectionsRes.content)) {
+      collectionsList = collectionsRes.content
+        .map((item: any) => {
+          if (item.type === "text" && item.text) {
+            // Text is formatted as: "Name: users"
+            const match = item.text.match(/^Name:\s*(.+)$/);
+            return match ? match[1].trim() : item.text.replace("Name: ", "").trim();
+          }
+          return "";
+        })
+        .filter((name: string) => name !== "");
+    }
+
+    const collectionsCount = collectionsList.length;
+    const collectionListStr = collectionsList.join(", ") || "None";
+
+    // 3. Get Stats using db-stats
+    const statsRes = await client.callTool("db-stats", { database: dbName });
+    let dataSize = 0;
+    let indexCount = 0;
+
+    if (statsRes && Array.isArray(statsRes.content)) {
+      const statsText = statsRes.content.find((item: any) => item.type === "text")?.text || "";
+      const jsonStart = statsText.indexOf("{");
+      if (jsonStart !== -1) {
+        try {
+          const statsJson = JSON.parse(statsText.substring(jsonStart));
+          // statsJson storageSize/dataSize can have form: { "low": 4096, "high": 0, "unsigned": false } or simply number
+          const getVal = (val: any) => {
+            if (typeof val === "number") return val;
+            if (val && typeof val.low === "number") return val.low;
+            return 0;
+          };
+          dataSize = getVal(statsJson.totalSize || statsJson.dataSize || statsJson.storageSize);
+          indexCount = getVal(statsJson.indexes);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
 
     let storageSize = "0 B";
     if (dataSize > 1024 * 1024) {
@@ -48,7 +76,7 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify({
       databaseName: dbName,
       collectionsCount: String(collectionsCount),
-      collectionList,
+      collectionList: collectionListStr,
       storageSize,
       indexCount: String(indexCount),
       status: "Connected"
@@ -70,6 +98,6 @@ export async function GET(req: NextRequest) {
       headers: { "Content-Type": "application/json" }
     });
   } finally {
-    await client.close();
+    client.close();
   }
 }

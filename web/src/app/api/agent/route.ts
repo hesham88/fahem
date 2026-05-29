@@ -1,173 +1,25 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { MongoClient } from "mongodb";
-import dns from "dns";
-
-// Ensure DNS SRV queries resolve correctly in production and local environments
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4"]);
-  dns.setDefaultResultOrder("ipv4first");
-} catch (e) {
-  console.warn("Failed to set DNS servers:", e);
-}
+import { StdioMcpClient } from "../mcp-client";
 
 export const dynamic = "force-dynamic";
 
-// Helper database tools executed dynamically via the agentic tool-calling loop
-async function handleToolCall(name: string, args: any): Promise<any> {
-  const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-  const client = new MongoClient(uri);
-  try {
-    await client.connect();
-    const dbName = args.databaseName || "fahem";
-
-    if (name === "list_databases") {
-      const result = await client.db().admin().listDatabases();
-      return result;
-    } else if (name === "list_database_collections") {
-      const collections = await client.db(dbName).listCollections().toArray();
-      return { collections: collections.map((c) => c.name) };
-    } else if (name === "get_database_stats") {
-      const stats = await client.db(dbName).command({ dbStats: 1 });
-      if (stats.raw) {
-        stats.raw = "[MASKED_RAW_METADATA]";
-      }
-      return stats;
-    } else if (name === "get_collection_schema") {
-      const colName = args.collectionName;
-      if (!colName) throw new Error("Collection name must be provided");
-      const sample = await client.db(dbName).collection(colName).find().limit(10).toArray();
-      if (sample.length === 0) {
-        return { message: "Collection is empty." };
-      }
-      const schema: any = {};
-      for (const doc of sample) {
-        for (const [key, val] of Object.entries(doc)) {
-          const type = typeof val;
-          if (!schema[key]) {
-            schema[key] = { type, occurrences: 1 };
-          } else {
-            schema[key].occurrences += 1;
-          }
-        }
-      }
-      return { schema };
-    } else if (name === "find_documents") {
-      const colName = args.collectionName;
-      if (!colName) throw new Error("Collection name must be provided");
-      const filter = args.filter ? JSON.parse(args.filter) : {};
-      const projection = args.projection ? JSON.parse(args.projection) : {};
-      const limit = args.limit || 10;
-      const skip = args.skip || 0;
-      const docs = await client.db(dbName).collection(colName).find(filter, { projection }).skip(skip).limit(limit).toArray();
-      return docs;
-    } else if (name === "aggregate_documents") {
-      const colName = args.collectionName;
-      if (!colName) throw new Error("Collection name must be provided");
-      const pipeline = JSON.parse(args.pipeline);
-      const docs = await client.db(dbName).collection(colName).aggregate(pipeline).toArray();
-      return docs;
-    } else if (name === "count_documents") {
-      const colName = args.collectionName;
-      if (!colName) throw new Error("Collection name must be provided");
-      const filter = args.filter ? JSON.parse(args.filter) : {};
-      const count = await client.db(dbName).collection(colName).countDocuments(filter);
-      return { count };
-    } else {
-      throw new Error(`Unknown function: ${name}`);
+function sanitizeSchemaForGemini(schema: any): any {
+  if (!schema) return undefined;
+  const clean: any = {};
+  if (schema.type) clean.type = schema.type;
+  if (schema.description) clean.description = schema.description;
+  if (schema.properties) {
+    clean.properties = {};
+    for (const [key, val] of Object.entries(schema.properties)) {
+      clean.properties[key] = sanitizeSchemaForGemini(val);
     }
-  } finally {
-    await client.close();
   }
+  if (schema.required) clean.required = schema.required;
+  if (schema.items) clean.items = sanitizeSchemaForGemini(schema.items);
+  if (schema.enum) clean.enum = schema.enum;
+  return clean;
 }
-
-// Function Declarations exposed to the Gemini Model for Tool Use
-const functionDeclarations: any[] = [
-  {
-    name: "list_databases",
-    description: "Discovers all available databases and lists their basic metrics.",
-    parameters: {
-      type: "OBJECT",
-      properties: {},
-    }
-  },
-  {
-    name: "list_database_collections",
-    description: "Lists all collections in a given database.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" }
-      },
-      required: ["databaseName"]
-    }
-  },
-  {
-    name: "get_database_stats",
-    description: "Retrieves storage size, index counts, and document stats for a database.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" }
-      },
-      required: ["databaseName"]
-    }
-  },
-  {
-    name: "get_collection_schema",
-    description: "Samples documents from a collection to derive its schema.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" },
-        collectionName: { type: "STRING", description: "The name of the collection" }
-      },
-      required: ["databaseName", "collectionName"]
-    }
-  },
-  {
-    name: "find_documents",
-    description: "Finds documents matching a query filter from a collection.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" },
-        collectionName: { type: "STRING", description: "The name of the collection" },
-        filter: { type: "STRING", description: "JSON string representing the query filter (e.g. '{\"name\": \"Alice\"}')" },
-        projection: { type: "STRING", description: "JSON string representing projection fields (e.g. '{\"email\": 1}')" },
-        limit: { type: "NUMBER", description: "Maximum number of documents to return" },
-        skip: { type: "NUMBER", description: "Number of documents to skip" }
-      },
-      required: ["databaseName", "collectionName"]
-    }
-  },
-  {
-    name: "aggregate_documents",
-    description: "Runs an aggregation pipeline on a collection.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" },
-        collectionName: { type: "STRING", description: "The name of the collection" },
-        pipeline: { type: "STRING", description: "JSON string representing the aggregation pipeline array (e.g. '[{\"$match\": {\"active\": true}}]')" }
-      },
-      required: ["databaseName", "collectionName", "pipeline"]
-    }
-  },
-  {
-    name: "count_documents",
-    description: "Counts documents matching a filter in a collection.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        databaseName: { type: "STRING", description: "The name of the database" },
-        collectionName: { type: "STRING", description: "The name of the collection" },
-        filter: { type: "STRING", description: "JSON string representing the filter query" }
-      },
-      required: ["databaseName", "collectionName"]
-    }
-  }
-];
 
 export async function POST(req: NextRequest) {
   try {
@@ -182,16 +34,41 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        const client = new StdioMcpClient();
         try {
           const apiKey = process.env.GEMINI_API_KEY;
           if (!apiKey) {
             controller.enqueue(encoder.encode("[ERROR] GEMINI_API_KEY is not configured.\n"));
+            client.close();
             controller.close();
             return;
           }
 
-          controller.enqueue(encoder.encode("[SYSTEM] Initiating native Node-based agent execution stream...\n"));
+          controller.enqueue(encoder.encode("[SYSTEM] Initiating MongoDB MCP agent execution stream...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt}\n\n`));
+
+          // 1. Connect to MongoDB using the connect tool
+          const mongodbUri = process.env.MONGODB_URI;
+          if (!mongodbUri) {
+            controller.enqueue(encoder.encode("[ERROR] MONGODB_URI is not configured.\n"));
+            client.close();
+            controller.close();
+            return;
+          }
+
+          controller.enqueue(encoder.encode("[SYSTEM] Connecting to MongoDB instance via MCP connect tool...\n"));
+          await client.callTool("connect", { connectionString: mongodbUri });
+          controller.enqueue(encoder.encode("[SYSTEM] Connected successfully.\n"));
+
+          // 2. Fetch all tools dynamically from the MCP server
+          const toolsRes = await client.listTools();
+          const tools = (toolsRes.tools || []).filter((t: any) => t.name !== "connect");
+
+          const functionDeclarations = tools.map((t: any) => ({
+            name: t.name,
+            description: t.description,
+            parameters: sanitizeSchemaForGemini(t.inputSchema)
+          }));
 
           const ai = new GoogleGenAI({ apiKey });
           const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
@@ -218,7 +95,7 @@ export async function POST(req: NextRequest) {
                 systemInstruction: `
                   You are the Fahem MongoDB Database Agent.
                   You assist the user in inspecting database collections, examining schemas, running diagnostics, and executing queries.
-                  You have direct access to list databases, list collections, get stats, analyze schemas, count documents, find records, and aggregate collections.
+                  You interact with the database ONLY through the official MongoDB MCP server tools.
                   Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
                 `,
                 tools: [{ functionDeclarations }]
@@ -262,7 +139,27 @@ export async function POST(req: NextRequest) {
               controller.enqueue(encoder.encode(`\n[SYSTEM] Tool Call: ${name}(${JSON.stringify(args)})\n`));
               
               try {
-                const toolResult = await handleToolCall(name, args);
+                // Call the MCP tool
+                const toolResult = await client.callTool(name, args);
+                
+                // Mask sensitive info inside db-stats or explain results if they leak raw server stats
+                if (name === "db-stats" || name === "dbStats") {
+                  if (Array.isArray(toolResult.content)) {
+                    for (const item of toolResult.content) {
+                      if (item.type === "text" && item.text) {
+                        const jsonStart = item.text.indexOf("{");
+                        if (jsonStart !== -1) {
+                          try {
+                            const parsed = JSON.parse(item.text.substring(jsonStart));
+                            if (parsed.raw) parsed.raw = "[MASKED_RAW_METADATA]";
+                            item.text = item.text.substring(0, jsonStart) + JSON.stringify(parsed);
+                          } catch(e) {}
+                        }
+                      }
+                    }
+                  }
+                }
+
                 controller.enqueue(encoder.encode(`[SYSTEM] Tool Response: Success\n`));
                 toolResponseParts.push({
                   functionResponse: {
@@ -292,10 +189,13 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(finalResponse));
           controller.enqueue(encoder.encode("\n==========================\n"));
           controller.enqueue(encoder.encode("[CLOSE] Process exited with code 0\n"));
+          
+          client.close();
           controller.close();
 
         } catch (e: any) {
           controller.enqueue(encoder.encode(`\n[ERROR] Agent Loop Failure: ${e.message}\n`));
+          client.close();
           controller.close();
         }
       }
