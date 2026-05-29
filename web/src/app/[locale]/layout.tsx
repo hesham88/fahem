@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
 import { LanguageProvider, Language } from "../../context/LanguageContext";
+import StickyChat from "../../components/StickyChat";
 import React from "react";
 
 const playfair = Playfair_Display({
@@ -60,6 +61,7 @@ export default async function LocaleLayout({
       <body>
         <LanguageProvider locale={locale as Language}>
           {children}
+          <StickyChat />
         </LanguageProvider>
       </body>
     </html>

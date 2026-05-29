@@ -1,7 +1,7 @@
 try:
-    from mongodb_agent.agent import root_agent
+    from agent import fahem_workflow
 except ImportError:
-    from agents.mongodb_agent.agent import root_agent
+    from agents.agent import fahem_workflow
 
-# Expose 'root_agent' and 'app' as fallback
-app = root_agent
+# Expose 'fahem_workflow' as the main app entry point
+app = fahem_workflow

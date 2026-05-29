@@ -92,6 +92,8 @@ class WorkflowState(BaseModel):
     language: str = "en"
     user_email: str = ""
     user_id: str = ""
+    username: str = ""
+    credits: int = 100
     guardrail_passed: bool = False
     guardrail_reason: str = ""
     database_results: str = ""
@@ -117,15 +119,32 @@ except ImportError:
 
 async def orchestrator_node_func(ctx, node_input: Any) -> str:
     """Orchestrator receives user input and seeds state variables."""
-    prompt_str = str(node_input)
+    prompt_str = str(node_input).strip()
     
-    # Store essential parameters into state
-    ctx.state["original_prompt"] = prompt_str
-    ctx.state["language"] = os.environ.get("LANGUAGE", "en")
-    ctx.state["user_email"] = os.environ.get("USER_EMAIL", "")
-    ctx.state["user_id"] = os.environ.get("USER_ID", "")
-    
-    return f"Orchestrator seed prompt: {prompt_str}"
+    # Try parsing as JSON first to extract rich session/context variables
+    is_json = False
+    try:
+        data = json.loads(prompt_str)
+        if isinstance(data, dict) and "prompt" in data:
+            is_json = True
+            ctx.state["original_prompt"] = data.get("prompt", "")
+            ctx.state["language"] = data.get("language") or os.environ.get("LANGUAGE", "en")
+            ctx.state["user_email"] = data.get("user_email") or os.environ.get("USER_EMAIL", "")
+            ctx.state["user_id"] = data.get("user_id") or os.environ.get("USER_ID", "")
+            ctx.state["username"] = data.get("username") or os.environ.get("USERNAME", "anonymous")
+            ctx.state["credits"] = int(data.get("credits", 100))
+    except Exception:
+        pass
+        
+    if not is_json:
+        ctx.state["original_prompt"] = prompt_str
+        ctx.state["language"] = os.environ.get("LANGUAGE", "en")
+        ctx.state["user_email"] = os.environ.get("USER_EMAIL", "")
+        ctx.state["user_id"] = os.environ.get("USER_ID", "")
+        ctx.state["username"] = os.environ.get("USERNAME", "anonymous")
+        ctx.state["credits"] = 100
+        
+    return f"Orchestrator seed prompt: {ctx.state['original_prompt']}"
 
 async def guardrail_node_func(ctx, node_input: Any) -> str:
     """Guardrail verifies safety, permissions, and authentication."""

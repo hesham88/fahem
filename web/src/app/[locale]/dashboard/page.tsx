@@ -5,6 +5,7 @@ import { auth } from "../../../lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
+import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
 import { 
   FiCpu, 
   FiTerminal, 
@@ -160,9 +161,11 @@ export default function Dashboard() {
     }
   ];
 
-  const fetchMetadata = async () => {
+  const fetchMetadata = async (emailParam?: string) => {
     try {
-      const response = await fetch("/api/db-metadata");
+      const activeEmail = emailParam || user?.email;
+      if (!activeEmail) return;
+      const response = await fetch(`/api/db-metadata?email=${encodeURIComponent(activeEmail)}`);
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -181,7 +184,7 @@ export default function Dashboard() {
         router.push(`/${language}`);
       } else {
         setUser(currentUser);
-        fetchMetadata(); // Fetch live database metadata on mount
+        fetchMetadata(currentUser.email || undefined); // Fetch live database metadata on mount
         
         // Verify superadmin status
         if (currentUser.email) {
@@ -1053,8 +1056,13 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          /* Admin Sourcing Engine Tab View */
-          <div className="grid-cols-2">
+          /* Admin Security & Sourcing View */
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            {/* Visual Security Configurations & Workflow Pipeline DAG */}
+            <AdminSecurityDashboard language={language} />
+
+            {/* Admin Sourcing Engine Tab View */}
+            <div className="grid-cols-2">
             {/* Left Side: Create/Configure Source Feed */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
               <section className="panel-card" id="sourcing-pipeline-config">
@@ -1499,6 +1507,7 @@ export default function Dashboard() {
                 )}
               </section>
             </div>
+          </div>
           </div>
         )}
 

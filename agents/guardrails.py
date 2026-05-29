@@ -38,6 +38,59 @@ def sanitize_text(text: str) -> str:
     text = text.replace("hesh1", "***USER***")
     return text
 
+import httpx
+
+def check_model_armor_py(prompt: str) -> tuple[bool, str]:
+    """Pre-flight safety filtration via GCP Model Armor REST API."""
+    if not prompt:
+        return False, ""
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request
+        
+        credentials, project_id = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        credentials.refresh(Request())
+        token = credentials.token
+    except Exception as auth_err:
+        logger.warning(f"Model Armor: Failed to acquire credentials inside callback: {auth_err}")
+        token = None
+        
+    if not token:
+        logger.info("Model Armor: No GCP token available for server-side validation. Skipping check.")
+        return False, ""
+        
+    try:
+        project_id = os.environ.get("GCP_PROJECT", "fahem-88d40")
+        location = os.environ.get("GCP_LOCATION", "us-central1")
+        template_id = os.environ.get("MODEL_ARMOR_TEMPLATE", "fahem-default-template")
+        
+        url = f"https://modelarmor.{location}.rep.googleapis.com/v1/projects/{project_id}/locations/{location}/templates/{template_id}:sanitizeUserPrompt"
+        payload = {
+            "userPromptData": {
+                "text": prompt
+            }
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
+        
+        with httpx.Client() as client:
+            res = client.post(url, json=payload, headers=headers, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                sanitization_result = data.get("sanitizationResult", {})
+                if sanitization_result.get("filterMatchState") == "MATCH_FOUND":
+                    return True, "GCP Model Armor: Content flagged as unsafe or violating safety guidelines."
+            else:
+                logger.warning(f"Model Armor REST API returned error status {res.status_code}: {res.text}")
+    except Exception as err:
+        logger.error(f"Error executing server-side GCP Model Armor check: {err}")
+        
+    return False, ""
+
 def before_agent_callback(*args, **kwargs) -> Optional[Content]:
     """Before Agent Callback: Detects jailbreak signatures or injection patterns in the user prompt.
     
@@ -70,6 +123,7 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
     logger.info(f"[AUDIT] Agent {agent_name} invoked by user_id={user_id} (Prompt Size: {len(prompt_text)})")
     
     if prompt_text:
+        # Run local heuristics first
         prompt_lower = prompt_text.lower()
         jailbreak_patterns = [
             "ignore previous instructions",
@@ -87,6 +141,16 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
                     role="model",
                     parts=[Part.from_text(text=f"DENIED: Safety policy violation. Unsafe instruction or pattern ('{pattern}') detected. Operation blocked.")]
                 )
+                
+        # Run server-side Model Armor REST API check
+        blocked, reason = check_model_armor_py(prompt_text)
+        if blocked:
+            logger.warning(f"[SECURITY] server-side Model Armor check flagged prompt: {reason}")
+            return Content(
+                role="model",
+                parts=[Part.from_text(text=f"DENIED: Safety policy violation. {reason}")]
+            )
+            
     return None
 
 def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
@@ -152,21 +216,43 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
         logger.warning(f"[SECURITY] Blocked unauthorized Collection access: {collection_param}")
         raise PermissionError(f"Access Denied: Collection '{collection_param}' is not whitelisted.")
         
-    # 3. Delegated Authorization & Principle of Least Privilege: Force session checks for mutations
+    # 3. Delegated Authorization & Principle of Least Privilege: Force session checks and credits check for mutations
+    credits = 100
+    user_email = ""
+    username = "anonymous"
+    user_id = ""
+    
+    if tool_context and hasattr(tool_context, "state") and tool_context.state:
+        try:
+            state = tool_context.state
+            if hasattr(state, "get"):
+                credits = state.get("credits", 100)
+                user_email = state.get("user_email", "")
+                username = state.get("username", "anonymous")
+                user_id = state.get("user_id", "")
+            else:
+                credits = getattr(state, "credits", 100)
+                user_email = getattr(state, "user_email", "")
+                username = getattr(state, "username", "anonymous")
+                user_id = getattr(state, "user_id", "")
+        except Exception as state_err:
+            logger.warning(f"Failed to extract state in before_tool_callback: {state_err}")
+            
+    # Fallback to environment variables if state didn't provide them
+    if not user_email:
+        user_email = os.environ.get("USER_EMAIL", "")
+        
     is_write = any(kw in tool_name.lower() for kw in ["insert", "update", "delete", "drop", "write", "create"])
     if is_write:
-        user_email = ""
-        if tool_context and hasattr(tool_context, "state") and tool_context.state:
-            try:
-                user_email = tool_context.state.get("user_email")
-            except Exception:
-                pass
-                
         if not user_email:
             logger.warning("[SECURITY] Write operation rejected: User is not authenticated or lacks active session.")
             raise PermissionError("Access Denied: Write operations require an active, authenticated user session.")
             
-        logger.info(f"[AUDIT] Verified delegated write authorization for user: {user_email}")
+        if credits <= 0:
+            logger.warning(f"[SECURITY] Write operation rejected: User {user_email or username} has insufficient credits ({credits}).")
+            raise PermissionError(f"Access Denied: Insufficient credits. Active balance is {credits}. Mutation blocked.")
+            
+        logger.info(f"[AUDIT] Verified delegated write authorization for user: {user_email} (Credits: {credits})")
         
     return None
 
@@ -222,6 +308,24 @@ def after_tool_callback(*args, **kwargs) -> Optional[dict]:
     tool_name = getattr(tool, "name", "unknown_tool")
     logger.info(f"[AUDIT] Tool succeeded: '{tool_name}'")
     
+    # Decrement credits on-the-fly inside agent state for successful tool executions
+    if tool_context and hasattr(tool_context, "state") and tool_context.state:
+        try:
+            state = tool_context.state
+            if hasattr(state, "get"):
+                current_credits = state.get("credits", 100)
+                new_credits = max(0, current_credits - 1)
+                state["credits"] = new_credits
+            else:
+                current_credits = getattr(state, "credits", 100)
+                new_credits = max(0, current_credits - 1)
+                state.credits = new_credits
+            # Write to stdout using the standard format that Next.js stream can log
+            print(f"[METADATA] Credits: {new_credits}", flush=True)
+            logger.info(f"[AUDIT] Decremented credits. Balance: {new_credits}")
+        except Exception as e:
+            logger.error(f"Error decrementing credits in after_tool_callback: {e}")
+            
     if not tool_response:
         return None
         

@@ -17,6 +17,69 @@ function getLanguageName(lang: string): string {
   return mapping[lang] || "English";
 }
 
+async function getGcpAccessToken(): Promise<string | null> {
+  try {
+    const auth = new GoogleAuth({
+      scopes: ["https://www.googleapis.com/auth/cloud-platform"]
+    });
+    const client = await auth.getClient();
+    const tokenResponse = await client.getAccessToken();
+    return tokenResponse.token || null;
+  } catch (err: any) {
+    console.warn("Failed to get GCP access token for Model Armor:", err.message);
+    return null;
+  }
+}
+
+async function checkModelArmor(prompt: string): Promise<{ blocked: boolean; reason?: string }> {
+  try {
+    const token = await getGcpAccessToken();
+    if (!token) {
+      console.warn("Model Armor: No GCP token available. Skipping pre-flight.");
+      return { blocked: false };
+    }
+
+    const projectId = process.env.GCP_PROJECT || "fahem-88d40";
+    const location = process.env.GCP_LOCATION || "us-central1";
+    const templateId = process.env.MODEL_ARMOR_TEMPLATE || "fahem-default-template";
+
+    const url = `https://modelarmor.${location}.rep.googleapis.com/v1/projects/${projectId}/locations/${location}/templates/${templateId}:sanitizeUserPrompt`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        userPromptData: {
+          text: prompt
+        }
+      })
+    });
+
+    if (res.ok) {
+      const data: any = await res.json();
+      const sanitizationResult = data?.sanitizationResult;
+      if (sanitizationResult) {
+        const filterMatchState = sanitizationResult.filterMatchState;
+        if (filterMatchState === "MATCH_FOUND") {
+          return {
+            blocked: true,
+            reason: "GCP Model Armor: Content flagged as unsafe or violating safety guidelines."
+          };
+        }
+      }
+    } else {
+      const errText = await res.text();
+      console.warn(`Model Armor API returned error status ${res.status}: ${errText}`);
+    }
+  } catch (err: any) {
+    console.error("Error calling GCP Model Armor:", err);
+  }
+  return { blocked: false };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { prompt, language, userEmail, userId } = await req.json();
@@ -36,6 +99,23 @@ export async function POST(req: NextRequest) {
           // Initial terminal logs
           controller.enqueue(encoder.encode("[Unknown] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
+
+          // -------------------------------------------------------------
+          // STEP 0: Model Armor Pre-flight check
+          // -------------------------------------------------------------
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Model Armor\n"));
+          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
+          const armorRes = await checkModelArmor(prompt);
+          if (armorRes.blocked) {
+            controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
+            controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+            controller.enqueue(encoder.encode(`DENIED: Security Policy Violation. Google Cloud Model Armor template flagged the query as unsafe. Please rephrase your query and try again.`));
+            controller.enqueue(encoder.encode("\n==========================\n"));
+            controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
+            controller.close();
+            return;
+          }
+          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
 
           // Initialize Gemini AI Client
           const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -162,13 +242,23 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
               controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Warning: No GCP ID token secured. Continuing unauthenticated.\n"));
             }
 
+            // Enforce and pass structured context variables safely inside prompt text payload as JSON
+            const serializedContext = JSON.stringify({
+              prompt: prompt,
+              language: language || "en",
+              user_email: userEmail || "",
+              user_id: userId || "",
+              username: userEmail ? userEmail.split("@")[0] : "anonymous",
+              credits: 100 // Managed on-the-fly inside agent state
+            });
+
             const payload = {
               user_id: userId || "anonymous",
               session_id: "fahem_microservice_session",
               app_name: "app",
               new_message: {
                 role: "user",
-                parts: [{ text: prompt }]
+                parts: [{ text: serializedContext }]
               },
               streaming: false
             };
