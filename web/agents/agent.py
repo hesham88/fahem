@@ -28,9 +28,9 @@ from google.adk.tools.mcp_tool import StdioConnectionParams, McpToolset
 from google.adk import Agent
 
 try:
-    from tools import get_database_stats, list_database_collections, get_collection_schema, get_mongodb_uri
+    from tools import get_mongodb_uri
 except ImportError:
-    from agents.tools import get_database_stats, list_database_collections, get_collection_schema, get_mongodb_uri
+    from agents.tools import get_mongodb_uri
 
 def get_model_name() -> str:
     """Resolves model name dynamically based on environment or configuration."""
@@ -61,13 +61,28 @@ def get_model_name() -> str:
         pass
     return "gemini-3.1-flash-lite"
 
-# 1. Determine platform-specific npx executable to avoid spawning failure on Windows vs GCloud Containers
-cmd = "npx.cmd" if os.name == "nt" else "npx"
+# 1. Resolve local @mongodb-js/mongodb-mcp-server dist/index.js if it exists to avoid npx download overhead
+agents_dir = os.path.dirname(os.path.abspath(__file__))
+local_mcp_server = os.path.join(
+    os.path.dirname(agents_dir), 
+    "node_modules", 
+    "@mongodb-js", 
+    "mongodb-mcp-server", 
+    "dist", 
+    "index.js"
+)
+
+if os.path.exists(local_mcp_server):
+    cmd = "node"
+    args = [local_mcp_server]
+else:
+    cmd = "npx.cmd" if os.name == "nt" else "npx"
+    args = ["-y", "@mongodb-js/mongodb-mcp-server"]
 
 # 2. Configure MongoDB MCP server parameters
 server_params = StdioServerParameters(
     command=cmd,
-    args=["-y", "@mongodb-js/mongodb-mcp-server"],
+    args=args,
     env={"MDB_MCP_CONNECTION_STRING": get_mongodb_uri()}
 )
 
@@ -82,10 +97,15 @@ mongodb_agent = Agent(
     instruction="""
         You are the Fahem MongoDB Database Agent.
         You assist the user in inspecting database collections, examining schemas, and running diagnostics.
-        You have direct access to:
-        1. Local custom tools (get_database_stats, list_database_collections, get_collection_schema).
-        2. Official MongoDB MCP server tools (atlas-list-clusters, list-databases, find, aggregate, etc.).
+        You have direct access to the official MongoDB MCP server tools (connect, list-collections, find, aggregate, etc.).
         Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
+        
+        CRITICAL: Do NOT attempt to call any administrative tools starting with 'atlas-' (such as 'atlas-list-clusters', 'atlas-list-projects', etc.). These tools require restricted organization-level Programmatic API Keys and specific whitelisted IPs, and will fail with '403 Forbidden'. Stick strictly to standard database-level operations like 'list-collections', 'db-stats', 'find', 'insert-many', and 'update-many'.
+        
+        To connect to the database:
+        1. Always call the 'get_mongodb_uri' tool first to retrieve the active MongoDB connection string.
+        2. Call the MCP 'connect' tool passing the retrieved connection string as the 'connectionString' parameter.
+        3. Only after a successful connection should you list collections or run other queries.
         
         You MUST respond to the user in the language they write in or explicitly request.
         You natively support the following 7 languages:
@@ -100,8 +120,6 @@ mongodb_agent = Agent(
     """,
     tools=[
         mcp_toolset,
-        get_database_stats,
-        list_database_collections,
-        get_collection_schema
+        get_mongodb_uri
     ]
 )

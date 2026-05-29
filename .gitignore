@@ -33,4 +33,5 @@ agy.exe
 # Debug logs
 *.log
 firebase-debug.log
+build_log*.txt
 

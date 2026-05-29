@@ -1,13 +1,102 @@
 import os
 import json
-from pymongo import MongoClient
+
+def resolve_srv_to_mongodb_uri(uri: str) -> str:
+    """Converts a mongodb+srv:// connection string to a standard mongodb:// string by resolving SRV records using public DNS."""
+    if not uri or not uri.startswith("mongodb+srv://"):
+        return uri
+    try:
+        rest = uri[len("mongodb+srv://"):]
+        if "@" in rest:
+            creds, host_and_params = rest.split("@", 1)
+            creds_part = creds + "@"
+        else:
+            creds_part = ""
+            host_and_params = rest
+
+        if "/" in host_and_params:
+            host, db_and_params = host_and_params.split("/", 1)
+            db_part = "/" + db_and_params
+        else:
+            host = host_and_params
+            db_part = "/"
+
+        if "?" in host:
+            host, params = host.split("?", 1)
+            db_part = "/?" + params
+
+        host = host.strip()
+
+        import dns.resolver
+        resolver = dns.resolver.Resolver(configure=False)
+        resolver.nameservers = ["8.8.8.8", "8.8.4.4"]
+        srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+
+        targets = []
+        for rec in srv_records:
+            target = str(rec.target)
+            if target.endswith("."):
+                target = target[:-1]
+            targets.append(f"{target}:{rec.port}")
+
+        if not targets:
+            return uri
+
+        resolved_hosts = ",".join(targets)
+
+        # Resolve TXT records to dynamically get connection options (like replicaSet and authSource)
+        txt_options = {}
+        try:
+            txt_records = resolver.resolve(host, "TXT")
+            for txt in txt_records:
+                rec_str = "".join([s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in txt.strings])
+                for param in rec_str.split("&"):
+                    if "=" in param:
+                        k, v = param.split("=", 1)
+                        txt_options[k.strip()] = v.strip()
+        except Exception:
+            pass
+
+        # Split path and query from db_part
+        if "?" in db_part:
+            path, query_str = db_part.split("?", 1)
+        else:
+            path = db_part
+            query_str = ""
+
+        # Parse existing query params
+        query_params = {}
+        if query_str:
+            for param in query_str.split("&"):
+                if "=" in param:
+                    k, v = param.split("=", 1)
+                    query_params[k.strip()] = v.strip()
+
+        # Merge TXT options into query params (so replicaSet is dynamically fetched)
+        for k, v in txt_options.items():
+            if k not in query_params:
+                query_params[k] = v
+
+        # Ensure ssl/tls is set
+        if "ssl" not in query_params and "tls" not in query_params:
+            query_params["ssl"] = "true"
+
+        # Reconstruct query string
+        merged_query = "&".join([f"{k}={v}" for k, v in query_params.items()])
+        final_db_part = f"{path}?{merged_query}" if merged_query else path
+
+        resolved_uri = f"mongodb://{creds_part}{resolved_hosts}{final_db_part}"
+        return resolved_uri
+    except Exception as e:
+        # Fallback to original URI if resolution fails
+        return uri
 
 def get_mongodb_uri() -> str:
     """Resolves the MongoDB connection string from environment or local ignored configurations."""
     # 1. Environment variable (standard production / GCP Secret Manager flow)
     uri = os.environ.get("MONGODB_URI")
     if uri:
-        return uri
+        return resolve_srv_to_mongodb_uri(uri)
     
     # 2. Local ignored secrets file
     try:
@@ -23,7 +112,7 @@ def get_mongodb_uri() -> str:
                 data = json.load(f)
                 val = data.get("MONGODB_URI", "")
                 if val:
-                    return val
+                    return resolve_srv_to_mongodb_uri(val)
     except Exception:
         pass
     
@@ -39,109 +128,8 @@ def get_mongodb_uri() -> str:
                     if line.startswith("MONGODB_URI="):
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
-                            return val
+                            return resolve_srv_to_mongodb_uri(val)
     except Exception:
         pass
         
     return "mongodb://localhost:27017"
-
-def get_database_stats(database: str = "fahem") -> dict:
-    """
-    Returns usage statistics reflecting the state of a single MongoDB database.
-    
-    Args:
-        database: The name of the database to retrieve stats for.
-    """
-    uri = get_mongodb_uri()
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        db = client[database]
-        # Run dbStats command
-        stats = db.command("dbStats")
-        # Mask sensitive server path details if present in stats
-        if "raw" in stats:
-            stats["raw"] = "[MASKED_RAW_METADATA]"
-        return {
-            "status": "success",
-            "database": database,
-            "stats": stats
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to retrieve database stats: {str(e)}"
-        }
-
-def list_database_collections(database: str = "fahem") -> dict:
-    """
-    Lists all collections present inside a given MongoDB database.
-    
-    Args:
-        database: The name of the database.
-    """
-    uri = get_mongodb_uri()
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        db = client[database]
-        collections = db.list_collection_names()
-        return {
-            "status": "success",
-            "database": database,
-            "collections": collections
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to list collections: {str(e)}"
-        }
-
-def get_collection_schema(database: str = "fahem", collection: str = "") -> dict:
-    """
-    Analyzes documents in a collection and derives a basic JSON schema representation.
-    
-    Args:
-        database: The name of the database.
-        collection: The name of the collection to analyze.
-    """
-    if not collection:
-        return {"status": "error", "message": "Collection name must be provided."}
-        
-    uri = get_mongodb_uri()
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        db = client[database]
-        col = db[collection]
-        
-        # Sample the first 10 documents
-        sample = list(col.find().limit(10))
-        if not sample:
-            return {
-                "status": "success",
-                "database": database,
-                "collection": collection,
-                "schema": {},
-                "message": "Collection is empty."
-            }
-            
-        schema = {}
-        for doc in sample:
-            for key, val in doc.items():
-                if key not in schema:
-                    schema[key] = {
-                        "type": type(val).__name__,
-                        "occurrences": 1
-                    }
-                else:
-                    schema[key]["occurrences"] += 1
-                    
-        return {
-            "status": "success",
-            "database": database,
-            "collection": collection,
-            "schema": schema
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to retrieve collection schema: {str(e)}"
-        }

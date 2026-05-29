@@ -5,6 +5,20 @@ import { auth, googleProvider } from "../../lib/firebase";
 import { signInWithPopup, onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
+import { 
+  FiGithub, 
+  FiTwitter, 
+  FiLinkedin, 
+  FiGlobe, 
+  FiBookOpen, 
+  FiLock, 
+  FiActivity, 
+  FiCpu, 
+  FiKey, 
+  FiLayers, 
+  FiShield, 
+  FiExternalLink 
+} from "react-icons/fi";
 
 export default function LandingPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -46,7 +60,10 @@ export default function LandingPage() {
   if (loading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
-        <div style={{ fontSize: "1.5rem", color: "var(--primary)" }}>{t("loading_ambient")}</div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <FiCpu className="spinning-icon" style={{ fontSize: "3rem", color: "var(--primary)" }} />
+          <div style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 500 }}>{t("loading_ambient")}</div>
+        </div>
       </div>
     );
   }
@@ -62,33 +79,44 @@ export default function LandingPage() {
 
       {/* Glassmorphic Navbar */}
       <nav className="glass-nav">
-        <div className="glass-nav-logo">
-          <span>🧠</span> {t("dashboard_title")}
+        <div className="glass-nav-logo" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <FiCpu className="pulse-icon" style={{ fontSize: "1.6rem", color: "var(--secondary)" }} />
+          <span style={{ fontWeight: 700, letterSpacing: "1px" }}>{t("dashboard_title")}</span>
         </div>
         <ul className="glass-nav-links">
           <li>
-            <a href="#overview" className="glass-nav-link">{t("nav_overview")}</a>
+            <a href="#overview" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <FiLayers /> {t("nav_overview")}
+            </a>
           </li>
           <li>
-            <a href="#toolkit" className="glass-nav-link">{t("nav_toolkit")}</a>
+            <a href="#toolkit" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <FiActivity /> {t("nav_toolkit")}
+            </a>
           </li>
           <li>
-            <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link">{t("nav_github")}</a>
+            <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <FiGithub /> {t("nav_github")}
+            </a>
           </li>
           <li>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as any)}
-              className="language-select"
-            >
-              <option value="en">English</option>
-              <option value="ar">العربية</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="zh">中文</option>
-              <option value="it">Italiano</option>
-            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)" }}>
+              <FiGlobe />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="language-select"
+                style={{ marginLeft: "0.25rem" }}
+              >
+                <option value="en">English</option>
+                <option value="ar">العربية</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="zh">中文</option>
+                <option value="it">Italiano</option>
+              </select>
+            </div>
           </li>
           <li>
             <button
@@ -105,21 +133,23 @@ export default function LandingPage() {
       {/* Glassmorphic Hero section */}
       <main className="glass-hero-section">
         <div className="glass-card">
-          <div className="glass-card-icon">🔑</div>
+          <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))" }}>
+            <FiKey style={{ fontSize: "1.8rem", color: "#ffffff" }} />
+          </div>
           <h2>{t("welcome_to_fahem")}</h2>
           <p>{t("hero_subtitle")}</p>
 
           <div className="feature-bullets">
             <div className="feature-bullet-item">
-              <span className="feature-bullet-icon">✦</span>
+              <span className="feature-bullet-icon"><FiLayers /></span>
               <span>{t("bullet_1")}</span>
             </div>
             <div className="feature-bullet-item">
-              <span className="feature-bullet-icon">✦</span>
+              <span className="feature-bullet-icon" style={{ color: "var(--accent-orange)" }}><FiActivity /></span>
               <span>{t("bullet_2")}</span>
             </div>
             <div className="feature-bullet-item">
-              <span className="feature-bullet-icon">✦</span>
+              <span className="feature-bullet-icon" style={{ color: "var(--accent-green)" }}><FiShield /></span>
               <span>{t("bullet_3")}</span>
             </div>
           </div>
@@ -150,7 +180,35 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className="metadata-footer" style={{ zIndex: 2, paddingBottom: "2rem" }}>
+      {/* Styled Interactive Footer */}
+      <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+          <a href={`/${language}/terms`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <FiBookOpen /> {t("nav_terms")}
+          </a>
+          <a href={`/${language}/privacy`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <FiLock /> {t("nav_privacy")}
+          </a>
+          <a href={`/${language}/report`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <FiActivity /> {t("nav_report")}
+          </a>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1.5rem" }}>
+          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Twitter">
+            <FiTwitter />
+          </a>
+          <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="GitHub">
+            <FiGithub />
+          </a>
+          <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="LinkedIn">
+            <FiLinkedin />
+          </a>
+          <a href="https://fahem.app" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Website">
+            <FiGlobe />
+          </a>
+        </div>
+
         <p>{t("footer_landing")}</p>
       </footer>
     </div>

@@ -1,6 +1,14 @@
 import os
 import sys
 
+# Preload public Google DNS servers to ensure Atlas SRV resolution works reliably
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "8.8.4.4"]
+except Exception:
+    pass
+
 # Set UTF-8 encoding on standard output to fully support unicode/multilingual outputs
 if hasattr(sys.stdout, "reconfigure"):
     try:
