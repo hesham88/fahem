@@ -2,14 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  outputFileTracingIncludes: {
-    "/api/agent": [
-      "agents/**/*"
-    ],
-    "/api/db-metadata": [
-      "agents/**/*"
-    ],
-  },
   serverExternalPackages: [
     "@mongodb-js/mongodb-mcp-server",
     "@modelcontextprotocol/sdk",
@@ -27,3 +19,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
