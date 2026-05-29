@@ -11,6 +11,9 @@ jobs:
   deploy:
     name: Deploy to GCP Cloud Run
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     
     steps:
       - name: Checkout Code
@@ -20,7 +23,8 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: 'projects/1061555578804/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-deployer@fahem-88d40.iam.gserviceaccount.com'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
