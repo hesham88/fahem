@@ -29,7 +29,15 @@ import {
   FiFileText,
   FiTrash2,
   FiAlertTriangle,
-  FiServer
+  FiServer,
+  FiUsers,
+  FiMessageSquare,
+  FiUserCheck,
+  FiUserPlus,
+  FiUserMinus,
+  FiSend,
+  FiUser,
+  FiX
 } from "react-icons/fi";
 
 interface PresetQuery {
@@ -87,6 +95,121 @@ const telemetryTranslations = {
   }
 };
 
+const historyTranslations = {
+  en: {
+    newChat: "New Chat",
+    savedChats: "Saved Chats",
+    noSavedChats: "No saved chats yet",
+    loadingChats: "Loading chats...",
+    tokenAnalytics: "Token Consumption",
+    dailyTokens: "Daily Tokens",
+    weeklyTokens: "Weekly Tokens",
+    monthlyTokens: "Monthly Tokens",
+    totalTokens: "Total Lifetime",
+    activeChat: "Active Conversation History",
+    tokenLimitHelp: "Consumption against daily allocation",
+    today: "Today",
+    yesterday: "Yesterday",
+    previousDays: "Previous Days",
+  },
+  ar: {
+    newChat: "محادثة جديدة",
+    savedChats: "المحادثات المحفوظة",
+    noSavedChats: "لا توجد محادثات محفوظة بعد",
+    loadingChats: "جاري تحميل المحادثات...",
+    tokenAnalytics: "استهلاك الرموز (Tokens)",
+    dailyTokens: "الاستهلاك اليومي",
+    weeklyTokens: "الاستهلاك الأسبوعي",
+    monthlyTokens: "الاستهلاك الشهري",
+    totalTokens: "الإجمالي الكلي",
+    activeChat: "سجل المحادثة النشطة",
+    tokenLimitHelp: "نسبة الاستهلاك من الحصة اليومية المخصصة لك",
+    today: "اليوم",
+    yesterday: "أمس",
+    previousDays: "الأيام السابقة",
+  },
+  es: {
+    newChat: "Nuevo Chat",
+    savedChats: "Chats Guardados",
+    noSavedChats: "Aún no hay chats guardados",
+    loadingChats: "Cargando chats...",
+    tokenAnalytics: "Consumo de Tokens",
+    dailyTokens: "Tokens Diarios",
+    weeklyTokens: "Tokens Semanales",
+    monthlyTokens: "Tokens Mensuales",
+    totalTokens: "Total Acumulado",
+    activeChat: "Historial de Conversación Activa",
+    tokenLimitHelp: "Consumo en relación con la asignación diaria",
+    today: "Hoy",
+    yesterday: "Ayer",
+    previousDays: "Días Anteriores",
+  },
+  fr: {
+    newChat: "Nouvelle Discussion",
+    savedChats: "Discussions Enregistrées",
+    noSavedChats: "Aucune discussion enregistrée",
+    loadingChats: "Chargement...",
+    tokenAnalytics: "Consommation de Jetons",
+    dailyTokens: "Jetons Quotidiens",
+    weeklyTokens: "Jetons Hebdomadaires",
+    monthlyTokens: "Jetons Mensuels",
+    totalTokens: "Total Cumulé",
+    activeChat: "Historique de Discussion",
+    tokenLimitHelp: "Consommation par rapport à l'allocation quotidienne",
+    today: "Aujourd'hui",
+    yesterday: "Hier",
+    previousDays: "Jours Précédents",
+  },
+  de: {
+    newChat: "Neuer Chat",
+    savedChats: "Gespeicherte Chats",
+    noSavedChats: "Noch keine gespeicherten Chats",
+    loadingChats: "Chats werden geladen...",
+    tokenAnalytics: "Token-Verbrauch",
+    dailyTokens: "Tägliche Tokens",
+    weeklyTokens: "Wöchentliche Tokens",
+    monthlyTokens: "Monatliche Tokens",
+    totalTokens: "Gesamtlebensdauer",
+    activeChat: "Aktiver Chatverlauf",
+    tokenLimitHelp: "Verbrauch im Vergleich zum Tageslimit",
+    today: "Heute",
+    yesterday: "Gestern",
+    previousDays: "Vorherige Tage",
+  },
+  zh: {
+    newChat: "新建对话",
+    savedChats: "已存对话",
+    noSavedChats: "暂无保存的对话",
+    loadingChats: "正在加载对话...",
+    tokenAnalytics: "代币消耗分析",
+    dailyTokens: "今日代币",
+    weeklyTokens: "本周代币",
+    monthlyTokens: "本月代币",
+    totalTokens: "累计总量",
+    activeChat: "当前对话历史",
+    tokenLimitHelp: "今日配额消耗比例",
+    today: "今天",
+    yesterday: "昨天",
+    previousDays: "往日对话",
+  },
+  it: {
+    newChat: "Nuova Chat",
+    savedChats: "Chat Salvate",
+    noSavedChats: "Nessuna chat salvata",
+    loadingChats: "Caricamento chat...",
+    tokenAnalytics: "Consumo Token",
+    dailyTokens: "Token Giornalieri",
+    weeklyTokens: "Token Settimanali",
+    monthlyTokens: "Token Mensili",
+    totalTokens: "Totale Accumulato",
+    activeChat: "Cronologia Chat Attiva",
+    tokenLimitHelp: "Consumo rispetto alla quota giornaliera",
+    today: "Oggi",
+    yesterday: "Ieri",
+    previousDays: "Giorni Precedenti",
+  }
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -99,6 +222,12 @@ export default function Dashboard() {
     return dictionary[key] || telemetryTranslations.en[key];
   };
 
+  const getHistoryT = (key: keyof typeof historyTranslations.en) => {
+    const lang = (language as keyof typeof historyTranslations) || "en";
+    const dictionary = historyTranslations[lang] || historyTranslations.en;
+    return dictionary[key] || historyTranslations.en[key];
+  };
+
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -106,7 +235,55 @@ export default function Dashboard() {
   
   // Superadmin status
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"agent" | "admin">("agent");
+  const [activeTab, setActiveTab] = useState<"agent" | "admin" | "social" | "settings">("agent");
+
+  // User Profile & Onboarding states
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  
+  // Conversational Onboarding states
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [onboardingName, setOnboardingName] = useState("");
+  const [onboardingAge, setOnboardingAge] = useState("");
+  const [onboardingCountry, setOnboardingCountry] = useState("");
+  const [onboardingGradeOption, setOnboardingGradeOption] = useState<"recommended" | "custom" | "lifelong" | "skip">("recommended");
+  const [onboardingCustomGrade, setOnboardingCustomGrade] = useState("");
+  const [onboardingParentEmail, setOnboardingParentEmail] = useState("");
+  const [onboardingAvatar, setOnboardingAvatar] = useState("");
+  const [onboardingSchool, setOnboardingSchool] = useState("");
+  const [onboardingUserType, setOnboardingUserType] = useState<"student" | "teacher" | "parent" | "admin">("student");
+
+  // Social & Messenger states
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loadingAllUsers, setLoadingAllUsers] = useState(false);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [chatRecipient, setChatRecipient] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  
+  // Parental child approval panel states
+  const [parentChildren, setParentChildren] = useState<any[]>([]);
+  const [parentChildrenLoading, setParentChildrenLoading] = useState(false);
+
+  // Settings & Preferences states
+  const [privacyVisibility, setPrivacyVisibility] = useState<"public" | "friends" | "private">("public");
+  const [privacyAllowMessages, setPrivacyAllowMessages] = useState(true);
+  const [privacyShowActivity, setPrivacyShowActivity] = useState(true);
+  const [preferencesSchool, setPreferencesSchool] = useState("");
+
+  // Session History, Chat History, Activity History & Telemetry states
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState<boolean>(false);
+  const [activeSessionMessages, setActiveSessionMessages] = useState<any[]>([]);
+  const [userTokenStats, setUserTokenStats] = useState<{
+    daily: number;
+    weekly: number;
+    monthly: number;
+    total: number;
+    history: any[];
+  } | null>(null);
 
   // Grounded Multi-Agent Test Bench State
   const [groundedPrompt, setGroundedPrompt] = useState("");
@@ -161,6 +338,388 @@ export default function Dashboard() {
     }
   ];
 
+  const fetchAllUsersList = async () => {
+    setLoadingAllUsers(true);
+    try {
+      const res = await fetch("/api/user/list");
+      if (res.ok) {
+        const data = await res.json();
+        setAllUsers(data.users || []);
+      }
+    } catch (err) {
+      console.error("Error fetching all users:", err);
+    } finally {
+      setLoadingAllUsers(false);
+    }
+  };
+
+  const fetchParentChildrenList = async () => {
+    if (!user || !user.email) return;
+    setParentChildrenLoading(true);
+    try {
+      const res = await fetch(`/api/parent/children?parentEmail=${encodeURIComponent(user.email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setParentChildren(data.children || []);
+      }
+    } catch (err) {
+      console.error("Error fetching children list:", err);
+    } finally {
+      setParentChildrenLoading(false);
+    }
+  };
+
+  const approveChildProfile = async (childId: string) => {
+    if (!user || !user.email) return;
+    try {
+      const res = await fetch("/api/parent/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentEmail: user.email, childId })
+      });
+      if (res.ok) {
+        await fetchParentChildrenList();
+        // Log action
+        await logActivity("parent_approve_child", "success", `Approved child ${childId}`);
+      }
+    } catch (err) {
+      console.error("Error approving child:", err);
+    }
+  };
+
+  const fetchChatMessages = async (recipientId: string) => {
+    if (!user) return;
+    setChatLoading(true);
+    try {
+      const res = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(recipientId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(data.messages || []);
+      }
+    } catch (err) {
+      console.error("Error fetching chat messages:", err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!user || !chatRecipient || !chatInput.trim()) return;
+    const msgContent = chatInput.trim();
+    setChatInput("");
+    
+    // Optimistic update
+    const tempMsg = {
+      senderId: user.uid,
+      senderName: userProfile?.name || user.email?.split("@")[0] || "Me",
+      recipientId: chatRecipient.userId,
+      content: msgContent,
+      timestamp: new Date().toISOString()
+    };
+    setChatMessages((prev) => [...prev, tempMsg]);
+
+    try {
+      const res = await fetch("/api/chat/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderId: user.uid,
+          senderName: userProfile?.name || user.email?.split("@")[0] || "Me",
+          recipientId: chatRecipient.userId,
+          content: msgContent,
+          isGroup: false
+        })
+      });
+      if (res.ok) {
+        // Log activity
+        await logActivity("send_chat_message", "success", `Sent direct message to ${chatRecipient.userId}`);
+        // Fetch actual list to keep sync
+        const messagesRes = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
+        if (messagesRes.ok) {
+          const mData = await messagesRes.json();
+          setChatMessages(mData.messages || []);
+        }
+      }
+    } catch (err) {
+      console.error("Error sending message:", err);
+    }
+  };
+
+  const logActivity = async (action: string, status: string, details?: string) => {
+    if (!user) return;
+    try {
+      await fetch("/api/activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          userEmail: user.email || "",
+          action,
+          status,
+          details
+        })
+      });
+    } catch (err) {
+      console.error("Error logging activity:", err);
+    }
+  };
+
+  const handleUpdatePrivacySettings = async () => {
+    if (!user || !userProfile) return;
+    try {
+      const updatedProfile = {
+        ...userProfile,
+        school: preferencesSchool,
+        privacySettings: {
+          profileVisibility: privacyVisibility,
+          allowMessages: privacyAllowMessages,
+          showActivity: privacyShowActivity
+        }
+      };
+      const res = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          profile: updatedProfile
+        })
+      });
+      if (res.ok) {
+        setUserProfile(updatedProfile);
+        alert(language === "ar" ? "تم تحديث الإعدادات بنجاح!" : "Preferences updated successfully!");
+        await logActivity("update_preferences", "success", "Updated privacy and account settings");
+      }
+    } catch (err) {
+      console.error("Error updating privacy settings:", err);
+    }
+  };
+
+  const handleDeleteUserAccount = async () => {
+    if (!user || !user.email) return;
+    const confirmMsg = language === "ar" 
+      ? "تنبيه هام جداً: هل أنت متأكد تماماً من حذف حسابك بالكامل؟ سيؤدي هذا إلى مسح كافة بياناتك وسجلاتك ومحادثاتك نهائياً من قاعدة البيانات بلا رجعة وفقاً لمعايير GDPR."
+      : "CRITICAL WARNING: Are you absolutely sure you want to delete your account? This will permanently wipe your profile, chat history, activity logs, and token telemetry from the database in compliance with GDPR. This action CANNOT be undone.";
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/user/account?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        alert(language === "ar" ? "تم مسح حسابك وكافة بياناتك بنجاح من النظام." : "Your account and all associated records have been successfully erased.");
+        // Sign out
+        await signOut(auth);
+        router.push(`/${language}`);
+      }
+    } catch (err) {
+      console.error("Error deleting account:", err);
+    }
+  };
+
+  // Onboarding Chat Messages State
+  const [onboardingMessages, setOnboardingMessages] = useState<Array<{ sender: "fahem" | "user"; text: string }>>([
+    { sender: "fahem", text: "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps." },
+    { sender: "fahem", text: "To begin, what is your role on our platform today? Select from the cards below:" }
+  ]);
+
+  // Handle Dynamic Translation for Onboarding
+  useEffect(() => {
+    setOnboardingMessages([
+      { sender: "fahem", text: language === "ar" 
+        ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية." 
+        : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps." },
+      { sender: "fahem", text: language === "ar" 
+        ? "في البداية، ما هو دورك في منصتنا اليوم؟ اختر من البطاقات أدناه:" 
+        : "To begin, what is your role on our platform today? Select from the cards below:" }
+    ]);
+  }, [language]);
+
+  const handleOnboardingNext = async () => {
+    if (onboardingStep === 0) { // User type selection
+      const roleText = onboardingUserType === "student" ? (language === "ar" ? "طالب" : "Student") :
+                       onboardingUserType === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
+                       onboardingUserType === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
+                       (language === "ar" ? "مشرف" : "Admin");
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: roleText },
+        { sender: "fahem", text: language === "ar" ? "مرحباً بك! ما هو اسمك الكامل؟ 👋" : "Excellent! What is your full name? 👋" }
+      ]);
+      setOnboardingStep(1);
+    } else if (onboardingStep === 1) { // Name step
+      if (!onboardingName.trim()) return;
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: onboardingName },
+        onboardingUserType === "student"
+          ? { sender: "fahem", text: language === "ar" ? `سعدت بلقائك يا ${onboardingName}! كم عمرك الآن؟ 🎂` : `Nice to meet you, ${onboardingName}! How old are you? 🎂` }
+          : { sender: "fahem", text: language === "ar" ? `سعدت بلقائك يا ${onboardingName}! ما هي بلد إقامتك؟ 🌍` : `Nice to meet you, ${onboardingName}! What is your country of residence? 🌍` }
+      ]);
+      setOnboardingStep(onboardingUserType === "student" ? 2 : 3); // Students go to age, others go to country
+    } else if (onboardingStep === 2) { // Age step (Student only)
+      if (!onboardingAge.trim()) return;
+      const ageVal = parseInt(onboardingAge);
+      if (isNaN(ageVal) || ageVal <= 0) return;
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: language === "ar" ? `عمري ${onboardingAge} عاماً` : `I am ${onboardingAge} years old` },
+        { sender: "fahem", text: language === "ar" ? `رائع! ما هي بلد إقامتك؟ 🌍` : `Great! What is your country of residence? 🌍` }
+      ]);
+      setOnboardingStep(3);
+    } else if (onboardingStep === 3) { // Country step
+      if (!onboardingCountry.trim()) return;
+      const proposedGrade = parseInt(onboardingAge) >= 18 ? "lifelong" : `Grade ${parseInt(onboardingAge) - 5}`;
+      const proposedGradeAr = parseInt(onboardingAge) >= 18 ? "متعلم مدى الحياة" : `الصف ${parseInt(onboardingAge) - 5}`;
+      
+      const nextMsg = onboardingUserType === "student"
+        ? (language === "ar"
+          ? `بناءً على عمرك (${onboardingAge} سنة) وإقامتك في (${onboardingCountry})، نقترح عليك المسار الدراسي: **${proposedGradeAr}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
+          : `Based on your age of ${onboardingAge} and residing in ${onboardingCountry}, we recommend: **${proposedGrade === "lifelong" ? "Lifelong Learner" : proposedGrade}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`)
+        : (language === "ar"
+          ? `ممتاز! ما هو اسم المدرسة أو المؤسسة التعليمية التي تنتمي إليها؟ (اختياري، يمكنك تخطيه)`
+          : `Great! What is the name of your school or educational institution? (Optional, you can skip)`);
+
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: language === "ar" ? `أقيم في ${onboardingCountry}` : `I live in ${onboardingCountry}` },
+        { sender: "fahem", text: nextMsg }
+      ]);
+      setOnboardingStep(onboardingUserType === "student" ? 4 : 5); // Students go to grade proposal, others to school
+    } else if (onboardingStep === 4) { // Grade Proposal step (Student only)
+      let choiceText = "";
+      if (onboardingGradeOption === "recommended") choiceText = language === "ar" ? "قبول الصف المقترح" : "Accept Recommended Grade";
+      else if (onboardingGradeOption === "lifelong") choiceText = language === "ar" ? "متعلم مدى الحياة" : "Lifelong Learner";
+      else if (onboardingGradeOption === "skip") choiceText = language === "ar" ? "تخطي هذه الخطوة" : "Skip Step";
+      else choiceText = `${language === "ar" ? "صف مخصص:" : "Custom Grade:"} ${onboardingCustomGrade}`;
+
+      const ageVal = parseInt(onboardingAge);
+      const isUnderage = ageVal < 13;
+
+      const nextMsg = isUnderage
+        ? (language === "ar"
+          ? "تنبيه الأمان والرقابة الأبوية 🛡️: بما أن عمرك أقل من 13 سنة، فإننا نطبق معايير الخصوصية لحماية الأطفال. يرجى كتابة البريد الإلكتروني لولي أمرك ليقوم بالموافقة على تفعيل حسابك من لوحته الخاصة:"
+          : "Safety & Parental Consent Notice 🛡️: Since you are under 13, standard age limit protections apply. Please enter your parent's email address so they can approve your account from their portal:")
+        : (language === "ar"
+          ? "رائع جداً! لقد أكملنا البيانات الأساسية. الآن، اختر صورتك الرمزية (الرمز التعبيري) المفضلة لملفك الشخصي من القائمة أدناه:"
+          : "Excellent! We have captured your core info. Now, select your preferred avatar emoji from our diverse library below to complete onboarding:");
+
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: choiceText },
+        { sender: "fahem", text: nextMsg }
+      ]);
+      setOnboardingStep(isUnderage ? 6 : 7); // Underage go to parent email, others go to avatar
+    } else if (onboardingStep === 5) { // School step (Non-students only)
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: onboardingSchool.trim() ? onboardingSchool : (language === "ar" ? "تخطي" : "Skipped") },
+        { sender: "fahem", text: language === "ar" ? "رائع جداً! الآن، اختر صورتك الرمزية المفضلة لملفك الشخصي من القائمة أدناه:" : "Awesome! Now select your favorite avatar emoji from our library below to complete onboarding:" }
+      ]);
+      setOnboardingStep(7); // Go to avatar selection
+    } else if (onboardingStep === 6) { // Parent email step (Underage Student only)
+      if (!onboardingParentEmail.trim()) return;
+      setOnboardingMessages(prev => [
+        ...prev,
+        { sender: "user", text: onboardingParentEmail },
+        { sender: "fahem", text: language === "ar" ? "شكراً لك! تم تسجيل البريد الأبوي للموافقة الأمنية. أخيراً، اختر صورتك الرمزية المفضلة من القائمة أدناه:" : "Thank you! Parental email registered for approval check. Finally, select your favorite avatar emoji from the list below:" }
+      ]);
+      setOnboardingStep(7); // Go to avatar selection
+    }
+  };
+
+  const handleOnboardingComplete = async (avatarEmoji: string) => {
+    if (!user) return;
+    setOnboardingAvatar(avatarEmoji);
+    setLoadingProfile(true);
+
+    const gradeVal = onboardingGradeOption === "recommended"
+      ? (parseInt(onboardingAge) >= 18 ? "lifelong" : `Grade ${parseInt(onboardingAge) - 5}`)
+      : onboardingGradeOption === "custom" ? onboardingCustomGrade
+      : onboardingGradeOption === "lifelong" ? "lifelong" : "skipped";
+
+    const isUnderage = onboardingUserType === "student" && parseInt(onboardingAge) < 13;
+
+    const profileData = {
+      userId: user.uid,
+      email: user.email || "",
+      name: onboardingName || user.displayName || user.email?.split("@")[0] || "User",
+      age: parseInt(onboardingAge) || 0,
+      country: onboardingCountry || "Egypt",
+      grade: onboardingUserType === "student" ? gradeVal : "N/A",
+      parentEmail: isUnderage ? onboardingParentEmail : "",
+      avatar: avatarEmoji,
+      school: onboardingSchool || "",
+      userType: onboardingUserType,
+      role: onboardingUserType,
+      onboardingCompleted: true,
+      isApproved: !isUnderage, // Pending parent approval if underage student
+      friends: [],
+      groupsJoined: [],
+      privacySettings: {
+        profileVisibility: "public",
+        allowMessages: true,
+        showActivity: true
+      }
+    };
+
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          profile: profileData
+        })
+      });
+      if (res.ok) {
+        setUserProfile(profileData);
+        await logActivity("onboarding_completed", "success", `Completed onboarding as ${onboardingUserType}`);
+      }
+    } catch (err) {
+      console.error("Error saving onboarding profile:", err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const handleToggleFriend = async (targetUser: any) => {
+    if (!user || !userProfile) return;
+    const isFriend = userProfile.friends?.includes(targetUser.userId);
+    const action = isFriend ? "remove" : "add";
+    try {
+      const res = await fetch("/api/user/friend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          friendId: targetUser.userId,
+          action
+        })
+      });
+      if (res.ok) {
+        const updatedFriends = isFriend
+          ? userProfile.friends.filter((id: string) => id !== targetUser.userId)
+          : [...(userProfile.friends || []), targetUser.userId];
+        
+        setUserProfile((prev: any) => ({
+          ...prev,
+          friends: updatedFriends
+        }));
+
+        await logActivity(
+          action === "add" ? "add_friend" : "remove_friend",
+          "success",
+          `${action === "add" ? "Added" : "Removed"} friend ${targetUser.userId}`
+        );
+
+        await fetchAllUsersList();
+      }
+    } catch (err) {
+      console.error("Error toggling friend:", err);
+    }
+  };
+
   const fetchMetadata = async (emailParam?: string) => {
     try {
       const activeEmail = emailParam || user?.email;
@@ -177,6 +736,99 @@ export default function Dashboard() {
     }
   };
 
+  const fetchUserSessions = async (userIdVal?: string) => {
+    const activeUserId = userIdVal || user?.uid;
+    if (!activeUserId) return;
+    setIsSessionsLoading(true);
+    try {
+      const response = await fetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data.sessions || []);
+      }
+    } catch (err) {
+      console.error("Error fetching sessions:", err);
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  };
+
+  const fetchUserTokenStats = async (userIdVal?: string) => {
+    const activeUserId = userIdVal || user?.uid;
+    if (!activeUserId) return;
+    try {
+      const response = await fetch(`/api/telemetry?userId=${encodeURIComponent(activeUserId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserTokenStats(data);
+      }
+    } catch (err) {
+      console.error("Error fetching token stats:", err);
+    }
+  };
+
+  const loadSession = async (sessionIdVal: string) => {
+    if (!sessionIdVal) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const sess = data.session;
+        if (sess) {
+          setCurrentSessionId(sess.sessionId);
+          setActiveSessionMessages(sess.messages || []);
+          // Set finalResult to the last assistant response if there is one
+          const assistantMsgs = (sess.messages || []).filter((m: any) => m.role === "assistant");
+          if (assistantMsgs.length > 0) {
+            setFinalResult(assistantMsgs[assistantMsgs.length - 1].content);
+          } else {
+            setFinalResult("");
+          }
+          // Clear standard logs/terminal stream unless the user executes a new one
+          setLogs([]);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading session:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSession = async (sessionIdVal: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!sessionIdVal) return;
+    if (!confirm(language === "ar" ? "هل أنت متأكد من حذف هذه المحادثة؟" : "Are you sure you want to delete this chat session?")) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
+        method: "DELETE"
+      });
+      if (response.ok) {
+        if (currentSessionId === sessionIdVal) {
+          startNewChat();
+        }
+        await fetchUserSessions();
+      }
+    } catch (err) {
+      console.error("Error deleting session:", err);
+    }
+  };
+
+  const startNewChat = () => {
+    setCurrentSessionId("");
+    setActiveSessionMessages([]);
+    setLogs([]);
+    setFinalResult("");
+    setPrompt("");
+    setGroundedInput("");
+    setGroundedPrompt("");
+    setGroundedLogs([]);
+    setGroundedResult("");
+  };
+
   // Auth Guard & Initial Load
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -185,7 +837,46 @@ export default function Dashboard() {
       } else {
         setUser(currentUser);
         fetchMetadata(currentUser.email || undefined); // Fetch live database metadata on mount
+        fetchUserSessions(currentUser.uid); // Fetch user sessions
+        fetchUserTokenStats(currentUser.uid); // Fetch user token usage stats
         
+        // Fetch User Profile over MongoDB Agent Proxies
+        setLoadingProfile(true);
+        fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.profile && data.profile.userId) {
+              setUserProfile(data.profile);
+              setPrivacyVisibility(data.profile.privacySettings?.profileVisibility || "public");
+              setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
+              setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
+              setPreferencesSchool(data.profile.school || "");
+            } else {
+              // No user document found - this is first time onboarding trigger state
+              const defaultProfile = {
+                userId: currentUser.uid,
+                email: currentUser.email || "",
+                onboardingCompleted: false,
+                userType: "student",
+                role: "student",
+                friends: [],
+                groupsJoined: [],
+                privacySettings: {
+                  profileVisibility: "public",
+                  allowMessages: true,
+                  showActivity: true
+                }
+              };
+              setUserProfile(defaultProfile);
+            }
+          })
+          .catch((err) => {
+            console.error("Error loading user profile:", err);
+          })
+          .finally(() => {
+            setLoadingProfile(false);
+          });
+
         // Verify superadmin status
         if (currentUser.email) {
           fetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
@@ -235,7 +926,8 @@ export default function Dashboard() {
           prompt: promptText,
           language,
           userEmail: user?.email || "",
-          userId: user?.uid || ""
+          userId: user?.uid || "",
+          sessionId: currentSessionId || undefined
         }),
       });
 
@@ -263,6 +955,9 @@ export default function Dashboard() {
                 if (content.startsWith("ActiveAgent:")) {
                   const agentName = content.replace("ActiveAgent:", "").trim();
                   setActiveGroundedAgent(agentName);
+                } else if (content.startsWith("SessionId:")) {
+                  const activeSessId = content.replace("SessionId:", "").trim();
+                  setCurrentSessionId(activeSessId);
                 } else if (content.startsWith("Duration:")) {
                   const parts = content.replace("Duration:", "").trim().split(":");
                   const metricName = parts[0]?.trim();
@@ -298,6 +993,8 @@ export default function Dashboard() {
       setGroundedLogs((prev) => [...prev, `[ERROR] Workflow execution failed: ${error.message}`]);
     } finally {
       setGroundedLoading(false);
+      fetchUserSessions();
+      fetchUserTokenStats();
     }
   };
 
@@ -485,7 +1182,8 @@ export default function Dashboard() {
           prompt: queryText,
           language,
           userEmail: user?.email || "",
-          userId: user?.uid || ""
+          userId: user?.uid || "",
+          sessionId: currentSessionId || undefined
         }),
       });
 
@@ -513,6 +1211,9 @@ export default function Dashboard() {
                 if (content.startsWith("ActiveAgent:")) {
                   const agentName = content.replace("ActiveAgent:", "").trim();
                   setActiveDbAgent(agentName);
+                } else if (content.startsWith("SessionId:")) {
+                  const activeSessId = content.replace("SessionId:", "").trim();
+                  setCurrentSessionId(activeSessId);
                 } else if (content.startsWith("Duration:")) {
                   const parts = content.replace("Duration:", "").trim().split(":");
                   const metricName = parts[0]?.trim();
@@ -554,6 +1255,8 @@ export default function Dashboard() {
       setFinalResult(t("stream_error_occurred") + error.message);
     } finally {
       setLoading(false);
+      fetchUserSessions();
+      fetchUserTokenStats();
     }
   };
 
@@ -563,19 +1266,378 @@ export default function Dashboard() {
     setFinalResult("");
   };
 
-  if (loadingUser) {
+  if (loadingUser || loadingProfile) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
           <FiCpu className="spinning-icon" style={{ fontSize: "3rem", color: "var(--primary)" }} />
-          <div style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 500 }}>{t("loading_session")}</div>
+          <div style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 500 }}>
+            {language === "ar" ? "جاري تحميل بيانات الجلسة والملف الشخصي..." : "Loading session and user profile..."}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (userProfile && userProfile.onboardingCompleted !== true) {
+    return (
+      <div className="onboarding-overlay" style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+        background: "radial-gradient(circle at top right, rgba(212, 175, 55, 0.15), rgba(16, 107, 163, 0.05)), #f4ecd8",
+        display: "flex", justifyContent: "center", alignItems: "center", padding: "1.5rem",
+        fontFamily: "var(--font-sans)", direction: language === "ar" ? "rtl" : "ltr"
+      }}>
+        <div style={{
+          width: "100%", maxWidth: "750px", height: "90vh", maxHeight: "680px",
+          background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(20px)",
+          border: "1px solid rgba(16, 107, 163, 0.15)", borderRadius: "var(--border-radius-lg)",
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.08)", display: "flex", flexDirection: "column",
+          overflow: "hidden"
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: "1.25rem 1.5rem", borderBottom: "1px solid rgba(16, 107, 163, 0.1)",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.4rem", borderRadius: "8px", color: "#ffffff", display: "flex" }}>
+                <FiCpu className="pulse-icon" style={{ fontSize: "1.2rem" }} />
+              </div>
+              <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--primary)" }}>
+                {language === "ar" ? "إعداد حساب فاهم الذكي" : "Fahem Interactive Profile Setup"}
+              </span>
+            </div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)", padding: "4px 10px", borderRadius: "20px" }}>
+              {language === "ar" ? `الخطوة ${onboardingStep + 1} من 8` : `Step ${onboardingStep + 1} of 8`}
+            </div>
+          </div>
+
+          {/* Conversational Scroll Log */}
+          <div style={{
+            flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem"
+          }} className="custom-scrollbar">
+            {onboardingMessages.map((msg, index) => {
+              const isFahem = msg.sender === "fahem";
+              return (
+                <div key={index} style={{
+                  display: "flex", gap: "0.75rem", alignSelf: isFahem ? "flex-start" : "flex-end",
+                  flexDirection: isFahem ? "row" : "row-reverse", maxWidth: "80%"
+                }}>
+                  <div style={{
+                    width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                    background: isFahem ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(212, 175, 55, 0.2)",
+                    color: isFahem ? "#ffffff" : "var(--secondary-hover)", fontWeight: 700, fontSize: "1.1rem", flexShrink: 0
+                  }}>
+                    {isFahem ? "🤖" : (onboardingAvatar || "👤")}
+                  </div>
+                  <div style={{
+                    padding: "0.85rem 1.1rem", borderRadius: "16px",
+                    borderTopLeftRadius: isFahem ? "2px" : "16px", borderTopRightRadius: isFahem ? "16px" : "2px",
+                    background: isFahem ? "#ffffff" : "linear-gradient(135deg, var(--primary), rgba(16, 107, 163, 0.95))",
+                    color: isFahem ? "var(--foreground)" : "#ffffff",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)",
+                    border: isFahem ? "1px solid rgba(16, 107, 163, 0.08)" : "none",
+                    lineHeight: "1.6", fontSize: "0.95rem"
+                  }}>
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Interactive Input Section */}
+          <div style={{
+            padding: "1.5rem", borderTop: "1px solid rgba(16, 107, 163, 0.1)",
+            background: "#ffffff", display: "flex", flexDirection: "column", gap: "1rem"
+          }}>
+            {/* Step 0: User Type Grid */}
+            {onboardingStep === 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                {[
+                  { id: "student", emoji: "🎓", labelAr: "طالب علم", labelEn: "Student", descAr: "تعلم وتبادل الأفكار مع معلمنا الذكي", descEn: "Learn & chat with our advanced AI tutor" },
+                  { id: "teacher", emoji: "🍎", labelAr: "معلم متميز", labelEn: "Teacher", descAr: "قم بإدارة المجموعات والمحتوى الدراسي", descEn: "Manage student groups & educational content" },
+                  { id: "parent", emoji: "👪", labelAr: "ولي أمر", labelEn: "Parent", descAr: "أضف أطفالك، وافق على الطلبات وتابع التطور", descEn: "Add children, approve requests, monitor progress" },
+                  { id: "admin", emoji: "🛡️", labelAr: "مشرف نظام", labelEn: "Admin", descAr: "أشرف على الأمان وسياسات الاستخدام والتقارير", descEn: "Supervise safety, telemetry & audit reports" }
+                ].map((role) => (
+                  <button
+                    key={role.id}
+                    onClick={() => {
+                      setOnboardingUserType(role.id as any);
+                    }}
+                    style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem",
+                      padding: "0.85rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                      background: onboardingUserType === role.id ? "rgba(16, 107, 163, 0.05)" : "rgba(255, 255, 255, 0.6)",
+                      borderColor: onboardingUserType === role.id ? "var(--primary)" : "var(--card-border)",
+                      cursor: "pointer", transition: "all 0.2s ease"
+                    }}
+                  >
+                    <span style={{ fontSize: "1.8rem" }}>{role.emoji}</span>
+                    <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "0.95rem" }}>
+                      {language === "ar" ? role.labelAr : role.labelEn}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", textAlign: "center" }}>
+                      {language === "ar" ? role.descAr : role.descEn}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Step 1: Name Input */}
+            {onboardingStep === 1 && (
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="text"
+                  value={onboardingName}
+                  onChange={(e) => setOnboardingName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
+                  placeholder={language === "ar" ? "مثال: أحمد محمود" : "e.g., Jane Doe"}
+                  style={{
+                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Step 2: Age Input */}
+            {onboardingStep === 2 && (
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="number"
+                  value={onboardingAge}
+                  onChange={(e) => setOnboardingAge(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
+                  placeholder={language === "ar" ? "أدخل عمرك" : "e.g., 14"}
+                  style={{
+                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Step 3: Country Input */}
+            {onboardingStep === 3 && (
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <select
+                  value={onboardingCountry}
+                  onChange={(e) => setOnboardingCountry(e.target.value)}
+                  style={{
+                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)",
+                    background: "#ffffff"
+                  }}
+                  autoFocus
+                >
+                  <option value="">{language === "ar" ? "اختر بلد إقامتك..." : "Select residence country..."}</option>
+                  <option value="Egypt">{language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬"}</option>
+                  <option value="Saudi Arabia">{language === "ar" ? "المملكة العربية السعودية 🇸🇦" : "Saudi Arabia 🇸🇦"}</option>
+                  <option value="UAE">{language === "ar" ? "الإمارات العربية المتحدة 🇦🇪" : "UAE 🇦🇪"}</option>
+                  <option value="Qatar">{language === "ar" ? "قطر 🇶🇦" : "Qatar 🇶🇦"}</option>
+                  <option value="Kuwait">{language === "ar" ? "الكويت 🇰🇼" : "Kuwait 🇰🇼"}</option>
+                  <option value="Oman">{language === "ar" ? "عمان 🇴🇲" : "Oman 🇴🇲"}</option>
+                  <option value="Jordan">{language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴"}</option>
+                  <option value="USA">{language === "ar" ? "الولايات المتحدة الأمريكية 🇺🇸" : "USA 🇺🇸"}</option>
+                  <option value="UK">{language === "ar" ? "المملكة المتحدة 🇬🇧" : "UK 🇬🇧"}</option>
+                  <option value="Other">{language === "ar" ? "بلد آخر 🌍" : "Other Country 🌍"}</option>
+                </select>
+              </div>
+            )}
+
+            {/* Step 4: Grade Proposal (Student) */}
+            {onboardingStep === 4 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                  <button
+                    onClick={() => setOnboardingGradeOption("recommended")}
+                    style={{
+                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                      background: onboardingGradeOption === "recommended" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
+                      borderColor: onboardingGradeOption === "recommended" ? "var(--primary)" : "var(--card-border)",
+                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem"
+                    }}
+                  >
+                    {language === "ar" ? `الصف المقترح (الصف ${parseInt(onboardingAge) - 5})` : `Recommend (Grade ${parseInt(onboardingAge) - 5})`}
+                  </button>
+                  <button
+                    onClick={() => setOnboardingGradeOption("lifelong")}
+                    style={{
+                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                      background: onboardingGradeOption === "lifelong" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
+                      borderColor: onboardingGradeOption === "lifelong" ? "var(--primary)" : "var(--card-border)",
+                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem"
+                    }}
+                  >
+                    {language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠"}
+                  </button>
+                  <button
+                    onClick={() => setOnboardingGradeOption("custom")}
+                    style={{
+                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                      background: onboardingGradeOption === "custom" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
+                      borderColor: onboardingGradeOption === "custom" ? "var(--primary)" : "var(--card-border)",
+                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem"
+                    }}
+                  >
+                    {language === "ar" ? "صف مخصص آخر ✍️" : "Type Custom Grade ✍️"}
+                  </button>
+                  <button
+                    onClick={() => setOnboardingGradeOption("skip")}
+                    style={{
+                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                      background: onboardingGradeOption === "skip" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
+                      borderColor: onboardingGradeOption === "skip" ? "var(--primary)" : "var(--card-border)",
+                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem"
+                    }}
+                  >
+                    {language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip this step ⏭️"}
+                  </button>
+                </div>
+
+                {onboardingGradeOption === "custom" && (
+                  <input
+                    type="text"
+                    value={onboardingCustomGrade}
+                    onChange={(e) => setOnboardingCustomGrade(e.target.value)}
+                    placeholder={language === "ar" ? "مثال: المسار البريطاني السنة 8" : "e.g., Year 8 British Curriculum"}
+                    style={{
+                      padding: "0.75rem", border: "1px solid var(--card-border)",
+                      borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
+                    }}
+                    autoFocus
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Step 5: School (Non-student) */}
+            {onboardingStep === 5 && (
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="text"
+                  value={onboardingSchool}
+                  onChange={(e) => setOnboardingSchool(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
+                  placeholder={language === "ar" ? "مثال: مدرسة المستقبل النموذجية" : "e.g., Future Model School"}
+                  style={{
+                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Step 6: Parent Email (Underage Student only) */}
+            {onboardingStep === 6 && (
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="email"
+                  value={onboardingParentEmail}
+                  onChange={(e) => setOnboardingParentEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
+                  placeholder={language === "ar" ? "البريد الإلكتروني لولي الأمر" : "parent@example.com"}
+                  style={{
+                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Step 7: Avatar Selection Grid */}
+            {onboardingStep === 7 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "0.5rem",
+                  maxHeight: "180px", overflowY: "auto", padding: "0.25rem"
+                }}>
+                  {[
+                    { e: "🚀", lEn: "Space Explorer", lAr: "مستكشف الفضاء" },
+                    { e: "🧠", lEn: "Deep Thinker", lAr: "مفكر عميق" },
+                    { e: "🎨", lEn: "Artist", lAr: "فنان مبدع" },
+                    { e: "👾", lEn: "Gamer/Coder", lAr: "مبرمج محترف" },
+                    { e: "🦄", lEn: "Dreamer", lAr: "حالم مبدع" },
+                    { e: "🐼", lEn: "Nature Lover", lAr: "صديق الطبيعة" },
+                    { e: "🧪", lEn: "Scientist", lAr: "عالم ذكي" },
+                    { e: "🦸", lEn: "Super Hero", lAr: "بطل خارق" },
+                    { e: "🦉", lEn: "Wise Owl", lAr: "بومة حكيمة" },
+                    { e: "🦁", lEn: "Leader", lAr: "أسد قائد" },
+                    { e: "🐬", lEn: "Dolphin", lAr: "دلفين ذكي" },
+                    { e: "🍕", lEn: "Pizza Lover", lAr: "محب البيتزا" }
+                  ].map((item) => (
+                    <button
+                      key={item.e}
+                      onClick={() => handleOnboardingComplete(item.e)}
+                      title={language === "ar" ? item.lAr : item.lEn}
+                      style={{
+                        padding: "1rem 0", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
+                        background: "#ffffff", cursor: "pointer", transition: "all 0.2s ease",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem"
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.borderColor = "var(--primary)";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.borderColor = "var(--card-border)";
+                        e.currentTarget.style.transform = "scale(1)";
+                      }}
+                    >
+                      <span style={{ fontSize: "2rem" }}>{item.e}</span>
+                      <span style={{ fontSize: "0.65rem", color: "#6a7c88", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "90%", textAlign: "center" }}>
+                        {language === "ar" ? item.lAr : item.lEn}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Bar */}
+            {onboardingStep < 7 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOnboardingComplete("🚀");
+                  }}
+                  style={{
+                    background: "none", border: "none", color: "#8a9ca8", cursor: "pointer",
+                    fontSize: "0.85rem", fontWeight: 600, padding: "0.5rem"
+                  }}
+                >
+                  {language === "ar" ? "تخطي الإعداد بالكامل ⏭️" : "Skip profile setup completely ⏭️"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOnboardingNext}
+                  className="btn btn-primary"
+                  style={{
+                    padding: "0.6rem 1.75rem", fontSize: "0.9rem", fontWeight: 700, borderRadius: "var(--border-radius-md)",
+                    display: "flex", alignItems: "center", gap: "0.35rem"
+                  }}
+                >
+                  <span>{language === "ar" ? "متابعة" : "Next / Send"}</span>
+                  <FiSend style={{ fontSize: "0.9rem" }} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app-layout" style={{ direction: language === "ar" ? "rtl" : "ltr" }}>
+    <div className="app-layout" dir={language === "ar" ? "rtl" : "ltr"} style={{ direction: language === "ar" ? "rtl" : "ltr" }}>
       {/* Background ambient light */}
       <div className="ambient-background" style={{ zIndex: 1 }}>
         <div className="sphere sphere-1"></div>
@@ -585,7 +1647,7 @@ export default function Dashboard() {
 
       {/* Modern Sidebar Panel */}
       <aside className="sidebar">
-        <div className="sidebar-top">
+        <div className="sidebar-top" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: "1rem" }}>
           {/* Logo Section */}
           <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
@@ -625,6 +1687,28 @@ export default function Dashboard() {
               </button>
             )}
 
+            <button
+              onClick={() => {
+                setActiveTab("social");
+                fetchAllUsersList();
+                fetchParentChildrenList();
+              }}
+              className={`sidebar-nav-btn ${activeTab === "social" ? "active" : ""}`}
+              type="button"
+            >
+              <FiUsers />
+              <span>{language === "ar" ? "التواصل والدردشة" : "Social & Chat"}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={`sidebar-nav-btn ${activeTab === "settings" ? "active" : ""}`}
+              type="button"
+            >
+              <FiSettings />
+              <span>{language === "ar" ? "الإعدادات والخصوصية" : "Preferences & Privacy"}</span>
+            </button>
+
             {/* GitHub Repo link */}
             <a 
               href="https://github.com/hesham88/fahem" 
@@ -637,6 +1721,180 @@ export default function Dashboard() {
               <span>{t("nav_github")}</span>
             </a>
           </nav>
+
+          {/* Saved Chats Sidebar Section */}
+          <div style={{ 
+            display: "flex", 
+            flexDirection: "column", 
+            flex: 1, 
+            minHeight: 0, 
+            marginTop: "0.5rem",
+            borderTop: "1px dashed rgba(235, 220, 185, 0.4)",
+            paddingTop: "0.75rem"
+          }}>
+            <h3 style={{ 
+              fontSize: "0.85rem", 
+              fontWeight: 800, 
+              color: "#6a7c88", 
+              textTransform: "uppercase", 
+              letterSpacing: "0.5px",
+              marginBottom: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
+              <span>{getHistoryT("savedChats")}</span>
+              {sessions.length > 0 && (
+                <span style={{
+                  fontSize: "0.75rem",
+                  background: "rgba(16, 107, 163, 0.08)",
+                  color: "var(--primary)",
+                  padding: "2px 6px",
+                  borderRadius: "10px",
+                  fontWeight: 700
+                }}>
+                  {sessions.length}
+                </span>
+              )}
+            </h3>
+
+            {/* New Chat Button */}
+            <button
+              onClick={startNewChat}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                width: "100%",
+                padding: "0.65rem",
+                background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "var(--border-radius-md)",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                boxShadow: "var(--shadow-sm)",
+                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                marginBottom: "0.75rem",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.filter = "brightness(1.1)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.filter = "none";
+                e.currentTarget.style.transform = "none";
+              }}
+            >
+              <FiPlus style={{ fontSize: "1rem" }} />
+              <span>{getHistoryT("newChat")}</span>
+            </button>
+
+            {/* Scrollable Container */}
+            <div style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.4rem",
+              minHeight: 0
+            }} className="custom-scrollbar">
+              {isSessionsLoading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", color: "#8a9ca8" }}>
+                  <FiRefreshCw className="spin-icon" style={{ marginRight: "0.5rem", animation: "spin 2s linear infinite" }} />
+                  <span style={{ fontSize: "0.8rem" }}>{getHistoryT("loadingChats")}</span>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1.5rem", color: "#8a9ca8", textAlign: "center" }}>
+                  <FiFileText style={{ fontSize: "1.5rem", opacity: 0.3, marginBottom: "0.5rem" }} />
+                  <span style={{ fontSize: "0.8rem" }}>{getHistoryT("noSavedChats")}</span>
+                </div>
+              ) : (
+                sessions.map((sess) => {
+                  const isActive = currentSessionId === sess.sessionId;
+                  return (
+                    <div
+                      key={sess.sessionId}
+                      onClick={() => loadSession(sess.sessionId)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.55rem 0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        background: isActive ? "rgba(16, 107, 163, 0.08)" : "rgba(255, 255, 255, 0.4)",
+                        border: `1px solid ${isActive ? "rgba(16, 107, 163, 0.15)" : "rgba(235, 220, 185, 0.25)"}`,
+                        cursor: "pointer",
+                        transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                        gap: "0.5rem"
+                      }}
+                      onMouseOver={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)";
+                          e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.1)";
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.4)";
+                          e.currentTarget.style.borderColor = "rgba(235, 220, 185, 0.25)";
+                        }
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden", flex: 1 }}>
+                        <FiFileText style={{ color: isActive ? "var(--primary)" : "#8a9ca8", flexShrink: 0, fontSize: "0.95rem" }} />
+                        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}>
+                          <span style={{
+                            fontSize: "0.82rem",
+                            fontWeight: isActive ? 700 : 600,
+                            color: isActive ? "var(--primary)" : "var(--text-color)",
+                            whiteSpace: "nowrap",
+                            textOverflow: "ellipsis",
+                            overflow: "hidden"
+                          }} title={sess.title || "Untitled Chat"}>
+                            {sess.title || (language === "ar" ? "محادثة بدون عنوان" : "Untitled Chat")}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", color: "#8a9ca8" }}>
+                            {sess.messageCount} {language === "ar" ? "رسائل" : "messages"}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={(e) => deleteSession(sess.sessionId, e)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          padding: "4px",
+                          cursor: "pointer",
+                          color: "#8a9ca8",
+                          borderRadius: "var(--border-radius-sm)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.2s"
+                        }}
+                        onMouseOver={(e) => {
+                          e.stopPropagation();
+                          e.currentTarget.style.color = "var(--accent-red)";
+                          e.currentTarget.style.background = "rgba(235, 87, 87, 0.1)";
+                        }}
+                        onMouseOut={(e) => {
+                          e.stopPropagation();
+                          e.currentTarget.style.color = "#8a9ca8";
+                          e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        <FiTrash2 style={{ fontSize: "0.85rem" }} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Sidebar Footer (Language + Profile + Sign Out) */}
@@ -710,6 +1968,111 @@ export default function Dashboard() {
             {/* Left Side: Interaction & Output */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
               
+              {/* User Token consumption cards */}
+              {userTokenStats && (
+                <section className="panel-card" style={{ padding: "1.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <h2 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0, fontWeight: 800 }}>
+                      <FiActivity style={{ color: "var(--primary)" }} />
+                      <span>{getHistoryT("tokenAnalytics")}</span>
+                    </h2>
+                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", background: "rgba(16, 107, 163, 0.06)", padding: "4px 8px", borderRadius: "var(--border-radius-sm)", fontWeight: 700 }}>
+                      {getHistoryT("tokenLimitHelp")}
+                    </span>
+                  </div>
+                  
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: "1rem",
+                  }} className="token-stats-grid">
+                    {/* Daily Card */}
+                    <div style={{
+                      background: "rgba(255, 255, 255, 0.4)",
+                      border: "1px solid rgba(235, 220, 185, 0.25)",
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      boxShadow: "var(--shadow-sm)",
+                    }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("dailyTokens")}</span>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--primary)" }}>{userTokenStats.daily.toLocaleString()}</strong>
+                      <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
+                        <div style={{ width: `${Math.min(100, (userTokenStats.daily / 50000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, #106ba3, #4394d2)", borderRadius: "3px" }}></div>
+                      </div>
+                      <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
+                        {Math.round(Math.min(100, (userTokenStats.daily / 50000) * 100))}% of 50K limit
+                      </span>
+                    </div>
+
+                    {/* Weekly Card */}
+                    <div style={{
+                      background: "rgba(255, 255, 255, 0.4)",
+                      border: "1px solid rgba(235, 220, 185, 0.25)",
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      boxShadow: "var(--shadow-sm)",
+                    }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("weeklyTokens")}</span>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--secondary)" }}>{userTokenStats.weekly.toLocaleString()}</strong>
+                      <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
+                        <div style={{ width: `${Math.min(100, (userTokenStats.weekly / 250000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, var(--secondary), #f5c242)", borderRadius: "3px" }}></div>
+                      </div>
+                      <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
+                        {Math.round(Math.min(100, (userTokenStats.weekly / 250000) * 100))}% of 250K limit
+                      </span>
+                    </div>
+
+                    {/* Monthly Card */}
+                    <div style={{
+                      background: "rgba(255, 255, 255, 0.4)",
+                      border: "1px solid rgba(235, 220, 185, 0.25)",
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      boxShadow: "var(--shadow-sm)",
+                    }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("monthlyTokens")}</span>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--accent-green)" }}>{userTokenStats.monthly.toLocaleString()}</strong>
+                      <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
+                        <div style={{ width: `${Math.min(100, (userTokenStats.monthly / 1000000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, var(--accent-green), #42d2a2)", borderRadius: "3px" }}></div>
+                      </div>
+                      <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
+                        {Math.round(Math.min(100, (userTokenStats.monthly / 1000000) * 100))}% of 1M limit
+                      </span>
+                    </div>
+
+                    {/* Lifetime Total Card */}
+                    <div style={{
+                      background: "rgba(255, 255, 255, 0.4)",
+                      border: "1px solid rgba(235, 220, 185, 0.25)",
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      boxShadow: "var(--shadow-sm)",
+                    }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("totalTokens")}</span>
+                      <strong style={{ fontSize: "1.25rem", color: "#635bff" }}>{userTokenStats.total.toLocaleString()}</strong>
+                      <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
+                        <div style={{ width: "100%", height: "100%", background: "linear-gradient(90deg, #635bff, #a35bff)", borderRadius: "3px" }}></div>
+                      </div>
+                      <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
+                        Uncapped Lifetime
+                      </span>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {/* Custom Prompt Box */}
               <section className="panel-card" id="agent-input-panel">
                 <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -777,6 +2140,110 @@ export default function Dashboard() {
                   </div>
                 </form>
               </section>
+
+              {/* Active Session Conversation History (Chat Bubbles) */}
+              {activeSessionMessages.length > 0 && (
+                <section className="panel-card" style={{ padding: "1.5rem" }}>
+                  <h2 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.75rem", fontWeight: 800 }}>
+                    <FiFileText style={{ color: "var(--primary)" }} />
+                    <span>{getHistoryT("activeChat")}</span>
+                  </h2>
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1rem",
+                    maxHeight: "450px",
+                    overflowY: "auto",
+                    padding: "0.25rem",
+                  }} className="custom-scrollbar">
+                    {activeSessionMessages.map((msg, index) => {
+                      const isUser = msg.role === "user";
+                      // Format local time if available
+                      let timeStr = "";
+                      if (msg.createdAt || msg.timestamp) {
+                        try {
+                          const date = new Date(msg.createdAt || msg.timestamp);
+                          timeStr = date.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
+                        } catch (_) {}
+                      }
+                      
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: isUser ? "flex-end" : "flex-start",
+                            width: "100%"
+                          }}
+                        >
+                          <div
+                            style={{
+                              maxWidth: "85%",
+                              padding: "0.85rem 1.1rem",
+                              borderRadius: "var(--border-radius-lg)",
+                              border: isUser ? "1px solid rgba(16, 107, 163, 0.15)" : "1px solid rgba(235, 220, 185, 0.3)",
+                              background: isUser 
+                                ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(67, 148, 210, 0.08))" 
+                                : "rgba(255, 255, 255, 0.65)",
+                              boxShadow: "var(--shadow-sm)",
+                              textAlign: language === "ar" ? "right" : "left",
+                              direction: language === "ar" ? "rtl" : "ltr",
+                            }}
+                          >
+                            {/* Role Label */}
+                            <div style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              color: isUser ? "var(--primary)" : "var(--secondary)",
+                              marginBottom: "0.4rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.3rem"
+                            }}>
+                              <span style={{
+                                width: "6px",
+                                height: "6px",
+                                borderRadius: "50%",
+                                background: isUser ? "var(--primary)" : "var(--secondary)",
+                                display: "inline-block"
+                              }}></span>
+                              {isUser 
+                                ? (language === "ar" ? "أنت" : "You") 
+                                : (language === "ar" ? "وكيل فاهم الذكي" : "Fahem AI Agent")}
+                            </div>
+                            
+                            {/* Message Content */}
+                            <div style={{
+                              color: "var(--foreground)",
+                              fontSize: "0.95rem",
+                              lineHeight: "1.6"
+                            }}>
+                              {renderPremiumContent(msg.content)}
+                            </div>
+                          </div>
+                          
+                          {timeStr && (
+                            <span style={{
+                              fontSize: "0.68rem",
+                              color: "#8a9ca8",
+                              marginTop: "0.3rem",
+                              marginRight: isUser ? "0.5rem" : "none",
+                              marginLeft: isUser ? "none" : "0.5rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.2rem"
+                            }}>
+                              <FiClock style={{ fontSize: "0.75rem" }} />
+                              {timeStr}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
               {/* Execution Stream Output Console */}
               <section className="panel-card" id="agent-output-panel">
@@ -1093,7 +2560,7 @@ export default function Dashboard() {
               </section>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "admin" ? (
           /* Admin Security & Sourcing View */
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
@@ -1547,7 +3014,608 @@ export default function Dashboard() {
             </div>
           </div>
           </div>
-        )}
+        ) : activeTab === "social" ? (
+          /* Social Hub & Messenger Pane */
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            
+            {/* Parent Control & Approvals Panel */}
+            {userProfile?.userType === "parent" && (
+              <section className="panel-card" style={{ padding: "2rem" }}>
+                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem", fontWeight: 800 }}>
+                  <FiShield style={{ color: "var(--primary)" }} />
+                  <span>{language === "ar" ? "إدارة حسابات الأبناء والموافقات الأبوية" : "Children Panel & Parental Consents"}</span>
+                </h2>
+                <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem", lineHeight: "1.6" }}>
+                  {language === "ar" 
+                    ? "بصفتك ولي أمر، يمكنك مراقبة حسابات أبنائك الذين تقل أعمارهم عن 13 عاماً والموافقة على تفعيلها للسماح لهم بالاستفادة من خدمات المنصة والذكاء الاصطناعي تماشياً مع معايير COPPA وحماية الأطفال."
+                    : "As a parent, you have direct oversight over your children's profiles. Approve pending children below to authorize their access to Fahem AI tools under COPPA and standard protection protocols."}
+                </p>
+
+                {parentChildrenLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88" }}>
+                    <FiRefreshCw className="spinning-icon" />
+                    <span>{language === "ar" ? "جاري تحميل حسابات الأبناء..." : "Fetching children records..."}</span>
+                  </div>
+                ) : parentChildren.length === 0 ? (
+                  <div style={{ padding: "1.5rem", background: "rgba(255, 255, 255, 0.4)", borderRadius: "var(--border-radius-md)", border: "1px dashed var(--card-border)", textAlign: "center", color: "#6a7c88" }}>
+                    {language === "ar" 
+                      ? "لم يتم العثور على أي حسابات أبناء مسجلة بريدك الإلكتروني كولي أمر حالياً." 
+                      : "No child profiles are registered under your parent email address yet."}
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
+                    {parentChildren.map((child: any) => (
+                      <div
+                        key={child.userId}
+                        style={{
+                          padding: "1.25rem",
+                          borderRadius: "var(--border-radius-md)",
+                          background: "rgba(255, 255, 255, 0.65)",
+                          border: "1px solid var(--card-border)",
+                          boxShadow: "var(--shadow-sm)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.85rem",
+                          position: "relative"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                          <span style={{ fontSize: "2.5rem", background: "rgba(16, 107, 163, 0.06)", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {child.avatar || "👤"}
+                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                            <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{child.name}</strong>
+                            <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{child.email}</span>
+                            <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 600 }}>
+                              {language === "ar" ? `العمر: ${child.age} سنة` : `Age: ${child.age} years old`}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                            {language === "ar" ? `المسار: ${child.grade}` : `Track: ${child.grade}`}
+                          </span>
+                          {child.isApproved ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", padding: "4px 10px", borderRadius: "10px", background: "rgba(46, 125, 50, 0.1)", color: "var(--accent-green)", fontSize: "0.75rem", fontWeight: 700 }}>
+                              <FiUserCheck />
+                              {language === "ar" ? "مصرح ونشط" : "Approved"}
+                            </span>
+                          ) : (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", padding: "4px 10px", borderRadius: "10px", background: "rgba(211, 47, 47, 0.1)", color: "#d32f2f", fontSize: "0.75rem", fontWeight: 700 }}>
+                              <FiClock />
+                              {language === "ar" ? "قيد المراجعة" : "Pending Consent"}
+                            </span>
+                          )}
+                        </div>
+
+                        {!child.isApproved && (
+                          <button
+                            type="button"
+                            onClick={() => approveChildProfile(child.userId)}
+                            className="btn btn-primary"
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", padding: "0.6rem", fontSize: "0.85rem" }}
+                          >
+                            <FiUserPlus />
+                            <span>{language === "ar" ? "تفعيل الحساب والموافقة" : "Authorize Child Account"}</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Main Messenger and Directory Split Layout */}
+            <div className="grid-cols-2" style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: "2rem" }}>
+              
+              {/* Left Side: Messenger Direct DM Panel */}
+              <section className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", minHeight: "550px" }}>
+                {!chatRecipient ? (
+                  /* No chat recipient selected */
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", gap: "1rem", padding: "2rem" }}>
+                    <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "rgba(16, 107, 163, 0.05)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem", animation: "pulse 2s infinite" }}>
+                      <FiMessageSquare style={{ fontSize: "2.5rem", color: "var(--primary)" }} />
+                    </div>
+                    <h3 style={{ fontSize: "1.25rem", margin: 0 }}>{language === "ar" ? "مراسلات آمنة ومباشرة" : "Secure Direct Messenger"}</h3>
+                    <p style={{ color: "#6a7c88", fontSize: "0.9rem", maxWidth: "340px", lineHeight: "1.6", margin: 0 }}>
+                      {language === "ar"
+                        ? "اختر صديقاً من قائمتك أو ابحث عن مستخدمين في الدليل لبدء محادثة مشفرة وآمنة في الوقت الفعلي."
+                        : "Select a friend from your roster or discover users in the platform directory to exchange private messages."}
+                    </p>
+                  </div>
+                ) : (
+                  /* Chat client active */
+                  <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                    {/* Chat Header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span style={{ fontSize: "2.2rem" }}>{chatRecipient.avatar || "👤"}</span>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{chatRecipient.name}</strong>
+                          <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                            {chatRecipient.userType === "student" ? (language === "ar" ? "طالب" : "Student") :
+                             chatRecipient.userType === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
+                             chatRecipient.userType === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
+                             (language === "ar" ? "مشرف" : "Admin")}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setChatRecipient(null)}
+                        style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", display: "flex", alignItems: "center", padding: "0.5rem", borderRadius: "50%", transition: "background 0.2s ease" }}
+                        className="btn-close-chat"
+                        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.05)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                        aria-label="Close Chat"
+                      >
+                        <FiX />
+                      </button>
+                    </div>
+
+                    {/* Messages Body */}
+                    <div
+                      style={{
+                        flex: 1,
+                        maxHeight: "350px",
+                        overflowY: "auto",
+                        padding: "0.5rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.85rem",
+                        marginBottom: "1rem",
+                      }}
+                      className="custom-scrollbar"
+                    >
+                      {chatLoading ? (
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", gap: "0.5rem", color: "#6a7c88" }}>
+                          <FiRefreshCw className="spinning-icon" />
+                          <span>{language === "ar" ? "جاري جلب الرسائل..." : "Retrieving history..."}</span>
+                        </div>
+                      ) : chatMessages.length === 0 ? (
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#8a9ca8", fontSize: "0.9rem" }}>
+                          {language === "ar" ? "ابدأ المحادثة الآن! اكتب رسالة أدناه 👇" : "No messages yet. Send a friendly hello! 👇"}
+                        </div>
+                      ) : (
+                        chatMessages.map((msg: any, index: number) => {
+                          const isMe = msg.senderId === user?.uid;
+                          let timeStr = "";
+                          try {
+                            timeStr = new Date(msg.timestamp).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
+                          } catch (_) {}
+
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: isMe ? "flex-end" : "flex-start",
+                                alignSelf: isMe ? "flex-end" : "flex-start",
+                                maxWidth: "85%"
+                              }}
+                            >
+                              <div
+                                style={{
+                                  padding: "0.75rem 1rem",
+                                  borderRadius: isMe 
+                                    ? (language === "ar" ? "16px 16px 4px 16px" : "16px 16px 16px 4px")
+                                    : (language === "ar" ? "16px 16px 16px 4px" : "16px 16px 4px 16px"),
+                                  background: isMe 
+                                    ? "linear-gradient(135deg, var(--primary), var(--secondary))" 
+                                    : "rgba(255,255,255,0.75)",
+                                  color: isMe ? "#ffffff" : "var(--foreground)",
+                                  border: isMe ? "none" : "1px solid var(--card-border)",
+                                  boxShadow: "var(--shadow-sm)",
+                                  fontSize: "0.95rem",
+                                  lineHeight: "1.5",
+                                  textAlign: language === "ar" ? "right" : "left",
+                                  wordBreak: "break-word"
+                                }}
+                              >
+                                {msg.content}
+                              </div>
+                              <span style={{ fontSize: "0.68rem", color: "#8a9ca8", marginTop: "2px", display: "inline-block", padding: "0 4px" }}>
+                                {timeStr}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Messages Footer Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        sendChatMessage();
+                      }}
+                      style={{ display: "flex", gap: "0.5rem", borderTop: "1px dashed rgba(235, 220, 185, 0.4)", paddingTop: "1rem" }}
+                    >
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder={language === "ar" ? "اكتب رسالة مشفرة..." : "Type a secure message..."}
+                        style={{
+                          flex: 1,
+                          padding: "0.75rem 1rem",
+                          borderRadius: "var(--border-radius-md)",
+                          border: "1px solid var(--card-border)",
+                          outline: "none",
+                          fontFamily: "var(--font-sans)",
+                          background: "#ffffff",
+                          fontSize: "0.95rem"
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim()}
+                        className="btn btn-primary"
+                        style={{ padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        <FiSend />
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </section>
+
+              {/* Right Side: Connections list & Directory */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+                
+                {/* Connections (Friends list) */}
+                <section className="panel-card" style={{ padding: "1.5rem" }}>
+                  <h2 style={{ fontSize: "1.2rem", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.3)", paddingBottom: "0.5rem", fontWeight: 800 }}>
+                    <FiUserCheck style={{ color: "var(--accent-green)" }} />
+                    <span>{language === "ar" ? "قائمة الأصدقاء" : "Your Friend Circle"}</span>
+                  </h2>
+
+                  {userProfile?.friends?.length === 0 ? (
+                    <div style={{ padding: "1rem", borderRadius: "var(--border-radius-md)", background: "rgba(255,255,255,0.4)", border: "1px dashed var(--card-border)", textAlign: "center", color: "#6a7c88", fontSize: "0.85rem" }}>
+                      {language === "ar" 
+                        ? "لم تقم بإضافة أي أصدقاء بعد. تصفح الدليل في الأسفل وأضف زملاء دراسة!" 
+                        : "No friends added to your circle yet. Add classmates below!"}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "200px", overflowY: "auto" }} className="custom-scrollbar">
+                      {allUsers
+                        .filter((u: any) => userProfile?.friends?.includes(u.userId))
+                        .map((friend: any) => (
+                          <div
+                            key={friend.userId}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "0.6rem 0.85rem",
+                              borderRadius: "var(--border-radius-sm)",
+                              background: "rgba(255,255,255,0.6)",
+                              border: "1px solid var(--card-border)",
+                              boxShadow: "var(--shadow-sm)"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <span style={{ fontSize: "1.5rem" }}>{friend.avatar || "👤"}</span>
+                              <div style={{ display: "flex", flexDirection: "column" }}>
+                                <strong style={{ fontSize: "0.9rem", color: "var(--foreground)" }}>{friend.name}</strong>
+                                <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{friend.email}</span>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setChatRecipient(friend);
+                                  fetchChatMessages(friend.userId);
+                                }}
+                                className="btn btn-secondary"
+                                style={{ padding: "0.35rem 0.65rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                              >
+                                <FiMessageSquare />
+                                <span>{language === "ar" ? "دردشة" : "Chat"}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFriend(friend)}
+                                style={{ background: "rgba(211, 47, 47, 0.08)", color: "#d32f2f", border: "1px solid rgba(211, 47, 47, 0.2)", padding: "0.35rem 0.65rem", borderRadius: "var(--border-radius-sm)", fontSize: "0.75rem", cursor: "pointer", fontWeight: 700 }}
+                              >
+                                {language === "ar" ? "حذف" : "Remove"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* Directory */}
+                <section className="panel-card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column" }}>
+                  <h2 style={{ fontSize: "1.2rem", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.3)", paddingBottom: "0.5rem", fontWeight: 800 }}>
+                    <FiUsers style={{ color: "var(--primary)" }} />
+                    <span>{language === "ar" ? "دليل مستخدمي المنصة" : "Discover Members & Directory"}</span>
+                  </h2>
+
+                  {/* Search bar */}
+                  <div style={{ position: "relative", marginBottom: "1rem" }}>
+                    <input
+                      type="text"
+                      value={directorySearch}
+                      onChange={(e) => setDirectorySearch(e.target.value)}
+                      placeholder={language === "ar" ? "ابحث عن مستخدمين بالاسم، البريد أو الدور..." : "Search by name, email, or role..."}
+                      style={{
+                        width: "100%",
+                        padding: "0.6rem 1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff",
+                        fontSize: "0.85rem"
+                      }}
+                    />
+                  </div>
+
+                  {loadingAllUsers ? (
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "2rem", gap: "0.5rem", color: "#6a7c88" }}>
+                      <FiRefreshCw className="spinning-icon" />
+                      <span>{language === "ar" ? "جاري تحميل الدليل..." : "Loading directory list..."}</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "280px", overflowY: "auto" }} className="custom-scrollbar">
+                      {allUsers
+                        .filter((u: any) => u.userId !== user?.uid) // Exclude current user
+                        .filter((u: any) => {
+                          const s = directorySearch.toLowerCase();
+                          return (
+                            (u.name || "").toLowerCase().includes(s) ||
+                            (u.email || "").toLowerCase().includes(s) ||
+                            (u.userType || u.role || "").toLowerCase().includes(s) ||
+                            (u.country || "").toLowerCase().includes(s)
+                          );
+                        })
+                        .map((dirUser: any) => {
+                          const isFriend = userProfile?.friends?.includes(dirUser.userId);
+                          
+                          // Custom styling for role badge
+                          let badgeBg = "rgba(16, 107, 163, 0.08)";
+                          let badgeColor = "var(--primary)";
+                          let roleName = dirUser.userType || dirUser.role || "student";
+                          if (roleName === "admin") {
+                            badgeBg = "rgba(198, 40, 40, 0.08)";
+                            badgeColor = "#c62828";
+                          } else if (roleName === "teacher") {
+                            badgeBg = "rgba(245, 194, 66, 0.1)";
+                            badgeColor = "var(--secondary-hover)";
+                          } else if (roleName === "parent") {
+                            badgeBg = "rgba(46, 125, 50, 0.08)";
+                            badgeColor = "var(--accent-green)";
+                          }
+
+                          return (
+                            <div
+                              key={dirUser.userId}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "0.6rem 0.85rem",
+                                borderRadius: "var(--border-radius-sm)",
+                                background: "rgba(255,255,255,0.45)",
+                                border: "1px solid var(--card-border)",
+                                boxShadow: "var(--shadow-sm)",
+                                transition: "all 0.2s ease"
+                              }}
+                              className="directory-item"
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                <span style={{ fontSize: "1.8rem" }}>{dirUser.avatar || "👤"}</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                    <strong style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>{dirUser.name}</strong>
+                                    <span style={{ fontSize: "0.65rem", padding: "2px 6px", borderRadius: "8px", background: badgeBg, color: badgeColor, fontWeight: 700, textTransform: "capitalize" }}>
+                                      {roleName === "student" ? (language === "ar" ? "طالب" : "Student") :
+                                       roleName === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
+                                       roleName === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
+                                       (language === "ar" ? "مشرف" : "Admin")}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{dirUser.email}</span>
+                                  {dirUser.school && (
+                                    <span style={{ fontSize: "0.68rem", color: "var(--primary)" }}>🏫 {dirUser.school}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ display: "flex", gap: "0.35rem" }}>
+                                {/* Profile Link */}
+                                <a
+                                  href={`/${language}/profile/${dirUser.userId}`}
+                                  className="btn btn-secondary"
+                                  style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem", display: "flex", alignItems: "center", textDecoration: "none" }}
+                                >
+                                  <FiUser />
+                                </a>
+
+                                {/* Add/Remove Friend */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFriend(dirUser)}
+                                  className={isFriend ? "btn btn-secondary" : "btn btn-primary"}
+                                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                                >
+                                  {isFriend ? (
+                                    <>
+                                      <FiUserMinus />
+                                      <span>{language === "ar" ? "حذف" : "Remove"}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FiUserPlus />
+                                      <span>{language === "ar" ? "صديق" : "Add Friend"}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </section>
+              </div>
+
+            </div>
+          </div>
+        ) : activeTab === "settings" ? (
+          /* Preferences & Privacy panel */
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            <section className="panel-card" style={{ padding: "2rem" }}>
+              <h2 style={{ fontSize: "1.5rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem", fontWeight: 800 }}>
+                <FiSettings style={{ color: "var(--primary)" }} />
+                <span>{language === "ar" ? "مركز الحساب والخصوصية" : "Account & Privacy Center"}</span>
+              </h2>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }} className="grid-cols-2">
+                {/* School Preferences */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
+                    {language === "ar" ? "المدرسة أو المؤسسة التعليمية" : "School or Educational Institution"}
+                  </label>
+                  <input
+                    type="text"
+                    value={preferencesSchool}
+                    onChange={(e) => setPreferencesSchool(e.target.value)}
+                    placeholder={language === "ar" ? "أدخل اسم مدرستك" : "Enter your school name"}
+                    style={{
+                      padding: "0.85rem 1.1rem",
+                      borderRadius: "var(--border-radius-md)",
+                      border: "1px solid var(--card-border)",
+                      outline: "none",
+                      fontFamily: "var(--font-sans)",
+                      background: "#ffffff",
+                      fontSize: "0.95rem",
+                      boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
+                      transition: "border-color 0.2s ease"
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
+                    onBlur={(e) => e.target.style.borderColor = "var(--card-border)"}
+                  />
+                </div>
+
+                {/* Profile Visibility */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
+                    {language === "ar" ? "ظهور الملف الشخصي" : "Profile Visibility"}
+                  </label>
+                  <select
+                    value={privacyVisibility}
+                    onChange={(e: any) => setPrivacyVisibility(e.target.value)}
+                    style={{
+                      padding: "0.85rem 1.1rem",
+                      borderRadius: "var(--border-radius-md)",
+                      border: "1px solid var(--card-border)",
+                      outline: "none",
+                      fontFamily: "var(--font-sans)",
+                      background: "#ffffff",
+                      fontSize: "0.95rem",
+                      boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
+                      transition: "border-color 0.2s ease"
+                    }}
+                  >
+                    <option value="public">{language === "ar" ? "عام (الجميع يمكنه رؤية ملفك)" : "Public (Visible to everyone)"}</option>
+                    <option value="friends">{language === "ar" ? "الأصدقاء فقط" : "Friends Only"}</option>
+                    <option value="private">{language === "ar" ? "خاص (مخفي من الدليل)" : "Private (Hidden from directory)"}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggles & Privacy Settings */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", background: "rgba(255, 255, 255, 0.4)", border: "1px solid rgba(235, 220, 185, 0.25)", borderRadius: "var(--border-radius-md)", padding: "1.5rem", marginBottom: "2rem" }}>
+                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 700 }}>{language === "ar" ? "خيارات الخصوصية والتحكم" : "Privacy & Connection Preferences"}</h3>
+                
+                {/* Messages Switch */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{language === "ar" ? "مراسلات مباشرة" : "Allow Direct Messages"}</span>
+                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{language === "ar" ? "السماح للمستخدمين الآخرين بإرسال رسائل مباشرة إليك" : "Let other active members message you directly"}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={privacyAllowMessages}
+                    onChange={(e) => setPrivacyAllowMessages(e.target.checked)}
+                    style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--primary)" }}
+                  />
+                </div>
+
+                <div style={{ width: "100%", height: "1px", background: "rgba(235, 220, 185, 0.3)" }}></div>
+
+                {/* Show Activity Switch */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{language === "ar" ? "عرض سجل الأنشطة" : "Show Activity Timeline"}</span>
+                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{language === "ar" ? "إظهار سجل أنشطتك واستعلامات الذكاء الاصطناعي في صفحتك العامة" : "Display your study session history and AI interactions on your profile"}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={privacyShowActivity}
+                    onChange={(e) => setPrivacyShowActivity(e.target.checked)}
+                    style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--primary)" }}
+                  />
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="button"
+                onClick={handleUpdatePrivacySettings}
+                className="btn btn-primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", minWidth: "160px" }}
+              >
+                <FiCheckCircle />
+                <span>{language === "ar" ? "حفظ التغييرات" : "Save Settings"}</span>
+              </button>
+            </section>
+
+            {/* Danger Zone */}
+            <section className="panel-card" style={{ padding: "2rem", border: "1px solid rgba(211, 47, 47, 0.25)", background: "rgba(211, 47, 47, 0.03)", borderRadius: "var(--border-radius-md)" }}>
+              <h2 style={{ fontSize: "1.3rem", display: "flex", alignItems: "center", gap: "0.6rem", color: "#c62828", margin: "0 0 1rem 0", fontWeight: 800 }}>
+                <FiAlertTriangle style={{ color: "#d32f2f" }} />
+                <span>{language === "ar" ? "منطقة الخطر: حذف الحساب والبيانات (GDPR)" : "Danger Zone: GDPR Right to be Forgotten"}</span>
+              </h2>
+              <p style={{ fontSize: "0.9rem", color: "#5a6a75", lineHeight: "1.6", marginBottom: "1.5rem" }}>
+                {language === "ar"
+                  ? "بموجب المادة 17 من اللائحة العامة لحماية البيانات (GDPR)، يحق لك طلب حذف حسابك نهائياً من النظام. الضغط على الزر أدناه سيقوم بمسح كامل لملفك الشخصي، وسجلات الدردشة والرسائل المباشرة، وسجل الأنشطة بالكامل، وإحصاءات استهلاك الرموز (Tokens) من خوادمنا بشكل نهائي وغير قابل للاسترجاع."
+                  : "Under Article 17 of the General Data Protection Regulation (GDPR), you hold the right to erasure. Triggering the process below immediately deletes your user profile, chat history, direct messages, study logs, and token telemetry from our MongoDB servers permanently. This action is absolutely irreversible."}
+              </p>
+              <button
+                type="button"
+                onClick={handleDeleteUserAccount}
+                style={{
+                  background: "#d32f2f",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "0.85rem 1.5rem",
+                  borderRadius: "var(--border-radius-md)",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  transition: "background 0.2s ease, transform 0.1s ease"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#c62828"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "#d32f2f"}
+              >
+                <FiTrash2 />
+                <span>{language === "ar" ? "حذف حسابي وكافة بياناتي نهائياً" : "Permanently Erase My Account"}</span>
+              </button>
+            </section>
+          </div>
+        ) : null}
 
         {/* Styled Interactive Footer */}
         <footer className="metadata-footer" style={{ marginTop: "4rem", padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)" }}>

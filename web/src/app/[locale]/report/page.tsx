@@ -166,9 +166,12 @@ export default function ReportPage() {
                     border: "1px solid var(--card-border)",
                     outline: "none",
                     fontFamily: "var(--font-sans)",
-                    background: "rgba(255,255,255,0.8)"
+                    background: currentUser ? "rgba(226, 232, 240, 0.4)" : "rgba(255,255,255,0.8)",
+                    color: currentUser ? "#64748b" : "inherit",
+                    cursor: currentUser ? "not-allowed" : "text",
+                    opacity: currentUser ? 0.75 : 1
                   }}
-                  disabled={loading}
+                  disabled={loading || !!currentUser}
                 />
               </div>
 
@@ -186,9 +189,12 @@ export default function ReportPage() {
                     border: "1px solid var(--card-border)",
                     outline: "none",
                     fontFamily: "var(--font-sans)",
-                    background: "rgba(255,255,255,0.8)"
+                    background: currentUser ? "rgba(226, 232, 240, 0.4)" : "rgba(255,255,255,0.8)",
+                    color: currentUser ? "#64748b" : "inherit",
+                    cursor: currentUser ? "not-allowed" : "text",
+                    opacity: currentUser ? 0.75 : 1
                   }}
-                  disabled={loading}
+                  disabled={loading || !!currentUser}
                 />
               </div>
             </div>

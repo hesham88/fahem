@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
+import { proxyRequest } from "../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ async function checkModelArmor(prompt: string): Promise<{ blocked: boolean; reas
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, language, userEmail, userId } = await req.json();
+    const { prompt, language, userEmail, userId, sessionId } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
@@ -95,6 +96,10 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           const langName = getLanguageName(language || "en");
+          const activeSessionId = sessionId || "sess_" + Date.now();
+
+          // Stream the active session id to the frontend right away
+          controller.enqueue(encoder.encode(`[METADATA] SessionId: ${activeSessionId}\n`));
 
           // Initial terminal logs
           controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
@@ -112,6 +117,17 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encoder.encode(`DENIED: Security Policy Violation. Google Cloud Model Armor template flagged the query as unsafe. Please rephrase your query and try again.`));
             controller.enqueue(encoder.encode("\n==========================\n"));
             controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
+
+            if (userId && userEmail) {
+              await proxyRequest("/user/activity", "POST", {
+                userId,
+                userEmail,
+                action: "Standard Agent Query",
+                status: "BLOCKED",
+                details: "Blocked by GCP Model Armor: " + prompt.substring(0, 150)
+              }).catch(() => {});
+            }
+
             controller.close();
             return;
           }
@@ -343,8 +359,10 @@ ${guardText || "Access unauthorized"}
             }
           });
 
+          let finalResponseText = "";
           for await (const chunk of responseStream) {
             if (chunk.text) {
+              finalResponseText += chunk.text;
               controller.enqueue(encoder.encode(chunk.text));
             }
           }
@@ -357,6 +375,87 @@ ${guardText || "Access unauthorized"}
           controller.enqueue(encoder.encode(`[METADATA] Duration: Orchestrator: ${orchDuration}s\n`));
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
           controller.enqueue(encoder.encode(`\n[CLOSE] Execution complete. Total time: ${(((performance.now() - guardStart)) / 1000).toFixed(2)}s\n`));
+
+          // -------------------------------------------------------------
+          // STEP 4: Session, Chat, Activity, and Token Logging
+          // -------------------------------------------------------------
+          if (userId && userEmail) {
+            // A. Fetch existing session messages
+            let existingMessages: any[] = [];
+            try {
+              const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
+              if (res.ok) {
+                const data = await res.json();
+                if (data?.session?.messages) {
+                  existingMessages = data.session.messages;
+                }
+              }
+            } catch (err) {
+              console.warn("Failed to fetch existing session:", err);
+            }
+
+            // B. Prepare updated messages list
+            const newMessages = [
+              ...existingMessages,
+              { role: "user", content: prompt, timestamp: new Date().toISOString() },
+              { role: "assistant", content: finalResponseText, timestamp: new Date().toISOString() }
+            ];
+
+            const isNewSession = existingMessages.length === 0;
+            const title = isNewSession 
+              ? (prompt.length > 40 ? prompt.substring(0, 40) + "..." : prompt)
+              : undefined;
+
+            // C. Save Chat Session
+            try {
+              await proxyRequest("/user/chat-session", "POST", {
+                sessionId: activeSessionId,
+                userId,
+                userEmail,
+                title,
+                messages: newMessages
+              });
+            } catch (err) {
+              console.warn("Failed to save session history:", err);
+            }
+
+            // D. Log Token Usage
+            const guardPrompt = guardrailResponse.usageMetadata?.promptTokenCount || Math.ceil(JSON.stringify(reviewPayload).length / 4);
+            const guardComp = guardrailResponse.usageMetadata?.candidatesTokenCount || Math.ceil((guardrailResponse.text || "").length / 4);
+            const orchPrompt = Math.ceil(presentationPrompt.length / 4);
+            const orchComp = Math.ceil(finalResponseText.length / 4);
+
+            const promptTokens = guardPrompt + orchPrompt;
+            const completionTokens = guardComp + orchComp;
+            const totalTokens = promptTokens + completionTokens;
+
+            try {
+              await proxyRequest("/user/token-usage", "POST", {
+                userId,
+                userEmail,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                model: modelName,
+                type: isConfirmed ? "standard_orchestrator" : "guardrail_block"
+              });
+            } catch (err) {
+              console.warn("Failed to log token telemetry:", err);
+            }
+
+            // E. Log User Activity
+            try {
+              await proxyRequest("/user/activity", "POST", {
+                userId,
+                userEmail,
+                action: isConfirmed ? "Standard Agent Query" : "Standard Agent Query (Guardrail Blocked)",
+                status: isConfirmed ? "SUCCESS" : "BLOCKED",
+                details: isConfirmed ? prompt.substring(0, 150) : `Blocked prompt: ${prompt.substring(0, 100)}`
+              });
+            } catch (err) {
+              console.warn("Failed to log user activity:", err);
+            }
+          }
 
         } catch (err: any) {
           console.error("[agent-api] Orchestration failed:", err);

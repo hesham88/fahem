@@ -79,9 +79,12 @@ def scan_files():
                 # 1. Check for competitor keywords (skip for doc files)
                 if not is_doc_file:
                     for kw in COMPETITOR_KEYWORDS:
-                        # Prevent flagging CSS cursor properties in styling files
+                        # Prevent flagging CSS cursor properties or Tailwind classes in styling or component files
                         if kw == "cursor":
-                            if file.endswith('.css') or re.search(r"cursor\s*:\s*['\"]?\w+", content, re.IGNORECASE):
+                            if file.endswith('.css'):
+                                continue
+                            # Avoid flagging cursor if it is followed by hyphen or colon (e.g. cursor-pointer, cursor: "pointer")
+                            if not re.search(r"\bcursor\b(?!\s*[:-].*)", content, re.IGNORECASE):
                                 continue
                         
                         pattern = re.compile(rf"\b{kw}\b", re.IGNORECASE)

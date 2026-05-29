@@ -19,7 +19,10 @@ import {
   FiSearch,
   FiActivity,
   FiAlertTriangle,
-  FiRefreshCw
+  FiRefreshCw,
+  FiTrendingUp,
+  FiUsers,
+  FiUser
 } from "react-icons/fi";
 
 interface NodeDetail {
@@ -97,6 +100,18 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [filterCat, setFilterCat] = useState<"ALL" | "INFO" | "SECURITY" | "DATABASE" | "MODEL_ARMOR">("ALL");
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
+  // Superadmin global metrics & activity trail states
+  const [globalStats, setGlobalStats] = useState<{
+    daily: number;
+    weekly: number;
+    monthly: number;
+    total: number;
+    userBreakdown: { email: string; tokens: number }[];
+  } | null>(null);
+  const [globalActivities, setGlobalActivities] = useState<any[]>([]);
+  const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
+  const [activitySearchQuery, setActivitySearchQuery] = useState("");
+
   useEffect(() => {
     if (!email) return;
 
@@ -121,9 +136,35 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
       }
     };
 
+    const fetchGlobalStats = async () => {
+      setIsLoadingGlobal(true);
+      try {
+        const response = await fetch(`/api/admin/activities?email=${encodeURIComponent(email)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tokenStats) {
+            setGlobalStats(data.tokenStats);
+          }
+          if (data.activities && Array.isArray(data.activities)) {
+            setGlobalActivities(data.activities);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch global stats:", err);
+      } finally {
+        setIsLoadingGlobal(false);
+      }
+    };
+
     fetchLogs();
-    // Refresh logs every 10 seconds automatically
-    const interval = setInterval(fetchLogs, 10000);
+    fetchGlobalStats();
+
+    // Refresh logs & stats every 10 seconds automatically
+    const interval = setInterval(() => {
+      fetchLogs();
+      fetchGlobalStats();
+    }, 10000);
+
     return () => clearInterval(interval);
   }, [email]);
 
@@ -808,6 +849,292 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
               );
             })
           )}
+        </div>
+      </section>
+
+      {/* 4. Executive Global Token Analytics Panel */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+          <div>
+            <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+              <FiTrendingUp style={{ color: "var(--primary)" }} />
+              <span>{language === "ar" ? "التحليلات التنفيذية لاستهلاك الرموز عالمياً" : "Executive Global Token Analytics"}</span>
+            </h2>
+            <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
+              {language === "ar"
+                ? "مراقبة وتحليل منحنيات استهلاك الرموز (Tokens) يومياً، أسبوعياً، وشهرياً لجميع الحسابات."
+                : "Real-time monitoring and reporting of token consumption metrics across Daily, Weekly, Monthly, and Lifetime intervals."}
+            </p>
+          </div>
+          {isLoadingGlobal && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85rem", color: "var(--primary)" }}>
+              <FiRefreshCw className="spinning-icon" />
+              <span>{language === "ar" ? "جاري التحديث..." : "Syncing..."}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Token Stats Grid */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "1.25rem"
+          }}>
+            {[
+              {
+                id: "daily",
+                titleAr: "الاستهلاك اليومي",
+                titleEn: "Daily Consumption",
+                tokens: globalStats?.daily ?? 0,
+                color: "var(--primary)",
+                descAr: "آخر 24 ساعة",
+                descEn: "Last 24 hours"
+              },
+              {
+                id: "weekly",
+                titleAr: "الاستهلاك الأسبوعي",
+                titleEn: "Weekly Consumption",
+                tokens: globalStats?.weekly ?? 0,
+                color: "var(--secondary-hover)",
+                descAr: "آخر 7 أيام",
+                descEn: "Last 7 days"
+              },
+              {
+                id: "monthly",
+                titleAr: "الاستهلاك الشهري",
+                titleEn: "Monthly Consumption",
+                tokens: globalStats?.monthly ?? 0,
+                color: "var(--accent-orange)",
+                descAr: "آخر 30 يوم",
+                descEn: "Last 30 days"
+              },
+              {
+                id: "lifetime",
+                titleAr: "الاستهلاك الإجمالي",
+                titleEn: "Lifetime Consumption",
+                tokens: globalStats?.total ?? 0,
+                color: "var(--accent-green)",
+                descAr: "تراكمي مدى الحياة",
+                descEn: "Cumulative overall"
+              }
+            ].map((card) => (
+              <div key={card.id} style={{
+                padding: "1.25rem",
+                background: "rgba(255, 255, 255, 0.45)",
+                border: "1px solid var(--card-border)",
+                borderRadius: "var(--border-radius-md)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: "var(--shadow-sm)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#6a7c88", fontWeight: 600 }}>
+                    {language === "ar" ? card.titleAr : card.titleEn}
+                  </span>
+                  <div style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: card.color,
+                    animation: "pulse 2s infinite"
+                  }} />
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0" }}>
+                  <span style={{ fontSize: "1.65rem", fontWeight: 800, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                    {(card.tokens || 0).toLocaleString()}
+                  </span>
+                  <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 500 }}>
+                    {language === "ar" ? "رمز" : "tokens"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#5a6e7c" }}>
+                  {language === "ar" ? card.descAr : card.descEn}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Top Consuming Users Table */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.25rem",
+          }}>
+            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 1rem 0" }}>
+              <FiUsers style={{ color: "var(--secondary)" }} />
+              <span>{language === "ar" ? "أكثر المستخدمين استهلاكاً للرموز" : "Top Consuming Users Breakdown"}</span>
+            </h3>
+
+            {!globalStats?.userBreakdown || globalStats.userBreakdown.length === 0 ? (
+              <div style={{ color: "#506578", textAlign: "center", padding: "1.5rem", fontSize: "0.85rem" }}>
+                {language === "ar" ? "لا توجد بيانات استهلاك متاحة حالياً." : "No usage data available."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "250px", overflowY: "auto" }}>
+                {globalStats.userBreakdown.map((user, idx) => {
+                  const maxTokens = globalStats.userBreakdown[0]?.tokens || 1;
+                  const percentage = Math.min(100, Math.round(((user.tokens || 0) / maxTokens) * 100));
+                  return (
+                    <div key={idx} style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.35rem",
+                      padding: "0.75rem",
+                      background: "rgba(255,255,255,0.7)",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(235, 220, 185, 0.4)"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                          {user.email}
+                        </span>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)" }}>
+                          {(user.tokens || 0).toLocaleString()} {language === "ar" ? "رمز" : "tokens"}
+                        </span>
+                      </div>
+                      <div style={{
+                        width: "100%",
+                        height: "6px",
+                        background: "rgba(16, 107, 163, 0.08)",
+                        borderRadius: "50px",
+                        overflow: "hidden"
+                      }}>
+                        <div style={{
+                          width: `${percentage}%`,
+                          height: "100%",
+                          background: "linear-gradient(90deg, var(--primary), var(--secondary))",
+                          borderRadius: "50px"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Global Operational Activity Trail */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+          <div>
+            <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+              <FiActivity style={{ color: "var(--secondary)" }} />
+              <span>{language === "ar" ? "سجل الأنشطة والعمليات العام لفاهم" : "Global Operational Activity Trail"}</span>
+            </h2>
+            <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
+              {language === "ar"
+                ? "تتبع مباشر وتدقيق شامل لجميع استعلامات المستخدمين، عمليات البحث الموثق، والحظر الأمني."
+                : "Real-time ledger auditing all standard queries, grounded searches, blocks, and system events."}
+            </p>
+          </div>
+        </div>
+
+        {/* Filter Controls */}
+        <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.7)", border: "1px solid var(--card-border)", borderRadius: "6px", padding: "0.4rem 0.75rem", flex: 1 }}>
+            <FiSearch style={{ color: "#7a8b9e" }} />
+            <input
+              type="text"
+              placeholder={language === "ar" ? "البحث بالبريد الإلكتروني، العملية، أو الحالة..." : "Filter by email, action, or status..."}
+              value={activitySearchQuery}
+              onChange={(e) => setActivitySearchQuery(e.target.value)}
+              style={{ border: "none", outline: "none", background: "transparent", fontSize: "0.85rem", width: "100%", color: "var(--foreground)" }}
+            />
+          </div>
+        </div>
+
+        {/* Table representation */}
+        <div style={{ overflowX: "auto", background: "rgba(255,255,255,0.4)", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", textAlign: "left" }}>
+            <thead>
+              <tr style={{ background: "rgba(16, 107, 163, 0.04)", borderBottom: "1px solid var(--card-border)" }}>
+                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{language === "ar" ? "المستخدم" : "User"}</th>
+                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{language === "ar" ? "العملية" : "Action"}</th>
+                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{language === "ar" ? "الحالة" : "Status"}</th>
+                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{language === "ar" ? "التوقيت" : "Timestamp"}</th>
+                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{language === "ar" ? "التفاصيل" : "Details"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {globalActivities.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: "2rem", textAlign: "center", color: "#6a7c88" }}>
+                    {language === "ar" ? "لا توجد أنشطة مسجلة حالياً." : "No activities recorded."}
+                  </td>
+                </tr>
+              ) : (
+                globalActivities
+                  .filter((act) => {
+                    if (!activitySearchQuery) return true;
+                    const q = activitySearchQuery.toLowerCase();
+                    return (
+                      (act.userEmail || "").toLowerCase().includes(q) ||
+                      (act.action || "").toLowerCase().includes(q) ||
+                      (act.status || "").toLowerCase().includes(q) ||
+                      (act.details || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .slice(0, 100) // Show up to 100 entries
+                  .map((act, idx) => {
+                    const status = (act.status || "SUCCESS").toUpperCase();
+                    const isSuccess = status === "SUCCESS" || status === "COMPLETED" || status === "PASSED";
+                    const isBlocked = status === "BLOCKED" || status === "DENIED" || status === "CRITICAL";
+                    
+                    let badgeBg = "rgba(16, 107, 163, 0.08)";
+                    let badgeColor = "var(--primary)";
+                    if (isSuccess) {
+                      badgeBg = "rgba(40, 167, 69, 0.08)";
+                      badgeColor = "var(--accent-green)";
+                    } else if (isBlocked) {
+                      badgeBg = "rgba(220, 53, 69, 0.08)";
+                      badgeColor = "#dc3545";
+                    }
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: "1px solid var(--card-border)", transition: "all 0.2s ease" }}>
+                        <td style={{ padding: "0.75rem 1rem", fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--foreground)" }}>
+                          {act.userEmail}
+                        </td>
+                        <td style={{ padding: "0.75rem 1rem", fontWeight: 600 }}>
+                          {act.action}
+                        </td>
+                        <td style={{ padding: "0.75rem 1rem" }}>
+                          <span style={{
+                            padding: "0.25rem 0.5rem",
+                            borderRadius: "4px",
+                            background: badgeBg,
+                            color: badgeColor,
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem"
+                          }}>
+                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: badgeColor, display: "inline-block" }} />
+                            {status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "0.75rem 1rem", color: "#6a7c88", fontSize: "0.8rem" }}>
+                          {new Date(act.timestamp).toLocaleString(language === "ar" ? "ar-EG" : "en-US")}
+                        </td>
+                        <td style={{ padding: "0.75rem 1rem", color: "#4f6371", maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={act.details}>
+                          {act.details}
+                        </td>
+                      </tr>
+                    );
+                  })
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 

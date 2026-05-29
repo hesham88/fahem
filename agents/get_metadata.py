@@ -25,6 +25,7 @@ def get_mcp_toolset():
     return mcp_toolset
 
 _mcp_connected = False
+_indexes_tuned = False
 
 async def _run_mcp_tool(tool_name: str, args: dict) -> json:
     """Helper to programmatically invoke a specific MCP tool inside mcp_toolset."""
@@ -75,6 +76,58 @@ async def get_metadata(database: str = "fahem") -> dict:
             await _run_mcp_tool("connect", {"connectionStringOrClusterName": uri})
         except Exception as conn_err:
             logger.warning(f"Connection over MCP failed: {conn_err}")
+            
+        # Ensure database index-tuning is applied once in the container lifecycle
+        global _indexes_tuned
+        if not _indexes_tuned:
+            try:
+                logger.info("[get_metadata] Initiating auto-healing database schema index tuning...")
+                # 1. Users collection
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "users",
+                    "definition": [{"type": "classic", "keys": {"userId": 1}}],
+                    "name": "idx_userId_unique"
+                })
+                # 2. Messages collection (composite)
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "messages",
+                    "definition": [{"type": "classic", "keys": {"senderId": 1, "recipientId": 1, "timestamp": 1}}],
+                    "name": "idx_sender_recipient_timestamp"
+                })
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "messages",
+                    "definition": [{"type": "classic", "keys": {"recipientId": 1, "senderId": 1, "timestamp": 1}}],
+                    "name": "idx_recipient_sender_timestamp"
+                })
+                # 3. Chat sessions
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "chat_sessions",
+                    "definition": [{"type": "classic", "keys": {"userId": 1}}],
+                    "name": "idx_chats_userId"
+                })
+                # 4. User activities
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "user_activities",
+                    "definition": [{"type": "classic", "keys": {"userId": 1}}],
+                    "name": "idx_activities_userId"
+                })
+                # 5. Token telemetry
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "token_telemetry",
+                    "definition": [{"type": "classic", "keys": {"userId": 1}}],
+                    "name": "idx_telemetry_userId"
+                })
+                _indexes_tuned = True
+                logger.info("[get_metadata] Database schema index tuning completed successfully! 🚀")
+                await log_audit_event("DATABASE", "System", "Database schema indexes tuned successfully.", "Created user, message composite, chat sessions, user activities, and token telemetry indexes.")
+            except Exception as index_err:
+                logger.warning(f"[get_metadata] Non-critical database index-tuning warning: {index_err}")
             
         # 2. Get active collections over MCP
         collections = []
@@ -179,6 +232,626 @@ async def get_audit_logs() -> list:
     except Exception as err:
         logger.warning(f"Failed to fetch audit logs over MCP: {err}")
         return []
+
+async def log_user_activity(user_id: str, user_email: str, action: str, status: str, details: str = None) -> bool:
+    """Inserts a user activity log record into user_activities collection."""
+    try:
+        from datetime import datetime
+        doc = {
+            "userId": user_id,
+            "userEmail": user_email,
+            "action": action,
+            "status": status,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        if details:
+            doc["details"] = details
+            
+        await _run_mcp_tool("insert-many", {
+            "database": "fahem",
+            "collection": "user_activities",
+            "documents": [doc]
+        })
+        logger.info(f"[MCP ACTIVITY LOGGED] {user_email} • {action} - {status}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to log user activity: {err}")
+        return False
+
+async def get_user_activities(user_id: str) -> list:
+    """Fetches up to 100 recent activities for a specific user."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "user_activities",
+            "filter": {"userId": user_id},
+            "options": {
+                "sort": {"timestamp": -1},
+                "limit": 100
+            }
+        })
+        if isinstance(res, list):
+            return res
+        elif isinstance(res, dict) and "documents" in res:
+            return res["documents"]
+        return []
+    except Exception as err:
+        logger.warning(f"Failed to fetch user activities: {err}")
+        return []
+
+async def get_all_activities() -> list:
+    """Fetches up to 200 recent activities globally (for Superadmins)."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "user_activities",
+            "filter": {},
+            "options": {
+                "sort": {"timestamp": -1},
+                "limit": 200
+            }
+        })
+        if isinstance(res, list):
+            return res
+        elif isinstance(res, dict) and "documents" in res:
+            return res["documents"]
+        return []
+    except Exception as err:
+        logger.warning(f"Failed to fetch all activities: {err}")
+        return []
+
+async def save_chat_session(session_id: str, user_id: str, user_email: str, title: str, messages: list) -> bool:
+    """Creates or updates a user chat session in chat_sessions collection."""
+    try:
+        from datetime import datetime
+        now_str = datetime.utcnow().isoformat() + "Z"
+        
+        existing = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"sessionId": session_id}
+        })
+        
+        # Check if existing list has records
+        is_existing = False
+        if isinstance(existing, list) and len(existing) > 0:
+            is_existing = True
+        elif isinstance(existing, dict) and "documents" in existing and len(existing["documents"]) > 0:
+            is_existing = True
+            
+        if is_existing:
+            await _run_mcp_tool("update-many", {
+                "database": "fahem",
+                "collection": "chat_sessions",
+                "filter": {"sessionId": session_id},
+                "update": {
+                    "$set": {
+                        "title": title,
+                        "messages": messages,
+                        "updatedAt": now_str
+                    }
+                }
+            })
+            logger.info(f"[MCP SESSION UPDATED] {session_id} - Title: {title}")
+        else:
+            doc = {
+                "sessionId": session_id,
+                "userId": user_id,
+                "userEmail": user_email,
+                "title": title,
+                "messages": messages,
+                "createdAt": now_str,
+                "updatedAt": now_str
+            }
+            await _run_mcp_tool("insert-many", {
+                "database": "fahem",
+                "collection": "chat_sessions",
+                "documents": [doc]
+            })
+            logger.info(f"[MCP SESSION CREATED] {session_id} - Title: {title}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to save chat session: {err}")
+        return False
+
+async def get_user_sessions(user_id: str) -> list:
+    """Fetches all chat sessions for a specific user (summary list)."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"userId": user_id},
+            "options": {
+                "sort": {"updatedAt": -1}
+            }
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+            
+        list_res = []
+        for doc in docs:
+            list_res.append({
+                "sessionId": doc.get("sessionId"),
+                "userId": doc.get("userId"),
+                "userEmail": doc.get("userEmail"),
+                "title": doc.get("title"),
+                "createdAt": doc.get("createdAt"),
+                "updatedAt": doc.get("updatedAt"),
+                "messageCount": len(doc.get("messages", []))
+            })
+        return list_res
+    except Exception as err:
+        logger.warning(f"Failed to fetch user sessions: {err}")
+        return []
+
+async def get_session_detail(session_id: str) -> dict:
+    """Fetches details (including full message history) of a session."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"sessionId": session_id}
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+            
+        if docs and len(docs) > 0:
+            return docs[0]
+        return {}
+    except Exception as err:
+        logger.warning(f"Failed to fetch session detail: {err}")
+        return {}
+
+async def delete_session(session_id: str) -> bool:
+    """Deletes a specific chat session."""
+    try:
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"sessionId": session_id}
+        })
+        logger.info(f"[MCP SESSION DELETED] {session_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to delete session: {err}")
+        return False
+
+async def log_token_usage(user_id: str, user_email: str, prompt_tokens: int, completion_tokens: int, total_tokens: int, model: str, run_type: str) -> bool:
+    """Logs token usage metrics for telemetry and reporting."""
+    try:
+        from datetime import datetime
+        doc = {
+            "userId": user_id,
+            "userEmail": user_email,
+            "promptTokens": int(prompt_tokens),
+            "completionTokens": int(completion_tokens),
+            "totalTokens": int(total_tokens),
+            "model": model,
+            "type": run_type,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        await _run_mcp_tool("insert-many", {
+            "database": "fahem",
+            "collection": "token_telemetry",
+            "documents": [doc]
+        })
+        logger.info(f"[MCP TOKENS LOGGED] {user_email} • {run_type} • Model: {model} • Total: {total_tokens}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to log token usage: {err}")
+        return False
+
+async def get_user_token_stats(user_id: str) -> dict:
+    """Calculates daily, weekly, monthly, and overall token usage stats for a user."""
+    from datetime import datetime, timedelta
+    try:
+        now = datetime.utcnow()
+        today_start = (now.replace(hour=0, minute=0, second=0, microsecond=0)).isoformat() + "Z"
+        seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
+        thirty_days_ago = (now - timedelta(days=30)).isoformat() + "Z"
+        
+        logs = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "token_telemetry",
+            "filter": {"userId": user_id}
+        })
+        
+        docs = []
+        if isinstance(logs, list):
+            docs = logs
+        elif isinstance(logs, dict) and "documents" in logs:
+            docs = logs["documents"]
+            
+        daily_prompt = 0
+        daily_comp = 0
+        daily_total = 0
+        
+        weekly_prompt = 0
+        weekly_comp = 0
+        weekly_total = 0
+        
+        monthly_prompt = 0
+        monthly_comp = 0
+        monthly_total = 0
+        
+        total_prompt = 0
+        total_comp = 0
+        total_total = 0
+        
+        for doc in docs:
+            pt = int(doc.get("promptTokens", 0))
+            ct = int(doc.get("completionTokens", 0))
+            tt = int(doc.get("totalTokens", 0))
+            ts = doc.get("timestamp", "")
+            
+            total_prompt += pt
+            total_comp += ct
+            total_total += tt
+            
+            if ts >= today_start:
+                daily_prompt += pt
+                daily_comp += ct
+                daily_total += tt
+                
+            if ts >= seven_days_ago:
+                weekly_prompt += pt
+                weekly_comp += ct
+                weekly_total += tt
+                
+            if ts >= thirty_days_ago:
+                monthly_prompt += pt
+                monthly_comp += ct
+                monthly_total += tt
+                
+        return {
+            "daily": {"prompt": daily_prompt, "completion": daily_comp, "total": daily_total},
+            "weekly": {"prompt": weekly_prompt, "completion": weekly_comp, "total": weekly_total},
+            "monthly": {"prompt": monthly_prompt, "completion": monthly_comp, "total": monthly_total},
+            "total": {"prompt": total_prompt, "completion": total_comp, "total": total_total}
+        }
+    except Exception as err:
+        logger.error(f"Failed to aggregate token stats: {err}")
+        return {
+            "daily": {"prompt": 0, "completion": 0, "total": 0},
+            "weekly": {"prompt": 0, "completion": 0, "total": 0},
+            "monthly": {"prompt": 0, "completion": 0, "total": 0},
+            "total": {"prompt": 0, "completion": 0, "total": 0}
+        }
+
+async def get_global_token_stats() -> dict:
+    """Calculates global daily, weekly, monthly, and overall token usage stats with user breakdown (Superadmins)."""
+    from datetime import datetime, timedelta
+    try:
+        now = datetime.utcnow()
+        today_start = (now.replace(hour=0, minute=0, second=0, microsecond=0)).isoformat() + "Z"
+        seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
+        thirty_days_ago = (now - timedelta(days=30)).isoformat() + "Z"
+        
+        logs = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "token_telemetry",
+            "filter": {}
+        })
+        
+        docs = []
+        if isinstance(logs, list):
+            docs = logs
+        elif isinstance(logs, dict) and "documents" in logs:
+            docs = logs["documents"]
+            
+        daily_total = 0
+        weekly_total = 0
+        monthly_total = 0
+        lifetime_total = 0
+        
+        user_breakdown = {}
+        
+        for doc in docs:
+            tt = int(doc.get("totalTokens", 0))
+            ts = doc.get("timestamp", "")
+            email = doc.get("userEmail", "anonymous")
+            if not email:
+                email = "anonymous"
+            
+            lifetime_total += tt
+            if ts >= today_start:
+                daily_total += tt
+            if ts >= seven_days_ago:
+                weekly_total += tt
+            if ts >= thirty_days_ago:
+                monthly_total += tt
+                
+            user_breakdown[email] = user_breakdown.get(email, 0) + tt
+            
+        breakdown_list = [{"email": k, "tokens": v} for k, v in user_breakdown.items()]
+        breakdown_list.sort(key=lambda x: x["tokens"], reverse=True)
+        
+        return {
+            "daily": daily_total,
+            "weekly": weekly_total,
+            "monthly": monthly_total,
+            "total": lifetime_total,
+            "userBreakdown": breakdown_list[:10]
+        }
+    except Exception as err:
+        logger.error(f"Failed to get global token stats: {err}")
+        return {
+            "daily": 0,
+            "weekly": 0,
+            "monthly": 0,
+            "total": 0,
+            "userBreakdown": []
+        }
+
+async def get_user_profile(user_id: str) -> dict:
+    """Fetches user profile from the 'users' collection."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": user_id}
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+        elif isinstance(res, dict) and "result" in res:
+            docs = res["result"]
+            
+        if docs and len(docs) > 0:
+            return docs[0]
+        return {}
+    except Exception as err:
+        logger.warning(f"Failed to fetch user profile for {user_id}: {err}")
+        return {}
+
+async def save_user_profile(user_id: str, data: dict) -> bool:
+    """Saves or updates a user profile in the 'users' collection."""
+    try:
+        from datetime import datetime
+        now_str = datetime.utcnow().isoformat() + "Z"
+        
+        existing = await get_user_profile(user_id)
+        if existing:
+            # Update existing
+            update_data = {**data, "updatedAt": now_str}
+            # Remove mongo internal fields if present
+            update_data.pop("_id", None)
+            update_data.pop("userId", None)
+            
+            await _run_mcp_tool("update-many", {
+                "database": "fahem",
+                "collection": "users",
+                "filter": {"userId": user_id},
+                "update": {"$set": update_data}
+            })
+            logger.info(f"[MCP PROFILE UPDATED] {user_id}")
+        else:
+            # Insert new
+            doc = {
+                "userId": user_id,
+                **data,
+                "createdAt": now_str,
+                "updatedAt": now_str
+            }
+            await _run_mcp_tool("insert-many", {
+                "database": "fahem",
+                "collection": "users",
+                "documents": [doc]
+            })
+            logger.info(f"[MCP PROFILE CREATED] {user_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to save user profile: {err}")
+        return False
+
+async def delete_user_account(user_id: str, email: str) -> bool:
+    """GDPR compliant deletion of all user records across all collection types."""
+    try:
+        # Delete user profile
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": user_id}
+        })
+        # Delete chat sessions
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"userId": user_id}
+        })
+        # Delete activities
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "user_activities",
+            "filter": {"userId": user_id}
+        })
+        # Delete telemetry
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "token_telemetry",
+            "filter": {"userId": user_id}
+        })
+        # Delete chat messages
+        await _run_mcp_tool("delete-many", {
+            "database": "fahem",
+            "collection": "messages",
+            "filter": {
+                "$or": [
+                    {"senderId": user_id},
+                    {"recipientId": user_id}
+                ]
+            }
+        })
+        logger.info(f"[MCP GDPR DELETION COMPLETED] User ID: {user_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to delete user account: {err}")
+        return False
+
+async def get_all_users() -> list:
+    """Fetches list of all registered users on the platform."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {}
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+        elif isinstance(res, dict) and "result" in res:
+            docs = res["result"]
+        return docs
+    except Exception as err:
+        logger.warning(f"Failed to fetch all users: {err}")
+        return []
+
+async def add_friend(user_id: str, friend_id: str) -> bool:
+    """Adds a bidirectional friendship between user_id and friend_id."""
+    try:
+        # 1. Update user_id's friends list
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": user_id},
+            "update": {"$addToSet": {"friends": friend_id}}
+        })
+        # 2. Update friend_id's friends list
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": friend_id},
+            "update": {"$addToSet": {"friends": user_id}}
+        })
+        logger.info(f"[MCP BI-FRIENDSHIP ESTABLISHED] {user_id} <-> {friend_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to add friend: {err}")
+        return False
+
+async def remove_friend(user_id: str, friend_id: str) -> bool:
+    """Removes bidirectional friendship between user_id and friend_id."""
+    try:
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": user_id},
+            "update": {"$pull": {"friends": friend_id}}
+        })
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": friend_id},
+            "update": {"$pull": {"friends": user_id}}
+        })
+        logger.info(f"[MCP BI-FRIENDSHIP SEVERED] {user_id} <-> {friend_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to remove friend: {err}")
+        return False
+
+async def save_chat_message(sender_id: str, sender_name: str, recipient_id: str, content: str, is_group: bool) -> bool:
+    """Persists direct or group chat messages."""
+    try:
+        from datetime import datetime
+        doc = {
+            "senderId": sender_id,
+            "senderName": sender_name,
+            "recipientId": recipient_id,
+            "content": content,
+            "isGroup": is_group,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        await _run_mcp_tool("insert-many", {
+            "database": "fahem",
+            "collection": "messages",
+            "documents": [doc]
+        })
+        logger.info(f"[MCP MSG SENT] {sender_name} -> {recipient_id} (Group: {is_group})")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to save chat message: {err}")
+        return False
+
+async def get_chat_history(sender_id: str, recipient_id: str, is_group: bool) -> list:
+    """Fetches message history between two users or within a group."""
+    try:
+        if is_group:
+            filt = {"recipientId": recipient_id, "isGroup": True}
+        else:
+            filt = {
+                "isGroup": False,
+                "$or": [
+                    {"senderId": sender_id, "recipientId": recipient_id},
+                    {"senderId": recipient_id, "recipientId": sender_id}
+                ]
+            }
+            
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "messages",
+            "filter": filt,
+            "options": {
+                "sort": {"timestamp": 1},
+                "limit": 200
+            }
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+        elif isinstance(res, dict) and "result" in res:
+            docs = res["result"]
+        return docs
+    except Exception as err:
+        logger.warning(f"Failed to fetch chat history: {err}")
+        return []
+
+async def get_pending_children(parent_email: str) -> list:
+    """Fetches underage students associated with parent_email."""
+    try:
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"parentEmail": parent_email.strip().lower()}
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+        elif isinstance(res, dict) and "result" in res:
+            docs = res["result"]
+        return docs
+    except Exception as err:
+        logger.warning(f"Failed to get pending children: {err}")
+        return []
+
+async def approve_child(parent_email: str, child_id: str) -> bool:
+    """Approves a child profile pending review."""
+    try:
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"userId": child_id, "parentEmail": parent_email.strip().lower()},
+            "update": {"$set": {"isApproved": True}}
+        })
+        logger.info(f"[MCP CHILD APPROVED] Parent: {parent_email} -> Child: {child_id}")
+        return True
+    except Exception as err:
+        logger.warning(f"Failed to approve child: {err}")
+        return False
 
 if __name__ == "__main__":
     # Load env variables relative to agents path if needed
