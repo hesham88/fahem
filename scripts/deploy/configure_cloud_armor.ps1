@@ -45,7 +45,7 @@ try {
     gcloud compute security-policies create $PolicyName `
         --description "Cloud Armor WAF and rate limiting policy for Fahem Backend API" `
         --quiet
-    Write-Host "✓ Security policy '$PolicyName' created successfully." -ForegroundColor Green
+    Write-Host "[OK] Security policy '$PolicyName' created successfully." -ForegroundColor Green
 } catch {
     Write-Host "Policy might already exist. Continuing to configure rules..." -ForegroundColor Gray
 }
@@ -62,7 +62,7 @@ try {
         --action "deny-403" `
         --description "Block SQL Injection attacks" `
         --quiet
-    Write-Host "   ✓ SQL Injection rule configured." -ForegroundColor Green
+    Write-Host "   [OK] SQL Injection rule configured." -ForegroundColor Green
 } catch {
     Write-Host "   (Rule 1000 already configured or failed to create)" -ForegroundColor DarkGray
 }
@@ -76,7 +76,7 @@ try {
         --action "deny-403" `
         --description "Block Cross-Site Scripting attacks" `
         --quiet
-    Write-Host "   ✓ XSS rule configured." -ForegroundColor Green
+    Write-Host "   [OK] XSS rule configured." -ForegroundColor Green
 } catch {
     Write-Host "   (Rule 1010 already configured or failed to create)" -ForegroundColor DarkGray
 }
@@ -90,7 +90,7 @@ try {
         --action "deny-403" `
         --description "Block Remote Code Execution attacks" `
         --quiet
-    Write-Host "   ✓ RCE rule configured." -ForegroundColor Green
+    Write-Host "   [OK] RCE rule configured." -ForegroundColor Green
 } catch {
     Write-Host "   (Rule 1020 already configured or failed to create)" -ForegroundColor DarkGray
 }
@@ -104,7 +104,7 @@ try {
         --action "deny-403" `
         --description "Block Local File Inclusion attacks" `
         --quiet
-    Write-Host "   ✓ LFI rule configured." -ForegroundColor Green
+    Write-Host "   [OK] LFI rule configured." -ForegroundColor Green
 } catch {
     Write-Host "   (Rule 1030 already configured or failed to create)" -ForegroundColor DarkGray
 }
@@ -115,7 +115,7 @@ try {
     gcloud compute security-policies rules create 2000 `
         --security-policy $PolicyName `
         --expression "true" `
-        --action "rate-limit" `
+        --action "throttle" `
         --rate-limit-threshold-count 100 `
         --rate-limit-threshold-interval-sec 60 `
         --conform-action "allow" `
@@ -126,7 +126,7 @@ try {
         --ban-duration-sec 300 `
         --description "Limit requests to 100/min and ban IP for 5 minutes if exceeded" `
         --quiet
-    Write-Host "   ✓ DDoS rate-limiting rule configured." -ForegroundColor Green
+    Write-Host "   [OK] DDoS rate-limiting rule configured." -ForegroundColor Green
 } catch {
     Write-Host "   (Rule 2000 already configured or failed to create)" -ForegroundColor DarkGray
 }
@@ -140,7 +140,7 @@ try {
         --network-endpoint-type=serverless `
         --cloud-run-service=$Service `
         --quiet
-    Write-Host "✓ Serverless NEG '$NegName' created." -ForegroundColor Green
+    Write-Host "[OK] Serverless NEG '$NegName' created." -ForegroundColor Green
 } catch {
     Write-Host "   (Serverless NEG already exists or failed to create)" -ForegroundColor DarkGray
 }
@@ -153,7 +153,7 @@ try {
         --global `
         --load-balancing-scheme=EXTERNAL_MANAGED `
         --quiet
-    Write-Host "✓ Global Backend Service '$BackendService' created." -ForegroundColor Green
+    Write-Host "[OK] Global Backend Service '$BackendService' created." -ForegroundColor Green
 } catch {
     Write-Host "   Backend Service may already exist. Continuing..." -ForegroundColor Gray
 }
@@ -166,7 +166,7 @@ try {
         --network-endpoint-group=$NegName `
         --network-endpoint-group-region=$Region `
         --quiet
-    Write-Host "   ✓ Cloud Run Backend linked successfully." -ForegroundColor Green
+    Write-Host "   [OK] Cloud Run Backend linked successfully." -ForegroundColor Green
 } catch {
     Write-Host "   (Backend was already added or linking failed)" -ForegroundColor DarkGray
 }
@@ -178,7 +178,7 @@ try {
         --global `
         --security-policy=$PolicyName `
         --quiet
-    Write-Host "   ✓ Cloud Armor security policy bound to '$BackendService'!" -ForegroundColor Green
+    Write-Host "   [OK] Cloud Armor security policy bound to '$BackendService'!" -ForegroundColor Green
 } catch {
     Write-Error "   Failed to attach security policy to backend service."
 }
@@ -194,7 +194,7 @@ try {
     gcloud compute url-maps create $UrlMap `
         --default-service=$BackendService `
         --quiet
-    Write-Host "✓ URL Map '$UrlMap' configured." -ForegroundColor Green
+    Write-Host "[OK] URL Map '$UrlMap' configured." -ForegroundColor Green
 } catch {
     Write-Host "   (URL Map already exists)" -ForegroundColor DarkGray
 }
@@ -204,21 +204,30 @@ try {
     gcloud compute target-http-proxies create $TargetProxy `
         --url-map=$UrlMap `
         --quiet
-    Write-Host "✓ Target HTTP Proxy '$TargetProxy' configured." -ForegroundColor Green
+    Write-Host "[OK] Target HTTP Proxy '$TargetProxy' configured." -ForegroundColor Green
 } catch {
     Write-Host "   (HTTP Proxy already exists)" -ForegroundColor DarkGray
 }
 
 # Create Forwarding Rule (exposes global external IPv4 frontend)
+$RuleCreated = $false
 try {
     gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
-    Write-Host "✓ Global HTTP Forwarding Rule '$ForwardingRule' created!" -ForegroundColor Green
+    Write-Host "[OK] Global HTTP Forwarding Rule '$ForwardingRule' created!" -ForegroundColor Green
+    $RuleCreated = $true
 } catch {
-    # Fallback if static IP resource does not exist yet (creates static IP and forwarding rule dynamically)
+    # If it failed, we will attempt to create the static IP first and retry
+}
+
+if (-not $RuleCreated) {
     try {
         gcloud compute addresses create fahem-lb-static-ip --global --quiet
+    } catch {
+        # Address may already exist
+    }
+    try {
         gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
-        Write-Host "✓ Global HTTP Forwarding Rule with static IP created!" -ForegroundColor Green
+        Write-Host "[OK] Global HTTP Forwarding Rule with static IP created!" -ForegroundColor Green
     } catch {
         Write-Host "   (Forwarding Rule configuration already complete or failed to bind)" -ForegroundColor DarkGray
     }

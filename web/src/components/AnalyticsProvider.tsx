@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { logPageView, logClick, logError, getClientGeoInfo } from "../lib/logger";
 
-export default function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+function AnalyticsTrackerInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activePathRef = useRef<string>("");
 
-  // 1. Page View Tracking
   useEffect(() => {
     const paramsStr = searchParams?.toString();
     const fullPath = pathname + (paramsStr ? `?${paramsStr}` : "");
@@ -21,7 +20,11 @@ export default function AnalyticsProvider({ children }: { children: React.ReactN
     }
   }, [pathname, searchParams]);
 
-  // 2. Click and Interaction Tracking & Global Error Logging
+  return null;
+}
+
+export default function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  // 1. Setup global handlers on mount (non-search params dependent logic)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -123,5 +126,12 @@ export default function AnalyticsProvider({ children }: { children: React.ReactN
     };
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      <Suspense fallback={null}>
+        <AnalyticsTrackerInner />
+      </Suspense>
+      {children}
+    </>
+  );
 }
