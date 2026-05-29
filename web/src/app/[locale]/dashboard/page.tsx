@@ -37,11 +37,66 @@ interface PresetQuery {
   query: string;
 }
 
+const telemetryTranslations = {
+  en: {
+    telemetryTitle: "Sub-Agent Execution Telemetry",
+    activeAgent: "Active Agent:",
+    guardrailName: "Guardrail Audit",
+    dbEngineName: "Database Engine",
+    orchestratorName: "Orchestrator",
+    groundedTitle: "Grounded Multi-Agent Telemetry",
+    groundedSearchName: "Grounded Search",
+    stylizerName: "Stylizer",
+    statusAuditing: "Auditing...",
+    statusQuerying: "Querying...",
+    statusFormatting: "Formatting...",
+    statusSearching: "Searching...",
+    statusStylizing: "Stylizing...",
+    statusCompleted: "Passed",
+    statusExecuted: "Executed",
+    statusStructured: "Structured",
+    statusFound: "Sourced",
+    statusStylized: "Stylized",
+    statusIdle: "Idle",
+    unitMs: "ms",
+    unitSec: "s"
+  },
+  ar: {
+    telemetryTitle: "مؤشرات تشغيل الوكلاء الفرعيين",
+    activeAgent: "الوكيل النشط حالياً:",
+    guardrailName: "مراجعة الحماية والأمان",
+    dbEngineName: "محرك الاستعلام وقاعدة البيانات",
+    orchestratorName: "منسق المخرجات والعرض",
+    groundedTitle: "تتبع البحث الموثق متعدد الوكلاء",
+    groundedSearchName: "محرك البحث والتقصي",
+    stylizerName: "منسق الأسلوب والصياغة",
+    statusAuditing: "جاري التدقيق والأمان...",
+    statusQuerying: "جاري استعلام البيانات...",
+    statusFormatting: "جاري تنظيم وهيكلة البيانات...",
+    statusSearching: "جاري البحث والتقصي...",
+    statusStylizing: "جاري صياغة وتنسيق الأسلوب...",
+    statusCompleted: "تم التدقيق بنجاح",
+    statusExecuted: "تم الاستعلام بنجاح",
+    statusStructured: "تمت الهيكلة بنجاح",
+    statusFound: "تم العثور والمطابقة",
+    statusStylized: "تم التنسيق النهائي",
+    statusIdle: "في الانتظار",
+    unitMs: "ملي ثانية",
+    unitSec: "ثانية"
+  }
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
+
+  const getTelemetryT = (key: keyof typeof telemetryTranslations.en) => {
+    const lang = (language as keyof typeof telemetryTranslations) || "en";
+    const dictionary = telemetryTranslations[lang] || telemetryTranslations.en;
+    return dictionary[key] || telemetryTranslations.en[key];
+  };
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,6 +114,17 @@ export default function Dashboard() {
   const [groundedLogs, setGroundedLogs] = useState<string[]>([]);
   const [groundedResult, setGroundedResult] = useState("");
   const groundedLogsEndRef = useRef<HTMLDivElement>(null);
+
+  // Real-time Multi-Agent Telemetry State (MongoDB Engine)
+  const [activeDbAgent, setActiveDbAgent] = useState<string>("idle");
+  const [dbGuardTime, setDbGuardTime] = useState<string>("");
+  const [dbEngineTime, setDbEngineTime] = useState<string>("");
+  const [dbOrchTime, setDbOrchTime] = useState<string>("");
+
+  // Real-time Multi-Agent Telemetry State (Grounded Search Engine)
+  const [activeGroundedAgent, setActiveGroundedAgent] = useState<string>("idle");
+  const [groundedSearchTime, setGroundedSearchTime] = useState<string>("");
+  const [stylizerTime, setStylizerTime] = useState<string>("");
 
   const [stats, setStats] = useState({
     databaseName: "...",
@@ -150,6 +216,11 @@ export default function Dashboard() {
     setGroundedPrompt(promptText);
     setGroundedLogs(["[System] Connecting to Grounded Orchestrator..."]);
     setGroundedResult("");
+    
+    // Reset telemetry metrics
+    setActiveGroundedAgent("Grounded Search");
+    setGroundedSearchTime("");
+    setStylizerTime("");
 
     try {
       const response = await fetch("/api/agent/grounded", {
@@ -181,10 +252,30 @@ export default function Dashboard() {
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split("\n");
           lines.forEach((line) => {
-            if (line.trim()) {
+            const trimmedLine = line.trim();
+            if (trimmedLine) {
+              // Parse metadata lines
+              if (trimmedLine.startsWith("[METADATA]")) {
+                const content = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
+                if (content.startsWith("ActiveAgent:")) {
+                  const agentName = content.replace("ActiveAgent:", "").trim();
+                  setActiveGroundedAgent(agentName);
+                } else if (content.startsWith("Duration:")) {
+                  const parts = content.replace("Duration:", "").trim().split(":");
+                  const metricName = parts[0]?.trim();
+                  const durationValue = parts[1]?.trim();
+                  if (metricName === "Grounded Search") {
+                    setGroundedSearchTime(durationValue);
+                  } else if (metricName === "Stylizer") {
+                    setStylizerTime(durationValue);
+                  }
+                }
+                return; // Do NOT add metadata line to visible terminal logs
+              }
+
               setGroundedLogs((prev) => [...prev, line]);
               if (!line.startsWith("[System]") && !line.startsWith("[Sub-Agent:") && !line.includes("[CLOSE]") && !line.includes("[ERROR]") && !line.startsWith("Prompt:")) {
-                if (line !== "=== Agent Final Output ===" && line !== "==========================") {
+                if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
                   accumulatedResult += line + "\n";
                 }
               }
@@ -375,6 +466,12 @@ export default function Dashboard() {
     setLogs([t("initiating_stream")]);
     setFinalResult("");
 
+    // Reset telemetry metrics
+    setActiveDbAgent("Guardrail Audit");
+    setDbGuardTime("");
+    setDbEngineTime("");
+    setDbOrchTime("");
+
     try {
       const response = await fetch("/api/agent", {
         method: "POST",
@@ -405,10 +502,32 @@ export default function Dashboard() {
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split("\n");
           lines.forEach((line) => {
-            if (line.trim()) {
+            const trimmedLine = line.trim();
+            if (trimmedLine) {
+              // Parse metadata lines
+              if (trimmedLine.startsWith("[METADATA]")) {
+                const content = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
+                if (content.startsWith("ActiveAgent:")) {
+                  const agentName = content.replace("ActiveAgent:", "").trim();
+                  setActiveDbAgent(agentName);
+                } else if (content.startsWith("Duration:")) {
+                  const parts = content.replace("Duration:", "").trim().split(":");
+                  const metricName = parts[0]?.trim();
+                  const durationValue = parts[1]?.trim();
+                  if (metricName === "Guardrail Audit") {
+                    setDbGuardTime(durationValue);
+                  } else if (metricName === "Database Engine") {
+                    setDbEngineTime(durationValue);
+                  } else if (metricName === "Orchestrator") {
+                    setDbOrchTime(durationValue);
+                  }
+                }
+                return; // Do NOT add metadata line to visible terminal logs
+              }
+
               setLogs((prev) => [...prev, line]);
               if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
-                if (line !== "=== Agent Final Output ===" && line !== "==========================") {
+                if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
                   accumulatedResult += line + "\n";
                 }
               }
@@ -644,6 +763,216 @@ export default function Dashboard() {
                   )}
                   <div ref={logsEndRef} />
                 </div>
+
+                {/* Real-time Multi-Agent Telemetry Grid */}
+                {(activeDbAgent !== "idle" || dbGuardTime || dbEngineTime || dbOrchTime) && (
+                  <div style={{
+                    marginTop: "1.25rem",
+                    marginBottom: "1.25rem",
+                    padding: "1.25rem",
+                    background: "rgba(255, 255, 255, 0.5)",
+                    borderRadius: "var(--border-radius-md)",
+                    border: "1px solid var(--card-border)",
+                    boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.4)",
+                    backdropFilter: "blur(10px)",
+                    transition: "all 0.3s ease"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <h3 style={{ fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0, color: "var(--foreground)" }}>
+                        <FiCpu style={{ color: "var(--primary)", animation: activeDbAgent !== "idle" ? "spin 4s linear infinite" : "none" }} />
+                        <span>{getTelemetryT("telemetryTitle")}</span>
+                      </h3>
+                      {activeDbAgent !== "idle" && (
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.3rem 0.75rem",
+                          borderRadius: "50px",
+                          background: "rgba(16, 107, 163, 0.08)",
+                          color: "var(--primary)",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                        }}>
+                          <span style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            background: "var(--primary)",
+                            display: "inline-block",
+                            animation: "pulse 2s infinite"
+                          }} />
+                          <span>{getTelemetryT("activeAgent")} {
+                            activeDbAgent === "Guardrail Audit" ? getTelemetryT("guardrailName") :
+                            activeDbAgent === "Database Engine" ? getTelemetryT("dbEngineName") :
+                            activeDbAgent === "Orchestrator" ? getTelemetryT("orchestratorName") :
+                            activeDbAgent
+                          }</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                      gap: "0.75rem"
+                    }}>
+                      {/* Guardrail Card */}
+                      <div style={{
+                        padding: "1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        background: activeDbAgent === "Guardrail Audit" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
+                        border: activeDbAgent === "Guardrail Audit" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                        boxShadow: activeDbAgent === "Guardrail Audit" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
+                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
+                            {getTelemetryT("guardrailName")}
+                          </span>
+                          <FiShield style={{ fontSize: "0.95rem", color: activeDbAgent === "Guardrail Audit" ? "var(--primary)" : "#8a9ca8" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
+                          {dbGuardTime ? (
+                            <>
+                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                                {dbGuardTime.replace("ms", "").replace("s", "").trim()}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
+                                {dbGuardTime.includes("s") && !dbGuardTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeDbAgent === "Guardrail Audit" ? "var(--primary)" : "#b0c0cb" }}>
+                              {activeDbAgent === "Guardrail Audit" ? "..." : "-"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
+                          {activeDbAgent === "Guardrail Audit" ? (
+                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
+                              {getTelemetryT("statusAuditing")}
+                            </span>
+                          ) : dbGuardTime ? (
+                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
+                              {getTelemetryT("statusCompleted")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* DB Engine Card */}
+                      <div style={{
+                        padding: "1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        background: activeDbAgent === "Database Engine" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
+                        border: activeDbAgent === "Database Engine" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                        boxShadow: activeDbAgent === "Database Engine" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
+                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
+                            {getTelemetryT("dbEngineName")}
+                          </span>
+                          <FiDatabase style={{ fontSize: "0.95rem", color: activeDbAgent === "Database Engine" ? "var(--primary)" : "#8a9ca8" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
+                          {dbEngineTime ? (
+                            <>
+                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                                {dbEngineTime.replace("ms", "").replace("s", "").trim()}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
+                                {dbEngineTime.includes("s") && !dbEngineTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeDbAgent === "Database Engine" ? "var(--primary)" : "#b0c0cb" }}>
+                              {activeDbAgent === "Database Engine" ? "..." : "-"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
+                          {activeDbAgent === "Database Engine" ? (
+                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
+                              {getTelemetryT("statusQuerying")}
+                            </span>
+                          ) : dbEngineTime ? (
+                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
+                              {getTelemetryT("statusExecuted")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Orchestrator Card */}
+                      <div style={{
+                        padding: "1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        background: activeDbAgent === "Orchestrator" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
+                        border: activeDbAgent === "Orchestrator" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                        boxShadow: activeDbAgent === "Orchestrator" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
+                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
+                            {getTelemetryT("orchestratorName")}
+                          </span>
+                          <FiLayers style={{ fontSize: "0.95rem", color: activeDbAgent === "Orchestrator" ? "var(--primary)" : "#8a9ca8" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
+                          {dbOrchTime ? (
+                            <>
+                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                                {dbOrchTime.replace("ms", "").replace("s", "").trim()}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
+                                {dbOrchTime.includes("s") && !dbOrchTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeDbAgent === "Orchestrator" ? "var(--primary)" : "#b0c0cb" }}>
+                              {activeDbAgent === "Orchestrator" ? "..." : "-"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
+                          {activeDbAgent === "Orchestrator" ? (
+                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
+                              {getTelemetryT("statusFormatting")}
+                            </span>
+                          ) : dbOrchTime ? (
+                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
+                              {getTelemetryT("statusStructured")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {finalResult && (
                   <div className="agent-response-box" id="agent-final-response" style={{ borderRadius: "var(--border-radius-md)", borderLeftWidth: "4px" }}>
@@ -985,6 +1314,164 @@ export default function Dashboard() {
                   )}
                   <div ref={groundedLogsEndRef} />
                 </div>
+
+                {/* Grounded Search Multi-Agent Telemetry Grid */}
+                {(activeGroundedAgent !== "idle" || groundedSearchTime || stylizerTime) && (
+                  <div style={{
+                    marginTop: "1.25rem",
+                    marginBottom: "1.25rem",
+                    padding: "1.25rem",
+                    background: "rgba(255, 255, 255, 0.5)",
+                    borderRadius: "var(--border-radius-md)",
+                    border: "1px solid var(--card-border)",
+                    boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.4)",
+                    backdropFilter: "blur(10px)",
+                    transition: "all 0.3s ease"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <h3 style={{ fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0, color: "var(--foreground)" }}>
+                        <FiCpu style={{ color: "var(--primary)", animation: activeGroundedAgent !== "idle" ? "spin 4s linear infinite" : "none" }} />
+                        <span>{getTelemetryT("groundedTitle")}</span>
+                      </h3>
+                      {activeGroundedAgent !== "idle" && (
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.3rem 0.75rem",
+                          borderRadius: "50px",
+                          background: "rgba(16, 107, 163, 0.08)",
+                          color: "var(--primary)",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                        }}>
+                          <span style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            background: "var(--primary)",
+                            display: "inline-block",
+                            animation: "pulse 2s infinite"
+                          }} />
+                          <span>{getTelemetryT("activeAgent")} {
+                            activeGroundedAgent === "Grounded Search" ? getTelemetryT("groundedSearchName") :
+                            activeGroundedAgent === "Stylizer" ? getTelemetryT("stylizerName") :
+                            activeGroundedAgent
+                          }</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: "0.75rem"
+                    }}>
+                      {/* Grounded Search Sub-Agent */}
+                      <div style={{
+                        padding: "1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        background: activeGroundedAgent === "Grounded Search" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
+                        border: activeGroundedAgent === "Grounded Search" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                        boxShadow: activeGroundedAgent === "Grounded Search" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
+                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
+                            {getTelemetryT("groundedSearchName")}
+                          </span>
+                          <FiGlobe style={{ fontSize: "0.95rem", color: activeGroundedAgent === "Grounded Search" ? "var(--primary)" : "#8a9ca8" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
+                          {groundedSearchTime ? (
+                            <>
+                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                                {groundedSearchTime.replace("ms", "").replace("s", "").trim()}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
+                                {groundedSearchTime.includes("s") && !groundedSearchTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeGroundedAgent === "Grounded Search" ? "var(--primary)" : "#b0c0cb" }}>
+                              {activeGroundedAgent === "Grounded Search" ? "..." : "-"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
+                          {activeGroundedAgent === "Grounded Search" ? (
+                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
+                              {getTelemetryT("statusSearching")}
+                            </span>
+                          ) : groundedSearchTime ? (
+                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
+                              {getTelemetryT("statusFound")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stylizer Sub-Agent */}
+                      <div style={{
+                        padding: "1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        background: activeGroundedAgent === "Stylizer" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
+                        border: activeGroundedAgent === "Stylizer" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                        boxShadow: activeGroundedAgent === "Stylizer" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
+                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
+                            {getTelemetryT("stylizerName")}
+                          </span>
+                          <FiLayers style={{ fontSize: "0.95rem", color: activeGroundedAgent === "Stylizer" ? "var(--primary)" : "#8a9ca8" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
+                          {stylizerTime ? (
+                            <>
+                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                                {stylizerTime.replace("ms", "").replace("s", "").trim()}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
+                                {stylizerTime.includes("s") && !stylizerTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeGroundedAgent === "Stylizer" ? "var(--primary)" : "#b0c0cb" }}>
+                              {activeGroundedAgent === "Stylizer" ? "..." : "-"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
+                          {activeGroundedAgent === "Stylizer" ? (
+                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
+                              {getTelemetryT("statusStylizing")}
+                            </span>
+                          ) : stylizerTime ? (
+                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
+                              {getTelemetryT("statusStylized")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {groundedResult && (
                   <div className="agent-response-box" id="grounded-final-response" style={{ borderRadius: "var(--border-radius-md)", borderLeftWidth: "4px", borderLeftColor: "var(--primary)", background: "var(--background)", padding: "1.5rem", marginTop: "1rem", border: "1px solid var(--card-border)" }}>

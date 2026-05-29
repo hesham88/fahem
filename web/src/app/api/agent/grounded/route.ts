@@ -46,9 +46,11 @@ export async function POST(req: NextRequest) {
           // -------------------------------------------------------------
           // STEP 1: Grounded Search Sub-agent
           // -------------------------------------------------------------
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Grounded Search\n"));
           controller.enqueue(encoder.encode("[Sub-Agent: Grounded Search] Starting web-grounded research...\n"));
           controller.enqueue(encoder.encode("[Sub-Agent: Grounded Search] Querying live Google Search indices for real-time, accurate facts...\n"));
 
+          const searchStart = performance.now();
           const searchInstruction = `
 You are the Fahem Grounded Search Sub-agent.
 Your goal is to use Google Search grounding to retrieve extremely accurate, real-world, up-to-date facts to answer the user's prompt.
@@ -65,15 +67,21 @@ Please compile your final facts in ${langName}.
             }
           });
 
+          const searchEnd = performance.now();
+          const searchDuration = ((searchEnd - searchStart) / 1000).toFixed(2);
+
           const rawFacts = searchResponse.text || "No facts found.";
-          controller.enqueue(encoder.encode(`[Sub-Agent: Grounded Search] Research complete. Facts compiled successfully (${rawFacts.length} chars).\n`));
+          controller.enqueue(encoder.encode(`[Sub-Agent: Grounded Search] Research complete in ${searchDuration}s. Facts compiled successfully (${rawFacts.length} chars).\n`));
+          controller.enqueue(encoder.encode(`[METADATA] Duration: Grounded Search: ${searchDuration}s\n`));
 
           // -------------------------------------------------------------
           // STEP 2: Format and Stylizer Sub-agent
           // -------------------------------------------------------------
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Stylizer\n"));
           controller.enqueue(encoder.encode("[Sub-Agent: Stylizer] Handing off research to Stylizer agent...\n"));
           controller.enqueue(encoder.encode("[Sub-Agent: Stylizer] Applying custom layout structure, markdown grids, and visual hierarchy...\n"));
 
+          const stylizerStart = performance.now();
           const stylizerInstruction = `
 You are the Fahem Format and Stylizer Sub-agent.
 Your sole job is to take raw, search-grounded research facts and turn them into a premium, stunning presentation.
@@ -103,8 +111,13 @@ ${rawFacts}
             }
           }
 
+          const stylizerEnd = performance.now();
+          const stylizerDuration = ((stylizerEnd - stylizerStart) / 1000).toFixed(2);
+
           controller.enqueue(encoder.encode("\n==========================\n"));
-          controller.enqueue(encoder.encode("\n[CLOSE] Grounded search execution complete\n"));
+          controller.enqueue(encoder.encode(`[METADATA] Duration: Stylizer: ${stylizerDuration}s\n`));
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
+          controller.enqueue(encoder.encode(`\n[CLOSE] Grounded search execution complete. Total time: ${(((performance.now() - searchStart)) / 1000).toFixed(2)}s\n`));
 
         } catch (err: any) {
           console.error("[grounded-api] Orchestration failed:", err);

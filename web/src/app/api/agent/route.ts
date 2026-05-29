@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         try {
           const langName = getLanguageName(language || "en");
 
-          // Initial terminal logs (the UI filters lines starting with Prompt: or containing [Unknown] from the final result card, but displays them in terminal log)
+          // Initial terminal logs
           controller.enqueue(encoder.encode("[Unknown] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
@@ -45,9 +45,13 @@ export async function POST(req: NextRequest) {
           const ai = new GoogleGenAI({ apiKey: geminiApiKey });
           const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
-          // 1. Guardrail Gate
+          // -------------------------------------------------------------
+          // STEP 1: Guardrail Gate
+          // -------------------------------------------------------------
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Guardrail Audit\n"));
           controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running security and authentication guardrails...\n"));
 
+          const guardStart = performance.now();
           const guardrailSystemInstruction = `
 You are the Fahem Security Guardrail Agent.
 Your sole role is to audit user prompts, queries, and user context to verify they are secure and authorized.
@@ -76,22 +80,31 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
             }
           });
 
+          const guardEnd = performance.now();
+          const guardDuration = ((guardEnd - guardStart) / 1000).toFixed(2);
+
           const guardText = guardrailResponse.text ? guardrailResponse.text.trim() : "";
           const isConfirmed = guardText.includes("CONFIRMED");
 
-          controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Guardrail check result: ${guardText}\n`));
+          controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Guardrail check complete in ${guardDuration}s. Result: ${guardText}\n`));
+          controller.enqueue(encoder.encode(`[METADATA] Duration: Guardrail Audit: ${guardDuration}s\n`));
 
           let databaseResults = "";
           let executionSuccess = false;
 
           if (isConfirmed) {
-            // 2. Execute query against MongoDB remote microservice on Cloud Run
+            // -------------------------------------------------------------
+            // STEP 2: Database Engine (Cloud Run execution)
+            // -------------------------------------------------------------
+            controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Database Engine\n"));
             const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
             if (!cloudRunUrl) {
               throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
             }
 
             controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Sending query execution to Cloud Run Agent: ${cloudRunUrl}...\n`));
+
+            const dbStart = performance.now();
 
             // Fetch GCP OIDC identity token for service-to-service authentication
             let oidcToken: string | null = null;
@@ -166,6 +179,9 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
               body: JSON.stringify(payload)
             });
 
+            const dbEnd = performance.now();
+            const dbDuration = ((dbEnd - dbStart) / 1000).toFixed(2);
+
             if (response.ok) {
               const resData: any = await response.json();
               const outMsg = resData?.output?.message;
@@ -175,14 +191,18 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
                 databaseResults = JSON.stringify(resData);
               }
               executionSuccess = true;
-              controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Query executed successfully. Formatting results...\n"));
+              controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Query executed successfully in ${dbDuration}s. Formatting results...\n`));
+              controller.enqueue(encoder.encode(`[METADATA] Duration: Database Engine: ${dbDuration}s\n`));
             } else {
               const errorText = await response.text();
               throw new Error(`Microservice HTTP error: ${response.status} - ${errorText}`);
             }
           }
 
-          // 3. Format and stream presentation
+          // -------------------------------------------------------------
+          // STEP 3: Orchestrator Presentation Phase
+          // -------------------------------------------------------------
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Orchestrator\n"));
           controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Presenting final output to user dashboard...\n"));
 
           const orchestratorSystemInstruction = `
@@ -220,6 +240,8 @@ ${guardText || "Access unauthorized"}
 `;
           }
 
+          const orchStart = performance.now();
+
           // Signal start of final output to the frontend parser
           controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
 
@@ -237,9 +259,14 @@ ${guardText || "Access unauthorized"}
             }
           }
 
+          const orchEnd = performance.now();
+          const orchDuration = ((orchEnd - orchStart) / 1000).toFixed(2);
+
           // Signal close of final output
           controller.enqueue(encoder.encode("\n==========================\n"));
-          controller.enqueue(encoder.encode("\n[CLOSE] Execution complete\n"));
+          controller.enqueue(encoder.encode(`[METADATA] Duration: Orchestrator: ${orchDuration}s\n`));
+          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
+          controller.enqueue(encoder.encode(`\n[CLOSE] Execution complete. Total time: ${(((performance.now() - guardStart)) / 1000).toFixed(2)}s\n`));
 
         } catch (err: any) {
           console.error("[agent-api] Orchestration failed:", err);
