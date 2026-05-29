@@ -19,18 +19,18 @@ function decodeBase64(b64: string): string {
 
 function getPreloadPath(): string {
   const root = new Function("return process.cwd()")();
-  const p1 = root + "/" + decodeBase64("ZG5zLXByZWxvYWQuanM=");
+  const p1 = (root + "/" + decodeBase64("ZG5zLXByZWxvYWQuanM=")).replace(/\\/g, "/");
   if (existsFn(p1)) return p1;
-  const p2 = root + "/" + decodeBase64("d2ViL2Rucy1wcmVsb2FkLmpz");
+  const p2 = (root + "/" + decodeBase64("d2ViL2Rucy1wcmVsb2FkLmpz")).replace(/\\/g, "/");
   if (existsFn(p2)) return p2;
   return p1;
 }
 
 function getServerPath(): string {
   const root = new Function("return process.cwd()")();
-  const p1 = root + "/" + decodeBase64("bm9kZV9tb2R1bGVzL0Btb25nb2RiLWpzL21vbmdvZGItbWNwLXNlcnZlci9kaXN0L2luZGV4Lmpz");
+  const p1 = (root + "/" + decodeBase64("bm9kZV9tb2R1bGVzL0Btb25nb2RiLWpzL21vbmdvZGItbWNwLXNlcnZlci9kaXN0L2luZGV4Lmpz")).replace(/\\/g, "/");
   if (existsFn(p1)) return p1;
-  const p2 = root + "/" + decodeBase64("d2ViL25vZGVfbW9kdWxlcy9AbW9uZ29kYi1qcy9tb25nb2RiLW1jcC1zZXJ2ZXIvZGlzdC9pbmRleC5qcw==");
+  const p2 = (root + "/" + decodeBase64("d2ViL25vZGVfbW9kdWxlcy9AbW9uZ29kYi1qcy9tb25nb2RiLW1jcC1zZXJ2ZXIvZGlzdC9pbmRleC5qcw==")).replace(/\\/g, "/");
   if (existsFn(p2)) return p2;
   return p1;
 }

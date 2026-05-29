@@ -108,12 +108,7 @@ export async function POST(req: NextRequest) {
             // Log model output turns to history
             contents.push({
               role: "model",
-              parts: parts.map((p: any) => {
-                const pObj: any = {};
-                if (p.text) pObj.text = p.text;
-                if (p.functionCall) pObj.functionCall = p.functionCall;
-                return pObj;
-              })
+              parts
             });
 
             // Print textual responses
