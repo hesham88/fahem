@@ -52,6 +52,14 @@ export default function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"agent" | "admin">("agent");
 
+  // Grounded Multi-Agent Test Bench State
+  const [groundedPrompt, setGroundedPrompt] = useState("");
+  const [groundedInput, setGroundedInput] = useState("");
+  const [groundedLoading, setGroundedLoading] = useState(false);
+  const [groundedLogs, setGroundedLogs] = useState<string[]>([]);
+  const [groundedResult, setGroundedResult] = useState("");
+  const groundedLogsEndRef = useRef<HTMLDivElement>(null);
+
   const [stats, setStats] = useState({
     databaseName: "...",
     collectionsCount: "...",
@@ -128,6 +136,228 @@ export default function Dashboard() {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs]);
+
+  // Auto scroll grounded terminal to the bottom when new grounded logs arrive
+  useEffect(() => {
+    if (groundedLogsEndRef.current) {
+      groundedLogsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [groundedLogs]);
+
+  const runGroundedWorkflow = async (promptText: string) => {
+    if (!promptText.trim()) return;
+    setGroundedLoading(true);
+    setGroundedPrompt(promptText);
+    setGroundedLogs(["[System] Connecting to Grounded Orchestrator..."]);
+    setGroundedResult("");
+
+    try {
+      const response = await fetch("/api/agent/grounded", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: promptText,
+          language,
+          userEmail: user?.email || "",
+          userId: user?.uid || ""
+        }),
+      });
+
+      if (!response.body) {
+        throw new Error("ReadableStream is not supported by the response.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedResult = "";
+
+      while (!done) {
+        const { value, done: isDone } = await reader.read();
+        done = isDone;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+          lines.forEach((line) => {
+            if (line.trim()) {
+              setGroundedLogs((prev) => [...prev, line]);
+              if (!line.startsWith("[System]") && !line.startsWith("[Sub-Agent:") && !line.includes("[CLOSE]") && !line.includes("[ERROR]") && !line.startsWith("Prompt:")) {
+                if (line !== "=== Agent Final Output ===" && line !== "==========================") {
+                  accumulatedResult += line + "\n";
+                }
+              }
+            }
+          });
+        }
+      }
+
+      const cleanResult = accumulatedResult
+         .replace(/=== Agent Final Output ===/g, "")
+         .replace(/==========================/g, "")
+         .trim();
+      
+      setGroundedResult(cleanResult || "Grounded execution complete!");
+
+    } catch (error: any) {
+      setGroundedLogs((prev) => [...prev, `[ERROR] Workflow execution failed: ${error.message}`]);
+    } finally {
+      setGroundedLoading(false);
+    }
+  };
+
+  const handleClearGrounded = () => {
+    setGroundedInput("");
+    setGroundedPrompt("");
+    setGroundedLogs([]);
+    setGroundedResult("");
+  };
+
+  const renderPremiumContent = (markdownText: string) => {
+    if (!markdownText) return null;
+
+    const lines = markdownText.split("\n");
+    let inTable = false;
+    let tableHeaders: string[] = [];
+    let tableRows: string[][] = [];
+
+    const elements: React.ReactNode[] = [];
+
+    const parseInlineMarkdown = (text: string) => {
+      const parts = text.split(/(\*\*.*?\*\*)/);
+      return parts.map((part, index) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={index} style={{ color: "var(--primary)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+        }
+        const subParts = part.split(/(\*.*?\*)/);
+        return subParts.map((subPart, subIndex) => {
+          if (subPart.startsWith("*") && subPart.endsWith("*")) {
+            return <em key={subIndex} style={{ fontStyle: "italic", color: "var(--foreground)" }}>{subPart.slice(1, -1)}</em>;
+          }
+          const codeParts = subPart.split(/(`.*?`)/);
+          return codeParts.map((codePart, codeIndex) => {
+            if (codePart.startsWith("`") && codePart.endsWith("`")) {
+              return (
+                <code key={codeIndex} style={{ 
+                  background: "rgba(16, 107, 163, 0.08)", 
+                  padding: "2px 6px", 
+                  borderRadius: "4px", 
+                  fontFamily: "var(--font-mono)", 
+                  fontSize: "0.85rem",
+                  color: "var(--primary)"
+                }}>
+                  {codePart.slice(1, -1)}
+                </code>
+              );
+            }
+            return codePart;
+          });
+        });
+      });
+    };
+
+    const flushTable = (key: number) => {
+      if (tableHeaders.length > 0 || tableRows.length > 0) {
+        elements.push(
+          <div key={`table-${key}`} style={{ overflowX: "auto", margin: "1.5rem 0", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)", boxShadow: "var(--shadow-sm)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "left", background: "#ffffff" }}>
+              <thead>
+                <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))", borderBottom: "2px solid var(--card-border)" }}>
+                  {tableHeaders.map((h, i) => (
+                    <th key={i} style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--primary)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((row, rowIndex) => (
+                  <tr key={rowIndex} style={{ borderBottom: rowIndex === tableRows.length - 1 ? "none" : "1px solid var(--card-border)" }}>
+                    {row.map((cell, cellIndex) => (
+                      <td key={cellIndex} style={{ padding: "0.75rem 1rem", color: "var(--foreground)" }}>{parseInlineMarkdown(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableHeaders = [];
+        tableRows = [];
+        inTable = false;
+      }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (line.startsWith("|")) {
+        inTable = true;
+        const cells = line.split("|").map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+        if (cells.every(c => c.startsWith("-"))) {
+          continue;
+        }
+        if (tableHeaders.length === 0) {
+          tableHeaders = cells;
+        } else {
+          tableRows.push(cells);
+        }
+        continue;
+      } else if (inTable) {
+        flushTable(i);
+      }
+
+      if (line.startsWith("###")) {
+        elements.push(
+          <h4 key={i} style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "1.5rem", marginBottom: "0.5rem", color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+            {parseInlineMarkdown(line.replace("###", "").trim())}
+          </h4>
+        );
+      } else if (line.startsWith("##")) {
+        elements.push(
+          <h3 key={i} style={{ fontSize: "1.3rem", fontWeight: 700, marginTop: "1.75rem", marginBottom: "0.75rem", color: "var(--foreground)", fontFamily: "var(--font-display)", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.25rem" }}>
+            {parseInlineMarkdown(line.replace("##", "").trim())}
+          </h3>
+        );
+      } else if (line.startsWith("#")) {
+        elements.push(
+          <h2 key={i} style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2rem", marginBottom: "1rem", color: "var(--foreground)", fontFamily: "var(--font-display)" }}>
+            {parseInlineMarkdown(line.replace("#", "").trim())}
+          </h2>
+        );
+      } else if (line.startsWith("* ") || line.startsWith("- ")) {
+        elements.push(
+          <div key={i} style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem", marginBottom: "0.35rem" }}>
+            <span style={{ color: "var(--secondary)", fontSize: "1.1rem", lineHeight: "1.2" }}>•</span>
+            <div style={{ fontSize: "0.95rem", color: "var(--foreground)" }}>{parseInlineMarkdown(line.slice(2))}</div>
+          </div>
+        );
+      } else if (/^\d+\.\s/.test(line)) {
+        const match = line.match(/^(\d+)\.\s(.*)/);
+        if (match) {
+          elements.push(
+            <div key={i} style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem", marginBottom: "0.35rem" }}>
+              <span style={{ color: "var(--primary)", fontWeight: 600, fontSize: "0.95rem" }}>{match[1]}.</span>
+              <div style={{ fontSize: "0.95rem", color: "var(--foreground)" }}>{parseInlineMarkdown(match[2])}</div>
+            </div>
+          );
+        }
+      } else if (line === "") {
+        elements.push(<div key={i} style={{ height: "0.5rem" }} />);
+      } else {
+        elements.push(
+          <p key={i} style={{ fontSize: "0.95rem", lineHeight: "1.7", color: "var(--foreground)", marginBottom: "0.5rem" }}>
+            {parseInlineMarkdown(line)}
+          </p>
+        );
+      }
+    }
+
+    if (inTable) {
+      flushTable(lines.length);
+    }
+
+    return <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>{elements}</div>;
+  };
 
   const handleLogout = async () => {
     try {
@@ -588,6 +818,84 @@ export default function Dashboard() {
                   </div>
                 </form>
               </section>
+
+              {/* Grounded Multi-Agent Test Bench Card */}
+              <section className="panel-card" style={{ marginTop: "2rem" }}>
+                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <FiGlobe className={groundedLoading ? "pulse-icon" : ""} style={{ color: "var(--primary)" }} />
+                  <span>{language === "ar" ? "منصة اختبار البحث الموثق" : "Grounded Multi-Agent Test Bench"}</span>
+                </h2>
+                <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+                  {language === "ar" 
+                    ? "تفاعل مع عملاء البحث الموثق والتنسيق المتقدم للحصول على نتائج دقيقة ومنسقة في الوقت الفعلي."
+                    : "Test dynamic handoffs between the Grounded Search agent (with web search grounding) and the Stylizer agent."}
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {language === "ar" ? "استعلام البحث الموثق" : "Grounded Prompt Query"}
+                    </label>
+                    <textarea 
+                      value={groundedInput}
+                      onChange={(e) => setGroundedInput(e.target.value)}
+                      placeholder={language === "ar" ? "مثال: ما هو سعر سهم أبل اليوم وأهم الأخبار؟" : "e.g., What is the current price of Bitcoin today and latest news?"}
+                      rows={3}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff",
+                        resize: "vertical"
+                      }}
+                    />
+                  </div>
+
+                  {/* Preset Queries for Grounded Search */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    {[
+                      { en: "Bitcoin Price Today", ar: "سعر البيتكوين اليوم" },
+                      { en: "Google Stock Valuation", ar: "سهم جوجل والتقييم المالي" },
+                      { en: "Weather in Paris & Tokyo", ar: "حالة الطقس في باريس وطوكيو" }
+                    ].map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setGroundedInput(language === "ar" ? preset.ar : preset.en)}
+                        style={{
+                          padding: "0.35rem 0.75rem",
+                          fontSize: "0.8rem",
+                          borderRadius: "20px",
+                          border: "1px solid var(--card-border)",
+                          background: "var(--cream-bg)",
+                          color: "var(--text-color)",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {language === "ar" ? preset.ar : preset.en}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    disabled={groundedLoading}
+                    onClick={() => runGroundedWorkflow(groundedInput)}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", alignSelf: "flex-start" }}
+                  >
+                    {groundedLoading ? <FiRefreshCw className="pulse-icon" /> : <FiLayers />}
+                    <span>
+                      {groundedLoading 
+                        ? (language === "ar" ? "جاري تشغيل الوكلاء..." : "Running Agents...") 
+                        : (language === "ar" ? "تشغيل دورة الوكلاء الموثقة" : "Run Grounded Workflow")}
+                    </span>
+                  </button>
+                </div>
+              </section>
             </div>
 
             {/* Right Side: Active pipelines & health metrics */}
@@ -646,6 +954,62 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
+              </section>
+
+              {/* Grounded Execution Console & Stylized Output Card */}
+              <section className="panel-card" id="grounded-terminal-panel">
+                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <FiTerminal style={{ color: "var(--secondary)" }} />
+                  <span>{language === "ar" ? "منصة تشغيل ومخرجات البحث الموثق" : "Grounded Execution Console & Output"}</span>
+                </h2>
+                
+                <div className="logs-console" id="grounded-logs-console" style={{ maxHeight: "250px", marginBottom: "1.5rem" }}>
+                  {groundedLogs.length === 0 ? (
+                    <span style={{ color: "#6a7c88" }}>
+                      {language === "ar" ? "بانتظار تشغيل استعلام البحث الموثق..." : "Waiting for grounded search query..."}
+                    </span>
+                  ) : (
+                    groundedLogs.map((log, idx) => {
+                      let styleClass = "log-info";
+                      if (log.startsWith("[System]")) styleClass = "log-success";
+                      else if (log.startsWith("[Sub-Agent: Grounded Search]")) styleClass = "log-tool";
+                      else if (log.startsWith("[Sub-Agent: Stylizer]")) styleClass = "log-success";
+                      else if (log.startsWith("[ERROR]")) styleClass = "log-error";
+                      
+                      return (
+                        <div key={idx} className={`log-entry ${styleClass}`}>
+                          {log}
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={groundedLogsEndRef} />
+                </div>
+
+                {groundedResult && (
+                  <div className="agent-response-box" id="grounded-final-response" style={{ borderRadius: "var(--border-radius-md)", borderLeftWidth: "4px", borderLeftColor: "var(--primary)", background: "var(--background)", padding: "1.5rem", marginTop: "1rem", border: "1px solid var(--card-border)" }}>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", color: "var(--primary)" }}>
+                      <FiCheckCircle style={{ color: "var(--primary)" }} />
+                      <span>{language === "ar" ? "المخرجات المنسقة للوكيل" : "Stylized Agent Presentation"}</span>
+                    </h3>
+                    <div style={{ color: "var(--foreground)", fontSize: "0.95rem", lineHeight: "1.7" }}>
+                      {renderPremiumContent(groundedResult)}
+                    </div>
+                  </div>
+                )}
+
+                {(groundedLogs.length > 0 || groundedResult) && (
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={handleClearGrounded}
+                    disabled={groundedLoading}
+                    style={{ marginTop: "1rem" }}
+                  >
+                    <FiTrash2 />
+                    <span>{language === "ar" ? "مسح السجلات" : "Clear Console"}</span>
+                  </button>
+                )}
               </section>
             </div>
           </div>
