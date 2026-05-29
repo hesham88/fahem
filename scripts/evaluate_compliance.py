@@ -81,7 +81,7 @@ def scan_files():
                     for kw in COMPETITOR_KEYWORDS:
                         # Prevent flagging CSS cursor properties in styling files
                         if kw == "cursor":
-                            if file.endswith('.css') or re.search(r"cursor\s*:\s*\w+", content, re.IGNORECASE):
+                            if file.endswith('.css') or re.search(r"cursor\s*:\s*['\"]?\w+", content, re.IGNORECASE):
                                 continue
                         
                         pattern = re.compile(rf"\b{kw}\b", re.IGNORECASE)
