@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "validate-i18n": "python ../scripts/validate_i18n.py"
   },
   "dependencies": {
     "@google/genai": "^2.7.0",

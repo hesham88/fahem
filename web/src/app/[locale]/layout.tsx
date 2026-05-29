@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   title: "Fahem - MongoDB Partner Agent Dashboard",
   description: "Fahem is an intelligent AI assistant programmatically powered by Google Agent Development Kit (ADK) and the MongoDB Model Context Protocol (MCP) server.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.svg",
   },
 };
 

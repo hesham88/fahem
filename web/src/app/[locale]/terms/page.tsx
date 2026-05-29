@@ -48,7 +48,7 @@ export default function TermsPage() {
               </h3>
               <p style={{ color: "var(--foreground)", fontSize: "1rem", lineHeight: "1.7" }}>
                 {language === "ar" 
-                  ? "باستخدام منصة فهم، فإنك توافق على الالتزام بشروط الخدمة هذه وجميع القوانين واللوائح المعمول بها. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام المنصة."
+                  ? "باستخدام منصة فاهم، فإنك توافق على الالتزام بشروط الخدمة هذه وجميع القوانين واللوائح المعمول بها. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام المنصة."
                   : "By accessing and using the Fahem platform, you agree to be bound by these terms of service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this site."}
               </p>
             </section>
@@ -88,7 +88,7 @@ export default function TermsPage() {
               </h3>
               <p style={{ color: "var(--foreground)", fontSize: "1rem", lineHeight: "1.7" }}>
                 {language === "ar"
-                  ? "في أي حال من الأحوال، لن تكون منصة فهم أو مطوروها مسؤولين عن أي أضرار (بما في ذلك، دون حصر، الأضرار الناجمة عن فقدان البيانات أو الأرباح) الناتجة عن استخدام أو عدم القدرة على استخدام خدمات الذكاء الاصطناعي."
+                  ? "في أي حال من الأحوال، لن تكون منصة فاهم أو مطوروها مسؤولين عن أي أضرار (بما في ذلك، دون حصر، الأضرار الناجمة عن فقدان البيانات أو الأرباح) الناتجة عن استخدام أو عدم القدرة على استخدام خدمات الذكاء الاصطناعي."
                   : "In no event shall Fahem or its developers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the AI assistant services."}
               </p>
             </section>
