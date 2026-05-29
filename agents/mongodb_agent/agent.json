@@ -1,0 +1,4 @@
+{
+  "name": "mongodb_agent",
+  "description": "Fahem MongoDB Database Agent with MCP server integration"
+}

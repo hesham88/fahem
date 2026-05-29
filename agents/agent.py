@@ -68,45 +68,10 @@ def get_model_name() -> str:
 # -------------------------------------------------------------
 # 1. Standalone / Fallback MongoDB MCP Agent Node Config
 # -------------------------------------------------------------
-agents_dir = os.path.dirname(os.path.abspath(__file__))
-local_mcp_server = os.path.join(
-    os.path.dirname(agents_dir), 
-    "node_modules", 
-    "@mongodb-js", 
-    "mongodb-mcp-server", 
-    "dist", 
-    "index.js"
-)
-
-if os.path.exists(local_mcp_server):
-    cmd = "node"
-    args = [local_mcp_server]
-else:
-    cmd = "npx.cmd" if os.name == "nt" else "npx"
-    args = ["-y", "@mongodb-js/mongodb-mcp-server"]
-
-server_params = StdioServerParameters(
-    command=cmd,
-    args=args,
-    env={"MDB_MCP_CONNECTION_STRING": get_mongodb_uri()}
-)
-
-connection_params = StdioConnectionParams(server_params=server_params)
-mcp_toolset = McpToolset(connection_params=connection_params)
-
-# Local fallback MongoDB MCP Agent
-local_mongodb_agent = Agent(
-    name="FahemLocalMongoDBAgent",
-    model=get_model_name(),
-    instruction="""
-        You are the local Fahem MongoDB Database Agent fallback.
-        You assist in executing database collections inspection, exams schemas, diagnostics and record creation.
-        You have direct access to standard database tools.
-        Always mask server paths and sensitive fields.
-        CRITICAL: Do NOT attempt 'atlas-' admin tools. Call 'get_mongodb_uri' first, then 'connect'.
-    """,
-    tools=[mcp_toolset, get_mongodb_uri]
-)
+try:
+    from mongodb_agent.agent import mongodb_agent as local_mongodb_agent
+except ImportError:
+    from agents.mongodb_agent.agent import mongodb_agent as local_mongodb_agent
 
 # -------------------------------------------------------------
 # 2. Multi-Agent Orchestration workflow setup
@@ -124,43 +89,18 @@ class WorkflowState(BaseModel):
     execution_success: bool = False
     final_output: str = ""
 
-# Define the Orchestrator Agent
-orchestrator_agent = Agent(
-    name="FahemOrchestratorAgent",
-    model=get_model_name(),
-    instruction="""
-        You are the Fahem Multi-Agent Orchestrator.
-        Your job is to receive, process, and beautifully format database operations or security alerts for the user dashboard.
-        
-        When compiling database output results:
-        1. Avoid raw JSON or BSON dumps.
-        2. Construct highly professional, premium Markdown tables, lists, or structured cards.
-        3. Localize explanations, text, table headers, and statuses fully into the user's selected language.
-        4. Preserve technical names such as collection names, database names, or specific keys as-is.
-        
-        When presenting a security denial message:
-        1. Explain politely in the requested language that security guardrails blocked the execution.
-        2. Highlight the active safety enforcement without releasing internal developer secrets.
-    """
-)
+# Import the Orchestrator Agent
+try:
+    from orchestrator_agent.agent import orchestrator_agent
+except ImportError:
+    from agents.orchestrator_agent.agent import orchestrator_agent
 
-# Define the Guardrail Agent
-guardrail_agent = Agent(
-    name="FahemGuardrailAgent",
-    model=get_model_name(),
-    instruction="""
-        You are the Fahem Security Guardrail Agent.
-        Your sole role is to audit user prompts, queries, and user context to verify they are secure and authorized.
-        
-        You must perform these strict checks:
-        1. **Authentication Gate**: Inspect if a valid 'user_email' or 'user_id' is provided. For standard inspections or queries (read-only), allow anonymous/unauthenticated access. For WRITE operations (inserting, updating, deleting, or reporting), a valid user email is STRICTLY REQUIRED. If empty or anonymous during a write operation, reject with 'UNAUTHORIZED: User must be signed-in to perform write operations'.
-        2. **Administrative Lock**: Strictly reject any commands or tools starting with 'atlas-'. Standard users should never manage clusters or projects.
-        3. **Injection and Drop Protection**: Block malicious injection payloads or destructive operations like dropping/deleting databases, unless it's a valid and authenticated report creation.
-        
-        If all criteria are fully met, respond exactly with "CONFIRMED: Authorized".
-        If any criteria fail, respond with "DENIED: <clear explanation in the user's requested language>".
-    """
-)
+# Import the Guardrail Agent
+try:
+    from guardrail_agent.agent import guardrail_agent
+except ImportError:
+    from agents.guardrail_agent.agent import guardrail_agent
+
 
 # -------------------------------------------------------------
 # 3. Workflow Node Functions
@@ -315,3 +255,7 @@ fahem_workflow = Workflow(
     state_schema=WorkflowState,
     edges=edges
 )
+
+# Expose 'app' for compatibility with Next.js frontend calling /run with app_name: "app"
+app = local_mongodb_agent
+

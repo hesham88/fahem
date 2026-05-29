@@ -15,9 +15,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-install MongoDB MCP server to guarantee offline availability and eliminate cold-start download overhead
+RUN npm install --no-package-lock --no-audit --no-fund @mongodb-js/mongodb-mcp-server
+
 COPY . .
 
 # Start the ADK API server with auto-create-session enabled. 
 # We use the shell form of CMD to allow environment variable expansion of $PORT injected by Cloud Run.
 CMD python -m google.adk.cli api_server --host 0.0.0.0 --port $PORT --auto_create_session .
-
