@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <!-- Premium background gradient representing a cozy, wise night study/library vibe -->
+    <linearGradient id="owlBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#311042" />
+    </linearGradient>
+    
+    <!-- Feather gradients -->
+    <linearGradient id="owlBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c18c5d" />
+      <stop offset="100%" stop-color="#724e2c" />
+    </linearGradient>
+    <linearGradient id="owlChestGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fdf6e2" />
+      <stop offset="100%" stop-color="#dfcfb7" />
+    </linearGradient>
+    
+    <!-- Mortarboard/Hat gradients -->
+    <linearGradient id="hatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d3748" />
+      <stop offset="100%" stop-color="#1a202c" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Circular background frame -->
+  <rect width="100" height="100" rx="50" fill="url(#owlBgGrad)" />
+
+  <!-- Soft glowing golden study sparks / stars background -->
+  <circle cx="20" cy="30" r="1.2" fill="#fbbf24" opacity="0.6" />
+  <circle cx="82" cy="25" r="1.5" fill="#fbbf24" opacity="0.7" />
+  <circle cx="15" cy="70" r="0.8" fill="#fbbf24" opacity="0.4" />
+  <circle cx="85" cy="72" r="1.0" fill="#fbbf24" opacity="0.5" />
+
+  <!-- Owl Body -->
+  <path d="M25,82 C25,62 30,52 50,52 C70,52 75,62 75,82 Z" fill="url(#owlBodyGrad)" />
+  
+  <!-- Owl Wings -->
+  <path d="M25,80 C18,68 22,58 28,54 Z" fill="#583e26" />
+  <path d="M75,80 C82,68 78,58 72,54 Z" fill="#583e26" />
+
+  <!-- Owl Chest Feather Pattern -->
+  <path d="M35,82 C35,66 40,58 50,58 C60,58 65,66 65,82 Z" fill="url(#owlChestGrad)" />
+  <path d="M46,65 L50,69 L54,65" fill="none" stroke="#a18262" stroke-width="1.5" stroke-linecap="round" />
+  <path d="M41,71 L45,75 L49,71" fill="none" stroke="#a18262" stroke-width="1.5" stroke-linecap="round" />
+  <path d="M51,71 L55,75 L59,71" fill="none" stroke="#a18262" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- Owl Head -->
+  <ellipse cx="50" cy="42" rx="23" ry="18" fill="url(#owlBodyGrad)" stroke="#583e26" stroke-width="1" />
+  
+  <!-- Owl Ears / Horns -->
+  <path d="M30,30 L24,18 L38,26 Z" fill="url(#owlBodyGrad)" />
+  <path d="M70,30 L76,18 L62,26 Z" fill="url(#owlBodyGrad)" />
+
+  <!-- Friendly Eyes (Large wise owl discs) -->
+  <!-- Left Eye Outer White/Cream -->
+  <circle cx="39" cy="42" r="8.5" fill="#fefaf0" stroke="#724e2c" stroke-width="1" />
+  <!-- Right Eye Outer White/Cream -->
+  <circle cx="61" cy="42" r="8.5" fill="#fefaf0" stroke="#724e2c" stroke-width="1" />
+  
+  <!-- Left Eye Pupil (Friendly alert dark brown/black) -->
+  <circle cx="39" cy="42" r="5" fill="#1e1b18" />
+  <!-- Right Eye Pupil -->
+  <circle cx="61" cy="42" r="5" fill="#1e1b18" />
+
+  <!-- Eye Reflections for Friendly Sparkle -->
+  <circle cx="41" cy="39" r="1.5" fill="#ffffff" />
+  <circle cx="37" cy="44" r="0.6" fill="#ffffff" />
+  <circle cx="63" cy="39" r="1.5" fill="#ffffff" />
+  <circle cx="59" cy="44" r="0.6" fill="#ffffff" />
+
+  <!-- Reading Glasses (Adding tutor personality!) -->
+  <circle cx="39" cy="42" r="9" fill="none" stroke="url(#goldGrad)" stroke-width="1.8" opacity="0.9" />
+  <circle cx="61" cy="42" r="9" fill="none" stroke="url(#goldGrad)" stroke-width="1.8" opacity="0.9" />
+  <path d="M48,42 L52,42" fill="none" stroke="url(#goldGrad)" stroke-width="1.8" />
+
+  <!-- Cute Beak -->
+  <path d="M50,42 L46,49 C48,53 52,53 54,49 Z" fill="#f59e0b" />
+
+  <!-- Mortarboard / Graduation Hat (Tutor Vibe!) -->
+  <!-- Skull Cap under the mortarboard plate -->
+  <path d="M38,25 C38,19 62,19 62,25 Z" fill="#1a202c" />
+  <!-- Diamond Top Plate -->
+  <polygon points="50,13 72,21 50,29 28,21" fill="url(#hatGrad)" stroke="#4a5568" stroke-width="0.8" />
+  <!-- Golden Tassel -->
+  <path d="M50,21 L28,21 L27,33" fill="none" stroke="url(#goldGrad)" stroke-width="1.5" stroke-linecap="round" />
+  <rect x="25" y="32" width="4" height="6" rx="0.5" fill="url(#goldGrad)" />
+</svg>

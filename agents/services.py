@@ -12,6 +12,61 @@ def register_metadata_route(app: fastapi.FastAPI):
         if hasattr(route, "path") and route.path == "/db-metadata":
             return
 
+    # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment
+    @app.middleware("http")
+    async def oidc_security_middleware(request: fastapi.Request, call_next):
+        secured_paths = [
+            "/db-metadata", "/audit-logs", "/user/activity", "/user/chat-session",
+            "/user/token-usage", "/user/token-stats", "/admin/global-stats",
+            "/user/profile", "/user/account", "/user/list", "/user/friend",
+            "/chat/message", "/parent/children", "/parent/approve"
+        ]
+        
+        path = request.url.path
+        is_secured = any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in secured_paths)
+        
+        if is_secured:
+            is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+            auth_header = request.headers.get("Authorization")
+            token = None
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                
+            if token:
+                try:
+                    from google.oauth2 import id_token
+                    from google.auth.transport import requests as auth_requests
+                    from google.auth import jwt
+                    
+                    # 1. Decode token payload without verification to inspect the audience dynamically
+                    payload = jwt.decode(token, verify=False)
+                    aud = payload.get("aud")
+                    
+                    # 2. Verify signature, expiry, and dynamic audience
+                    id_info = id_token.verify_oauth2_token(token, auth_requests.Request(), audience=aud)
+                    email = id_info.get("email")
+                    logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
+                    request.state.verified_email = email
+                except Exception as err:
+                    logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
+                    if is_gcp:
+                        return fastapi.responses.JSONResponse(
+                            content={"status": "error", "error": f"Unauthorized: Invalid OIDC Token ({str(err)})"},
+                            status_code=401
+                        )
+            else:
+                if is_gcp:
+                    logger.warning(f"[OIDC BLOCKED] Request to {path} blocked: No OIDC Bearer Token.")
+                    return fastapi.responses.JSONResponse(
+                        content={"status": "error", "error": "Unauthorized: OIDC Bearer token required on Google Cloud Run"},
+                        status_code=401
+                    )
+                else:
+                    logger.info(f"[OIDC BYPASS] Local request to {path} permitted without OIDC token.")
+                    
+        return await call_next(request)
+
+
     @app.get("/db-metadata")
     async def custom_db_metadata():
         try:
@@ -206,17 +261,30 @@ def register_metadata_route(app: fastapi.FastAPI):
             return {"activities": [], "tokenStats": {}, "error": str(err)}
 
     @app.get("/user/profile")
-    async def get_profile_endpoint(userId: str):
+    async def get_profile_endpoint(userId: str = None, username: str = None):
         try:
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             from get_metadata import get_user_profile
-            profile = await get_user_profile(userId)
+            profile = await get_user_profile(user_id=userId, username=username)
             return {"profile": profile}
         except Exception as err:
             logger.error(f"[services.py] Failed to get user profile: {err}", exc_info=True)
             return {"profile": {}, "error": str(err)}
+
+    @app.get("/user/username/check")
+    async def check_username_endpoint(username: str):
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from get_metadata import check_username_availability
+            available = await check_username_availability(username)
+            return {"available": available}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to check username: {err}", exc_info=True)
+            return {"available": False, "error": str(err)}
 
     @app.post("/user/profile")
     async def post_profile_endpoint(request: fastapi.Request):

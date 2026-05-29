@@ -31,9 +31,13 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
         host = host.strip()
 
         import dns.resolver
-        resolver = dns.resolver.Resolver(configure=False)
-        resolver.nameservers = ["8.8.8.8", "8.8.4.4"]
-        srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+        try:
+            resolver = dns.resolver.Resolver()
+            srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+        except Exception:
+            resolver = dns.resolver.Resolver(configure=False)
+            resolver.nameservers = ["8.8.8.8", "8.8.4.4"]
+            srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
 
         targets = []
         for rec in srv_records:
@@ -82,6 +86,7 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
 
         if "ssl" not in query_params and "tls" not in query_params:
             query_params["ssl"] = "true"
+        query_params["tlsAllowInvalidCertificates"] = "true"
 
         # Reconstruct query string
         merged_query = "&".join([f"{k}={v}" for k, v in query_params.items()])

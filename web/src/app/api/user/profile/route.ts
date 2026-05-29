@@ -7,15 +7,20 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
+    const username = searchParams.get("username");
 
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "userId is required" }), {
+    if (!userId && !username) {
+      return new Response(JSON.stringify({ error: "userId or username is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    return await proxyRequest(`/user/profile?userId=${encodeURIComponent(userId)}`, "GET");
+    const query = userId 
+      ? `userId=${encodeURIComponent(userId)}` 
+      : `username=${encodeURIComponent(username || "")}`;
+
+    return await proxyRequest(`/user/profile?${query}`, "GET");
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

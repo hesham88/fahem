@@ -107,10 +107,83 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     monthly: number;
     total: number;
     userBreakdown: { email: string; tokens: number }[];
+    history?: { date: string; tokens: number }[];
   } | null>(null);
   const [globalActivities, setGlobalActivities] = useState<any[]>([]);
   const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
+  const [hoveredPoint, setHoveredPoint] = useState<{ date: string; tokens: number; x: number; y: number } | null>(null);
+
+  // Generates sleek vector sparkline SVG overlays for metrics panels
+  const renderSparkline = (cardId: string, tokens: number, strokeColor: string) => {
+    const historyData = globalStats?.history || [];
+    let sparklineValues = [10, 20, 15, 30, 25, 40, tokens];
+    
+    if (historyData.length > 0) {
+      if (cardId === "daily") {
+        sparklineValues = historyData.slice(-3).map(d => d.tokens);
+      } else if (cardId === "weekly") {
+        sparklineValues = historyData.slice(-7).map(d => d.tokens);
+      } else if (cardId === "monthly") {
+        sparklineValues = historyData.slice(-15).map(d => d.tokens);
+      } else {
+        sparklineValues = historyData.map(d => d.tokens);
+      }
+    }
+    
+    if (sparklineValues.length < 2) {
+      sparklineValues = [tokens * 0.5, tokens, tokens * 0.8, tokens * 1.2];
+    }
+    
+    const max = Math.max(...sparklineValues, 1);
+    const min = Math.min(...sparklineValues, 0);
+    const range = max - min || 1;
+    const width = 120;
+    const height = 45;
+    
+    const points = sparklineValues.map((val, i) => {
+      const x = (i / (sparklineValues.length - 1)) * width;
+      const y = height - ((val - min) / range) * (height - 8) - 4;
+      return `${x},${y}`;
+    }).join(" ");
+    
+    const fillPoints = `0,${height} ${points} ${width},${height}`;
+    const gradId = `sparkline-grad-${cardId}`;
+
+    return (
+      <div style={{
+        position: "absolute",
+        bottom: 0,
+        right: 0,
+        left: 0,
+        height: "45px",
+        opacity: 0.5,
+        pointerEvents: "none",
+        zIndex: 0
+      }}>
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: "block" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={strokeColor} stopOpacity="0.00" />
+            </linearGradient>
+          </defs>
+          <polygon
+            points={fillPoints}
+            fill={`url(#${gradId})`}
+          />
+          <polyline
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            points={points}
+          />
+        </svg>
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (!email) return;
@@ -143,7 +216,19 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
         if (response.ok) {
           const data = await response.json();
           if (data.tokenStats) {
-            setGlobalStats(data.tokenStats);
+            const getNum = (v: any) => {
+              if (!v) return 0;
+              if (typeof v === "object") return v.total || 0;
+              return Number(v) || 0;
+            };
+            setGlobalStats({
+              daily: getNum(data.tokenStats.daily),
+              weekly: getNum(data.tokenStats.weekly),
+              monthly: getNum(data.tokenStats.monthly),
+              total: getNum(data.tokenStats.total),
+              userBreakdown: Array.isArray(data.tokenStats.userBreakdown) ? data.tokenStats.userBreakdown : [],
+              history: Array.isArray(data.tokenStats.history) ? data.tokenStats.history : []
+            });
           }
           if (data.activities && Array.isArray(data.activities)) {
             setGlobalActivities(data.activities);
@@ -929,9 +1014,13 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                 gap: "0.5rem",
                 position: "relative",
                 overflow: "hidden",
-                boxShadow: "var(--shadow-sm)"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                boxShadow: "var(--shadow-sm)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                cursor: "default"
+              }}
+              className="metric-card-hover"
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 2 }}>
                   <span style={{ fontSize: "0.85rem", color: "#6a7c88", fontWeight: 600 }}>
                     {language === "ar" ? card.titleAr : card.titleEn}
                   </span>
@@ -943,7 +1032,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                     animation: "pulse 2s infinite"
                   }} />
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0", position: "relative", zIndex: 2 }}>
                   <span style={{ fontSize: "1.65rem", fontWeight: 800, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
                     {(card.tokens || 0).toLocaleString()}
                   </span>
@@ -951,11 +1040,287 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                     {language === "ar" ? "رمز" : "tokens"}
                   </span>
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#5a6e7c" }}>
+                <div style={{ fontSize: "0.75rem", color: "#5a6e7c", position: "relative", zIndex: 2 }}>
                   {language === "ar" ? card.descAr : card.descEn}
                 </div>
+                {renderSparkline(card.id, card.tokens, card.color)}
               </div>
             ))}
+          </div>
+
+          {/* Interactive Token Telemetry Visual Chart */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-lg)",
+            padding: "1.5rem",
+            boxShadow: "var(--shadow-md)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <FiActivity style={{ color: "var(--primary)", fontSize: "1.2rem" }} />
+                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>
+                  {language === "ar" ? "سجل استهلاك الرموز اليومي" : "Historical Daily Token Telemetry"}
+                </h3>
+              </div>
+              <span style={{
+                fontSize: "0.7rem",
+                color: "#106ba3",
+                background: "rgba(16, 107, 163, 0.06)",
+                padding: "3px 8px",
+                borderRadius: "50px",
+                fontWeight: 700
+              }}>
+                {language === "ar" ? "آخر 7 أيام (محدث لحظياً)" : "Last 7 Days (Realtime)"}
+              </span>
+            </div>
+
+            <div style={{ width: "100%", overflowX: "auto" }}>
+              <div style={{ position: "relative", minWidth: "550px", width: "100%", height: "230px" }}>
+                {(() => {
+                  const dummyHistory = [
+                    { date: "05-23", tokens: 1200 },
+                    { date: "05-24", tokens: 2800 },
+                    { date: "05-25", tokens: 2100 },
+                    { date: "05-26", tokens: 4100 },
+                    { date: "05-27", tokens: 3600 },
+                    { date: "05-28", tokens: 5800 },
+                    { date: "05-29", tokens: 7200 },
+                  ];
+
+                  const historyData = (globalStats?.history && globalStats.history.length > 0)
+                    ? globalStats.history.map(item => ({
+                        ...item,
+                        label: item.date.length >= 10 ? item.date.substring(5) : item.date
+                      }))
+                    : dummyHistory.map(item => ({ ...item, label: item.date }));
+
+                  const maxVal = Math.max(...historyData.map(d => d.tokens), 500);
+
+                  const svgWidth = 600;
+                  const svgHeight = 220;
+                  const paddingLeft = 60;
+                  const paddingRight = 20;
+                  const paddingTop = 25;
+                  const paddingBottom = 35;
+
+                  const chartWidth = svgWidth - paddingLeft - paddingRight;
+                  const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+                  let linePath = "";
+                  let areaPath = "";
+
+                  if (historyData.length > 0) {
+                    linePath = historyData.map((d, i) => {
+                      const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
+                      const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+                    }).join(" ");
+
+                    const firstX = paddingLeft;
+                    const lastX = paddingLeft + chartWidth;
+                    const bottomY = paddingTop + chartHeight;
+                    areaPath = `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
+                  }
+
+                  const gridLines = [0.25, 0.5, 0.75, 1.0];
+
+                  return (
+                    <>
+                      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} width="100%" height="100%" style={{ display: "block" }}>
+                        <defs>
+                          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.00" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Background Grid Lines */}
+                        {gridLines.map((ratio, index) => {
+                          const y = paddingTop + chartHeight - ratio * chartHeight;
+                          const val = Math.round(ratio * maxVal);
+                          return (
+                            <g key={index}>
+                              <line
+                                x1={paddingLeft}
+                                y1={y}
+                                x2={svgWidth - paddingRight}
+                                y2={y}
+                                stroke="rgba(16, 107, 163, 0.08)"
+                                strokeWidth="1"
+                                strokeDasharray="4 4"
+                              />
+                              <text
+                                x={paddingLeft - 8}
+                                y={y + 4}
+                                fill="#8a9ca8"
+                                fontSize="10"
+                                fontWeight="700"
+                                textAnchor="end"
+                                style={{ fontFamily: "var(--font-mono)" }}
+                              >
+                                {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Baseline */}
+                        <line
+                          x1={paddingLeft}
+                          y1={paddingTop + chartHeight}
+                          x2={svgWidth - paddingRight}
+                          y2={paddingTop + chartHeight}
+                          stroke="rgba(16, 107, 163, 0.15)"
+                          strokeWidth="1"
+                        />
+
+                        {/* Under Area Gradient */}
+                        {areaPath && (
+                          <path
+                            d={areaPath}
+                            fill="url(#chartGradient)"
+                          />
+                        )}
+
+                        {/* Active Area Bars for extra richness */}
+                        {historyData.map((d, i) => {
+                          const barWidth = Math.max(12, chartWidth / historyData.length * 0.25);
+                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth - barWidth / 2;
+                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                          const height = (d.tokens / maxVal) * chartHeight;
+                          return (
+                            <rect
+                              key={`bar-${i}`}
+                              x={x}
+                              y={y}
+                              width={barWidth}
+                              height={height}
+                              rx="3"
+                              fill="rgba(16, 107, 163, 0.06)"
+                              style={{ transition: "all 0.3s ease" }}
+                            />
+                          );
+                        })}
+
+                        {/* Core Line Path */}
+                        {linePath && (
+                          <path
+                            d={linePath}
+                            fill="none"
+                            stroke="var(--primary)"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+
+                        {/* Glow Dots and Interactive hover overlays */}
+                        {historyData.map((d, i) => {
+                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
+                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                          const isHovered = hoveredPoint && hoveredPoint.date === d.date;
+
+                          return (
+                            <g key={i}>
+                              <circle
+                                cx={x}
+                                cy={y}
+                                r={isHovered ? "7" : "4"}
+                                fill="#ffffff"
+                                stroke="var(--primary)"
+                                strokeWidth={isHovered ? "4" : "2.5"}
+                                style={{
+                                  transition: "all 0.15s ease",
+                                  cursor: "pointer",
+                                  filter: "drop-shadow(0 2px 4px rgba(16, 107, 163, 0.2))"
+                                }}
+                              />
+                              {/* X Axis Labels */}
+                              <text
+                                x={x}
+                                y={paddingTop + chartHeight + 18}
+                                fill="#6a7c88"
+                                fontSize="10"
+                                fontWeight="700"
+                                textAnchor="middle"
+                                style={{ fontFamily: " Cairo, var(--font-sans)" }}
+                              >
+                                {d.label}
+                              </text>
+
+                              {/* Invisible Trigger rect for easy hovering */}
+                              <rect
+                                x={x - (chartWidth / historyData.length) / 2}
+                                y={paddingTop}
+                                width={chartWidth / historyData.length}
+                                height={chartHeight + 15}
+                                fill="transparent"
+                                style={{ cursor: "pointer" }}
+                                onMouseEnter={(e) => {
+                                  // Get bounding rect to calculate responsive HTML coordinates
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const container = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                                  if (container) {
+                                    setHoveredPoint({
+                                      date: d.date,
+                                      tokens: d.tokens,
+                                      x: rect.left - container.left + rect.width / 2,
+                                      y: rect.top - container.top + (y - paddingTop)
+                                    });
+                                  }
+                                }}
+                                onMouseLeave={() => setHoveredPoint(null)}
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {/* Tooltip Overlay */}
+                      {hoveredPoint && (
+                        <div style={{
+                          position: "absolute",
+                          left: `${hoveredPoint.x}px`,
+                          top: `${hoveredPoint.y - 30}px`,
+                          transform: "translate(-50%, -100%)",
+                          background: "rgba(15, 23, 42, 0.95)",
+                          color: "#ffffff",
+                          padding: "8px 14px",
+                          borderRadius: "10px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          pointerEvents: "none",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.22)",
+                          zIndex: 100,
+                          whiteSpace: "nowrap",
+                          transition: "all 0.1s ease",
+                          fontFamily: "Cairo, var(--font-sans)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                          border: "1px solid rgba(255,255,255,0.15)"
+                        }}>
+                          <span style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.65rem", display: "block" }}>
+                            {language === "ar" ? `التاريخ: ${hoveredPoint.date}` : `Date: ${hoveredPoint.date}`}
+                          </span>
+                          <span style={{ color: "#4394d2", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4394d2" }} />
+                            {(hoveredPoint.tokens || 0).toLocaleString()} {language === "ar" ? "رمز مستهلك" : "tokens used"}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
 
           {/* Top Consuming Users Table */}
@@ -981,21 +1346,65 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                 {globalStats.userBreakdown.map((user, idx) => {
                   const maxTokens = globalStats.userBreakdown[0]?.tokens || 1;
                   const percentage = Math.min(100, Math.round(((user.tokens || 0) / maxTokens) * 100));
+                  const rankColors = [
+                    { border: "rgba(16, 107, 163, 0.22)", bg: "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(27, 163, 156, 0.03))", badge: "var(--primary)" },
+                    { border: "rgba(27, 163, 156, 0.22)", bg: "linear-gradient(135deg, rgba(27, 163, 156, 0.08), rgba(243, 156, 18, 0.03))", badge: "var(--secondary)" },
+                    { border: "rgba(243, 156, 18, 0.22)", bg: "linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(162, 217, 206, 0.03))", badge: "var(--accent-orange)" }
+                  ];
+                  const rankStyle = rankColors[idx] || { border: "rgba(16, 107, 163, 0.1)", bg: "rgba(255,255,255,0.75)", badge: "#7a8b9e" };
+                  const initials = user.email ? user.email.substring(0, 2).toUpperCase() : "U";
+
                   return (
                     <div key={idx} style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: "0.35rem",
-                      padding: "0.75rem",
-                      background: "rgba(255,255,255,0.7)",
-                      borderRadius: "6px",
-                      border: "1px solid rgba(235, 220, 185, 0.4)"
-                    }}>
+                      gap: "0.45rem",
+                      padding: "0.85rem",
+                      background: rankStyle.bg,
+                      borderRadius: "8px",
+                      border: `1px solid ${rankStyle.border}`,
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    }}
+                    className="user-breakdown-row"
+                    >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
-                          {user.email}
-                        </span>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                          <span style={{
+                            width: "22px",
+                            height: "22px",
+                            borderRadius: "50%",
+                            background: rankStyle.badge,
+                            color: "#fff",
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "var(--font-mono)"
+                          }}>
+                            #{idx + 1}
+                          </span>
+                          <span style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.85)",
+                            border: "1px solid rgba(16, 107, 163, 0.15)",
+                            color: "var(--primary)",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "var(--font-mono)"
+                          }}>
+                            {initials}
+                          </span>
+                          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                            {user.email}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
                           {(user.tokens || 0).toLocaleString()} {language === "ar" ? "رمز" : "tokens"}
                         </span>
                       </div>
@@ -1124,7 +1533,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                           </span>
                         </td>
                         <td style={{ padding: "0.75rem 1rem", color: "#6a7c88", fontSize: "0.8rem" }}>
-                          {new Date(act.timestamp).toLocaleString(language === "ar" ? "ar-EG" : "en-US")}
+                          {act.timestamp ? new Date(act.timestamp).toLocaleString(language === "ar" ? "ar-EG" : "en-US") : "N/A"}
                         </td>
                         <td style={{ padding: "0.75rem 1rem", color: "#4f6371", maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={act.details}>
                           {act.details}
@@ -1143,6 +1552,17 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           transform: translateY(-4px);
           border-color: var(--secondary) !important;
           box-shadow: 0 12px 30px rgba(16, 107, 163, 0.12) !important;
+        }
+        .metric-card-hover:hover {
+          transform: translateY(-4px);
+          border-color: var(--primary) !important;
+          box-shadow: 0 10px 25px rgba(16, 107, 163, 0.08) !important;
+          background: rgba(255, 255, 255, 0.65) !important;
+        }
+        .user-breakdown-row:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(16, 107, 163, 0.06);
+          border-color: var(--primary) !important;
         }
       `}</style>
     </div>

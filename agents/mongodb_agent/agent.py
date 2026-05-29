@@ -72,6 +72,7 @@ micro_dir = os.path.dirname(os.path.abspath(__file__))
 agents_dir = os.path.dirname(micro_dir)
 
 possible_paths = [
+    os.path.join(os.path.dirname(agents_dir), "web", "node_modules", "@mongodb-js", "mongodb-mcp-server", "dist", "index.js"),
     os.path.join(os.path.dirname(agents_dir), "node_modules", "@mongodb-js", "mongodb-mcp-server", "dist", "index.js"),
     os.path.join(agents_dir, "node_modules", "@mongodb-js", "mongodb-mcp-server", "dist", "index.js"),
     os.path.join("/app", "node_modules", "@mongodb-js", "mongodb-mcp-server", "dist", "index.js")

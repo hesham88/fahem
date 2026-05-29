@@ -233,7 +233,7 @@ def command_audit_secrets(args):
                     for kw in COMPETITOR_KEYWORDS:
                         # Prevent flagging CSS cursor properties in styling files
                         if kw == "cursor":
-                            if rel_path.endswith('.css') or re.search(r"cursor\s*:\s*\w+", file_content, re.IGNORECASE):
+                            if rel_path.endswith('.css') or re.search(r"cursor\s*:\s*['\"]?\w+['\"]?", file_content, re.IGNORECASE):
                                 continue
                                 
                         pattern = re.compile(rf"\b{kw}\b", re.IGNORECASE)

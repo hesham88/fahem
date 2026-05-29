@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="spaceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b132b" />
+      <stop offset="100%" stop-color="#1c2541" />
+    </linearGradient>
+    <linearGradient id="helmetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#48cae4" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0077b6" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="100" height="100" rx="50" fill="url(#spaceGrad)" />
+  <!-- Stars -->
+  <circle cx="25" cy="25" r="1" fill="#ffffff" opacity="0.8" />
+  <circle cx="75" cy="30" r="1.5" fill="#ffffff" opacity="0.9" />
+  <circle cx="35" cy="70" r="0.8" fill="#ffffff" opacity="0.6" />
+  <circle cx="80" cy="75" r="1" fill="#ffffff" opacity="0.7" />
+  <!-- Astronaut Suit -->
+  <path d="M30,85 C30,70 40,65 50,65 C60,65 70,70 70,85 Z" fill="#f4f1de" />
+  <rect x="42" y="72" width="16" height="10" rx="2" fill="#e07a5f" />
+  <circle cx="50" cy="77" r="2" fill="#3d5a80" />
+  <!-- Helmet -->
+  <circle cx="50" cy="45" r="22" fill="#f4f1de" stroke="#3d5a80" stroke-width="2" />
+  <circle cx="50" cy="45" r="18" fill="url(#helmetGrad)" stroke="#0096c7" stroke-width="1" />
+  <!-- Reflection -->
+  <path d="M38,35 A 14 14 0 0 1 62,35" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.6" />
+</svg>

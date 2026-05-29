@@ -89,6 +89,18 @@ async def get_metadata(database: str = "fahem") -> dict:
                     "definition": [{"type": "classic", "keys": {"userId": 1}}],
                     "name": "idx_userId_unique"
                 })
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "users",
+                    "definition": [{"type": "classic", "keys": {"username": 1}}],
+                    "name": "idx_username_unique"
+                })
+                await _run_mcp_tool("create-index", {
+                    "database": database,
+                    "collection": "users",
+                    "definition": [{"type": "classic", "keys": {"username_clean": 1}}],
+                    "name": "idx_username_clean_unique"
+                })
                 # 2. Messages collection (composite)
                 await _run_mcp_tool("create-index", {
                     "database": database,
@@ -551,7 +563,11 @@ async def get_global_token_stats() -> dict:
         lifetime_total = 0
         
         user_breakdown = {}
-        
+        history_days = {}
+        for i in range(7):
+            day_str = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+            history_days[day_str] = 0
+
         for doc in docs:
             tt = int(doc.get("totalTokens", 0))
             ts = doc.get("timestamp", "")
@@ -569,15 +585,25 @@ async def get_global_token_stats() -> dict:
                 
             user_breakdown[email] = user_breakdown.get(email, 0) + tt
             
+            # Extract date portion (YYYY-MM-DD) from timestamp
+            if ts and len(ts) >= 10:
+                doc_date = ts[:10]
+                if doc_date in history_days:
+                    history_days[doc_date] += tt
+            
         breakdown_list = [{"email": k, "tokens": v} for k, v in user_breakdown.items()]
         breakdown_list.sort(key=lambda x: x["tokens"], reverse=True)
+        
+        history_list = [{"date": k, "tokens": v} for k, v in history_days.items()]
+        history_list.sort(key=lambda x: x["date"]) # chronological order
         
         return {
             "daily": daily_total,
             "weekly": weekly_total,
             "monthly": monthly_total,
             "total": lifetime_total,
-            "userBreakdown": breakdown_list[:10]
+            "userBreakdown": breakdown_list[:10],
+            "history": history_list
         }
     except Exception as err:
         logger.error(f"Failed to get global token stats: {err}")
@@ -589,13 +615,21 @@ async def get_global_token_stats() -> dict:
             "userBreakdown": []
         }
 
-async def get_user_profile(user_id: str) -> dict:
-    """Fetches user profile from the 'users' collection."""
+async def get_user_profile(user_id: str = None, username: str = None) -> dict:
+    """Fetches user profile from the 'users' collection by userId or username."""
     try:
+        filt = {}
+        if user_id:
+            filt["userId"] = user_id
+        elif username:
+            filt["username_clean"] = username.strip().lower()
+        else:
+            return {}
+
         res = await _run_mcp_tool("find", {
             "database": "fahem",
             "collection": "users",
-            "filter": {"userId": user_id}
+            "filter": filt
         })
         docs = []
         if isinstance(res, list):
@@ -607,16 +641,63 @@ async def get_user_profile(user_id: str) -> dict:
             
         if docs and len(docs) > 0:
             return docs[0]
+
+        # Fallback: if username was provided but no doc found, try to query by userId
+        if username:
+            res_fallback = await _run_mcp_tool("find", {
+                "database": "fahem",
+                "collection": "users",
+                "filter": {"userId": username}
+            })
+            docs_fallback = []
+            if isinstance(res_fallback, list):
+                docs_fallback = res_fallback
+            elif isinstance(res_fallback, dict) and "documents" in res_fallback:
+                docs_fallback = res_fallback["documents"]
+            elif isinstance(res_fallback, dict) and "result" in res_fallback:
+                docs_fallback = res_fallback["result"]
+                
+            if docs_fallback and len(docs_fallback) > 0:
+                return docs_fallback[0]
+
         return {}
     except Exception as err:
-        logger.warning(f"Failed to fetch user profile for {user_id}: {err}")
+        logger.warning(f"Failed to fetch user profile for {user_id or username}: {err}")
         return {}
+
+async def check_username_availability(username: str) -> bool:
+    """Checks if a username is available (i.e. not taken by any other user)."""
+    try:
+        if not username or not username.strip():
+            return False
+        username_clean = username.strip().lower()
+        res = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": {"username_clean": username_clean}
+        })
+        docs = []
+        if isinstance(res, list):
+            docs = res
+        elif isinstance(res, dict) and "documents" in res:
+            docs = res["documents"]
+        elif isinstance(res, dict) and "result" in res:
+            docs = res["result"]
+            
+        return len(docs) == 0
+    except Exception as err:
+        logger.warning(f"Failed to check username availability for {username}: {err}")
+        return False
 
 async def save_user_profile(user_id: str, data: dict) -> bool:
     """Saves or updates a user profile in the 'users' collection."""
     try:
         from datetime import datetime
         now_str = datetime.utcnow().isoformat() + "Z"
+        
+        # Ensure username_clean is stored alongside username
+        if "username" in data and data["username"]:
+            data["username_clean"] = str(data["username"]).strip().lower()
         
         existing = await get_user_profile(user_id)
         if existing:

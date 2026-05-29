@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <!-- Futuristic cyber/deep-space background gradient -->
+    <linearGradient id="cyberBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050811" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Neon Glow Effects -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="intenseGlow" x="-30%" y="-30%" width="160%" height="140%">
+      <feGaussianBlur stdDeviation="3.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Metallic/Robot material gradients -->
+    <linearGradient id="metalBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2e8f0" />
+      <stop offset="40%" stop-color="#94a3b8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+    <linearGradient id="darkMetal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="neonCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="neonMagenta" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f472b6" />
+      <stop offset="100%" stop-color="#be185d" />
+    </linearGradient>
+  </defs>
+
+  <!-- Circular background frame -->
+  <rect width="100" height="100" rx="50" fill="url(#cyberBg)" />
+
+  <!-- Abstract Background Cyber Circuit Lines/Stars -->
+  <path d="M15,50 L40,50 L50,60" fill="none" stroke="#334155" stroke-width="0.8" opacity="0.4" />
+  <path d="M85,50 L60,50 L50,60" fill="none" stroke="#334155" stroke-width="0.8" opacity="0.4" />
+  <path d="M50,15 L50,30" fill="none" stroke="#1e293b" stroke-width="1.2" opacity="0.5" />
+  <circle cx="40" cy="50" r="1.5" fill="#38bdf8" filter="url(#neonGlow)" opacity="0.4" />
+  <circle cx="60" cy="50" r="1.5" fill="#38bdf8" filter="url(#neonGlow)" opacity="0.4" />
+  
+  <circle cx="30" cy="22" r="0.8" fill="#ffffff" opacity="0.5" />
+  <circle cx="75" cy="78" r="1.2" fill="#38bdf8" opacity="0.6" filter="url(#neonGlow)" />
+
+  <!-- Cybernetic Shoulders/Suit -->
+  <path d="M26,85 C26,72 38,64 50,64 C62,64 74,72 74,85 Z" fill="url(#darkMetal)" />
+  <path d="M36,85 C36,75 42,70 50,70 C58,70 64,75 64,85 Z" fill="url(#metalBody)" />
+  <!-- Glowing core on chest -->
+  <polygon points="50,73 54,79 46,79" fill="#38bdf8" filter="url(#neonGlow)" />
+
+  <!-- Robot Neck -->
+  <rect x="44" y="55" width="12" height="10" rx="2" fill="url(#darkMetal)" stroke="#1e293b" stroke-width="1" />
+  <line x1="44" y1="60" x2="56" y2="60" stroke="#0ea5e9" stroke-width="1" opacity="0.8" filter="url(#neonGlow)" />
+
+  <!-- Floating Side Antennae/Ears (Advanced Guide Look) -->
+  <path d="M24,38 L16,42 L24,46 Z" fill="url(#metalBody)" />
+  <path d="M76,38 L84,42 L76,46 Z" fill="url(#metalBody)" />
+  <!-- Glow Tip -->
+  <circle cx="14" cy="42" r="2" fill="#f472b6" filter="url(#neonGlow)" />
+  <circle cx="86" cy="42" r="2" fill="#f472b6" filter="url(#neonGlow)" />
+
+  <!-- Robot Head Sleek Frame -->
+  <rect x="27" y="26" width="46" height="32" rx="14" fill="url(#metalBody)" stroke="#475569" stroke-width="1.5" />
+
+  <!-- Digital Visor Glass Screen -->
+  <rect x="31" y="30" width="38" height="24" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+  
+  <!-- Sleek neon cyber circuit path on visor border -->
+  <rect x="31" y="30" width="38" height="24" rx="10" fill="none" stroke="#0ea5e9" stroke-width="1" filter="url(#neonGlow)" opacity="0.65" />
+
+  <!-- Glowing Cyan Digital LED Eyes (Expressive/Friendly Arc) -->
+  <!-- Left Eye -->
+  <path d="M37,42 A 5 5 0 0 1 45,42" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" filter="url(#intenseGlow)" />
+  <!-- Right Eye -->
+  <path d="M55,42 A 5 5 0 0 1 63,42" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" filter="url(#intenseGlow)" />
+
+  <!-- Visualizer/Mouth LED Waveform (Adds intelligence & audio guide vibe) -->
+  <path d="M44,49 Q 47,46 50,49 T 56,49" fill="none" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round" filter="url(#neonGlow)" />
+
+  <!-- Visor Reflection Shine -->
+  <path d="M34,33 L66,33" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.25" />
+</svg>

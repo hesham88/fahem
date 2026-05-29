@@ -210,6 +210,30 @@ const historyTranslations = {
   }
 };
 
+const renderAvatar = (avatarVal?: string, fontSize?: string) => {
+  if (!avatarVal) return <span style={{ fontSize }}>👤</span>;
+  if (avatarVal.endsWith(".svg")) {
+    const size = fontSize === "2.5rem" ? "60px" :
+                 fontSize === "2.2rem" ? "48px" :
+                 fontSize === "1.8rem" ? "36px" :
+                 fontSize === "1.5rem" ? "30px" : "36px";
+    return (
+      <img
+        src={avatarVal}
+        alt="Avatar"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          objectFit: "contain",
+          display: "block"
+        }}
+      />
+    );
+  }
+  return <span style={{ fontSize }}>{avatarVal}</span>;
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -252,6 +276,10 @@ export default function Dashboard() {
   const [onboardingAvatar, setOnboardingAvatar] = useState("");
   const [onboardingSchool, setOnboardingSchool] = useState("");
   const [onboardingUserType, setOnboardingUserType] = useState<"student" | "teacher" | "parent" | "admin">("student");
+  const [onboardingUsername, setOnboardingUsername] = useState("");
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
 
   // Social & Messenger states
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -292,6 +320,8 @@ export default function Dashboard() {
   const [groundedLogs, setGroundedLogs] = useState<string[]>([]);
   const [groundedResult, setGroundedResult] = useState("");
   const groundedLogsEndRef = useRef<HTMLDivElement>(null);
+  const onboardingEndRef = useRef<HTMLDivElement>(null);
+  const onboardingScrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Real-time Multi-Agent Telemetry State (MongoDB Engine)
   const [activeDbAgent, setActiveDbAgent] = useState<string>("idle");
@@ -485,9 +515,25 @@ export default function Dashboard() {
         })
       });
       if (res.ok) {
-        setUserProfile(updatedProfile);
-        alert(language === "ar" ? "تم تحديث الإعدادات بنجاح!" : "Preferences updated successfully!");
-        await logActivity("update_preferences", "success", "Updated privacy and account settings");
+        const resData = await res.json();
+        if (resData.status !== "error") {
+          setUserProfile(updatedProfile);
+          alert(language === "ar" ? "تم تحديث الإعدادات بنجاح!" : "Preferences updated successfully!");
+          await logActivity("update_preferences", "success", "Updated privacy and account settings");
+        } else {
+          console.error("Failed to update preferences: backend returned error", resData.error || "");
+          alert(language === "ar"
+            ? `فشل تحديث الإعدادات: ${resData.error || "خطأ غير معروف في الخادم"}`
+            : `Failed to update preferences: ${resData.error || "unknown server error"}`
+          );
+        }
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to update privacy settings:", errorText);
+        alert(language === "ar"
+          ? "فشل الاتصال بالخادم لتحديث الإعدادات."
+          : "Failed to connect to server to update preferences."
+        );
       }
     } catch (err) {
       console.error("Error updating privacy settings:", err);
@@ -535,6 +581,23 @@ export default function Dashboard() {
     ]);
   }, [language]);
 
+  // Smooth scroll to the latest message during onboarding without scroll-fighting
+  useEffect(() => {
+    const scrollContainer = onboardingScrollContainerRef.current;
+    if (scrollContainer) {
+      // Instant scroll lock
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      // Smooth layout transition adjustment
+      const timer = setTimeout(() => {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: "smooth"
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [onboardingMessages, onboardingStep]);
+
   const handleOnboardingNext = async () => {
     if (onboardingStep === 0) { // User type selection
       const roleText = onboardingUserType === "student" ? (language === "ar" ? "طالب" : "Student") :
@@ -549,14 +612,79 @@ export default function Dashboard() {
       setOnboardingStep(1);
     } else if (onboardingStep === 1) { // Name step
       if (!onboardingName.trim()) return;
+
+      // Generate username suggestions based on the user's full name
+      const cleanParts = onboardingName.trim().toLowerCase().replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+      const suggestionsList: string[] = [];
+      if (cleanParts.length > 0) {
+        const p1 = cleanParts[0];
+        const p2 = cleanParts[1] || "";
+        suggestionsList.push(p2 ? `${p1}_${p2}` : `${p1}_fahem`);
+        suggestionsList.push(`${p1}${Math.floor(100 + Math.random() * 900)}`);
+        suggestionsList.push(p2 ? `${p2}_${p1}` : `${p1}_active`);
+      } else {
+        suggestionsList.push("user_" + Math.floor(1000 + Math.random() * 9000));
+        suggestionsList.push("fahem_learner");
+      }
+      setUsernameSuggestions(suggestionsList);
+
       setOnboardingMessages(prev => [
         ...prev,
         { sender: "user", text: onboardingName },
-        onboardingUserType === "student"
-          ? { sender: "fahem", text: language === "ar" ? `سعدت بلقائك يا ${onboardingName}! كم عمرك الآن؟ 🎂` : `Nice to meet you, ${onboardingName}! How old are you? 🎂` }
-          : { sender: "fahem", text: language === "ar" ? `سعدت بلقائك يا ${onboardingName}! ما هي بلد إقامتك؟ 🌍` : `Nice to meet you, ${onboardingName}! What is your country of residence? 🌍` }
+        { 
+          sender: "fahem", 
+          text: language === "ar" 
+            ? `سعدت بلقائك يا ${onboardingName}! 🌟 يرجى اختيار اسم مستخدم (Username) فريد لحسابك. سيتم استخدامه في رابط ملفك الشخصي بدلاً من الأرقام:` 
+            : `Nice to meet you, ${onboardingName}! 🌟 Please choose a unique username for your account. This will be used in your profile URL instead of numbers:`
+        }
       ]);
-      setOnboardingStep(onboardingUserType === "student" ? 2 : 3); // Students go to age, others go to country
+      setOnboardingStep(8); // Go to username selection
+    } else if (onboardingStep === 8) { // Username step
+      const inputUsername = onboardingUsername.trim();
+      if (!inputUsername) return;
+
+      // Alphanumeric and underscores between 3 and 20 chars
+      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+      if (!usernameRegex.test(inputUsername)) {
+        setUsernameError(
+          language === "ar"
+            ? "يجب أن يتراوح اسم المستخدم بين 3 إلى 20 حرفاً، ويحتوي فقط على أحرف إنجليزية وأرقام وشرطة سفلية (_)"
+            : "Username must be 3-20 characters, containing only English letters, numbers, and underscores (_)"
+        );
+        return;
+      }
+
+      setUsernameError("");
+      setCheckingUsername(true);
+      try {
+        const checkRes = await fetch(`/api/user/username/check?username=${encodeURIComponent(inputUsername)}`);
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (checkData.available) {
+            setOnboardingMessages(prev => [
+              ...prev,
+              { sender: "user", text: `@${inputUsername}` },
+              onboardingUserType === "student"
+                ? { sender: "fahem", text: language === "ar" ? `رائع جداً! اسم المستخدم @${inputUsername} متاح لحسابك. كم عمرك الآن؟ 🎂` : `Awesome! Username @${inputUsername} is available. How old are you? 🎂` }
+                : { sender: "fahem", text: language === "ar" ? `رائع جداً! اسم المستخدم @${inputUsername} متاح لحسابك. ما هي بلد إقامتك؟ 🌍` : `Awesome! Username @${inputUsername} is available. What is your country of residence? 🌍` }
+            ]);
+            setOnboardingStep(onboardingUserType === "student" ? 2 : 3);
+          } else {
+            setUsernameError(
+              language === "ar"
+                ? "عذراً، اسم المستخدم هذا محجوز مسبقاً! يرجى تجربة اسم آخر أو اختيار أحد الاقتراحات أدناه."
+                : "Sorry, this username is already taken! Please try another one or choose from the suggestions below."
+            );
+          }
+        } else {
+          setUsernameError(language === "ar" ? "فشل التحقق من اسم المستخدم. يرجى المحاولة مرة أخرى." : "Failed to verify username. Please try again.");
+        }
+      } catch (err) {
+        console.error("Error checking username:", err);
+        setUsernameError(language === "ar" ? "فشل الاتصال بالخادم." : "Connection failed.");
+      } finally {
+        setCheckingUsername(false);
+      }
     } else if (onboardingStep === 2) { // Age step (Student only)
       if (!onboardingAge.trim()) return;
       const ageVal = parseInt(onboardingAge);
@@ -640,8 +768,19 @@ export default function Dashboard() {
 
     const isUnderage = onboardingUserType === "student" && parseInt(onboardingAge) < 13;
 
+    // Generate/Use a unique username
+    let usernameVal = onboardingUsername.trim();
+    if (!usernameVal) {
+      const emailPrefix = user.email ? user.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "") : "";
+      const cleanedPrefix = emailPrefix.slice(0, 15);
+      usernameVal = cleanedPrefix.length >= 3 
+        ? `${cleanedPrefix}_${Math.floor(100 + Math.random() * 900)}` 
+        : `user_${user.uid.slice(0, 6)}`;
+    }
+
     const profileData = {
       userId: user.uid,
+      username: usernameVal,
       email: user.email || "",
       name: onboardingName || user.displayName || user.email?.split("@")[0] || "User",
       age: parseInt(onboardingAge) || 0,
@@ -673,8 +812,24 @@ export default function Dashboard() {
         })
       });
       if (res.ok) {
-        setUserProfile(profileData);
-        await logActivity("onboarding_completed", "success", `Completed onboarding as ${onboardingUserType}`);
+        const resData = await res.json();
+        if (resData.status !== "error") {
+          setUserProfile(profileData);
+          await logActivity("onboarding_completed", "success", `Completed onboarding as ${onboardingUserType}`);
+        } else {
+          console.error("Failed to save onboarding profile: backend returned status error", resData.error || "");
+          alert(language === "ar"
+            ? `عذراً، فشل حفظ ملفك الشخصي في قاعدة البيانات: ${resData.error || "خطأ في خادم قاعدة البيانات"}`
+            : `Sorry, failed to save your profile to the database: ${resData.error || "database server error"}`
+          );
+        }
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to save onboarding profile:", errorText);
+        alert(language === "ar"
+          ? "حدث خطأ في الشبكة أثناء حفظ بياناتك. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى."
+          : "A network error occurred while saving your profile. Please check your connection and try again."
+        );
       }
     } catch (err) {
       console.error("Error saving onboarding profile:", err);
@@ -760,7 +915,21 @@ export default function Dashboard() {
       const response = await fetch(`/api/telemetry?userId=${encodeURIComponent(activeUserId)}`);
       if (response.ok) {
         const data = await response.json();
-        setUserTokenStats(data);
+        const rawStats = (data && data.stats) ? data.stats : (data || {});
+        
+        const getVal = (v: any) => {
+          if (!v) return 0;
+          if (typeof v === "object") return v.total || 0;
+          return Number(v) || 0;
+        };
+
+        setUserTokenStats({
+          daily: getVal(rawStats.daily),
+          weekly: getVal(rawStats.weekly),
+          monthly: getVal(rawStats.monthly),
+          total: getVal(rawStats.total),
+          history: Array.isArray(rawStats.history) ? rawStats.history : []
+        });
       }
     } catch (err) {
       console.error("Error fetching token stats:", err);
@@ -1314,9 +1483,11 @@ export default function Dashboard() {
           </div>
 
           {/* Conversational Scroll Log */}
-          <div style={{
-            flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem"
-          }} className="custom-scrollbar">
+          <div 
+            ref={onboardingScrollContainerRef}
+            style={{
+              flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem"
+            }} className="custom-scrollbar">
             {onboardingMessages.map((msg, index) => {
               const isFahem = msg.sender === "fahem";
               return (
@@ -1329,7 +1500,7 @@ export default function Dashboard() {
                     background: isFahem ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(212, 175, 55, 0.2)",
                     color: isFahem ? "#ffffff" : "var(--secondary-hover)", fontWeight: 700, fontSize: "1.1rem", flexShrink: 0
                   }}>
-                    {isFahem ? "🤖" : (onboardingAvatar || "👤")}
+                    {isFahem ? "🤖" : renderAvatar(onboardingAvatar, "1.1rem")}
                   </div>
                   <div style={{
                     padding: "0.85rem 1.1rem", borderRadius: "16px",
@@ -1345,6 +1516,7 @@ export default function Dashboard() {
                 </div>
               );
             })}
+            <div ref={onboardingEndRef} />
           </div>
 
           {/* Interactive Input Section */}
@@ -1401,6 +1573,100 @@ export default function Dashboard() {
                   }}
                   autoFocus
                 />
+              </div>
+            )}
+
+            {/* Step 8: Username Selection */}
+            {onboardingStep === 8 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+                <div style={{ display: "flex", gap: "0.5rem", position: "relative", alignItems: "center" }}>
+                  <span style={{
+                    position: "absolute",
+                    left: language === "ar" ? "auto" : "12px",
+                    right: language === "ar" ? "12px" : "auto",
+                    color: "var(--secondary)",
+                    fontWeight: 700,
+                    fontSize: "1.1rem"
+                  }}>@</span>
+                  <input
+                    type="text"
+                    value={onboardingUsername}
+                    onChange={(e) => {
+                      setOnboardingUsername(e.target.value.replace(/\s+/g, ""));
+                      if (usernameError) setUsernameError("");
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && !checkingUsername && handleOnboardingNext()}
+                    placeholder={language === "ar" ? "اسم_المستخدم" : "username_here"}
+                    style={{
+                      flex: 1,
+                      padding: "0.75rem",
+                      paddingLeft: language === "ar" ? "0.75rem" : "2rem",
+                      paddingRight: language === "ar" ? "2rem" : "0.75rem",
+                      border: "1px solid var(--card-border)",
+                      borderRadius: "var(--border-radius-md)",
+                      outline: "none",
+                      fontFamily: "var(--font-sans)",
+                      borderColor: usernameError ? "var(--accent-orange)" : "var(--card-border)",
+                      transition: "border-color 0.2s"
+                    }}
+                    autoFocus
+                  />
+                  {checkingUsername && (
+                    <div style={{
+                      position: "absolute",
+                      right: language === "ar" ? "auto" : "12px",
+                      left: language === "ar" ? "12px" : "auto",
+                      display: "flex",
+                      alignItems: "center"
+                    }}>
+                      <FiCpu className="spinning-icon" style={{ color: "var(--primary)" }} />
+                    </div>
+                  )}
+                </div>
+
+                {usernameError && (
+                  <div style={{
+                    color: "var(--accent-orange)",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    marginTop: "-0.25rem"
+                  }}>
+                    ⚠️ {usernameError}
+                  </div>
+                )}
+
+                {usernameSuggestions.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                      {language === "ar" ? "أسماء مقترحة لك:" : "Suggested usernames for you:"}
+                    </span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      {usernameSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => {
+                            setOnboardingUsername(suggestion);
+                            setUsernameError("");
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "15px",
+                            border: "1px solid rgba(16, 107, 163, 0.15)",
+                            background: onboardingUsername === suggestion ? "rgba(212, 175, 55, 0.12)" : "rgba(255, 255, 255, 0.6)",
+                            color: "var(--primary)",
+                            fontSize: "0.8rem",
+                            cursor: "pointer",
+                            fontWeight: onboardingUsername === suggestion ? 700 : 500,
+                            borderColor: onboardingUsername === suggestion ? "var(--secondary)" : "rgba(16, 107, 163, 0.15)",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          @{suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1560,7 +1826,9 @@ export default function Dashboard() {
                   maxHeight: "180px", overflowY: "auto", padding: "0.25rem"
                 }}>
                   {[
-                    { e: "🚀", lEn: "Space Explorer", lAr: "مستكشف الفضاء" },
+                    { e: "/avatars/space_explorer.svg", lEn: "Space Explorer", lAr: "مستكشف الفضاء" },
+                    { e: "/avatars/wise_owl.svg", lEn: "Wise Owl", lAr: "بومة حكيمة" },
+                    { e: "/avatars/robot_tutor.svg", lEn: "Robot Tutor", lAr: "معلم آلي" },
                     { e: "🧠", lEn: "Deep Thinker", lAr: "مفكر عميق" },
                     { e: "🎨", lEn: "Artist", lAr: "فنان مبدع" },
                     { e: "👾", lEn: "Gamer/Coder", lAr: "مبرمج محترف" },
@@ -1568,9 +1836,7 @@ export default function Dashboard() {
                     { e: "🐼", lEn: "Nature Lover", lAr: "صديق الطبيعة" },
                     { e: "🧪", lEn: "Scientist", lAr: "عالم ذكي" },
                     { e: "🦸", lEn: "Super Hero", lAr: "بطل خارق" },
-                    { e: "🦉", lEn: "Wise Owl", lAr: "بومة حكيمة" },
                     { e: "🦁", lEn: "Leader", lAr: "أسد قائد" },
-                    { e: "🐬", lEn: "Dolphin", lAr: "دلفين ذكي" },
                     { e: "🍕", lEn: "Pizza Lover", lAr: "محب البيتزا" }
                   ].map((item) => (
                     <button
@@ -1591,7 +1857,11 @@ export default function Dashboard() {
                         e.currentTarget.style.transform = "scale(1)";
                       }}
                     >
-                      <span style={{ fontSize: "2rem" }}>{item.e}</span>
+                      {item.e.endsWith(".svg") ? (
+                        <img src={item.e} alt={item.lEn} style={{ width: "2.5rem", height: "2.5rem", objectFit: "contain", borderRadius: "50%" }} />
+                      ) : (
+                        <span style={{ fontSize: "2rem" }}>{item.e}</span>
+                      )}
                       <span style={{ fontSize: "0.65rem", color: "#6a7c88", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "90%", textAlign: "center" }}>
                         {language === "ar" ? item.lAr : item.lEn}
                       </span>
@@ -1998,12 +2268,12 @@ export default function Dashboard() {
                       boxShadow: "var(--shadow-sm)",
                     }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("dailyTokens")}</span>
-                      <strong style={{ fontSize: "1.25rem", color: "var(--primary)" }}>{userTokenStats.daily.toLocaleString()}</strong>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--primary)" }}>{(userTokenStats.daily || 0).toLocaleString()}</strong>
                       <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
-                        <div style={{ width: `${Math.min(100, (userTokenStats.daily / 50000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, #106ba3, #4394d2)", borderRadius: "3px" }}></div>
+                        <div style={{ width: `${Math.min(100, (((userTokenStats.daily || 0) / 50000) * 100))}%`, height: "100%", background: "linear-gradient(90deg, #106ba3, #4394d2)", borderRadius: "3px" }}></div>
                       </div>
                       <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
-                        {Math.round(Math.min(100, (userTokenStats.daily / 50000) * 100))}% of 50K limit
+                        {Math.round(Math.min(100, (((userTokenStats.daily || 0) / 50000) * 100)))}% of 50K limit
                       </span>
                     </div>
 
@@ -2019,12 +2289,12 @@ export default function Dashboard() {
                       boxShadow: "var(--shadow-sm)",
                     }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("weeklyTokens")}</span>
-                      <strong style={{ fontSize: "1.25rem", color: "var(--secondary)" }}>{userTokenStats.weekly.toLocaleString()}</strong>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--secondary)" }}>{(userTokenStats.weekly || 0).toLocaleString()}</strong>
                       <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
-                        <div style={{ width: `${Math.min(100, (userTokenStats.weekly / 250000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, var(--secondary), #f5c242)", borderRadius: "3px" }}></div>
+                        <div style={{ width: `${Math.min(100, (((userTokenStats.weekly || 0) / 250000) * 100))}%`, height: "100%", background: "linear-gradient(90deg, var(--secondary), #f5c242)", borderRadius: "3px" }}></div>
                       </div>
                       <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
-                        {Math.round(Math.min(100, (userTokenStats.weekly / 250000) * 100))}% of 250K limit
+                        {Math.round(Math.min(100, (((userTokenStats.weekly || 0) / 250000) * 100)))}% of 250K limit
                       </span>
                     </div>
 
@@ -2040,12 +2310,12 @@ export default function Dashboard() {
                       boxShadow: "var(--shadow-sm)",
                     }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("monthlyTokens")}</span>
-                      <strong style={{ fontSize: "1.25rem", color: "var(--accent-green)" }}>{userTokenStats.monthly.toLocaleString()}</strong>
+                      <strong style={{ fontSize: "1.25rem", color: "var(--accent-green)" }}>{(userTokenStats.monthly || 0).toLocaleString()}</strong>
                       <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
-                        <div style={{ width: `${Math.min(100, (userTokenStats.monthly / 1000000) * 100)}%`, height: "100%", background: "linear-gradient(90deg, var(--accent-green), #42d2a2)", borderRadius: "3px" }}></div>
+                        <div style={{ width: `${Math.min(100, (((userTokenStats.monthly || 0) / 1000000) * 100))}%`, height: "100%", background: "linear-gradient(90deg, var(--accent-green), #42d2a2)", borderRadius: "3px" }}></div>
                       </div>
                       <span style={{ fontSize: "0.65rem", color: "#8a9ca8", textAlign: "right", marginTop: "2px" }}>
-                        {Math.round(Math.min(100, (userTokenStats.monthly / 1000000) * 100))}% of 1M limit
+                        {Math.round(Math.min(100, (((userTokenStats.monthly || 0) / 1000000) * 100)))}% of 1M limit
                       </span>
                     </div>
 
@@ -2061,7 +2331,7 @@ export default function Dashboard() {
                       boxShadow: "var(--shadow-sm)",
                     }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{getHistoryT("totalTokens")}</span>
-                      <strong style={{ fontSize: "1.25rem", color: "#635bff" }}>{userTokenStats.total.toLocaleString()}</strong>
+                      <strong style={{ fontSize: "1.25rem", color: "#635bff" }}>{(userTokenStats.total || 0).toLocaleString()}</strong>
                       <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginTop: "0.5rem" }}>
                         <div style={{ width: "100%", height: "100%", background: "linear-gradient(90deg, #635bff, #a35bff)", borderRadius: "3px" }}></div>
                       </div>
@@ -3061,7 +3331,7 @@ export default function Dashboard() {
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                           <span style={{ fontSize: "2.5rem", background: "rgba(16, 107, 163, 0.06)", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {child.avatar || "👤"}
+                            {renderAvatar(child.avatar, "2.5rem")}
                           </span>
                           <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
                             <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{child.name}</strong>
@@ -3131,7 +3401,7 @@ export default function Dashboard() {
                     {/* Chat Header */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <span style={{ fontSize: "2.2rem" }}>{chatRecipient.avatar || "👤"}</span>
+                        {renderAvatar(chatRecipient.avatar, "2.2rem")}
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{chatRecipient.name}</strong>
                           <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
@@ -3298,7 +3568,7 @@ export default function Dashboard() {
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <span style={{ fontSize: "1.5rem" }}>{friend.avatar || "👤"}</span>
+                              {renderAvatar(friend.avatar, "1.5rem")}
                               <div style={{ display: "flex", flexDirection: "column" }}>
                                 <strong style={{ fontSize: "0.9rem", color: "var(--foreground)" }}>{friend.name}</strong>
                                 <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{friend.email}</span>
@@ -3411,7 +3681,7 @@ export default function Dashboard() {
                               className="directory-item"
                             >
                               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                                <span style={{ fontSize: "1.8rem" }}>{dirUser.avatar || "👤"}</span>
+                                {renderAvatar(dirUser.avatar, "1.8rem")}
                                 <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                     <strong style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>{dirUser.name}</strong>
@@ -3432,7 +3702,7 @@ export default function Dashboard() {
                               <div style={{ display: "flex", gap: "0.35rem" }}>
                                 {/* Profile Link */}
                                 <a
-                                  href={`/${language}/profile/${dirUser.userId}`}
+                                  href={`/${language}/profile/${dirUser.username || dirUser.userId}`}
                                   className="btn btn-secondary"
                                   style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem", display: "flex", alignItems: "center", textDecoration: "none" }}
                                 >
