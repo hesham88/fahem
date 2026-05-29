@@ -138,27 +138,65 @@ async def search_users_by_email(email_query: str) -> Dict[str, Any]:
         logger.error(f"Error in search_users_by_email: {e}", exc_info=True)
         return {"status": "error", "message": f"Search failed: {str(e)}"}
 
-async def insert_user_report(user_id: str, report_title: str, content: str) -> Dict[str, Any]:
-    """Saves a newly generated compliance, diagnostic, or security report on behalf of an authenticated user.
+async def insert_user_report(
+    user_id: Optional[str] = None,
+    report_title: Optional[str] = None,
+    content: Optional[str] = None,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    subject: Optional[str] = None,
+    description: Optional[str] = None,
+    timestamp: Optional[str] = None
+) -> Dict[str, Any]:
+    """Saves a newly generated compliance, diagnostic, issue, or security report inside the 'reports' collection.
+    
+    This tool supports recording user issue reports with flexible fields including name, email, subject, description, and timestamp.
     
     Args:
         user_id: The authenticated user ID creating this report.
-        report_title: Title/subject of the report.
-        content: Detailed text content of the report.
+        report_title: Title or subject of the report (maps to 'title' or 'subject' field).
+        content: Detailed text content or description of the report (maps to 'content' or 'description' field).
+        name: Name of the person reporting the issue.
+        email: Email address of the person reporting the issue.
+        subject: Subject of the issue report (fallback or alternate for report_title).
+        description: Description of the issue report (fallback or alternate for content).
+        timestamp: Isoformatted timestamp when the report was created (fallback or alternate for createdAt).
     """
-    logger.info(f"[TOOL] Executing insert_user_report for user_id={user_id}")
-    if not user_id or not report_title or not content:
-        return {"status": "error", "message": "Missing required parameters: user_id, report_title, and content must be provided."}
+    logger.info(f"[TOOL] Executing insert_user_report with user_id={user_id}, email={email}")
+    
+    # Require at least some identifying fields and description/content fields
+    has_identity = bool(user_id or email or name)
+    has_text = bool(report_title or subject or content or description)
+    
+    if not has_identity or not has_text:
+        return {"status": "error", "message": "Missing required parameters: A user identifier (user_id, email, or name) and text fields (subject or description) must be provided."}
         
     try:
+        final_userId = user_id or email or name or "anonymous"
+        final_title = report_title or subject or "User Issue Report"
+        final_content = content or description or "No description provided."
+        final_createdAt = timestamp or datetime.datetime.utcnow().isoformat() + "Z"
+        
         report_doc = {
-            "userId": user_id,
-            "title": report_title,
-            "content": content,
-            "createdAt": datetime.datetime.utcnow().isoformat() + "Z",
+            "userId": final_userId,
+            "title": final_title,
+            "content": final_content,
+            "createdAt": final_createdAt,
             "status": "active"
         }
         
+        # Explicitly support standard fields requested by prompt parameters
+        if name is not None:
+            report_doc["name"] = name
+        if email is not None:
+            report_doc["email"] = email
+        if subject is not None:
+            report_doc["subject"] = subject
+        if description is not None:
+            report_doc["description"] = description
+        if timestamp is not None:
+            report_doc["timestamp"] = timestamp
+            
         await _run_mcp_tool("insert-many", {"database": "fahem", "collection": "reports", "documents": [report_doc]})
         
         return {"status": "success", "message": "Report saved successfully.", "report": report_doc}

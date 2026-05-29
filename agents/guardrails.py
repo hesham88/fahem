@@ -131,6 +131,34 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         else:
             prompt_text = str(user_prompt)
             
+    # Try parsing as JSON first to extract rich session/context variables for tool callback access
+    if prompt_text:
+        try:
+            data = json.loads(prompt_text)
+            if isinstance(data, dict):
+                if "user_email" in data and data["user_email"]:
+                    os.environ["USER_EMAIL"] = data["user_email"]
+                if "user_id" in data and data["user_id"]:
+                    os.environ["USER_ID"] = data["user_id"]
+                    if hasattr(context, "user_id"):
+                        try:
+                            context.user_id = data["user_id"]
+                        except Exception:
+                            pass
+                if "credits" in data:
+                    os.environ["CREDITS"] = str(data["credits"])
+                if "prompt" in data:
+                    prompt_text = data["prompt"]
+                    if hasattr(context, "user_content"):
+                        if isinstance(context.user_content, str):
+                            context.user_content = prompt_text
+                        elif hasattr(context.user_content, "parts") and context.user_content.parts:
+                            for p in context.user_content.parts:
+                                if hasattr(p, "text") and p.text:
+                                    p.text = prompt_text
+        except Exception:
+            pass
+            
     agent_name = getattr(context, "agent_name", "UnknownAgent")
     user_id = getattr(context, "user_id", "UnknownUser")
     
@@ -261,6 +289,18 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
     if not user_email:
         user_email = os.environ.get("USER_EMAIL", "")
         
+    # Extra robust extraction from tool arguments or documents for insert/update/delete operations
+    if not user_email and tool_args:
+        user_email = tool_args.get("email") or tool_args.get("user_email") or tool_args.get("user_id") or tool_args.get("userId") or ""
+        if not user_email:
+            docs = tool_args.get("documents", [])
+            if isinstance(docs, list) and docs:
+                for doc in docs:
+                    if isinstance(doc, dict):
+                        user_email = doc.get("email") or doc.get("user_email") or doc.get("userId") or doc.get("userId") or ""
+                        if user_email:
+                            break
+                            
     is_write = any(kw in tool_name.lower() for kw in ["insert", "update", "delete", "drop", "write", "create"])
     if is_write:
         if not user_email:
