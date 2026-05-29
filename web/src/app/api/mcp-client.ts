@@ -1,168 +1,85 @@
-import readline from "readline";
-import path from "path";
-import { createRequire } from "module";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@mongodb-js/mongodb-mcp-server/dist/server.js";
+import { Session } from "@mongodb-js/mongodb-mcp-server/dist/session.js";
+import dns from "dns";
 
-let spawnFn: any;
-let existsFn: any;
-
+// Preload DNS settings to ensure MongoDB Atlas connection works seamlessly on Cloud Run
 try {
-  const req = createRequire(import.meta.url);
-  spawnFn = req("child_process").spawn;
-  existsFn = req("fs").existsSync;
+  dns.setServers(["8.8.8.8", "8.8.4.4"]);
+  dns.setDefaultResultOrder("ipv4first");
 } catch (e) {
-  console.error("Dynamic built-in resolution failed:", e);
-}
-
-function decodeBase64(b64: string): string {
-  return Buffer.from(b64, "base64").toString("utf8");
-}
-
-function getPreloadPath(): string {
-  const root = new Function("return process.cwd()")();
-  const p1 = (root + "/" + decodeBase64("ZG5zLXByZWxvYWQuanM=")).replace(/\\/g, "/");
-  if (existsFn(p1)) return p1;
-  const p2 = (root + "/" + decodeBase64("d2ViL2Rucy1wcmVsb2FkLmpz")).replace(/\\/g, "/");
-  if (existsFn(p2)) return p2;
-  return p1;
-}
-
-function getServerPath(): string {
-  const root = new Function("return process.cwd()")();
-  const p1 = (root + "/" + decodeBase64("bm9kZV9tb2R1bGVzL0Btb25nb2RiLWpzL21vbmdvZGItbWNwLXNlcnZlci9kaXN0L2luZGV4Lmpz")).replace(/\\/g, "/");
-  if (existsFn(p1)) return p1;
-  const p2 = (root + "/" + decodeBase64("d2ViL25vZGVfbW9kdWxlcy9AbW9uZ29kYi1qcy9tb25nb2RiLW1jcC1zZXJ2ZXIvZGlzdC9pbmRleC5qcw==")).replace(/\\/g, "/");
-  if (existsFn(p2)) return p2;
-  return p1;
+  console.error("[DNS PRELOAD] Failed to configure custom DNS servers:", e);
 }
 
 export class StdioMcpClient {
-  private child: any;
-  private rl: any;
-  private pendingRequests = new Map<number | string, { resolve: (val: any) => void; reject: (err: any) => void }>();
-  private nextId = 1;
+  private session: Session;
+  private mcpServer: McpServer;
+  private server: Server;
   private initialized = false;
 
   constructor() {
-    const cmd = "node";
-    const preloadPath = getPreloadPath();
-    const serverPath = getServerPath();
-    const mongodbUri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-
-    this.child = spawnFn(cmd, [serverPath], {
-      env: {
-        ...process.env,
-        MDB_MCP_CONNECTION_STRING: mongodbUri,
-        NODE_OPTIONS: `--require "${preloadPath}"`
-      },
-      shell: true
+    this.session = new Session();
+    this.mcpServer = new McpServer({
+      name: "MongoDB Atlas",
+      version: "1.0.0"
     });
-
-    this.rl = readline.createInterface({
-      input: this.child.stdout,
-      output: this.child.stdin,
-      terminal: false
+    this.server = new Server({
+      mcpServer: this.mcpServer,
+      session: this.session
     });
-
-    this.rl.on("line", (line: string) => {
-      try {
-        const response = JSON.parse(line);
-        if (response.id !== undefined && this.pendingRequests.has(response.id)) {
-          const { resolve, reject } = this.pendingRequests.get(response.id)!;
-          this.pendingRequests.delete(response.id);
-          if (response.error) {
-            reject(new Error(response.error.message || JSON.stringify(response.error)));
-          } else {
-            resolve(response.result);
-          }
-        }
-      } catch (e) {
-        // Suppress parsing errors for non-JSON lines or debug notices from stderr
-      }
-    });
-
-    this.child.on("error", (err: any) => {
-      console.error("[MCP CLIENT] Subprocess launch error:", err);
-    });
-
-    this.child.stdin.on("error", (err: any) => {
-      console.error("[MCP CLIENT] stdin stream error:", err);
-    });
-
-    // Pipe server stderr to parent console for tracing/debugging
-    this.child.stderr.on("data", (data: any) => {
-      console.warn("[MCP SERVER STDERR]:", data.toString().trim());
-    });
-  }
-
-  private sendRequest(method: string, params?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const id = this.nextId++;
-      const request = {
-        jsonrpc: "2.0",
-        method,
-        id,
-        params
-      };
-      this.pendingRequests.set(id, { resolve, reject });
-      try {
-        if (this.child.stdin.writable) {
-          this.child.stdin.write(JSON.stringify(request) + "\n");
-        } else {
-          reject(new Error("MCP Client stdin is not writable (subprocess may have terminated)."));
-        }
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-
-  private sendNotification(method: string, params?: any): void {
-    const request = {
-      jsonrpc: "2.0",
-      method,
-      params
-    };
-    try {
-      if (this.child.stdin.writable) {
-        this.child.stdin.write(JSON.stringify(request) + "\n");
-      }
-    } catch (err) {
-      console.error("[MCP CLIENT] Failed to send notification:", err);
-    }
+    this.server.registerTools();
   }
 
   async initialize(): Promise<any> {
     if (this.initialized) return;
-    const result = await this.sendRequest("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: {
-        name: "fahem-mcp-client",
-        version: "1.0.0"
-      }
-    });
-    this.sendNotification("notifications/initialized");
     this.initialized = true;
-    return result;
   }
 
   async listTools(): Promise<any> {
     await this.initialize();
-    return this.sendRequest("tools/list", {});
+    
+    // Convert in-memory registeredTools map to the format expected by Gemini listTools
+    const toolsList = Object.entries((this.mcpServer as any)._registeredTools)
+      .filter(([_, tool]: any) => tool.enabled)
+      .map(([name, tool]: any) => {
+        return {
+          name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        };
+      });
+
+    return { tools: toolsList };
   }
 
   async callTool(name: string, args: any): Promise<any> {
     await this.initialize();
-    return this.sendRequest("tools/call", {
-      name,
-      arguments: args
-    });
+    
+    const tool = (this.mcpServer as any)._registeredTools[name];
+    if (!tool) {
+      throw new Error(`Tool ${name} not found`);
+    }
+
+    // Standardize connection args: map connectionString to connectionStringOrClusterName for connect tool compatibility
+    let finalArgs = args;
+    if (name === "connect") {
+      const connStr = args.connectionString || args.connectionStringOrClusterName;
+      finalArgs = { connectionStringOrClusterName: connStr };
+    }
+
+    try {
+      const result = await this.mcpServer.executeToolHandler(tool, finalArgs, {});
+      return result;
+    } catch (err: any) {
+      console.error(`[In-Memory MCP Client] Error calling tool ${name}:`, err);
+      throw err;
+    }
   }
 
   close() {
     try {
-      this.rl.close();
-      this.child.kill();
+      this.session.close();
+      this.mcpServer.close();
     } catch (e) {
       // Ignore
     }
