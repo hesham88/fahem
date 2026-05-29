@@ -86,6 +86,17 @@ mongodb_agent = Agent(
         1. Local custom tools (get_database_stats, list_database_collections, get_collection_schema).
         2. Official MongoDB MCP server tools (atlas-list-clusters, list-databases, find, aggregate, etc.).
         Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
+        
+        You MUST respond to the user in the language they write in or explicitly request.
+        You natively support the following 7 languages:
+        - English (en)
+        - Arabic (ar)
+        - French (fr)
+        - German (de)
+        - Spanish (es)
+        - Italian (it)
+        - Chinese (zh)
+        Translate your explanations, diagnostics, descriptions, and outputs into the user's selected language, while preserving technical/system identifiers such as database and collection names (e.g. 'fahem', 'users') as is.
     """,
     tools=[
         mcp_toolset,

@@ -1,6 +1,13 @@
 import os
 import sys
 
+# Set UTF-8 encoding on standard output to fully support unicode/multilingual outputs
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Monkeypatch BSON types for Pydantic V2 serialization compatibility inside ADK logging
 try:
     import bson.timestamp
@@ -80,9 +87,20 @@ except ImportError:
 def load_local_env():
     """Loads variables from Next.js local env file to configure database URIs and API keys for local testing."""
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        env_path = os.path.join(base_dir, "web", ".env.local")
-        if os.path.exists(env_path):
+        agents_dir = os.path.dirname(os.path.abspath(__file__))
+        # Try nested under agents/ (for standalones), then parents
+        possible_paths = [
+            os.path.join(agents_dir, ".env.local"),
+            os.path.join(os.path.dirname(agents_dir), ".env.local"),
+            os.path.join(os.path.dirname(os.path.dirname(agents_dir)), "web", ".env.local")
+        ]
+        env_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                env_path = path
+                break
+                
+        if env_path:
             print(f"Loading local configuration from: {env_path}")
             with open(env_path, "r") as f:
                 for line in f:
@@ -160,7 +178,14 @@ def run_agent():
                     
         print("\n=== Agent Final Output ===")
         if final_text:
-            print(final_text.encode('ascii', errors='replace').decode('ascii'))
+            # Force printing as standard UTF-8 stream output
+            try:
+                print(final_text)
+            except Exception:
+                try:
+                    print(final_text.encode("utf-8", errors="replace").decode("utf-8"))
+                except Exception:
+                    print(final_text.encode("ascii", errors="replace").decode("ascii"))
         else:
             print("No output generated or execution finished without content.")
         print("==========================\n")

@@ -88,7 +88,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "MongoDB MCP Stdio Toolset",
     status_connecting: "Connecting...",
     status_error: "Error fetching metadata",
-    status_disconnected: "Disconnected"
+    status_disconnected: "Disconnected",
+    auth_failed: "Authentication failed. Please try again.",
+    initiating_stream: "[SYSTEM] Initiating agent execution stream...",
+    query_completed_success: "Query completed successfully. Please check the logs console for output details.",
+    stream_failure: "[ERROR] Stream failure: ",
+    stream_error_occurred: "An error occurred while streaming the agent output: ",
+    preset_list_db_query: "List the databases, list collections for 'fahem' database, and retrieve database stats.",
+    preset_get_stats_query: "Analyze database statistics for the 'fahem' database and summarize storage size and index metrics.",
+    preset_schema_query: "Get the collection schema for the 'users' collection inside the 'fahem' database and describe its fields.",
+    preset_list_col_query: "List all collections present in the 'fahem' database."
   },
   ar: {
     nav_overview: "نظرة عامة",
@@ -166,7 +175,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "أدوات بروتوكول MongoDB MCP",
     status_connecting: "جاري الاتصال...",
     status_error: "خطأ في استيراد البيانات الوصفية",
-    status_disconnected: "غير متصل"
+    status_disconnected: "غير متصل",
+    auth_failed: "فشل المصادقة. يرجى المحاولة مرة أخرى.",
+    initiating_stream: "[النظام] جاري بدء بث تنفيذ الوكيل...",
+    query_completed_success: "اكتمل الطلب بنجاح. يرجى التحقق من لوحة سجلات البث لمزيد من التفاصيل.",
+    stream_failure: "[خطأ] فشل البث: ",
+    stream_error_occurred: "حدث خطأ أثناء بث مخرجات الوكيل: ",
+    preset_list_db_query: "اسرد قواعد البيانات، واسرد المجموعات لقاعدة بيانات 'fahem'، واسترجع إحصائيات قاعدة البيانات.",
+    preset_get_stats_query: "حلل إحصائيات قاعدة البيانات لقاعدة 'fahem' ولخّص حجم التخزين ومقاييس الفهرسة.",
+    preset_schema_query: "احصل على مخطط المجموعة لمجموعة 'users' داخل قاعدة بيانات 'fahem' واشرح حقولها.",
+    preset_list_col_query: "اسرد جميع المجموعات الموجودة في قاعدة بيانات 'fahem'."
   },
   es: {
     nav_overview: "Resumen",
@@ -244,7 +262,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "Herramientas de MongoDB MCP",
     status_connecting: "Conectando...",
     status_error: "Error al obtener metadatos",
-    status_disconnected: "Desconectado"
+    status_disconnected: "Desconectado",
+    auth_failed: "La autenticación falló. Por favor, inténtelo de nuevo.",
+    initiating_stream: "[SISTEMA] Iniciando la transmisión de ejecución del agente...",
+    query_completed_success: "Consulta completada con éxito. Por favor, revise la consola de registros para ver los detalles.",
+    stream_failure: "[ERROR] Fallo en la transmisión: ",
+    stream_error_occurred: "Ocurrió un error al transmitir la salida del agente: ",
+    preset_list_db_query: "Enumere las bases de datos, enumere las colecciones de la base de datos 'fahem' y recupere las estadísticas de la base de datos.",
+    preset_get_stats_query: "Analice las estadísticas de la base de datos 'fahem' y resuma el tamaño de almacenamiento y las métricas de índice.",
+    preset_schema_query: "Obtenga el esquema de la colección 'users' dentro de la base de datos 'fahem' y describa sus campos.",
+    preset_list_col_query: "Enumere todas las colecciones presentes en la base de datos 'fahem'."
   },
   fr: {
     nav_overview: "Aperçu",
@@ -322,7 +349,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "Outils de MongoDB MCP",
     status_connecting: "Connexion...",
     status_error: "Erreur lors de la récupération des métadonnées",
-    status_disconnected: "Déconnecté"
+    status_disconnected: "Déconnecté",
+    auth_failed: "Échec de l'authentification. Veuillez réessayer.",
+    initiating_stream: "[SYSTEME] Initialisation du flux d'exécution de l'agent...",
+    query_completed_success: "Requête exécutée avec succès. Veuillez vérifier la console des journaux pour plus de détails.",
+    stream_failure: "[ERREUR] Échec du flux : ",
+    stream_error_occurred: "Une erreur est survenue lors de la diffusion du flux de l'agent : ",
+    preset_list_db_query: "Lister les bases de données, lister les collections de la base de données 'fahem' et récupérer les statistiques de la base de données.",
+    preset_get_stats_query: "Analyser les statistiques de la base de données 'fahem' et résumer la taille de stockage et les métriques d'index.",
+    preset_schema_query: "Obtenir le schéma de collection pour la collection 'users' dans la base de données 'fahem' et décrire ses champs.",
+    preset_list_col_query: "Lister toutes les collections présentes dans la base de données 'fahem'."
   },
   de: {
     nav_overview: "Übersicht",
@@ -400,7 +436,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "MongoDB MCP Werkzeuge",
     status_connecting: "Verbinden...",
     status_error: "Fehler beim Abrufen der Metadaten",
-    status_disconnected: "Getrennt"
+    status_disconnected: "Getrennt",
+    auth_failed: "Authentifizierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    initiating_stream: "[SYSTEM] Initiere Ausführungsdatenstrom des Agenten...",
+    query_completed_success: "Abfrage erfolgreich abgeschlossen. Bitte überprüfen Sie die Konsolenprotokolle für Details.",
+    stream_failure: "[FEHLER] Datenstromfehler: ",
+    stream_error_occurred: "Ein Fehler ist beim Streamen der Agentenausgabe aufgetreten: ",
+    preset_list_db_query: "Listen Sie die Datenbanken auf, listen Sie die Sammlungen für die Datenbank 'fahem' auf und rufen Sie die Datenbankstatistiken ab.",
+    preset_get_stats_query: "Analysieren Sie die Datenbankstatistiken für die Datenbank 'fahem' und fassen Sie die Speichergröße und Indexmetriken zusammen.",
+    preset_schema_query: "Rufen Sie das Sammlungsschema für die Sammlung 'users' in der Datenbank 'fahem' ab und beschreiben Sie deren Felder.",
+    preset_list_col_query: "Listen Sie alle in der Datenbank 'fahem' vorhandenen Sammlungen auf."
   },
   zh: {
     nav_overview: "概述",
@@ -478,7 +523,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "MongoDB MCP 工具集",
     status_connecting: "正在连接...",
     status_error: "获取元数据错误",
-    status_disconnected: "已断开连接"
+    status_disconnected: "已断开连接",
+    auth_failed: "身份验证失败。请重试。",
+    initiating_stream: "[系统] 正在启动代理执行流...",
+    query_completed_success: "查询成功完成。请检查控制台日志以获取详细输出。",
+    stream_failure: "[错误] 流传输失败: ",
+    stream_error_occurred: "流式传输代理输出时出错: ",
+    preset_list_db_query: "列出数据库，列出“fahem”数据库的集合，并检索数据库统计信息。",
+    preset_get_stats_query: "分析“fahem”数据库的数据库统计信息，并总结存储大小和索引指标。",
+    preset_schema_query: "获取“fahem”数据库中“users”集合的集合架构，并描述其字段。",
+    preset_list_col_query: "列出“fahem”数据库中存在的所有集合。"
   },
   it: {
     nav_overview: "Panoramica",
@@ -556,7 +610,16 @@ const translations: Record<Language, Record<string, string>> = {
     config_tools_list: "Strumenti MongoDB MCP",
     status_connecting: "Connessione in corso...",
     status_error: "Errore durante il recupero dei metadati",
-    status_disconnected: "Disconnesso"
+    status_disconnected: "Disconnesso",
+    auth_failed: "Autenticazione fallita. Riprova.",
+    initiating_stream: "[SISTEMA] Avvio dello streaming di esecuzione dell'agente...",
+    query_completed_success: "Query completata con successo. Controlla la console dei log per i dettagli.",
+    stream_failure: "[ERRORE] Errore di trasmissione: ",
+    stream_error_occurred: "Si è verificato un errore durante la trasmissione dell'output dell'agente: ",
+    preset_list_db_query: "Elenca i database, elenca le collezioni per il database 'fahem' e recupera le statistiche del database.",
+    preset_get_stats_query: "Analizza le statistiche del database per il database 'fahem' e riassumi le dimensioni di archiviazione e le metriche dell'indice.",
+    preset_schema_query: "Ottieni lo schema della collezione per la collezione 'users' all'interno del database 'fahem' e descrivi i suoi campi.",
+    preset_list_col_query: "Elenca tutte le collezioni presenti nel database 'fahem'."
   }
 };
 

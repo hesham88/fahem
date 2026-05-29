@@ -42,22 +42,22 @@ export default function Dashboard() {
     {
       title: t("preset_list_db_title"),
       description: t("preset_list_db_desc"),
-      query: "List the databases, list collections for 'fahem' database, and retrieve database stats."
+      query: t("preset_list_db_query")
     },
     {
       title: t("preset_get_stats_title"),
       description: t("preset_get_stats_desc"),
-      query: "Analyze database statistics for the 'fahem' database and summarize storage size and index metrics."
+      query: t("preset_get_stats_query")
     },
     {
       title: t("preset_schema_title"),
       description: t("preset_schema_desc"),
-      query: "Get the collection schema for the 'users' collection inside the 'fahem' database and describe its fields."
+      query: t("preset_schema_query")
     },
     {
       title: t("preset_list_col_title"),
       description: t("preset_list_col_desc"),
-      query: "List all collections present in the 'fahem' database."
+      query: t("preset_list_col_query")
     }
   ];
 
@@ -117,7 +117,7 @@ export default function Dashboard() {
     if (!queryText.trim()) return;
     setLoading(true);
     setPrompt(queryText);
-    setLogs(["[SYSTEM] Initiating agent execution stream..."]);
+    setLogs([t("initiating_stream")]);
     setFinalResult("");
 
     try {
@@ -158,18 +158,18 @@ export default function Dashboard() {
       }
 
       const cleanResult = accumulatedResult
-        .replace(/=== Agent Final Output ===/g, "")
-        .replace(/==========================/g, "")
-        .trim();
+         .replace(/=== Agent Final Output ===/g, "")
+         .replace(/==========================/g, "")
+         .trim();
       
-      setFinalResult(cleanResult || "Query completed successfully. Please check the logs console for output details.");
+      setFinalResult(cleanResult || t("query_completed_success"));
 
       // Retrieve fresh live database stats after query execution completes
       await fetchMetadata();
 
     } catch (error: any) {
-      setLogs((prev) => [...prev, `[ERROR] Stream failure: ${error.message}`]);
-      setFinalResult(`An error occurred while streaming the agent output: ${error.message}`);
+      setLogs((prev) => [...prev, t("stream_failure") + error.message]);
+      setFinalResult(t("stream_error_occurred") + error.message);
     } finally {
       setLoading(false);
     }

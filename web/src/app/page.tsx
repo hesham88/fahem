@@ -37,7 +37,7 @@ export default function LandingPage() {
       }
     } catch (error: any) {
       console.error("Google sign in failed", error);
-      setErrorMsg(error.message || "Authentication failed. Please try again.");
+      setErrorMsg(error.message || t("auth_failed"));
     } finally {
       setSigningIn(false);
     }

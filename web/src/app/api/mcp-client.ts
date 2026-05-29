@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+// @ts-ignore
 import { Server } from "@mongodb-js/mongodb-mcp-server/dist/server.js";
+// @ts-ignore
 import { Session } from "@mongodb-js/mongodb-mcp-server/dist/session.js";
 import dns from "dns";
 
@@ -68,7 +70,7 @@ export class StdioMcpClient {
     }
 
     try {
-      const result = await this.mcpServer.executeToolHandler(tool, finalArgs, {});
+      const result = await (this.mcpServer as any).executeToolHandler(tool, finalArgs, {});
       return result;
     } catch (err: any) {
       console.error(`[In-Memory MCP Client] Error calling tool ${name}:`, err);
