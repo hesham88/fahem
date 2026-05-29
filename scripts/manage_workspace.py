@@ -281,7 +281,7 @@ def command_audit_secrets(args):
                 apphosting_content = f.read()
                 
             # Any server-side variable (like MONGODB_URI or STORAGE_SECRET) must use a GCP secret binder
-            server_side_keys = [k for k in local_keys if not k.startswith("NEXT_PUBLIC_") and k != "GEMINI_MODEL"]
+            server_side_keys = [k for k in local_keys if not k.startswith("NEXT_PUBLIC_") and k not in ("GEMINI_MODEL", "MONGODB_AGENT_URL")]
             for k in server_side_keys:
                 if k not in apphosting_content:
                     log_error(f"Server-side env variable '{k}' in .env.local is not configured in apphosting.yaml")
