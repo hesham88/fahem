@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs";
+import { GoogleGenAI } from "@google/genai";
+import { GoogleAuth } from "google-auth-library";
 
 export const dynamic = "force-dynamic";
 
@@ -18,51 +17,6 @@ function getLanguageName(lang: string): string {
   return mapping[lang] || "English";
 }
 
-function getPythonCommand(): string {
-  if (process.platform === "win32") {
-    const candidatePaths = [
-      "C:\\Python313\\python.exe",
-      "C:\\Python312\\python.exe",
-      "C:\\Python311\\python.exe",
-      "C:\\Python310\\python.exe",
-      "C:\\Python39\\python.exe",
-      "C:\\Python38\\python.exe",
-      "C:\\Windows\\py.exe"
-    ];
-    for (const p of candidatePaths) {
-      if (fs.existsSync(p)) {
-        return p;
-      }
-    }
-
-    const envPath = process.env.PATH || "";
-    const paths = envPath.split(path.delimiter);
-    for (const cmd of ["python.exe", "py.exe", "python3.exe"]) {
-      for (const dir of paths) {
-        const fullPath = path.join(dir, cmd);
-        if (fs.existsSync(fullPath)) {
-          return fullPath;
-        }
-      }
-    }
-
-    return "py";
-  }
-
-  const envPath = process.env.PATH || "";
-  const paths = envPath.split(path.delimiter);
-  for (const cmd of ["python3", "python"]) {
-    for (const dir of paths) {
-      const fullPath = path.join(dir, cmd);
-      if (fs.existsSync(fullPath)) {
-        return fullPath;
-      }
-    }
-  }
-
-  return "python3";
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { prompt, language, userEmail, userId } = await req.json();
@@ -75,51 +29,190 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
-      start(controller) {
-        const agentScriptPath = path.resolve(process.cwd(), "agents/main.py");
-        
-        // Formulate language hint and prepend/append to the prompt
-        const langName = getLanguageName(language || "en");
-        const enhancedPrompt = `[Please respond in ${langName}] ${prompt}`;
+      async start(controller) {
+        try {
+          const langName = getLanguageName(language || "en");
 
-        controller.enqueue(encoder.encode("[SYSTEM] Initiating Python-based ADK Agent with MongoDB MCP server...\n"));
-        controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
+          // Initial terminal logs (the UI filters lines starting with Prompt: or containing [Unknown] from the final result card, but displays them in terminal log)
+          controller.enqueue(encoder.encode("[Unknown] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
+          controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
-        const pythonCmd = getPythonCommand();
-        // Spawn python web/agents/main.py [enhancedPrompt]
-        const pythonProcess = spawn(pythonCmd, [agentScriptPath, enhancedPrompt], {
-          cwd: process.cwd(),
-          env: {
-            ...process.env,
-            LANGUAGE: language || "en",
-            USER_EMAIL: userEmail || "",
-            USER_ID: userId || ""
+          // Initialize Gemini AI Client
+          const geminiApiKey = process.env.GEMINI_API_KEY;
+          if (!geminiApiKey) {
+            throw new Error("GEMINI_API_KEY environment variable is not configured.");
           }
-        });
+          const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+          const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
-        pythonProcess.stdout.on("data", (chunk: Buffer) => {
-          controller.enqueue(chunk);
-        });
+          // 1. Guardrail Gate
+          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running security and authentication guardrails...\n"));
 
-        pythonProcess.stderr.on("data", (chunk: Buffer) => {
-          // Log stderr to Node.js console, but don't clutter main agent output in UI
-          const errStr = chunk.toString();
-          if (errStr.includes("UserWarning") || errStr.includes("Loading local configuration")) {
-            // Quiet down normal experimental warnings / configuration logs
-            return;
+          const guardrailSystemInstruction = `
+You are the Fahem Security Guardrail Agent.
+Your sole role is to audit user prompts, queries, and user context to verify they are secure and authorized.
+
+You must perform these strict checks:
+1. **Authentication Gate**: Inspect if a valid 'user_email' or 'user_id' is provided. For standard inspections or queries (read-only), allow anonymous/unauthenticated access. For WRITE operations (inserting, updating, deleting, or reporting), a valid user email is STRICTLY REQUIRED. If empty or anonymous during a write operation, reject with 'UNAUTHORIZED: User must be signed-in to perform write operations'.
+2. **Administrative Lock**: Strictly reject any commands or tools starting with 'atlas-'. Standard users should never manage clusters or projects.
+3. **Injection and Drop Protection**: Block malicious injection payloads or destructive operations like dropping/deleting databases, unless it's a valid and authenticated report creation.
+
+If all criteria are fully met, respond exactly with "CONFIRMED: Authorized".
+If any criteria fail, respond with "DENIED: <clear explanation in the user's requested language>".
+`;
+
+          const reviewPayload = {
+            user_prompt: prompt,
+            user_email: userEmail || "",
+            user_id: userId || "",
+            language: language || "en"
+          };
+
+          const guardrailResponse = await ai.models.generateContent({
+            model: modelName,
+            contents: JSON.stringify(reviewPayload),
+            config: {
+              systemInstruction: guardrailSystemInstruction
+            }
+          });
+
+          const guardText = guardrailResponse.text ? guardrailResponse.text.trim() : "";
+          const isConfirmed = guardText.includes("CONFIRMED");
+
+          controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Guardrail check result: ${guardText}\n`));
+
+          let databaseResults = "";
+          let executionSuccess = false;
+
+          if (isConfirmed) {
+            // 2. Execute query against MongoDB remote microservice on Cloud Run
+            const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
+            if (!cloudRunUrl) {
+              throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
+            }
+
+            controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Sending query execution to Cloud Run Agent: ${cloudRunUrl}...\n`));
+
+            // Fetch GCP OIDC identity token for service-to-service authentication
+            let oidcToken: string | null = null;
+            try {
+              const auth = new GoogleAuth();
+              const authClient = await auth.getIdTokenClient(cloudRunUrl);
+              const headers = (await authClient.getRequestHeaders(cloudRunUrl)) as any;
+              const authHeader = headers["Authorization"] || headers["authorization"];
+              if (authHeader && authHeader.startsWith("Bearer ")) {
+                oidcToken = authHeader.substring(7);
+              }
+            } catch (authErr: any) {
+              controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Warning: Skipped GCP ID token generation (${authErr.message}).\n`));
+            }
+
+            const requestHeaders: Record<string, string> = {
+              "Content-Type": "application/json"
+            };
+            if (oidcToken) {
+              requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
+              controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Secured authenticated GCP ID token for agent-to-agent communication.\n"));
+            }
+
+            const payload = {
+              user_id: userId || "anonymous",
+              session_id: "fahem_microservice_session",
+              app_name: "app",
+              new_message: {
+                role: "user",
+                parts: [{ text: prompt }]
+              },
+              streaming: false
+            };
+
+            const response = await fetch(`${cloudRunUrl}/run`, {
+              method: "POST",
+              headers: requestHeaders,
+              body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+              const resData: any = await response.json();
+              const outMsg = resData?.output?.message;
+              if (outMsg && Array.isArray(outMsg.parts)) {
+                databaseResults = outMsg.parts.map((p: any) => p.text || "").join("");
+              } else {
+                databaseResults = JSON.stringify(resData);
+              }
+              executionSuccess = true;
+              controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Query executed successfully. Formatting results...\n"));
+            } else {
+              const errorText = await response.text();
+              throw new Error(`Microservice HTTP error: ${response.status} - ${errorText}`);
+            }
           }
-          controller.enqueue(encoder.encode(`[SYSTEM LOG] ${errStr}`));
-        });
 
-        pythonProcess.on("close", (code) => {
-          controller.enqueue(encoder.encode(`\n[CLOSE] Process exited with code ${code}\n`));
-          controller.close();
-        });
+          // 3. Format and stream presentation
+          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Presenting final output to user dashboard...\n"));
 
-        pythonProcess.on("error", (err) => {
-          controller.enqueue(encoder.encode(`\n[ERROR] Spawning python process failed: ${err.message}\n`));
+          const orchestratorSystemInstruction = `
+You are the Fahem Multi-Agent Orchestrator.
+Your job is to receive, process, and beautifully format database operations or security alerts for the user dashboard.
+
+When compiling database output results:
+1. Avoid raw JSON or BSON dumps.
+2. Construct highly professional, premium Markdown tables, lists, or structured cards.
+3. Localize explanations, text, table headers, and statuses fully into the user's selected language.
+4. Preserve technical names such as collection names, database names, or specific keys as-is.
+
+When presenting a security denial message:
+1. Explain politely in the requested language that security guardrails blocked the execution.
+2. Highlight the active safety enforcement without releasing internal developer secrets.
+`;
+
+          let presentationPrompt = "";
+          if (isConfirmed && executionSuccess) {
+            presentationPrompt = `
+Format and present the following database results nicely in ${langName} for the user dashboard.
+Use clean Markdown tables, lists, or structured highlights.
+Ensure it feels extremely premium and clear.
+
+Raw Database Results:
+${databaseResults}
+`;
+          } else {
+            presentationPrompt = `
+Present a polite security denial message in ${langName} to the user explaining why their request was blocked.
+Highlight that security guardrails are active and administrative/unauthorized operations are blocked.
+
+Reason for denial:
+${guardText || "Access unauthorized"}
+`;
+          }
+
+          // Signal start of final output to the frontend parser
+          controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+
+          const responseStream = await ai.models.generateContentStream({
+            model: modelName,
+            contents: presentationPrompt,
+            config: {
+              systemInstruction: orchestratorSystemInstruction
+            }
+          });
+
+          for await (const chunk of responseStream) {
+            if (chunk.text) {
+              controller.enqueue(encoder.encode(chunk.text));
+            }
+          }
+
+          // Signal close of final output
+          controller.enqueue(encoder.encode("\n==========================\n"));
+          controller.enqueue(encoder.encode("\n[CLOSE] Execution complete\n"));
+
+        } catch (err: any) {
+          console.error("[agent-api] Orchestration failed:", err);
+          controller.enqueue(encoder.encode(`\n[ERROR] Orchestration failed: ${err.message}\n`));
+        } finally {
           controller.close();
-        });
+        }
       }
     });
 
@@ -139,3 +232,4 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+

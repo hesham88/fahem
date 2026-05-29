@@ -535,5 +535,31 @@ Prompt: List all collections present in the 'fahem' database. (Language: English
 **Response Summary**:
 Diagnosed and resolved the `spawn python ENOENT` error in the API streaming route (`web/src/app/api/agent/route.ts`). Added a dynamic platform-agnostic Python executable locator helper `getPythonCommand()` that scans common Windows-specific installation paths (e.g. `C:\Python313\python.exe` and `C:\Windows\py.exe` launcher) and searches the environment `PATH` variable on both Windows and Linux hosts, safely locating and invoking the correct interpreter binary. Incremented project plan, tasks, and walkthrough memory files to Version 43 (`v43.0`) and compiled the Next.js production stand-alone application package successfully locally in 4.0s.
 
+---
+
+## Turn 46
+**Timestamp**: 2026-05-29T07:45:00+03:00  
+**User Prompt**:
+```text
+(Internal Server Error on deployed Firebase site for both db-metadata and agent routes due to python spawning process)
+```
+**Response Summary**:
+Migrated both `/api/db-metadata/route.ts` and `/api/agent/route.ts` from spawning child Python processes to running natively in pure TypeScript/Node.js. `/api/db-metadata/route.ts` directly queries the MongoDB statistics, list of collections, and sizes using the `"mongodb"` driver. `/api/agent/route.ts` runs the guardrail checks and orchestrates the remote private `fahem-agent` Cloud Run service fetch calls utilizing `@google/genai` (Gemini Node SDK) and `google-auth-library` for automatic GCP OIDC identity tokens, fully bypassing runtime platform spawning bottlenecks and generating flawless local Next.js builds.
+
+---
+
+## Turn 47
+**Timestamp**: 2026-05-29T07:53:00+03:00  
+**User Prompt**:
+```text
+VM1418 0p_c1_aq25i34.js:1 
+ GET https://fahem--fahem-88d40.us-east4.hosted.app/api/db-metadata 500 (Internal Server Error)
+...
+[ERROR] Spawning python process failed: spawn python ENOENT
+```
+**Response Summary**:
+Committed and pushed the pure TypeScript/Node API routes migration changes to the GitHub master branch to trigger continuous deployment and resolve the python runtime spawn errors on the hosted Firebase App Hosting site. Created `memory/tasks_v44.md`, `memory/walkthrough_v44.md`, and updated `log/turn_log.md` to version 44.0 with zero history deletion.
+
+
 
 
