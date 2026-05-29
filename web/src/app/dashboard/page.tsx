@@ -126,7 +126,7 @@ export default function Dashboard() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: queryText }),
+        body: JSON.stringify({ prompt: queryText, language }),
       });
 
       if (!response.body) {

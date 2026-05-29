@@ -23,7 +23,7 @@ function sanitizeSchemaForGemini(schema: any): any {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt } = await req.json();
+    const { prompt, language } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
                   You assist the user in inspecting database collections, examining schemas, running diagnostics, and executing queries.
                   You interact with the database ONLY through the official MongoDB MCP server tools.
                   Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
+                  You MUST respond to the user in the language defined by: "${language || "en"}" (which can be en, ar, es, fr, de, zh, or it). Translate your explanations, summaries, and conversational responses to that language, while keeping database technical names (like collections, keys, and values) as is if appropriate.
                 `,
                 tools: [{ functionDeclarations }]
               }
