@@ -27,8 +27,8 @@
     "typescript": "^5"
   },
   "optionalDependencies": {
-    "kerberos": "^7.0.0",
-    "mongodb-client-encryption": "^7.0.0",
-    "node-addon-api": "^8.8.0"
+    "kerberos": "2.2.2",
+    "mongodb-client-encryption": "6.5.0",
+    "node-addon-api": "6.1.0"
   }
 }
