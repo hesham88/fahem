@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,51 @@ function getLanguageName(lang: string): string {
     zh: "Chinese"
   };
   return mapping[lang] || "English";
+}
+
+function getPythonCommand(): string {
+  if (process.platform === "win32") {
+    const candidatePaths = [
+      "C:\\Python313\\python.exe",
+      "C:\\Python312\\python.exe",
+      "C:\\Python311\\python.exe",
+      "C:\\Python310\\python.exe",
+      "C:\\Python39\\python.exe",
+      "C:\\Python38\\python.exe",
+      "C:\\Windows\\py.exe"
+    ];
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+
+    const envPath = process.env.PATH || "";
+    const paths = envPath.split(path.delimiter);
+    for (const cmd of ["python.exe", "py.exe", "python3.exe"]) {
+      for (const dir of paths) {
+        const fullPath = path.join(dir, cmd);
+        if (fs.existsSync(fullPath)) {
+          return fullPath;
+        }
+      }
+    }
+
+    return "py";
+  }
+
+  const envPath = process.env.PATH || "";
+  const paths = envPath.split(path.delimiter);
+  for (const cmd of ["python3", "python"]) {
+    for (const dir of paths) {
+      const fullPath = path.join(dir, cmd);
+      if (fs.existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+
+  return "python3";
 }
 
 export async function POST(req: NextRequest) {
@@ -39,8 +85,9 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode("[SYSTEM] Initiating Python-based ADK Agent with MongoDB MCP server...\n"));
         controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
+        const pythonCmd = getPythonCommand();
         // Spawn python web/agents/main.py [enhancedPrompt]
-        const pythonProcess = spawn("python", [agentScriptPath, enhancedPrompt], {
+        const pythonProcess = spawn(pythonCmd, [agentScriptPath, enhancedPrompt], {
           cwd: process.cwd(),
           env: {
             ...process.env,
