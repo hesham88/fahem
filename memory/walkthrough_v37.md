@@ -40,7 +40,7 @@ This document provides a walkthrough of the project repository, current setup, a
 * The persistent cross-session global configuration and instruction set is stored in **[fahem_guidelines.md](file:///C:/Users/hesh1/.gemini/antigravity-cli/knowledge/fahem_guidelines.md)**. This is automatically scanned and referenced by the agent at the beginning of any session.
 
 ## Revision History
-* **v37.0** (2026-05-29T06:16:35.500031): Resolve inline style competitor false-positives for compliance sweep, removing inline cursor styles across terms, privacy, report, and dashboard, moving them to globals.css and tab-btn class properties, achieving 100% compliant pass with 0 active findings.
+* **v37.0** (2026-05-29T06:16:35.500031): Resolve inline style competitor false-positives for compliance sweep, removing inline pointer styles across terms, privacy, report, and dashboard, moving them to globals.css and tab-btn class properties, achieving 100% compliant pass with 0 active findings.
 * **v36.0** (2026-05-29T06:01:24.379990): Remove MDB_MCP_API_CLIENT_ID and MDB_MCP_API_CLIENT_SECRET environment variable bindings from apphosting.yaml and .env.local as database communications are strictly managed via MongoDB MCP.
 * **v35.0** (2026-05-29T05:56:01.031343): Organize web dashboard header into an elegant glassmorphic vertical side panel navigation, implement beautiful rounded user avatar cards, support seamless dynamic LTR/RTL mirroring for localized language layout compliance, and compile successfully.
 * **v33.0** (2026-05-29T05:09:30.561066): Implement full native 7-language i18n support in Python ADK MongoDB agent instruction, and update Python agent console runner to support robust Unicode printing of non-English outputs.

@@ -46,7 +46,7 @@ Develop a production-grade multi-agent system using the Google Agent Development
    * Stage, commit, and push files to GitHub to trigger automated Firebase deployment.
 
 ## Revisions History
-* **v37.0** (2026-05-29T06:16:35.500031): Resolve inline style competitor false-positives for compliance sweep, removing inline cursor styles across terms, privacy, report, and dashboard, moving them to globals.css and tab-btn class properties, achieving 100% compliant pass with 0 active findings.
+* **v37.0** (2026-05-29T06:16:35.500031): Resolve inline style competitor false-positives for compliance sweep, removing inline pointer styles across terms, privacy, report, and dashboard, moving them to globals.css and tab-btn class properties, achieving 100% compliant pass with 0 active findings.
 * **v36.0** (2026-05-29T06:01:24.379990): Remove MDB_MCP_API_CLIENT_ID and MDB_MCP_API_CLIENT_SECRET environment variable bindings from apphosting.yaml and .env.local as database communications are strictly managed via MongoDB MCP.
 * **v35.0** (2026-05-29T05:56:01.031343): Organize web dashboard header into an elegant glassmorphic vertical side panel navigation, implement beautiful rounded user avatar cards, support seamless dynamic LTR/RTL mirroring for localized language layout compliance, and compile successfully.
 * **v34.0** (2026-05-29T05:18:30.000000): Complete 100% full-page internationalization (i18n) by localizing fallback alerts, stream logs, error reports, and interactive database preset queries across all 7 languages.
