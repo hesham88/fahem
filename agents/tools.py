@@ -3,7 +3,10 @@ import json
 
 def resolve_srv_to_mongodb_uri(uri: str) -> str:
     """Converts a mongodb+srv:// connection string to a standard mongodb:// string by resolving SRV records using public DNS."""
-    if not uri or not uri.startswith("mongodb+srv://"):
+    if not uri:
+        return uri
+    uri = uri.strip()
+    if not uri.startswith("mongodb+srv://"):
         return uri
     try:
         rest = uri[len("mongodb+srv://"):]
@@ -96,7 +99,7 @@ def get_mongodb_uri() -> str:
     # 1. Environment variable (standard production / GCP Secret Manager flow)
     uri = os.environ.get("MONGODB_URI")
     if uri:
-        return resolve_srv_to_mongodb_uri(uri)
+        return resolve_srv_to_mongodb_uri(uri.strip())
     
     # 2. Local ignored secrets file
     try:
@@ -112,7 +115,7 @@ def get_mongodb_uri() -> str:
                 data = json.load(f)
                 val = data.get("MONGODB_URI", "")
                 if val:
-                    return resolve_srv_to_mongodb_uri(val)
+                    return resolve_srv_to_mongodb_uri(val.strip())
     except Exception:
         pass
     
