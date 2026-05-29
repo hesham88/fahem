@@ -23,20 +23,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const superadminConfig = process.env.SUPERADMIN_USER;
-  if (!superadminConfig) {
-    return new Response(
-      JSON.stringify({
-        error: "Server Error: Super Admin security policy is not configured on this server."
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
-  }
-
-  const admins = superadminConfig.split(",").map((addr) => addr.trim().toLowerCase());
+  const HARDCODED_ADMINS = ["hesham1988@gmail.com", "contact@asdaa.co"];
+  const envAdmins = process.env.SUPERADMIN_USER
+    ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
+    : [];
+  const admins = Array.from(new Set([...HARDCODED_ADMINS, ...envAdmins]));
   if (!admins.includes(email.toLowerCase().trim())) {
     return new Response(
       JSON.stringify({

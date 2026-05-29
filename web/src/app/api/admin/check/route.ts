@@ -14,16 +14,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const superadmin = process.env.SUPERADMIN_USER;
-    
-    if (!superadmin) {
-      return new Response(JSON.stringify({ isAdmin: false, warning: "SUPERADMIN_USER is not configured on server" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const admins = superadmin.split(",").map((addr) => addr.trim().toLowerCase());
+    const HARDCODED_ADMINS = ["hesham1988@gmail.com", "contact@asdaa.co"];
+    const envAdmins = process.env.SUPERADMIN_USER
+      ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
+      : [];
+    const admins = Array.from(new Set([...HARDCODED_ADMINS, ...envAdmins]));
     const isAdmin = admins.includes(email.toLowerCase().trim());
 
     return new Response(JSON.stringify({ isAdmin }), {
