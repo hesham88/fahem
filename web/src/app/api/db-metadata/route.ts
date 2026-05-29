@@ -104,7 +104,7 @@ export async function GET() {
         status: "Disconnected (Error: No active Agent URL or MONGODB_URI configured)"
       }),
       {
-        status: 500,
+        status: 200,
         headers: { "Content-Type": "application/json" }
       }
     );
@@ -176,7 +176,7 @@ export async function GET() {
         status: `Disconnected (Error: ${e.message})`
       }),
       {
-        status: 500,
+        status: 200,
         headers: { "Content-Type": "application/json" }
       }
     );

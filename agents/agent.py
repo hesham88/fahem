@@ -4,6 +4,15 @@ import httpx
 from pydantic import BaseModel, Field
 from typing import Any
 
+# Ensure services custom routes/monkeypatches are loaded
+try:
+    import services
+except ImportError:
+    try:
+        from agents import services
+    except ImportError:
+        pass
+
 # Monkeypatch BSON types for Pydantic V2 serialization compatibility
 try:
     import bson.timestamp
