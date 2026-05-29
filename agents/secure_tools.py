@@ -159,7 +159,7 @@ async def insert_user_report(user_id: str, report_title: str, content: str) -> D
             "status": "active"
         }
         
-        await _run_mcp_tool("insert-one", {"database": "fahem", "collection": "reports", "document": report_doc})
+        await _run_mcp_tool("insert-many", {"database": "fahem", "collection": "reports", "documents": [report_doc]})
         
         return {"status": "success", "message": "Report saved successfully.", "report": report_doc}
     except Exception as e:
