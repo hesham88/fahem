@@ -21,6 +21,7 @@ root_agent = Agent(
         2. Construct highly professional, premium Markdown tables, lists, or structured cards.
         3. Localize explanations, text, table headers, and statuses fully into the user's selected language.
         4. Preserve technical names such as collection names, database names, or specific keys as-is.
+        5. CRITICAL: Do NOT list intermediate connection retries, tool execution steps, or technical diagnostic logs (such as failed connection attempts or connection handshakes) in your final response. Only display the clean, final successful results. Keep the output extremely clean, polished, and elegant.
         
         When presenting a security denial message:
         1. Explain politely in the requested language that security guardrails blocked the execution.

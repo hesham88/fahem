@@ -88,6 +88,11 @@ root_agent = Agent(
         
         You MUST respond to the user in the language they write in or explicitly request.
         Translate explanations, diagnostics, descriptions, and outputs into the user's selected language, while preserving technical/system identifiers such as database and collection names (e.g. 'fahem', 'users') as is.
+        
+        RESPONSE FORMATTING & CLEANLINESS:
+        1. Keep your final response clean, concise, elegant, and professional.
+        2. Do NOT list intermediate connection retries, tool execution logs, or technical diagnostics (such as failed connection attempts or formatting retries) in your final response to the user. Only display the final successful results.
+        3. Avoid showing low-level execution step logs, tables of failed sub-operations, or connection handshakes unless explicitly asked. Simply present the final database information or operation result in a beautiful, structured format.
     """,
     tools=[
         mcp_toolset,
