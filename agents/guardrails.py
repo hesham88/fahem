@@ -17,6 +17,20 @@ try:
 except Exception:
     pass
 
+import asyncio
+def run_log_audit_task(category: str, agent: str, message: str, details: str = None):
+    """Enqueues an audit log insertion to the MongoDB collection asynchronously."""
+    try:
+        from get_metadata import log_audit_event
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(log_audit_event(category, agent, message, details))
+        except RuntimeError:
+            # No running loop, execute with asyncio.run
+            asyncio.run(log_audit_event(category, agent, message, details))
+    except Exception as e:
+        logger.warning(f"Could not log audit task asynchronously: {e}")
+
 # =================================----------------------------
 # CONSTANTS & WHITELISTS
 # =================================----------------------------
@@ -121,6 +135,7 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
     user_id = getattr(context, "user_id", "UnknownUser")
     
     logger.info(f"[AUDIT] Agent {agent_name} invoked by user_id={user_id} (Prompt Size: {len(prompt_text)})")
+    run_log_audit_task("INFO", agent_name, f"Agent {agent_name} invoked by user_id={user_id}", f"Prompt size: {len(prompt_text)}")
     
     if prompt_text:
         # Run local heuristics first
@@ -137,6 +152,7 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         for pattern in jailbreak_patterns:
             if pattern in prompt_lower:
                 logger.warning(f"[SECURITY] Potential injection or malicious pattern blocked: '{pattern}'")
+                run_log_audit_task("SECURITY", "Guardrail", f"OPERATION BLOCKED: Potential injection pattern '{pattern}' flagged", f"User Prompt: {prompt_text}")
                 return Content(
                     role="model",
                     parts=[Part.from_text(text=f"DENIED: Safety policy violation. Unsafe instruction or pattern ('{pattern}') detected. Operation blocked.")]
@@ -146,10 +162,13 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         blocked, reason = check_model_armor_py(prompt_text)
         if blocked:
             logger.warning(f"[SECURITY] server-side Model Armor check flagged prompt: {reason}")
+            run_log_audit_task("SECURITY", "Model Armor", f"CRITICAL: GCP Model Armor template blocked prompt: {reason}", f"User Prompt: {prompt_text}")
             return Content(
                 role="model",
                 parts=[Part.from_text(text=f"DENIED: Safety policy violation. {reason}")]
             )
+        else:
+            run_log_audit_task("MODEL_ARMOR", "Model Armor", "GCP Model Armor pre-flight safety filter passed.", "Prompt: " + (prompt_text[:150] + "..." if len(prompt_text) > 150 else prompt_text))
             
     return None
 

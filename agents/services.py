@@ -23,7 +23,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             from get_metadata import get_metadata
             
             # Fetch metadata natively using get_metadata()
-            meta = get_metadata()
+            meta = await get_metadata()
             return meta
         except Exception as err:
             logger.error(f"[services.py] Failed to retrieve DB metadata: {err}", exc_info=True)
@@ -35,7 +35,39 @@ def register_metadata_route(app: fastapi.FastAPI):
                 "indexCount": "...",
                 "status": f"Disconnected (Error in custom endpoint: {str(err)})"
             }
-    logger.info("Mounted custom /db-metadata route onto FastAPI application.")
+            
+    @app.get("/audit-logs")
+    async def get_logs_endpoint():
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from get_metadata import get_audit_logs
+            logs = await get_audit_logs()
+            return {"logs": logs}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to retrieve audit logs: {err}", exc_info=True)
+            return {"logs": [], "error": str(err)}
+
+    @app.post("/audit-logs")
+    async def post_log_endpoint(request: fastapi.Request):
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from get_metadata import log_audit_event
+            data = await request.json()
+            category = data.get("category", "INFO")
+            agent = data.get("agent", "System")
+            message = data.get("message", "")
+            details = data.get("details")
+            await log_audit_event(category, agent, message, details)
+            return {"status": "success"}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to record audit log: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    logger.info("Mounted custom /db-metadata and /audit-logs routes onto FastAPI application.")
 
 # 1. Universal Patch: fastapi.FastAPI.__init__
 try:

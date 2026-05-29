@@ -1,30 +1,36 @@
 :root {
-  --background: #fdfbf7;      /* Warm cream paper background */
-  --foreground: #1c2b36;      /* Deep slate charcoal text */
-  --primary: #106ba3;         /* Royal indigo-blue accent */
-  --primary-hover: #0a4f7c;
-  --secondary: #d4af37;       /* Antique warm gold accent */
-  --secondary-hover: #bda230;
-  --accent-orange: #f37b1d;   /* Warm sun-orange */
-  --accent-yellow: #f8c122;   /* Sunlight yellow */
-  --accent-green: #2e7d32;    /* Sage green */
-  --card-bg: #ffffff;         /* Pure white card backgrounds */
-  --card-border: #ebdcb9;     /* Cream/gold border */
-  --card-border-active: #d4af37;
-  --code-bg: #1c2226;         /* Soft dark for logs console */
-  --code-fg: #f4f6f8;
-  --shadow-sm: 0 2px 8px rgba(16, 107, 163, 0.04);
-  --shadow-md: 0 8px 30px rgba(16, 107, 163, 0.08);
-  --shadow-lg: 0 16px 40px rgba(16, 107, 163, 0.12);
-  --border-radius-sm: 6px;
-  --border-radius-md: 12px;
-  --border-radius-lg: 16px;
+  --background: #f8fafc;      /* Modern clean slate-white */
+  --foreground: #0f172a;      /* Deep modern slate-900 text */
+  --primary: #2563eb;         /* Vibrant brand blue */
+  --primary-hover: #1d4ed8;   /* Royal blue hover */
+  --secondary: #f97316;       /* Vibrant sunset orange */
+  --secondary-hover: #ea580c; /* Deep sunset orange hover */
+  --accent-orange: #ff7e40;   /* Sunset coral accent */
+  --accent-yellow: #fbbf24;   /* Warm sunlight amber */
+  --accent-green: #0d9488;    /* Premium mint/teal */
+  --card-bg: #ffffff;         /* Pure white glass card backgrounds */
+  --card-border: rgba(226, 232, 240, 0.8); /* Ultra-soft modern gray border */
+  --card-border-active: #2563eb;
+  --code-bg: #0f172a;         /* High-contrast deep slate logs terminal */
+  --code-fg: #f8fafc;
+  --shadow-sm: 0 2px 8px rgba(37, 99, 235, 0.02);
+  --shadow-md: 0 10px 30px -10px rgba(37, 99, 235, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 20px 40px -15px rgba(37, 99, 235, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --border-radius-sm: 8px;
+  --border-radius-md: 14px;
+  --border-radius-lg: 24px;   /* Extra-smooth rounded corners */
   
   --font-sans: var(--font-sans, 'Plus Jakarta Sans', -apple-system, sans-serif);
-  --font-display: var(--font-display, 'Playfair Display', serif);
+  --font-display: var(--font-display, 'Outfit', sans-serif);
   --font-mono: var(--font-mono, 'JetBrains Mono', monospace);
   
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* RTL and Arabic Language Font Mapping */
+html[lang="ar"], [dir="rtl"] {
+  --font-sans: var(--font-arabic, 'Cairo', sans-serif) !important;
+  --font-display: var(--font-arabic, 'Cairo', sans-serif) !important;
 }
 
 /* Base resets and defaults */
@@ -225,7 +231,7 @@ a:hover {
   border-radius: var(--border-radius-md);
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,14 +241,15 @@ a:hover {
 .btn-primary {
   background-color: var(--primary);
   color: #ffffff;
-  box-shadow: 0 4px 10px rgba(16, 107, 163, 0.2);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
 }
 .btn-primary:hover:not(:disabled) {
   background-color: var(--primary-hover);
-  transform: translateY(-1px);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
 }
 .btn-primary:disabled {
-  background-color: #b0c9d9;
+  background-color: #cbd5e1;
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -255,13 +262,13 @@ a:hover {
 .btn-secondary:hover:not(:disabled) {
   border-color: var(--primary);
   color: var(--primary);
-  background-color: #faf8f5;
+  background-color: rgba(37, 99, 235, 0.02);
 }
 
 .btn-accent {
   background-color: var(--secondary);
   color: #ffffff;
-  box-shadow: 0 4px 10px rgba(212, 175, 55, 0.25);
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.15);
 }
 .btn-accent:hover {
   background-color: var(--secondary-hover);
@@ -401,7 +408,7 @@ a:hover {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 10% 20%, rgba(16, 107, 163, 0.05) 0%, rgba(212, 175, 55, 0.03) 90.1%), #fdfbf7;
+  background: radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.04) 0%, rgba(249, 115, 22, 0.02) 90.1%), #f8fafc;
 }
 
 /* Floating background spheres for maximum glass blur visibility */

@@ -95,7 +95,7 @@ export default function ReportPage() {
           lines.forEach((line) => {
             if (line.trim()) {
               setLogs((prev) => [...prev, line]);
-              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
                 if (line !== "=== Agent Final Output ===" && line !== "==========================") {
                   accumulatedResult += line + "\n";
                 }

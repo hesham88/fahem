@@ -529,7 +529,7 @@ export default function Dashboard() {
               }
 
               setLogs((prev) => [...prev, line]);
-              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
                 if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
                   accumulatedResult += line + "\n";
                 }
@@ -575,96 +575,134 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="glass-container">
+    <div className="app-layout" style={{ direction: language === "ar" ? "rtl" : "ltr" }}>
       {/* Background ambient light */}
-      <div className="ambient-background">
+      <div className="ambient-background" style={{ zIndex: 1 }}>
         <div className="sphere sphere-1"></div>
         <div className="sphere sphere-2"></div>
         <div className="sphere sphere-3"></div>
       </div>
 
-      <main className="dashboard-container" style={{ position: "relative", zIndex: 2 }}>
-        {/* Header Bar */}
-        <header className="header" style={{ background: "rgba(255, 255, 255, 0.25)", padding: "1.5rem 2rem", borderRadius: "var(--border-radius-lg)", backdropFilter: "blur(10px)", border: "1px solid rgba(235, 220, 185, 0.25)" }}>
-          <div className="title-section" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.75rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
-              <FiCpu className="pulse-icon" style={{ fontSize: "2rem" }} />
+      {/* Modern Sidebar Panel */}
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          {/* Logo Section */}
+          <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
+              <FiCpu className="pulse-icon" style={{ fontSize: "1.4rem" }} />
             </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: "2rem" }}>{t("dashboard_title")}</h1>
-              <p style={{ margin: 0, fontSize: "0.9rem" }}>{t("dashboard_subtitle")}</p>
+            <span style={{ fontWeight: 800, letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
+          </div>
+
+          {/* Connection Status */}
+          <div className="sidebar-status">
+            <div className="status-badge" id="mcp-status-badge" style={{ background: "rgba(255,255,255,0.75)", border: "1px solid var(--card-border)", display: "flex", width: "100%", justifyContent: "center" }}>
+              <span className="status-dot"></span>
+              <FiServer style={{ color: "var(--accent-green)", fontSize: "0.95rem" }} />
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{t("cluster_status")}</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.7)", padding: "0.5rem 0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)" }}>
-              <FiGlobe style={{ color: "var(--primary)" }} />
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
-                className="language-select"
-                style={{ border: "none", background: "transparent", fontWeight: 600 }}
-              >
-                <option value="en">English</option>
-                <option value="ar">العربية</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="zh">中文</option>
-                <option value="it">Italiano</option>
-              </select>
-            </div>
+          {/* Navigation Items (Toolkit & Admin) */}
+          <nav className="sidebar-nav">
+            <button
+              onClick={() => setActiveTab("agent")}
+              className={`sidebar-nav-btn ${activeTab === "agent" ? "active" : ""}`}
+              type="button"
+            >
+              <FiActivity />
+              <span>{t("nav_toolkit")}</span>
+            </button>
 
-            {user && (
-              <div className="user-profile" style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(255,255,255,0.7)", padding: "0.4rem 0.85rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)" }}>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab("admin")}
+                className={`sidebar-nav-btn ${activeTab === "admin" ? "active" : ""}`}
+                type="button"
+              >
+                <FiShield />
+                <span>{t("nav_admin")}</span>
+              </button>
+            )}
+
+            {/* GitHub Repo link */}
+            <a 
+              href="https://github.com/hesham88/fahem" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="sidebar-nav-btn"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <FiGithub />
+              <span>{t("nav_github")}</span>
+            </a>
+          </nav>
+        </div>
+
+        {/* Sidebar Footer (Language + Profile + Sign Out) */}
+        <div className="sidebar-footer">
+          {/* Language Swapper */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.8rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <FiGlobe /> <span>{language === "ar" ? "اللغة" : "Language"}</span>
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as any)}
+              className="sidebar-language-select"
+            >
+              <option value="en">English</option>
+              <option value="ar">العربية</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="zh">中文</option>
+              <option value="it">Italiano</option>
+            </select>
+          </div>
+
+          {/* Profile Card */}
+          {user && (
+            <div className="sidebar-user-card">
+              <div className="sidebar-user-avatar-wrapper">
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName || "User"} className="user-avatar" style={{ width: "32px", height: "32px", borderRadius: "50%" }} />
+                  <img src={user.photoURL} alt={user.displayName || "User"} className="sidebar-user-avatar" />
                 ) : (
-                  <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
+                  <div className="sidebar-user-avatar" style={{ background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem" }}>
                     {user.email ? user.email[0].toUpperCase() : "U"}
                   </div>
                 )}
-                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{user.displayName || user.email}</span>
-                <button 
-                  onClick={handleLogout} 
-                  className="btn btn-secondary btn-signout"
-                  style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                >
-                  <FiLogOut />
-                  <span>{t("btn_signout")}</span>
-                </button>
               </div>
-            )}
-
-            <div className="status-badge" id="mcp-status-badge" style={{ background: "rgba(255,255,255,0.7)" }}>
-              <span className="status-dot"></span>
-              <FiServer style={{ color: "var(--accent-green)", fontSize: "0.95rem" }} />
-              <span style={{ fontWeight: 600 }}>{t("cluster_status")}</span>
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name" title={user.displayName || user.email || ""}>
+                  {user.displayName || (user.email ? user.email.split("@")[0] : "User")}
+                </span>
+                <span className="sidebar-user-email" title={user.email || ""}>
+                  {user.email}
+                </span>
+              </div>
             </div>
-          </div>
-        </header>
+          )}
 
-        {/* Navigation Tabs for Superadmin */}
-        {isAdmin && (
-          <div className="nav-tabs" style={{ display: "flex", gap: "0.75rem", background: "rgba(255,255,255,0.3)", padding: "0.4rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)", alignSelf: "flex-start" }}>
-            <button
-              onClick={() => setActiveTab("agent")}
-              className={`tab-btn ${activeTab === "agent" ? "active" : ""}`}
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1.2rem", borderRadius: "var(--border-radius-md)", fontWeight: 600, transition: "all 0.2s" }}
-              type="button"
-            >
-              <FiActivity /> {t("nav_toolkit")}
-            </button>
-            <button
-              onClick={() => setActiveTab("admin")}
-              className={`tab-btn ${activeTab === "admin" ? "active" : ""}`}
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1.2rem", borderRadius: "var(--border-radius-md)", fontWeight: 600, transition: "all 0.2s" }}
-              type="button"
-            >
-              <FiShield /> {t("nav_admin")}
-            </button>
-          </div>
-        )}
+          {/* Logout Button */}
+          <button 
+            onClick={handleLogout} 
+            className="btn btn-secondary btn-signout"
+            style={{ width: "100%", padding: "0.75rem", fontSize: "0.9rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", borderRadius: "var(--border-radius-md)" }}
+          >
+            <FiLogOut />
+            <span>{t("btn_signout")}</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="main-content" style={{ position: "relative", zIndex: 2 }}>
+        {/* Page Title Section */}
+        <header className="page-title-section">
+          <h1>{activeTab === "agent" ? t("dashboard_title") : (language === "ar" ? "لوحة التحكم الأمنية للمشرف" : "Superadmin Security & Telemetry")}</h1>
+          <p>{activeTab === "agent" ? t("dashboard_subtitle") : (language === "ar" ? "مراقبة إعدادات الأمان ومكافحة الانتهاكات وسجلات التدقيق المباشرة لوكلاء فاهم." : "Audit active safety guardrails, GCP Model Armor policies, and secure real-time system logs.")}</p>
+        </header>
 
         {activeTab === "agent" ? (
           /* Main Grid Layout for MongoDB Agent */
@@ -1059,7 +1097,7 @@ export default function Dashboard() {
           /* Admin Security & Sourcing View */
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
-            <AdminSecurityDashboard language={language} />
+            <AdminSecurityDashboard language={language} email={user?.email || undefined} />
 
             {/* Admin Sourcing Engine Tab View */}
             <div className="grid-cols-2">

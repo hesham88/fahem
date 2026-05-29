@@ -135,6 +135,51 @@ async def get_metadata(database: str = "fahem") -> dict:
             "status": f"Disconnected (Error: {str(e)})"
         }
 
+async def log_audit_event(category: str, agent: str, message: str, details: str = None):
+    """Inserts a real audit/telemetry log record into the fahem.audit_logs collection using MCP."""
+    try:
+        from datetime import datetime
+        doc = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "category": category,
+            "agent": agent,
+            "message": message,
+        }
+        if details:
+            doc["details"] = details
+            
+        await _run_mcp_tool("insert-many", {
+            "database": "fahem",
+            "collection": "audit_logs",
+            "documents": [doc]
+        })
+        logger.info(f"[MCP AUDIT LOGGED] {category} • {agent} - {message}")
+    except Exception as err:
+        logger.warning(f"Failed to log audit event over MCP: {err}")
+
+async def get_audit_logs() -> list:
+    """Fetches up to 100 audit log records from fahem.audit_logs collection using MCP."""
+    try:
+        logs = await _run_mcp_tool("find", {
+            "database": "fahem",
+            "collection": "audit_logs",
+            "filter": {},
+            "options": {
+                "sort": {"timestamp": -1},
+                "limit": 100
+            }
+        })
+        if isinstance(logs, list):
+            return logs
+        elif isinstance(logs, dict) and "documents" in logs:
+            return logs["documents"]
+        elif isinstance(logs, dict) and "result" in logs:
+            return logs["result"]
+        return []
+    except Exception as err:
+        logger.warning(f"Failed to fetch audit logs over MCP: {err}")
+        return []
+
 if __name__ == "__main__":
     # Load env variables relative to agents path if needed
     try:

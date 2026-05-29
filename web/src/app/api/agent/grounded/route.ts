@@ -103,10 +103,10 @@ export async function POST(req: NextRequest) {
           // STEP 0: Model Armor Pre-flight check
           // -------------------------------------------------------------
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Model Armor\n"));
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
           const armorRes = await checkModelArmor(prompt);
           if (armorRes.blocked) {
-            controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
             controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
             controller.enqueue(encoder.encode(`DENIED: Security Policy Violation. Google Cloud Model Armor template flagged the query as unsafe. Please rephrase your query and try again.`));
             controller.enqueue(encoder.encode("\n==========================\n"));
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
             controller.close();
             return;
           }
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
 
           // Initialize Gemini AI Client
           const geminiApiKey = process.env.GEMINI_API_KEY;

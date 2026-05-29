@@ -97,17 +97,17 @@ export async function POST(req: NextRequest) {
           const langName = getLanguageName(language || "en");
 
           // Initial terminal logs
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
           // -------------------------------------------------------------
           // STEP 0: Model Armor Pre-flight check
           // -------------------------------------------------------------
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Model Armor\n"));
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
           const armorRes = await checkModelArmor(prompt);
           if (armorRes.blocked) {
-            controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
             controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
             controller.enqueue(encoder.encode(`DENIED: Security Policy Violation. Google Cloud Model Armor template flagged the query as unsafe. Please rephrase your query and try again.`));
             controller.enqueue(encoder.encode("\n==========================\n"));
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
             controller.close();
             return;
           }
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
 
           // Initialize Gemini AI Client
           const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
           // STEP 1: Guardrail Gate
           // -------------------------------------------------------------
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Guardrail Audit\n"));
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Running security and authentication guardrails...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running security and authentication guardrails...\n"));
 
           const guardStart = performance.now();
           const guardrailSystemInstruction = `
@@ -166,7 +166,7 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
           const guardText = guardrailResponse.text ? guardrailResponse.text.trim() : "";
           const isConfirmed = guardText.includes("CONFIRMED");
 
-          controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Guardrail check complete in ${guardDuration}s. Result: ${guardText}\n`));
+          controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Guardrail check complete in ${guardDuration}s. Result: ${guardText}\n`));
           controller.enqueue(encoder.encode(`[METADATA] Duration: Guardrail Audit: ${guardDuration}s\n`));
 
           let databaseResults = "";
@@ -182,7 +182,7 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
               throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
             }
 
-            controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Sending query execution to Cloud Run Agent: ${cloudRunUrl}...\n`));
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Sending query execution to Cloud Run Agent: ${cloudRunUrl}...\n`));
 
             const dbStart = performance.now();
 
@@ -228,7 +228,7 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
                   tokenSource = "google-auth-library";
                 }
               } catch (authErr: any) {
-                controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Warning: Skipped GCP ID token generation (${authErr.message}).\n`));
+                controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Warning: Skipped GCP ID token generation (${authErr.message}).\n`));
               }
             }
 
@@ -237,9 +237,9 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
             };
             if (oidcToken) {
               requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-              controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Secured authenticated GCP ID token via ${tokenSource}.\n`));
+              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token via ${tokenSource}.\n`));
             } else {
-              controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Warning: No GCP ID token secured. Continuing unauthenticated.\n"));
+              controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Warning: No GCP ID token secured. Continuing unauthenticated.\n"));
             }
 
             // Enforce and pass structured context variables safely inside prompt text payload as JSON
@@ -281,7 +281,7 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
                 databaseResults = JSON.stringify(resData);
               }
               executionSuccess = true;
-              controller.enqueue(encoder.encode(`[Unknown] [SYSTEM LOG] Query executed successfully in ${dbDuration}s. Formatting results...\n`));
+              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Query executed successfully in ${dbDuration}s. Formatting results...\n`));
               controller.enqueue(encoder.encode(`[METADATA] Duration: Database Engine: ${dbDuration}s\n`));
             } else {
               const errorText = await response.text();
@@ -293,7 +293,7 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
           // STEP 3: Orchestrator Presentation Phase
           // -------------------------------------------------------------
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Orchestrator\n"));
-          controller.enqueue(encoder.encode("[Unknown] [SYSTEM LOG] Presenting final output to user dashboard...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Presenting final output to user dashboard...\n"));
 
           const orchestratorSystemInstruction = `
 You are the Fahem Multi-Agent Orchestrator.

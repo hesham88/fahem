@@ -160,8 +160,8 @@ export default function StickyChat() {
                 return;
               }
 
-              // Append system logs
-              if (trimmedLine.startsWith("[Unknown]") || trimmedLine.includes("[SYSTEM LOG]")) {
+               // Append system logs
+              if (trimmedLine.startsWith("[Unknown]") || trimmedLine.startsWith("[Fahem Agent]") || trimmedLine.startsWith("[Sub-Agent:") || trimmedLine.includes("[SYSTEM LOG]")) {
                 setSessionLogs((prev) => [...prev, trimmedLine]);
                 return;
               }
@@ -171,6 +171,8 @@ export default function StickyChat() {
                 !trimmedLine.includes("[STDERR]") &&
                 !trimmedLine.includes("[CLOSE]") &&
                 !trimmedLine.includes("[Unknown]") &&
+                !trimmedLine.includes("[Fahem Agent]") &&
+                !trimmedLine.startsWith("[Sub-Agent:") &&
                 !trimmedLine.startsWith("Prompt:") &&
                 trimmedLine !== "=== Agent Final Output ===" &&
                 trimmedLine !== "=========================="
