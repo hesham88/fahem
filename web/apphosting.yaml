@@ -40,3 +40,9 @@ env:
   - variable: SUPERADMIN_USER
     secret: fahem_superadmin_user
 
+  # MongoDB Atlas API Client Credentials for administrative MCP tools (atlas-list-clusters, etc.)
+  - variable: MDB_MCP_API_CLIENT_ID
+    secret: fahem_mdb_mcp_api_client_id
+  - variable: MDB_MCP_API_CLIENT_SECRET
+    secret: fahem_mdb_mcp_api_client_secret
+
