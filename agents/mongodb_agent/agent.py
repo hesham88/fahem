@@ -28,6 +28,38 @@ from google.adk.tools.mcp_tool import StdioConnectionParams, McpToolset
 from google.adk import Agent
 from .tools import get_mongodb_uri
 
+# Import Secure Parameterized Tools and Callbacks
+try:
+    from secure_tools import (
+        lookup_user_by_id,
+        search_users_by_email,
+        insert_user_report,
+        inspect_collection_schema,
+        get_whitelisted_db_stats
+    )
+    from guardrails import (
+        before_agent_callback,
+        before_model_callback,
+        before_tool_callback,
+        after_tool_callback,
+        on_tool_error_callback
+    )
+except ImportError:
+    from agents.secure_tools import (
+        lookup_user_by_id,
+        search_users_by_email,
+        insert_user_report,
+        inspect_collection_schema,
+        get_whitelisted_db_stats
+    )
+    from agents.guardrails import (
+        before_agent_callback,
+        before_model_callback,
+        before_tool_callback,
+        after_tool_callback,
+        on_tool_error_callback
+    )
+
 def get_model_name() -> str:
     """Resolves model name dynamically based on environment or configuration."""
     model = os.environ.get("GEMINI_MODEL")
@@ -69,22 +101,22 @@ server_params = StdioServerParameters(
 connection_params = StdioConnectionParams(server_params=server_params)
 mcp_toolset = McpToolset(connection_params=connection_params)
 
-# 4. Construct the mongodb agent
+# 4. Construct the mongodb agent with custom parameterized tools & callbacks
 root_agent = Agent(
     name="FahemMongoDBAgent",
     model=get_model_name(),
     instruction="""
         You are the Fahem MongoDB Database Agent deployed on Google Cloud Run.
-        You assist the user in inspecting database collections, examining schemas, running diagnostics, and writing records.
-        You have direct access to the official MongoDB MCP server tools (connect, list-collections, find, aggregate, etc.).
+        You assist the user in safely inspecting database collections, examining schemas, running diagnostics, and writing records.
+        You have direct access to high-level, parameterized secure tools (lookup_user_by_id, search_users_by_email, insert_user_report, etc.).
+        You also have standard access to MongoDB MCP tools, which are heavily monitored, whitelisted, and audited under strict security guardrails.
+        
+        CRITICAL: Do NOT attempt to call any administrative tools starting with 'atlas-'. Stick strictly to standard whitelisted operations.
         Always ensure sensitive information such as server paths, raw IPs, and password fields are fully masked.
         
-        CRITICAL: Do NOT attempt to call any administrative tools starting with 'atlas-'. Stick strictly to standard database-level operations like 'list-collections', 'db-stats', 'find', 'insert-many', and 'update-many'.
-        
-        To connect to the database:
-        1. Always call the 'get_mongodb_uri' tool first to retrieve the active MongoDB connection string.
-        2. Call the MCP 'connect' tool passing the retrieved connection string as the 'connectionString' parameter.
-        3. Only after a successful connection should you list collections or run other queries.
+        To query or modify data:
+        1. Prefer using specific parameterized tools (such as lookup_user_by_id, search_users_by_email, insert_user_report, inspect_collection_schema, get_whitelisted_db_stats) whenever possible. This prevents raw query injection and ensures the highest level of security.
+        2. Only fallback to standard database-level MCP operations (connect, find, list-collections) if high-level parameterized tools do not cover the requested operation.
         
         You MUST respond to the user in the language they write in or explicitly request.
         Translate explanations, diagnostics, descriptions, and outputs into the user's selected language, while preserving technical/system identifiers such as database and collection names (e.g. 'fahem', 'users') as is.
@@ -92,15 +124,23 @@ root_agent = Agent(
         RESPONSE FORMATTING & CLEANLINESS:
         1. Keep your final response clean, concise, elegant, and professional.
         2. Do NOT list intermediate connection retries, tool execution logs, or technical diagnostics (such as failed connection attempts or formatting retries) in your final response to the user. Only display the final successful results.
-        3. Avoid showing low-level execution step logs, tables of failed sub-operations, or connection handshakes unless explicitly asked. Simply present the final database information or operation result in a beautiful, structured format.
     """,
     tools=[
         mcp_toolset,
-        get_mongodb_uri
-    ]
+        get_mongodb_uri,
+        lookup_user_by_id,
+        search_users_by_email,
+        insert_user_report,
+        inspect_collection_schema,
+        get_whitelisted_db_stats
+    ],
+    before_agent_callback=before_agent_callback,
+    before_model_callback=before_model_callback,
+    before_tool_callback=before_tool_callback,
+    after_tool_callback=after_tool_callback,
+    on_tool_error_callback=on_tool_error_callback
 )
 
 # Expose both for compatibility
 mongodb_agent = root_agent
 app = root_agent
-

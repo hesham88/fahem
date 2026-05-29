@@ -94,18 +94,26 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
         # Fallback to original URI if resolution fails
         return uri
 
-def get_mongodb_uri() -> str:
-    """Resolves the MongoDB connection string from environment or local ignored configurations."""
-    # 1. Environment variable (standard production / GCP Secret Manager flow)
+def get_mongodb_uri(read_only: bool = False) -> str:
+    """Resolves the MongoDB connection string from environment or local configurations.
+    
+    If read_only=True, it prioritizes a read-only credential to enforce the Principle of Least Privilege.
+    """
+    # 1. Prioritize read-only environment variables if requested
+    if read_only:
+        uri = os.environ.get("MONGODB_READONLY_URI") or os.environ.get("MONGODB_URI_READONLY")
+        if uri:
+            return resolve_srv_to_mongodb_uri(uri.strip())
+
+    # 2. Standard full-privilege environment variable (or fallback read-only)
     uri = os.environ.get("MONGODB_URI")
     if uri:
         return resolve_srv_to_mongodb_uri(uri.strip())
     
-    # 2. Local ignored secrets file
+    # 3. Local ignored secrets file
     try:
         # Resolve path relative to agents/ directory (checking both workspace root and web/ nested levels)
         agents_dir = os.path.dirname(os.path.abspath(__file__))
-        # Try parent directory (if agents is at root) and parent's parent (if agents is inside web)
         secrets_path = os.path.join(os.path.dirname(agents_dir), "ignore", "mongodb_secrets.json")
         if not os.path.exists(secrets_path):
             secrets_path = os.path.join(os.path.dirname(os.path.dirname(agents_dir)), "ignore", "mongodb_secrets.json")
@@ -113,13 +121,17 @@ def get_mongodb_uri() -> str:
         if os.path.exists(secrets_path):
             with open(secrets_path, "r") as f:
                 data = json.load(f)
+                if read_only:
+                    val = data.get("MONGODB_READONLY_URI") or data.get("MONGODB_URI_READONLY")
+                    if val:
+                        return resolve_srv_to_mongodb_uri(val.strip())
                 val = data.get("MONGODB_URI", "")
                 if val:
                     return resolve_srv_to_mongodb_uri(val.strip())
     except Exception:
         pass
     
-    # 3. Local Next.js env file
+    # 4. Local Next.js env file
     try:
         env_path = os.path.join(os.path.dirname(agents_dir), "web", ".env.local")
         if not os.path.exists(env_path):
@@ -128,6 +140,11 @@ def get_mongodb_uri() -> str:
         if os.path.exists(env_path):
             with open(env_path, "r") as f:
                 for line in f:
+                    line = line.strip()
+                    if read_only and (line.startswith("MONGODB_READONLY_URI=") or line.startswith("MONGODB_URI_READONLY=")):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return resolve_srv_to_mongodb_uri(val)
                     if line.startswith("MONGODB_URI="):
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
@@ -136,3 +153,4 @@ def get_mongodb_uri() -> str:
         pass
         
     return "mongodb://localhost:27017"
+

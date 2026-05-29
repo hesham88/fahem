@@ -67,7 +67,7 @@ if __name__ == "__main__":
         possible_paths = [
             os.path.join(agents_dir, ".env.local"),
             os.path.join(os.path.dirname(agents_dir), ".env.local"),
-            os.path.join(os.path.dirname(os.path.dirname(agents_dir)), "web", ".env.local")
+            os.path.join(os.path.dirname(agents_dir), "web", ".env.local")
         ]
         for path in possible_paths:
             if os.path.exists(path):

@@ -92,12 +92,23 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
     except Exception:
         return uri
 
-def get_mongodb_uri() -> str:
-    """Resolves the MongoDB connection string from environment or local configurations."""
+def get_mongodb_uri(read_only: bool = False) -> str:
+    """Resolves the MongoDB connection string from environment or local configurations.
+    
+    If read_only=True, it prioritizes a read-only credential to enforce the Principle of Least Privilege.
+    """
+    # 1. Prioritize read-only environment variables if requested
+    if read_only:
+        uri = os.environ.get("MONGODB_READONLY_URI") or os.environ.get("MONGODB_URI_READONLY")
+        if uri:
+            return resolve_srv_to_mongodb_uri(uri.strip())
+
+    # 2. Standard full-privilege environment variable (or fallback read-only)
     uri = os.environ.get("MONGODB_URI")
     if uri:
         return resolve_srv_to_mongodb_uri(uri.strip())
     
+    # 3. Local ignored secrets file
     try:
         micro_dir = os.path.dirname(os.path.abspath(__file__))
         agents_dir = os.path.dirname(micro_dir)
@@ -105,6 +116,10 @@ def get_mongodb_uri() -> str:
         if os.path.exists(secrets_path):
             with open(secrets_path, "r") as f:
                 data = json.load(f)
+                if read_only:
+                    val = data.get("MONGODB_READONLY_URI") or data.get("MONGODB_URI_READONLY")
+                    if val:
+                        return resolve_srv_to_mongodb_uri(val.strip())
                 val = data.get("MONGODB_URI", "")
                 if val:
                     return resolve_srv_to_mongodb_uri(val.strip())
@@ -112,3 +127,4 @@ def get_mongodb_uri() -> str:
         pass
         
     return "mongodb://localhost:27017"
+

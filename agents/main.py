@@ -100,7 +100,7 @@ def load_local_env():
         possible_paths = [
             os.path.join(agents_dir, ".env.local"),
             os.path.join(os.path.dirname(agents_dir), ".env.local"),
-            os.path.join(os.path.dirname(os.path.dirname(agents_dir)), "web", ".env.local")
+            os.path.join(os.path.dirname(agents_dir), "web", ".env.local")
         ]
         env_path = None
         for path in possible_paths:
