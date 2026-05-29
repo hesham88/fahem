@@ -1,49 +1,76 @@
 import sys
 import os
 import logging
+import fastapi
 
 logger = logging.getLogger("google_adk." + __name__)
 
+# Helper to register route on a FastAPI app
+def register_metadata_route(app: fastapi.FastAPI):
+    # Check if the route is already registered to avoid duplication
+    for route in app.routes:
+        if hasattr(route, "path") and route.path == "/db-metadata":
+            return
+
+    @app.get("/db-metadata")
+    async def custom_db_metadata():
+        try:
+            # Add agents directory to sys.path to allow imports
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            
+            from get_metadata import get_metadata
+            
+            # Fetch metadata natively using get_metadata()
+            meta = get_metadata()
+            return meta
+        except Exception as err:
+            logger.error(f"[services.py] Failed to retrieve DB metadata: {err}", exc_info=True)
+            return {
+                "databaseName": "fahem",
+                "collectionsCount": "...",
+                "collectionList": "...",
+                "storageSize": "...",
+                "indexCount": "...",
+                "status": f"Disconnected (Error in custom endpoint: {str(err)})"
+            }
+    logger.info("Mounted custom /db-metadata route onto FastAPI application.")
+
+# 1. Universal Patch: fastapi.FastAPI.__init__
+try:
+    original_fastapi_init = fastapi.FastAPI.__init__
+    def patched_fastapi_init(self, *args, **kwargs):
+        original_fastapi_init(self, *args, **kwargs)
+        register_metadata_route(self)
+    fastapi.FastAPI.__init__ = patched_fastapi_init
+    logger.info("Successfully applied universal monkeypatch to fastapi.FastAPI.__init__")
+except Exception as e:
+    logger.warning(f"Could not monkeypatch fastapi.FastAPI.__init__: {e}")
+
+# 2. Specific Patches: ApiServer and DevServer
 try:
     from google.adk.cli.api_server import ApiServer
 except ImportError:
-    logger.warning("Could not import ApiServer in services.py to apply monkeypatch.")
     ApiServer = None
 
-if ApiServer is not None:
-    original_get_fast_api_app = ApiServer.get_fast_api_app
+try:
+    from google.adk.cli.dev_server import DevServer
+except ImportError:
+    DevServer = None
 
-    def patched_get_fast_api_app(self, *args, **kwargs):
-        # Call the original to get the FastAPI app instance
-        app = original_get_fast_api_app(self, *args, **kwargs)
-        
-        # Add custom route for database metadata
-        @app.get("/db-metadata")
-        async def custom_db_metadata():
-            try:
-                # Add agents directory to sys.path to allow imports
-                agents_dir = os.path.dirname(os.path.abspath(__file__))
-                if agents_dir not in sys.path:
-                    sys.path.insert(0, agents_dir)
-                
-                from get_metadata import get_metadata
-                
-                # Fetch metadata natively using get_metadata()
-                meta = get_metadata()
-                return meta
-            except Exception as err:
-                logger.error(f"[services.py] Failed to retrieve DB metadata: {err}", exc_info=True)
-                return {
-                    "databaseName": "fahem",
-                    "collectionsCount": "...",
-                    "collectionList": "...",
-                    "storageSize": "...",
-                    "indexCount": "...",
-                    "status": f"Disconnected (Error in custom endpoint: {str(err)})"
-                }
+def patch_server_class(ServerClass):
+    if ServerClass is not None:
+        try:
+            original_get_app = ServerClass.get_fast_api_app
+            def patched_get_app(self, *args, **kwargs):
+                app = original_get_app(self, *args, **kwargs)
+                register_metadata_route(app)
+                return app
+            ServerClass.get_fast_api_app = patched_get_app
+            logger.info(f"Successfully applied monkeypatch to {ServerClass.__name__}.get_fast_api_app")
+        except Exception as e:
+            logger.warning(f"Could not monkeypatch {ServerClass.__name__}: {e}")
 
-        logger.info("Successfully mounted custom /db-metadata route onto ADK FastAPI application.")
-        return app
-
-    # Apply monkeypatch
-    ApiServer.get_fast_api_app = patched_get_fast_api_app
+patch_server_class(ApiServer)
+patch_server_class(DevServer)
