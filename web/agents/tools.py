@@ -11,9 +11,13 @@ def get_mongodb_uri() -> str:
     
     # 2. Local ignored secrets file
     try:
-        # Resolve path relative to agents/ directory
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        secrets_path = os.path.join(base_dir, "ignore", "mongodb_secrets.json")
+        # Resolve path relative to agents/ directory (checking both workspace root and web/ nested levels)
+        agents_dir = os.path.dirname(os.path.abspath(__file__))
+        # Try parent directory (if agents is at root) and parent's parent (if agents is inside web)
+        secrets_path = os.path.join(os.path.dirname(agents_dir), "ignore", "mongodb_secrets.json")
+        if not os.path.exists(secrets_path):
+            secrets_path = os.path.join(os.path.dirname(os.path.dirname(agents_dir)), "ignore", "mongodb_secrets.json")
+            
         if os.path.exists(secrets_path):
             with open(secrets_path, "r") as f:
                 data = json.load(f)
@@ -25,7 +29,10 @@ def get_mongodb_uri() -> str:
     
     # 3. Local Next.js env file
     try:
-        env_path = os.path.join(base_dir, "web", ".env.local")
+        env_path = os.path.join(os.path.dirname(agents_dir), "web", ".env.local")
+        if not os.path.exists(env_path):
+            env_path = os.path.join(os.path.dirname(agents_dir), ".env.local")
+            
         if os.path.exists(env_path):
             with open(env_path, "r") as f:
                 for line in f:

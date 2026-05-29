@@ -379,3 +379,15 @@ Fix Next.js compilation issues with outputFileTracingIncludes...
 ```
 **Response Summary**:
 Fixed Next.js build compilation error by moving outputFileTracingIncludes to the root config object of next.config.ts. Rewrote path checking logic in both /api/agent and /api/db-metadata API routes to use statically scoped path checks (e.g. process.cwd() joined with static subfolder strings), resolving Turbopack dynamic tracing warnings. Compiled local Next.js project successfully.
+
+
+---
+
+## Turn 34
+**Timestamp**: 2026-05-29T03:07:24.506253  
+**User Prompt**:
+```text
+make sure to support LTR and RTL to each language correspondantly\nwe need to create a secret called superadmin user and value hesham1988@gmail.com, in the home we check if superadminuser then we show admin tab in the nav panel, in admin tab we have our first screen and we call it sourcing engine, sourcing will be discussed in later
+```
+**Response Summary**:
+Created the fahem_superadmin_user secret with value hesham1988@gmail.com. Localized every input, option, table, and button under the Sourcing Engine Admin panel for all 7 languages. Enhanced layout direction mechanics, adding explicit direction: rtl, list paddings, layout alignments, and response borders for native LTR/RTL rendering.

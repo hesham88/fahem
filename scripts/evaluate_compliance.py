@@ -133,7 +133,9 @@ def evaluate_memory():
 
 def check_mongodb_integration():
     log_report("Auditing MongoDB MCP Integration status...")
-    agent_path = os.path.join(WORKSPACE_DIR, "agents", "agent.py")
+    agent_path = os.path.join(WORKSPACE_DIR, "web", "agents", "agent.py")
+    if not os.path.exists(agent_path):
+        agent_path = os.path.join(WORKSPACE_DIR, "agents", "agent.py")
     if not os.path.exists(agent_path):
         return False, "Python Agent file (agent.py) does not exist!"
         

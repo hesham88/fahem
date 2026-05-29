@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingIncludes: {
-    "/api/agent": ["../agents/**/*"],
-    "/api/db-metadata": ["../agents/**/*"],
+    "/api/agent": ["agents/**/*"],
+    "/api/db-metadata": ["agents/**/*"],
   },
 };
 

@@ -35,3 +35,8 @@ env:
     secret: fahem_gemini_api_key
   - variable: GEMINI_MODEL
     value: "gemini-3.1-flash-lite"
+
+  # Superadmin user configuration for dashboard admin features
+  - variable: SUPERADMIN_USER
+    secret: fahem_superadmin_user
+
