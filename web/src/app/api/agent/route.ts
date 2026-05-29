@@ -15,39 +15,64 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Determine the absolute path to agents/main.py
-    const path1 = path.join(process.cwd(), "agents/main.py");
-    const path2 = path.join(process.cwd(), "web/agents/main.py");
-    const path3 = path.join(process.cwd(), ".next/standalone/web/agents/main.py");
-    const path4 = path.join(process.cwd(), "standalone/web/agents/main.py");
-    const path5 = path.join(process.cwd(), "../agents/main.py");
+    // Dynamic parent/child traversal to locate agents/main.py dynamically in production standalone container
+    function findScriptPath(startDir: string): { scriptPath: string; rootDir: string } | null {
+      // 1. Walk up parent directories
+      let current = startDir;
+      while (true) {
+        let potential = path.join(current, "agents/main.py");
+        if (fs.existsSync(potential)) {
+          return { scriptPath: potential, rootDir: current };
+        }
+        potential = path.join(current, "web/agents/main.py");
+        if (fs.existsSync(potential)) {
+          return { scriptPath: potential, rootDir: path.join(current, "web") };
+        }
+        const parent = path.dirname(current);
+        if (parent === current) break;
+        current = parent;
+      }
 
-    let scriptPath = "";
-    let rootDir = process.cwd();
+      // 2. Scan child directories recursively
+      function searchDown(dir: string, depth: number): { scriptPath: string; rootDir: string } | null {
+        if (depth > 5) return null;
+        try {
+          const files = fs.readdirSync(dir);
+          if (files.includes("agents")) {
+            const potential = path.join(dir, "agents/main.py");
+            if (fs.existsSync(potential)) {
+              return { scriptPath: potential, rootDir: dir };
+            }
+          }
+          for (const file of files) {
+            const fullPath = path.join(dir, file);
+            if (fs.statSync(fullPath).isDirectory() && file !== "node_modules" && file !== ".next" && !file.startsWith(".")) {
+              const res = searchDown(fullPath, depth + 1);
+              if (res) return res;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+        return null;
+      }
 
-    if (fs.existsSync(path1)) {
-      scriptPath = path1;
-      rootDir = process.cwd();
-    } else if (fs.existsSync(path2)) {
-      scriptPath = path2;
-      rootDir = path.join(process.cwd(), "web");
-    } else if (fs.existsSync(path3)) {
-      scriptPath = path3;
-      rootDir = path.join(process.cwd(), ".next/standalone/web");
-    } else if (fs.existsSync(path4)) {
-      scriptPath = path4;
-      rootDir = path.join(process.cwd(), "standalone/web");
-    } else if (fs.existsSync(path5)) {
-      scriptPath = path5;
-      rootDir = path.join(process.cwd(), "..");
-    } else {
+      return searchDown(startDir, 0);
+    }
+
+    const startDir = process.cwd();
+    const scriptInfo = findScriptPath(startDir);
+
+    if (!scriptInfo) {
       return new Response(JSON.stringify({ 
-        error: `Script not found. Paths checked: ${JSON.stringify([path1, path2, path3, path4, path5])}` 
+        error: `Script not found starting from ${startDir}. Directory contents: ${JSON.stringify(fs.existsSync(startDir) ? fs.readdirSync(startDir) : [])}` 
       }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
     }
+
+    const { scriptPath, rootDir } = scriptInfo;
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

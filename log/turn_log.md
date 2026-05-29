@@ -391,3 +391,15 @@ make sure to support LTR and RTL to each language correspondantly\nwe need to cr
 ```
 **Response Summary**:
 Created the fahem_superadmin_user secret with value hesham1988@gmail.com. Localized every input, option, table, and button under the Sourcing Engine Admin panel for all 7 languages. Enhanced layout direction mechanics, adding explicit direction: rtl, list paddings, layout alignments, and response borders for native LTR/RTL rendering.
+
+
+---
+
+## Turn 35
+**Timestamp**: 2026-05-29T03:11:10.039824  
+**User Prompt**:
+```text
+their can be multiple super admin users like contact@asdaa.co as well\nwe are still facing the same agent internal system error 500 POST https://fahem--fahem-88d40.us-east4.hosted.app/api/agent 500 (Internal Server Error)
+```
+**Response Summary**:
+Updated the SUPERADMIN_USER check to parse comma-separated values, allowing multiple super admin users (e.g. hesham1988@gmail.com and contact@asdaa.co). Updated the Secret Manager secret fahem_superadmin_user to include both. Implemented a self-healing recursive directory path resolver in Node API routes to resolve get_metadata.py and main.py dynamically inside standalone deployment containers.

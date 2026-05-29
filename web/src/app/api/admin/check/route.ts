@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const isAdmin = email.toLowerCase().trim() === superadmin.toLowerCase().trim();
+    const admins = superadmin.split(",").map((addr) => addr.trim().toLowerCase());
+    const isAdmin = admins.includes(email.toLowerCase().trim());
 
     return new Response(JSON.stringify({ isAdmin }), {
       status: 200,
