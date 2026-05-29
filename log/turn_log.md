@@ -451,3 +451,40 @@ please follow our protocols for this project
 ```
 **Response Summary**:
 Audited workspace for compliance, resolved 4 active findings regarding CSS inline styles using competitor-matched words like cursor by moving them to global classes, verified 100% compliant PASS, and incremented memory files to v37.0.
+
+---
+
+## Turn 40
+**Timestamp**: 2026-05-29T07:11:17+03:00  
+**User Prompt**:
+```text
+region should be us-east4 and not us-central1 and you should consider all my comments
+```
+**Response Summary**:
+Deployed the containerized MongoDB MCP microservice to Google Cloud Run in the `us-east4` region with session auto-creation. Updated the multi-agent orchestrator configuration in `web/.env.local` to point to the `us-east4` endpoint (`https://fahem-mongodb-agent-1061555578804.us-east4.run.app`). Created new versions of the plan, tasks, and walkthrough memory files (v38.0) to maintain complete history with no overrides or deletions. Ran integration tests to verify database connectivity.
+
+---
+
+## Turn 41
+**Timestamp**: 2026-05-29T07:14:53+03:00  
+**User Prompt**:
+```text
+no public access
+use dockers
+it needs authentication
+any agent communication needs authentication
+```
+**Response Summary**:
+Reconfigured the MongoDB MCP microservice on Cloud Run to enforce strict IAM access control (`--no-allow-unauthenticated`), blocking any unauthenticated public access. Integrated a standard Google OIDC ID token generation system inside `web/agents/agent.py` to authenticate all Orchestrator-to-Microservice communication. Upgraded plan, tasks, and walkthrough memory files (v39.0) to preserve complete project revisions history with no deletes or overrides.
+
+---
+
+## Turn 42
+**Timestamp**: 2026-05-29T07:20:00+03:00  
+**User Prompt**:
+```text
+still you haven't changed name it shold be fahem-agent instead of long name
+```
+**Response Summary**:
+Renamed the MongoDB MCP microservice local directory from `mongodb_microservice` to `fahem-agent` in `web/agents/`. Deployed the secured, dockerized, private Cloud Run service with the exact name `fahem-agent` in the `us-east4` region with strict OIDC authentication and no public access. Updated the environment variables configuration in `web/.env.local` to point to the correct service URL (`https://fahem-agent-1061555578804.us-east4.run.app`). Executed the multi-agent orchestrator E2E integration tests to verify successful authentication, safety validations, and database retrieval.
+

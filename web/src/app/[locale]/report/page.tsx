@@ -69,7 +69,12 @@ export default function ReportPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt, language }),
+        body: JSON.stringify({
+          prompt,
+          language,
+          userEmail: currentUser?.email || email || "",
+          userId: currentUser?.uid || ""
+        }),
       });
 
       if (!response.body) {

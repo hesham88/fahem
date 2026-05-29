@@ -88,9 +88,9 @@ except Exception:
     pass
 
 try:
-    from agent import mongodb_agent
+    from agent import fahem_workflow
 except ImportError:
-    from agents.agent import mongodb_agent
+    from agents.agent import fahem_workflow
 
 def load_local_env():
     """Loads variables from Next.js local env file to configure database URIs and API keys for local testing."""
@@ -126,7 +126,8 @@ def run_agent():
     
     # Check if GEMINI_API_KEY or Google Application Default Credentials are set. 
     # If using Vertex AI (project-based model), we must clear GEMINI_API_KEY to force OAuth2/ADC.
-    is_vertex = mongodb_agent.model.startswith("projects/")
+    model_name = os.environ.get("GEMINI_MODEL", "")
+    is_vertex = model_name.startswith("projects/")
     if is_vertex:
         if "GEMINI_API_KEY" in os.environ:
             del os.environ["GEMINI_API_KEY"]
@@ -141,7 +142,7 @@ def run_agent():
     
     session_service = InMemorySessionService()
     runner = Runner(
-        agent=mongodb_agent,
+        node=fahem_workflow,
         session_service=session_service,
         app_name="fahem",
         auto_create_session=True

@@ -19,7 +19,7 @@ function getLanguageName(lang: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, language } = await req.json();
+    const { prompt, language, userEmail, userId } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
         const pythonProcess = spawn("python", [agentScriptPath, enhancedPrompt], {
           cwd: process.cwd(),
           env: {
-            ...process.env
+            ...process.env,
+            LANGUAGE: language || "en",
+            USER_EMAIL: userEmail || "",
+            USER_ID: userId || ""
           }
         });
 

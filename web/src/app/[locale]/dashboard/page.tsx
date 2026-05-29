@@ -151,7 +151,12 @@ export default function Dashboard() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: queryText, language }),
+        body: JSON.stringify({
+          prompt: queryText,
+          language,
+          userEmail: user?.email || "",
+          userId: user?.uid || ""
+        }),
       });
 
       if (!response.body) {
