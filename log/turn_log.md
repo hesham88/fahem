@@ -488,3 +488,22 @@ still you haven't changed name it shold be fahem-agent instead of long name
 **Response Summary**:
 Renamed the MongoDB MCP microservice local directory from `mongodb_microservice` to `fahem-agent` in `web/agents/`. Deployed the secured, dockerized, private Cloud Run service with the exact name `fahem-agent` in the `us-east4` region with strict OIDC authentication and no public access. Updated the environment variables configuration in `web/.env.local` to point to the correct service URL (`https://fahem-agent-1061555578804.us-east4.run.app`). Executed the multi-agent orchestrator E2E integration tests to verify successful authentication, safety validations, and database retrieval.
 
+---
+
+## Turn 43
+**Timestamp**: 2026-05-29T07:25:00+03:00  
+**User Prompt**:
+```text
+Installing application dependencies.
+Running "npm ci --quiet --no-fund --no-audit (NODE_ENV=development)"
+npm error code EUSAGE
+npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync.
+npm error Missing: kerberos@2.2.2 from lock file
+npm error Missing: mongodb-client-encryption@6.5.0 from lock file
+npm error Missing: node-addon-api@6.1.0 from lock file
+npm error Missing: node-addon-api@4.3.0 from lock file
+```
+**Response Summary**:
+Diagnosed the npm peer dependency sync mismatch during build server `npm ci` executions. Added explicitly declared `optionalDependencies` for `kerberos`, `mongodb-client-encryption`, and `node-addon-api` inside `web/package.json`. Force-regenerated the lockfile from scratch by deleting `web/package-lock.json` and running a clean `npm install` locally. Verified the changes by executing a full production-grade Next.js build compilation successfully without errors, and successfully staged, committed, and pushed the synchronized package lock configuration to the GitHub master branch to trigger successful CD.
+
+
