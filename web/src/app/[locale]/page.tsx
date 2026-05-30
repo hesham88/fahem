@@ -6,10 +6,13 @@ import { signInWithPopup, onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
 import { 
-  FiGithub, 
+  FiGithub,
+  FiGlobe,
   FiTwitter, 
   FiLinkedin, 
-  FiGlobe, 
+  FiYoutube,
+  FiInstagram,
+  FiFacebook,
   FiBookOpen, 
   FiLock, 
   FiActivity, 
@@ -380,17 +383,20 @@ export default function LandingPage() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1.5rem" }}>
-          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Twitter" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiTwitter />
-          </a>
-          <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="GitHub" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiGithub />
-          </a>
           <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="LinkedIn" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
             <FiLinkedin />
           </a>
-          <a href="https://fahem.app" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Website" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiGlobe />
+          <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
+            <FiTwitter />
+          </a>
+          <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="YouTube" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
+            <FiYoutube />
+          </a>
+          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
+            <FiInstagram />
+          </a>
+          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
+            <FiFacebook />
           </a>
         </div>
 

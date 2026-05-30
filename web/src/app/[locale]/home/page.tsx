@@ -25,6 +25,9 @@ import {
   FiLock, 
   FiTwitter, 
   FiLinkedin,
+  FiYoutube,
+  FiInstagram,
+  FiFacebook,
   FiGithub,
   FiFileText,
   FiTrash2,
@@ -5877,17 +5880,20 @@ export default function Home() {
           </div>
 
           <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1.5rem" }}>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Twitter">
-              <FiTwitter />
-            </a>
-            <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="GitHub">
-              <FiGithub />
-            </a>
             <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="LinkedIn">
               <FiLinkedin />
             </a>
-            <a href="https://fahem.app" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Website">
-              <FiGlobe />
+            <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X">
+              <FiTwitter />
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="YouTube">
+              <FiYoutube />
+            </a>
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram">
+              <FiInstagram />
+            </a>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook">
+              <FiFacebook />
             </a>
           </div>
 
