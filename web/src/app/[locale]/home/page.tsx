@@ -1981,7 +1981,7 @@ export default function Home() {
       if (tableHeaders.length > 0 || tableRows.length > 0) {
         elements.push(
           <div key={`table-${key}`} style={{ overflowX: "auto", margin: "1.5rem 0", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)", boxShadow: "var(--shadow-sm)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "left", background: "#ffffff" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "start", background: "#ffffff" }}>
               <thead>
                 <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))", borderBottom: "2px solid var(--card-border)" }}>
                   {tableHeaders.map((h, i) => (
@@ -4247,7 +4247,7 @@ export default function Home() {
                 </h2>
                 
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "left" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "start" }}>
                     <thead>
                       <tr style={{ borderBottom: "2px solid var(--card-border)" }}>
                         <th style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{t("tbl_feed_name")}</th>

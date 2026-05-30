@@ -121,7 +121,7 @@ export default function ReportPage() {
   };
 
   return (
-    <div className="glass-container">
+    <div className="glass-container" dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Background ambient light */}
       <div className="ambient-background">
         <div className="sphere sphere-1"></div>
@@ -135,14 +135,14 @@ export default function ReportPage() {
           <span>🧠</span> {t("dashboard_title")}
         </div>
         <button className="btn btn-secondary" onClick={() => router.push(`/${language}`)}>
-          <FiArrowLeft style={{ fontSize: "1.2rem" }} />
+          <FiArrowLeft style={{ fontSize: "1.2rem", transform: language === "ar" ? "rotate(180deg)" : "none" }} />
           <span>{language === "ar" ? "العودة" : "Back"}</span>
         </button>
       </nav>
 
       {/* Main Container */}
       <main className="glass-hero-section" style={{ padding: "4rem 1.5rem" }}>
-        <div className="glass-card" style={{ maxWidth: "750px", width: "100%", margin: "0 auto", textAlign: "left" }}>
+        <div className="glass-card" style={{ maxWidth: "750px", width: "100%", margin: "0 auto", textAlign: "start" }}>
           <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))" }}>
             <FiAlertOctagon style={{ fontSize: "2rem", color: "#ffffff" }} />
           </div>
@@ -159,7 +159,7 @@ export default function ReportPage() {
                   type="text" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. John Doe"
+                  placeholder={language === "ar" ? "مثال: أحمد محمد" : "e.g. John Doe"}
                   style={{
                     padding: "0.75rem",
                     borderRadius: "var(--border-radius-md)",
@@ -182,7 +182,7 @@ export default function ReportPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. email@domain.com"
+                  placeholder={language === "ar" ? "مثال: email@domain.com" : "e.g. email@domain.com"}
                   style={{
                     padding: "0.75rem",
                     borderRadius: "var(--border-radius-md)",
@@ -227,7 +227,7 @@ export default function ReportPage() {
                 required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe your issue or feedback in detail..."
+                placeholder={language === "ar" ? "يرجى كتابة تفاصيل المشكلة أو الملاحظات هنا بالتفصيل..." : "Describe your issue or feedback in detail..."}
                 style={{
                   padding: "1rem",
                   minHeight: "120px",

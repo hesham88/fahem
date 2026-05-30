@@ -10,7 +10,7 @@ export default function TermsPage() {
   const router = useRouter();
 
   return (
-    <div className="glass-container">
+    <div className="glass-container" dir={language === "ar" ? "rtl" : "ltr"}>
       {/* Background ambient light */}
       <div className="ambient-background">
         <div className="sphere sphere-1"></div>
@@ -24,14 +24,14 @@ export default function TermsPage() {
           <span>🧠</span> {t("dashboard_title")}
         </div>
         <button className="btn btn-secondary" onClick={() => router.push(`/${language}`)}>
-          <FiArrowLeft style={{ fontSize: "1.2rem" }} />
+          <FiArrowLeft style={{ fontSize: "1.2rem", transform: language === "ar" ? "rotate(180deg)" : "none" }} />
           <span>{language === "ar" ? "العودة" : "Back"}</span>
         </button>
       </nav>
 
       {/* Main Container */}
       <main className="glass-hero-section" style={{ padding: "4rem 1.5rem" }}>
-        <div className="glass-card" style={{ maxWidth: "850px", width: "100%", margin: "0 auto", textAlign: "left" }}>
+        <div className="glass-card" style={{ maxWidth: "850px", width: "100%", margin: "0 auto", textAlign: "start" }}>
           <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))" }}>
             <FiFileText style={{ fontSize: "2rem", color: "#ffffff" }} />
           </div>

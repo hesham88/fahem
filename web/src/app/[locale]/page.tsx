@@ -72,7 +72,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="glass-container" style={{ display: "flex", flexDirection: "column", minHeight: "100vh", position: "relative" }}>
+    <div className="glass-container" dir={language === "ar" ? "rtl" : "ltr"} style={{ display: "flex", flexDirection: "column", minHeight: "100vh", position: "relative" }}>
       {/* Dynamic blurred environment spheres */}
       <div className="ambient-background" style={{ position: "fixed", width: "100vw", height: "100vh", zIndex: 0, pointerEvents: "none" }}>
         <div className="sphere sphere-1" style={{ top: "-10%", left: "-10%", background: "radial-gradient(circle, rgba(37,99,235,0.15) 0%, rgba(37,99,235,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
