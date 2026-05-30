@@ -2,46 +2,84 @@ import { GoogleAuth } from "google-auth-library";
 
 const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
 
-async function getOidcToken(): Promise<string | null> {
+let cachedToken: string | null = null;
+let tokenExpiry: number = 0; // timestamp when cached token expires
+let isGcpEnvironment: boolean | null = null; // null = unknown, true = GCP, false = local/non-GCP
+
+export async function getOidcToken(): Promise<string | null> {
   if (!cloudRunUrl) return null;
   
+  const now = Date.now();
+  // If we have a cached token that is still valid (with a 5-minute safety buffer)
+  if (cachedToken && tokenExpiry > now + 300000) {
+    return cachedToken;
+  }
+
+  // If we already know we are NOT in a GCP environment, we can skip metadata and auth client entirely
+  if (isGcpEnvironment === false) {
+    return null; // Will fallback to local bypass token
+  }
+
   let oidcToken: string | null = null;
 
-  // 1. Query GCP Metadata Server
-  try {
-    const metadataUrl = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(cloudRunUrl)}`;
-    const metadataRes = await fetch(metadataUrl, {
-      headers: { "Metadata-Flavor": "Google" }
-    });
-    if (metadataRes.ok) {
-      const tokenText = await metadataRes.text();
-      if (tokenText && tokenText.trim()) {
-        oidcToken = tokenText.trim();
+  // 1. Query GCP Metadata Server (with extremely fast timeout and environment check)
+  if (isGcpEnvironment === null || isGcpEnvironment === true) {
+    try {
+      const metadataUrl = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(cloudRunUrl)}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300); // 300ms timeout max
+      
+      const metadataRes = await fetch(metadataUrl, {
+        headers: { "Metadata-Flavor": "Google" },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (metadataRes.ok) {
+        const tokenText = await metadataRes.text();
+        if (tokenText && tokenText.trim()) {
+          oidcToken = tokenText.trim();
+          isGcpEnvironment = true;
+          cachedToken = oidcToken;
+          tokenExpiry = now + 3000000; // Cache for 50 minutes (standard GCP token is 1h)
+          return oidcToken;
+        }
+      }
+    } catch (metadataErr) {
+      // If metadata fetch fails or times out, we assume we might not be on GCP (unless we previously succeeded)
+      if (isGcpEnvironment === null) {
+        // We'll let the fallback run, but we will check GCP metadata status later
       }
     }
-  } catch (metadataErr) {
-    // Silently ignore
   }
 
   // 2. Fallback to google-auth-library
-  if (!oidcToken) {
-    try {
-      const auth = new GoogleAuth();
-      const authClient = await auth.getIdTokenClient(cloudRunUrl);
-      
-      let headers = (await authClient.getRequestHeaders()) as any;
-      let authHeader = headers["Authorization"] || headers["authorization"];
-      
-      if (!authHeader) {
-        const headersWithArg = (await authClient.getRequestHeaders(cloudRunUrl)) as any;
-        authHeader = headersWithArg["Authorization"] || headersWithArg["authorization"];
-      }
+  try {
+    const auth = new GoogleAuth();
+    const authClient = await auth.getIdTokenClient(cloudRunUrl);
+    
+    let headers = (await authClient.getRequestHeaders()) as any;
+    let authHeader = headers["Authorization"] || headers["authorization"];
+    
+    if (!authHeader) {
+      const headersWithArg = (await authClient.getRequestHeaders(cloudRunUrl)) as any;
+      authHeader = headersWithArg["Authorization"] || headersWithArg["authorization"];
+    }
 
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        oidcToken = authHeader.substring(7);
-      }
-    } catch (authErr: any) {
-      console.warn(`[proxy] GCP ID token generation skipped: ${authErr.message}`);
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      oidcToken = authHeader.substring(7);
+      isGcpEnvironment = true;
+      cachedToken = oidcToken;
+      tokenExpiry = now + 3000000; // Cache for 50 minutes
+      return oidcToken;
+    }
+  } catch (authErr: any) {
+    // Both attempts failed, we are definitely running locally/non-GCP
+    if (isGcpEnvironment === null) {
+      console.log(`[proxy] No GCP environment detected. Activating LOCAL_BYPASS mode for future requests.`);
+      isGcpEnvironment = false;
     }
   }
 

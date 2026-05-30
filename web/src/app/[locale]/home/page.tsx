@@ -37,7 +37,8 @@ import {
   FiUserMinus,
   FiSend,
   FiUser,
-  FiX
+  FiX,
+  FiMenu
 } from "react-icons/fi";
 
 interface PresetQuery {
@@ -467,6 +468,7 @@ export default function Home() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState<boolean>(false);
   const [activeSessionMessages, setActiveSessionMessages] = useState<any[]>([]);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [userTokenStats, setUserTokenStats] = useState<{
     daily: number;
     weekly: number;
@@ -1111,25 +1113,56 @@ export default function Home() {
     }
   }, [onboardingMessages, onboardingStep]);
 
+  const placesSearchTimeoutRef = useRef<any>(null);
+  const placesAbortControllerRef = useRef<AbortController | null>(null);
+
   // Google Places API integration helper
-  const fetchPlaces = async (query: string) => {
+  const fetchPlaces = (query: string) => {
+    if (placesSearchTimeoutRef.current) {
+      clearTimeout(placesSearchTimeoutRef.current);
+    }
+
     if (query.trim().length < 2) {
       setPlacesResults([]);
+      setSearchingPlaces(false);
+      if (placesAbortControllerRef.current) {
+        placesAbortControllerRef.current.abort();
+        placesAbortControllerRef.current = null;
+      }
       return;
     }
+
     setSearchingPlaces(true);
-    try {
-      const countryParam = onboardingCountry || "Egypt";
-      const res = await fetch(`/api/places/search?query=${encodeURIComponent(query)}&country=${encodeURIComponent(countryParam)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPlacesResults(data.results || []);
+
+    placesSearchTimeoutRef.current = setTimeout(async () => {
+      if (placesAbortControllerRef.current) {
+        placesAbortControllerRef.current.abort();
       }
-    } catch (err) {
-      console.error("Error searching places:", err);
-    } finally {
-      setSearchingPlaces(false);
-    }
+
+      const controller = new AbortController();
+      placesAbortControllerRef.current = controller;
+
+      try {
+        const countryParam = onboardingCountry || "Egypt";
+        const res = await fetch(
+          `/api/places/search?query=${encodeURIComponent(query)}&country=${encodeURIComponent(countryParam)}`,
+          { signal: controller.signal }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setPlacesResults(data.results || []);
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Error searching places:", err);
+        }
+      } finally {
+        if (placesAbortControllerRef.current === controller) {
+          setSearchingPlaces(false);
+          placesAbortControllerRef.current = null;
+        }
+      }
+    }, 250);
   };
 
   const handleOnboardingNext = async (
@@ -2591,40 +2624,63 @@ export default function Home() {
             {/* Step 5: School Search with Google Places & Branches */}
             {onboardingStep === 5 && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", position: "relative" }}>
-                <input
-                  type="text"
-                  value={onboardingSchool}
-                  onChange={(e) => {
-                    setOnboardingSchool(e.target.value);
-                    fetchPlaces(e.target.value);
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={
-                    onboardingUserType === "student"
-                      ? (language === "ar" ? "ابحث عن مدرستك أو جامعتك..." : "Search for your school or university...")
-                      : onboardingUserType === "teacher"
-                        ? (language === "ar" ? "ابحث عن مدرسة أو جامعة تعمل بها..." : "Search for school or university where you work...")
-                        : (language === "ar" ? "ابحث عن مدرسة أو جامعة أطفالك..." : "Search for your children's school or university...")
-                  }
-                  style={{
-                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
+                <div style={{ display: "flex", position: "relative", alignItems: "center", width: "100%" }}>
+                  <input
+                    type="text"
+                    value={onboardingSchool}
+                    onChange={(e) => {
+                      setOnboardingSchool(e.target.value);
+                      fetchPlaces(e.target.value);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
+                    placeholder={
+                      onboardingUserType === "student"
+                        ? (language === "ar" ? "ابحث عن مدرستك أو جامعتك..." : "Search for your school or university...")
+                        : onboardingUserType === "teacher"
+                          ? (language === "ar" ? "ابحث عن مدرسة أو جامعة تعمل بها..." : "Search for school or university where you work...")
+                          : (language === "ar" ? "ابحث عن مدرسة أو جامعة أطفالك..." : "Search for your children's school or university...")
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "0.75rem",
+                      paddingRight: language === "ar" ? "0.75rem" : "2.5rem",
+                      paddingLeft: language === "ar" ? "2.5rem" : "0.75rem",
+                      border: "1px solid var(--card-border)",
+                      borderRadius: "var(--border-radius-md)",
+                      outline: "none",
+                      fontFamily: "var(--font-sans)"
+                    }}
+                    autoFocus
+                  />
+                  {searchingPlaces && (
+                    <div style={{
+                      position: "absolute",
+                      right: language === "ar" ? "auto" : "12px",
+                      left: language === "ar" ? "12px" : "auto",
+                      display: "flex",
+                      alignItems: "center"
+                    }}>
+                      <FiCpu className="spinning-icon" style={{ color: "var(--primary)" }} />
+                    </div>
+                  )}
+                </div>
 
-                {searchingPlaces && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "var(--primary)", fontFamily: "var(--font-sans)" }}>
-                    <FiCpu className="spinning-icon" />
-                    <span>{language === "ar" ? "جاري البحث في خرائط جوجل..." : "Searching Google Maps places..."}</span>
-                  </div>
-                )}
-
-                {placesResults.length > 0 && (
+                {placesResults.length > 0 && !selectedPlaceForBranch && (
                   <div style={{
-                    maxHeight: "180px", overflowY: "auto", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", background: "#ffffff",
-                    display: "flex", flexDirection: "column", zIndex: 10
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    marginTop: "0.25rem",
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                    border: "1px solid var(--card-border)",
+                    borderRadius: "var(--border-radius-md)",
+                    background: "#ffffff",
+                    display: "flex",
+                    flexDirection: "column",
+                    zIndex: 15,
+                    boxShadow: "var(--shadow-md)"
                   }} className="custom-scrollbar">
                     {placesResults.map((place: any, index) => (
                       <button
@@ -2893,15 +2949,51 @@ export default function Home() {
         <div className="sphere sphere-3"></div>
       </div>
 
+      {/* Mobile Sticky Header */}
+      <header className="mobile-header">
+        <div className="mobile-header-left" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.4rem", borderRadius: "var(--border-radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
+            <FiCpu className="pulse-icon" style={{ fontSize: "1.1rem" }} />
+          </div>
+          <span style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
+        </div>
+        <div className="mobile-header-right" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button 
+            className="mobile-hamburger-btn" 
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            aria-label="Toggle Navigation Menu"
+            type="button"
+            style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "0.4rem" }}
+          >
+            <FiMenu style={{ fontSize: "1.5rem" }} />
+          </button>
+        </div>
+      </header>
+
+      {isMobileSidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setIsMobileSidebarOpen(false)}></div>
+      )}
+
       {/* Modern Sidebar Panel */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isMobileSidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-top" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: "1rem" }}>
           {/* Logo Section */}
-          <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
-              <FiCpu className="pulse-icon" style={{ fontSize: "1.4rem" }} />
+          <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "0.6rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
+                <FiCpu className="pulse-icon" style={{ fontSize: "1.4rem" }} />
+              </div>
+              <span style={{ fontWeight: 800, letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
             </div>
-            <span style={{ fontWeight: 800, letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
+            <button 
+              className="sidebar-close-btn" 
+              onClick={() => setIsMobileSidebarOpen(false)}
+              aria-label="Close menu"
+              type="button"
+              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "0.25rem" }}
+            >
+              <FiX style={{ fontSize: "1.5rem" }} />
+            </button>
           </div>
 
           {/* Connection Status */}

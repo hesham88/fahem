@@ -632,7 +632,14 @@ async def get_user_profile(user_id: str = None, username: str = None, email: str
         elif email:
             filt["email"] = email.strip().lower()
         elif username:
-            filt["username_clean"] = username.strip().lower()
+            import re
+            username_clean = username.strip().lower()
+            filt = {
+                "$or": [
+                    {"username_clean": username_clean},
+                    {"username": {"$regex": f"^{re.escape(username_clean)}$", "$options": "i"}}
+                ]
+            }
         else:
             return {}
 
@@ -681,10 +688,27 @@ async def check_username_availability(username: str, exclude_user_id: str = None
     try:
         if not username or not username.strip():
             return False
+        import re
         username_clean = username.strip().lower()
-        filt = {"username_clean": username_clean}
         if exclude_user_id:
-            filt["userId"] = {"$ne": exclude_user_id}
+            filt = {
+                "$and": [
+                    {
+                        "$or": [
+                            {"username_clean": username_clean},
+                            {"username": {"$regex": f"^{re.escape(username_clean)}$", "$options": "i"}}
+                        ]
+                    },
+                    {"userId": {"$ne": exclude_user_id}}
+                ]
+            }
+        else:
+            filt = {
+                "$or": [
+                    {"username_clean": username_clean},
+                    {"username": {"$regex": f"^{re.escape(username_clean)}$", "$options": "i"}}
+                ]
+            }
             
         res = await _run_mcp_tool("find", {
             "database": "fahem",

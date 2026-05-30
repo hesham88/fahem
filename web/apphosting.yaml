@@ -43,3 +43,8 @@ env:
   # MongoDB Cloud Run Microservice agent URL
   - variable: MONGODB_AGENT_URL
     value: "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
+
+  # Google Maps / Places API Key secret binding
+  - variable: GOOGLE_MAPS_API_KEY
+    secret: fahem_google_maps_api_key
+

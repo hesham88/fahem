@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
-import { proxyRequest } from "../proxy";
+import { proxyRequest, getOidcToken } from "../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -203,57 +203,14 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
             const dbStart = performance.now();
 
             // Fetch GCP OIDC identity token for service-to-service authentication
-            let oidcToken: string | null = null;
-            let tokenSource: string = "";
-
-            // 1. Try querying the GCP Metadata Server directly (guaranteed to succeed on GCP rtimes like App Hosting / Cloud Run)
-            try {
-              const metadataUrl = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(cloudRunUrl)}`;
-              const metadataRes = await fetch(metadataUrl, {
-                headers: { "Metadata-Flavor": "Google" }
-              });
-              if (metadataRes.ok) {
-                const tokenText = await metadataRes.text();
-                if (tokenText && tokenText.trim()) {
-                  oidcToken = tokenText.trim();
-                  tokenSource = "GCP Metadata Server";
-                }
-              }
-            } catch (metadataErr: any) {
-              // Silently ignore as this is expected when running in non-GCP/local environments
-            }
-
-            // 2. Fallback to google-auth-library if Metadata Server was not reachable or failed
-            if (!oidcToken) {
-              try {
-                const auth = new GoogleAuth();
-                const authClient = await auth.getIdTokenClient(cloudRunUrl);
-                
-                // Try calling getRequestHeaders() without args (safer) first
-                let headers = (await authClient.getRequestHeaders()) as any;
-                let authHeader = headers["Authorization"] || headers["authorization"];
-                
-                if (!authHeader) {
-                  // Fallback with cloudRunUrl argument
-                  const headersWithArg = (await authClient.getRequestHeaders(cloudRunUrl)) as any;
-                  authHeader = headersWithArg["Authorization"] || headersWithArg["authorization"];
-                }
-
-                if (authHeader && authHeader.startsWith("Bearer ")) {
-                  oidcToken = authHeader.substring(7);
-                  tokenSource = "google-auth-library";
-                }
-              } catch (authErr: any) {
-                controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Warning: Skipped GCP ID token generation (${authErr.message}).\n`));
-              }
-            }
+            const oidcToken = await getOidcToken();
 
             const requestHeaders: Record<string, string> = {
               "Content-Type": "application/json"
             };
             if (oidcToken) {
               requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token via ${tokenSource}.\n`));
+              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
             } else {
               controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Warning: No GCP ID token secured. Continuing unauthenticated.\n"));
             }

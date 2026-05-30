@@ -7,6 +7,16 @@ const defaultLocale = "en";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip middleware for static assets, public files, and api/internal routes
+  if (
+    pathname.includes(".") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/avatars/")
+  ) {
+    return;
+  }
+
   // Check if pathname already has a valid locale segment
   const pathnameHasLocale = locales.some(
     (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
@@ -40,6 +50,6 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Skip all internal paths (_next, public assets like favicon, images, etc.) and api routes
-    "/((?!api|_next/static|_next/image|favicon.ico|screenshots|doc|ignore|log|memory|scratches).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|avatars|screenshots|doc|ignore|log|memory|scratches).*)",
   ],
 };

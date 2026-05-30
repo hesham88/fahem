@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { GoogleAuth } from "google-auth-library";
+import { getOidcToken } from "../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -61,48 +61,7 @@ export async function GET(req: NextRequest) {
   try {
     console.log(`[db-metadata] Attempting to proxy DB metadata query through Cloud Run Agent: ${cloudRunUrl}...`);
 
-    let oidcToken: string | null = null;
-    let tokenSource: string = "";
-
-    // A. Query GCP Metadata Server (guaranteed inside App Hosting / Cloud Run)
-    try {
-      const metadataUrl = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(cloudRunUrl)}`;
-      const metadataRes = await fetch(metadataUrl, {
-        headers: { "Metadata-Flavor": "Google" }
-      });
-      if (metadataRes.ok) {
-        const tokenText = await metadataRes.text();
-        if (tokenText && tokenText.trim()) {
-          oidcToken = tokenText.trim();
-          tokenSource = "GCP Metadata Server";
-        }
-      }
-    } catch (metadataErr) {
-      // Silently skip
-    }
-
-    // B. Fallback to google-auth-library (for local/testing environments with service accounts)
-    if (!oidcToken) {
-      try {
-        const auth = new GoogleAuth();
-        const authClient = await auth.getIdTokenClient(cloudRunUrl);
-        
-        let headers = (await authClient.getRequestHeaders()) as any;
-        let authHeader = headers["Authorization"] || headers["authorization"];
-        
-        if (!authHeader) {
-          const headersWithArg = (await authClient.getRequestHeaders(cloudRunUrl)) as any;
-          authHeader = headersWithArg["Authorization"] || headersWithArg["authorization"];
-        }
-
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-          oidcToken = authHeader.substring(7);
-          tokenSource = "google-auth-library";
-        }
-      } catch (authErr: any) {
-        console.warn(`[db-metadata] GCP ID token generation skipped: ${authErr.message}`);
-      }
-    }
+    const oidcToken = await getOidcToken();
 
     const requestHeaders: Record<string, string> = {
       "Accept": "application/json"
@@ -110,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     if (oidcToken) {
       requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-      console.log(`[db-metadata] Secured OIDC ID token via ${tokenSource} for Agent communication.`);
+      console.log(`[db-metadata] Secured OIDC ID token for Agent communication.`);
     }
 
     const response = await fetch(`${cloudRunUrl}/db-metadata`, {
