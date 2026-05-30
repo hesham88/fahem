@@ -9,7 +9,10 @@ async def test_mcp_with_raw_uri():
     tools = await mcp_toolset.get_tools()
     tools_map = {t.name: t for t in tools}
     
-    raw_uri = "mongodb+srv://hesham1988_db_user:XYyNk2LfZqUkImvf@fahemcluster.trf718.mongodb.net/?appName=FahemCluster"
+    raw_uri = os.environ.get("MONGODB_URI")
+    if not raw_uri:
+        print("Error: MONGODB_URI environment variable is not set. Please set it before running this test script.")
+        return
     
     print("Testing connect with RAW SRV URI...")
     try:

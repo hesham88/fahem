@@ -1,7 +1,17 @@
 import dns.resolver
+import os
+import re
 
 def test():
-    host = "fahemcluster.trf718.mongodb.net"
+    uri = os.environ.get("MONGODB_URI")
+    if not uri:
+        print("Error: MONGODB_URI environment variable is not set. Please set it before running this test script.")
+        return
+    match = re.search(r"mongodb\+srv://[^/]*@([^/?]+)", uri)
+    if not match:
+        print("Error: Could not parse host from MONGODB_URI.")
+        return
+    host = match.group(1)
     print("Testing with system default resolver...")
     try:
         resolver = dns.resolver.Resolver()
