@@ -1431,7 +1431,7 @@ export default function Home() {
     }
   };
 
-  const handleOnboardingComplete = async (avatarEmoji: string) => {
+  const handleOnboardingComplete = async (avatarEmoji: string, isSkipped: boolean = false, skippedAtStep?: number) => {
     if (!user) return;
     setOnboardingAvatar(avatarEmoji);
     setLoadingProfile(true);
@@ -1467,6 +1467,8 @@ export default function Home() {
       userType: onboardingUserType,
       role: onboardingUserType,
       onboardingCompleted: true,
+      onboardingSkipped: isSkipped,
+      skippedAtStep: isSkipped && skippedAtStep !== undefined ? skippedAtStep : null,
       isApproved: !isUnderage, // Pending parent approval if underage student
       childrenCount: parseInt(onboardingChildrenCount) || 0,
       childrenInSchoolCount: parseInt(onboardingChildrenInSchool) || 0,
@@ -1495,7 +1497,13 @@ export default function Home() {
           if (typeof window !== "undefined") {
             localStorage.setItem("onboarding_completed_" + user.uid, "true");
           }
-          await logActivity("onboarding_completed", "success", `Completed onboarding as ${onboardingUserType}`);
+          await logActivity(
+            "onboarding_completed",
+            "success",
+            isSkipped 
+              ? `Skipped onboarding at step ${skippedAtStep} as ${onboardingUserType}` 
+              : `Completed onboarding as ${onboardingUserType}`
+          );
         } else {
           console.error("Failed to save onboarding profile: backend returned status error", resData.error || "");
           alert(language === "ar"
@@ -2922,7 +2930,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    handleOnboardingComplete("🚀");
+                    handleOnboardingComplete("🚀", true, onboardingStep);
                   }}
                   style={{
                     background: "none", border: "none", color: "#8a9ca8", cursor: "pointer",
