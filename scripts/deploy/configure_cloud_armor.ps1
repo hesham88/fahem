@@ -115,12 +115,12 @@ try {
     gcloud compute security-policies rules create 2000 `
         --security-policy $PolicyName `
         --expression "true" `
-        --action "throttle" `
+        --action "rate-based-ban" `
         --rate-limit-threshold-count 100 `
         --rate-limit-threshold-interval-sec 60 `
         --conform-action "allow" `
         --exceed-action "deny-429" `
-        --rate-limit-key "IP" `
+        --enforce-on-key "ip" `
         --ban-threshold-count 150 `
         --ban-threshold-interval-sec 60 `
         --ban-duration-sec 300 `
@@ -211,24 +211,18 @@ try {
 
 # Create Forwarding Rule (exposes global external IPv4 frontend)
 $RuleCreated = $false
-try {
-    gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
+gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
+if ($LastExitCode -eq 0) {
     Write-Host "[OK] Global HTTP Forwarding Rule '$ForwardingRule' created!" -ForegroundColor Green
     $RuleCreated = $true
-} catch {
-    # If it failed, we will attempt to create the static IP first and retry
-}
-
-if (-not $RuleCreated) {
-    try {
-        gcloud compute addresses create fahem-lb-static-ip --global --quiet
-    } catch {
-        # Address may already exist
-    }
-    try {
-        gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
+} else {
+    # Attempt to create static IP address first and retry
+    Write-Host "Creating static IP address fahem-lb-static-ip and retrying forwarding rule..." -ForegroundColor Yellow
+    gcloud compute addresses create fahem-lb-static-ip --global --quiet
+    gcloud compute forwarding-rules create $ForwardingRule --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=fahem-lb-static-ip --global --target-http-proxy=$TargetProxy --ports=80 --quiet
+    if ($LastExitCode -eq 0) {
         Write-Host "[OK] Global HTTP Forwarding Rule with static IP created!" -ForegroundColor Green
-    } catch {
+    } else {
         Write-Host "   (Forwarding Rule configuration already complete or failed to bind)" -ForegroundColor DarkGray
     }
 }
