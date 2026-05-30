@@ -126,6 +126,23 @@ const FALLBACK_INSTITUTIONS: Record<string, Array<{ name: string; type: "school"
   ]
 };
 
+const ALLOWED_EDUCATION_TYPES = [
+  "academic_department",
+  "educational_institution",
+  "library",
+  "preschool",
+  "primary_school",
+  "research_institute",
+  "school",
+  "secondary_school",
+  "university"
+];
+
+const EDUCATION_KEYWORDS = [
+  "school", "university", "college", "academy", "department", "library", "preschool", "institute", "education", "campus",
+  "مدرسة", "جامعة", "أكاديمية", "كلية", "روضة", "معهد", "حضانه", "حضانة", "تعليم", "تعليمي"
+];
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -151,18 +168,25 @@ export async function GET(req: NextRequest) {
         if (googleRes.ok) {
           const data = await googleRes.json();
           if (data.results && data.results.length > 0) {
+            // Auto-filter by allowed education types and keywords
+            const filteredResults = data.results.filter((p: any) => {
+              const hasAllowedType = p.types && p.types.some((t: string) => ALLOWED_EDUCATION_TYPES.includes(t));
+              if (hasAllowedType) return true;
+
+              const nameLower = p.name.toLowerCase();
+              const hasKeyword = EDUCATION_KEYWORDS.some((kw: string) => nameLower.includes(kw));
+              if (hasKeyword) return true;
+
+              return false;
+            });
+
             // Group similar named places to create virtual branches or return unique locations
-            const results = data.results.slice(0, 20).map((p: any) => {
+            const results = filteredResults.slice(0, 20).map((p: any) => {
               // Generate some virtual branches for demonstration if no distinct branches are returned
-              const defaultBranches = [
-                "Main Campus (الحرم الرئيسي)",
-                "North Branch (الفرع الشمالي)",
-                "South Branch (الفرع الجنوبي)"
-              ];
               return {
                 name: p.name,
                 address: p.formatted_address || "",
-                type: p.types && p.types.includes("university") ? "university" : "school",
+                type: p.types && (p.types.includes("university") || p.types.includes("research_institute")) ? "university" : "school",
                 branches: [p.formatted_address || "Main Branch"].concat(
                   p.name.includes("University") || p.name.includes("جامعة") 
                     ? ["New Extension Campus (الحرم الجديد)"] 
