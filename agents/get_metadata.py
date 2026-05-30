@@ -52,20 +52,53 @@ async def _run_mcp_tool(tool_name: str, args: dict) -> json:
                 
     res = await tools_map[tool_name].run_async(args=args, tool_context=None)
     
-    # Parse standard MCP text content structure into structured python objects
+    # Check for error status
+    is_err = False
+    err_msg = ""
+    if isinstance(res, dict):
+        if res.get("isError") or res.get("is_error"):
+            is_err = True
+            err_msg = str(res)
+    else:
+        if getattr(res, "isError", False) or getattr(res, "is_error", False):
+            is_err = True
+            err_msg = str(res)
+            
+    # Extract content and check for text-based errors
+    content_list = []
     if isinstance(res, dict) and "content" in res:
-        for item in res["content"]:
-            if isinstance(item, dict) and item.get("type") == "text":
-                text_val = item.get("text", "")
+        content_list = res["content"]
+    elif hasattr(res, "content"):
+        content_list = res.content
+        
+    text_val = None
+    if content_list:
+        for item in content_list:
+            item_type = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+            item_text = item.get("text") if isinstance(item, dict) else getattr(item, "text", "")
+            if item_type == "text" and item_text:
+                text_val = item_text
                 text_val_stripped = text_val.strip()
-                if (text_val_stripped.startswith("{") and text_val_stripped.endswith("}")) or \
-                   (text_val_stripped.startswith("[") and text_val_stripped.endswith("]")):
-                    try:
-                        return json.loads(text_val_stripped)
-                    except Exception:
-                        pass
-                return text_val
+                if text_val_stripped.startswith("Error") or "exception" in text_val.lower():
+                    is_err = True
+                    err_msg = text_val_stripped
+                break
+
+    if is_err:
+        raise ValueError(f"MCP tool '{tool_name}' failed: {err_msg}")
+        
+    if text_val is not None:
+        text_val_stripped = text_val.strip()
+        if (text_val_stripped.startswith("{") and text_val_stripped.endswith("}")) or \
+           (text_val_stripped.startswith("[") and text_val_stripped.endswith("]")):
+            try:
+                return json.loads(text_val_stripped)
+            except Exception:
+                pass
+        return text_val
+        
     return res
+
 
 async def get_metadata(database: str = "fahem") -> dict:
     """Fetches MongoDB database stats and collection list exclusively via the MongoDB MCP agent."""
