@@ -37,18 +37,18 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   
   const translations: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; keywords: string }> = {
     ar: {
-      title: "فاهم - لوحة تحكم مساعد شريك MongoDB",
+      title: "فاهم - الرئيسية مساعد شريك MongoDB",
       description: "فاهم هو مساعد ذكاء اصطناعي تفاعلي مدعوم برمجياً بحزمة تطوير الوكيل من جوجل (ADK) وأدوات بروتوكول سياق نموذج MongoDB (MCP).",
       ogTitle: "فاهم - وكيل قاعدة بيانات ذكي مع MongoDB MCP",
       ogDescription: "لوحة تحكم ذكاء اصطناعي متطورة للتفاعل الفوري مع قواعد بيانات MongoDB Atlas وإدارتها برمجياً.",
-      keywords: "ذكاء اصطناعي, وكيل قاعدة بيانات, شريك MongoDB, بروتوكول MCP, حزمة تطوير الوكيل من جوجل, Next.js, Firebase, لوحة تحكم"
+      keywords: "ذكاء اصطناعي, وكيل قاعدة بيانات, شريك MongoDB, بروتوكول MCP, حزمة تطوير الوكيل من جوجل, Next.js, Firebase, الرئيسية"
     },
     en: {
-      title: "Fahem - MongoDB Partner Agent Dashboard",
+      title: "Fahem - MongoDB Partner Agent Home",
       description: "Fahem is an intelligent AI assistant programmatically powered by Google Agent Development Kit (ADK) and the MongoDB Model Context Protocol (MCP) server.",
       ogTitle: "Fahem - Intelligent Database Agent with MongoDB MCP",
       ogDescription: "An advanced, elegant AI dashboard to programmatically analyze, query, and manage MongoDB Atlas database clusters in real-time.",
-      keywords: "AI Assistant, Database Agent, MongoDB Partner, Model Context Protocol, MCP, Google ADK, Next.js, Firebase, Dashboard"
+      keywords: "AI Assistant, Database Agent, MongoDB Partner, Model Context Protocol, MCP, Google ADK, Next.js, Firebase, Home"
     },
     es: {
       title: "Fahem - Panel de control del asistente de socios de MongoDB",
@@ -203,10 +203,13 @@ export default async function LocaleLayout({
   };
 
   return (
-    <html lang={locale} className={`${plusJakarta.variable} ${outfit.variable} ${cairo.variable} ${jetbrainsMono.variable}`}>
+    <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} className={`${plusJakarta.variable} ${outfit.variable} ${cairo.variable} ${jetbrainsMono.variable}`}>
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/favicon.svg" type="image/svg+xml" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

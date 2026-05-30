@@ -8,19 +8,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const username = searchParams.get("username");
+    const email = searchParams.get("email");
 
-    if (!userId && !username) {
-      return new Response(JSON.stringify({ error: "userId or username is required" }), {
+    if (!userId && !username && !email) {
+      return new Response(JSON.stringify({ error: "userId, username or email is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const query = userId 
-      ? `userId=${encodeURIComponent(userId)}` 
-      : `username=${encodeURIComponent(username || "")}`;
+    const params = new URLSearchParams();
+    if (userId) params.append("userId", userId);
+    if (username) params.append("username", username);
+    if (email) params.append("email", email);
 
-    return await proxyRequest(`/user/profile?${query}`, "GET");
+    return await proxyRequest(`/user/profile?${params.toString()}`, "GET");
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

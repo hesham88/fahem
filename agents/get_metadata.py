@@ -615,12 +615,22 @@ async def get_global_token_stats() -> dict:
             "userBreakdown": []
         }
 
-async def get_user_profile(user_id: str = None, username: str = None) -> dict:
-    """Fetches user profile from the 'users' collection by userId or username."""
+async def get_user_profile(user_id: str = None, username: str = None, email: str = None) -> dict:
+    """Fetches user profile from the 'users' collection by userId, email, or username."""
     try:
         filt = {}
-        if user_id:
+        if user_id and email:
+            filt = {
+                "$or": [
+                    {"userId": user_id},
+                    {"email": email.strip().lower()},
+                    {"email": email.strip()}
+                ]
+            }
+        elif user_id:
             filt["userId"] = user_id
+        elif email:
+            filt["email"] = email.strip().lower()
         elif username:
             filt["username_clean"] = username.strip().lower()
         else:
@@ -662,19 +672,24 @@ async def get_user_profile(user_id: str = None, username: str = None) -> dict:
 
         return {}
     except Exception as err:
-        logger.warning(f"Failed to fetch user profile for {user_id or username}: {err}")
-        return {}
+        logger.error(f"Error fetching user profile for {user_id or username or email}: {err}", exc_info=True)
+        # Raise database errors so they bubble up and are not treated as "user not found"
+        raise err
 
-async def check_username_availability(username: str) -> bool:
+async def check_username_availability(username: str, exclude_user_id: str = None) -> bool:
     """Checks if a username is available (i.e. not taken by any other user)."""
     try:
         if not username or not username.strip():
             return False
         username_clean = username.strip().lower()
+        filt = {"username_clean": username_clean}
+        if exclude_user_id:
+            filt["userId"] = {"$ne": exclude_user_id}
+            
         res = await _run_mcp_tool("find", {
             "database": "fahem",
             "collection": "users",
-            "filter": {"username_clean": username_clean}
+            "filter": filt
         })
         docs = []
         if isinstance(res, list):
@@ -686,11 +701,11 @@ async def check_username_availability(username: str) -> bool:
             
         return len(docs) == 0
     except Exception as err:
-        logger.warning(f"Failed to check username availability for {username}: {err}")
-        return False
+        logger.error(f"Error checking username availability for {username}: {err}", exc_info=True)
+        raise err
 
 async def save_user_profile(user_id: str, data: dict) -> bool:
-    """Saves or updates a user profile in the 'users' collection."""
+    """Saves or updates a user profile in the 'users' collection using atomic upsert to prevent duplicates."""
     try:
         from datetime import datetime
         now_str = datetime.utcnow().isoformat() + "Z"
@@ -698,39 +713,30 @@ async def save_user_profile(user_id: str, data: dict) -> bool:
         # Ensure username_clean is stored alongside username
         if "username" in data and data["username"]:
             data["username_clean"] = str(data["username"]).strip().lower()
-        
-        existing = await get_user_profile(user_id)
-        if existing:
-            # Update existing
-            update_data = {**data, "updatedAt": now_str}
-            # Remove mongo internal fields if present
-            update_data.pop("_id", None)
-            update_data.pop("userId", None)
+        if "email" in data and data["email"]:
+            data["email"] = str(data["email"]).strip().lower()
             
-            await _run_mcp_tool("update-many", {
-                "database": "fahem",
-                "collection": "users",
-                "filter": {"userId": user_id},
-                "update": {"$set": update_data}
-            })
-            logger.info(f"[MCP PROFILE UPDATED] {user_id}")
-        else:
-            # Insert new
-            doc = {
-                "userId": user_id,
-                **data,
-                "createdAt": now_str,
-                "updatedAt": now_str
-            }
-            await _run_mcp_tool("insert-many", {
-                "database": "fahem",
-                "collection": "users",
-                "documents": [doc]
-            })
-            logger.info(f"[MCP PROFILE CREATED] {user_id}")
+        # Construct update payload
+        filt = {"userId": user_id}
+        update_data = {**data, "userId": user_id, "updatedAt": now_str}
+        update_data.pop("_id", None)  # Clean mongo internal field
+        
+        update_doc = {
+            "$set": update_data,
+            "$setOnInsert": {"createdAt": now_str}
+        }
+        
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "users",
+            "filter": filt,
+            "update": update_doc,
+            "upsert": True
+        })
+        logger.info(f"[MCP PROFILE UPSERTED] {user_id}")
         return True
     except Exception as err:
-        logger.warning(f"Failed to save user profile: {err}")
+        logger.error(f"Failed to save user profile for {user_id}: {err}", exc_info=True)
         return False
 
 async def delete_user_account(user_id: str, email: str) -> bool:

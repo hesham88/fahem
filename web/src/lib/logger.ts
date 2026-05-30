@@ -133,6 +133,27 @@ if (typeof window !== "undefined") {
   });
 }
 
+function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeForFirestore);
+  }
+  if (typeof obj === "object") {
+    // Keep specialized objects like Dates or Firestore ServerTimestamps intact
+    if (obj.constructor && obj.constructor.name !== "Object" && obj.constructor.name !== "Array") {
+      return obj;
+    }
+    const sanitized: Record<string, any> = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      sanitized[key] = sanitizeForFirestore(val);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
 /**
  * Centralized logging function that persists entries to Firestore and logs events to Google Analytics.
  */
@@ -194,9 +215,10 @@ export async function logCentral(
       });
     }
 
-    // 5. Write to Firestore 'web_logs' database
+    // 5. Write to Firestore 'web_logs' database with sanitation
     const logsCol = collection(db, "web_logs");
-    await addDoc(logsCol, logDoc);
+    const sanitizedLogDoc = sanitizeForFirestore(logDoc);
+    await addDoc(logsCol, sanitizedLogDoc);
 
     // Print to browser console in developer-friendly styles
     const styles = {

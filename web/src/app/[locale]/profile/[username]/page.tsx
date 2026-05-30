@@ -21,7 +21,7 @@ import {
 
 const profileTranslations = {
   en: {
-    back: "Back to Dashboard",
+    back: "Back to Home",
     notFound: "User profile not found",
     loading: "Loading user profile...",
     friends: "Friends",
@@ -44,7 +44,7 @@ const profileTranslations = {
     viewProfile: "View Profile"
   },
   ar: {
-    back: "العودة للوحة التحكم",
+    back: "العودة للرئيسية",
     notFound: "الملف الشخصي للمستخدم غير موجود",
     loading: "جاري تحميل الملف الشخصي...",
     friends: "الأصدقاء",
@@ -67,7 +67,7 @@ const profileTranslations = {
     viewProfile: "عرض الملف الشخصي"
   },
   es: {
-    back: "Volver al panel",
+    back: "Volver al Inicio",
     notFound: "Perfil de usuario no encontrado",
     loading: "Cargando perfil de usuario...",
     friends: "Amigos",
@@ -90,7 +90,7 @@ const profileTranslations = {
     viewProfile: "Ver Perfil"
   },
   fr: {
-    back: "Retour au tableau",
+    back: "Retour à l'accueil",
     notFound: "Profil introuvable",
     loading: "Chargement du profil...",
     friends: "Amis",
@@ -113,7 +113,7 @@ const profileTranslations = {
     viewProfile: "Voir le profil"
   },
   de: {
-    back: "Zurück zum Dashboard",
+    back: "Zurück zur Startseite",
     notFound: "Benutzerprofil nicht gefunden",
     loading: "Profil wird geladen...",
     friends: "Freunde",
@@ -136,7 +136,7 @@ const profileTranslations = {
     viewProfile: "Profil anzeigen"
   },
   zh: {
-    back: "返回仪表盘",
+    back: "返回主页",
     notFound: "未找到用户个人资料",
     loading: "正在加载个人资料...",
     friends: "好友",
@@ -159,7 +159,7 @@ const profileTranslations = {
     viewProfile: "查看个人资料"
   },
   it: {
-    back: "Torna alla Dashboard",
+    back: "Torna alla Home",
     notFound: "Profilo utente non trovato",
     loading: "Caricamento profilo...",
     friends: "Amici",
@@ -443,7 +443,7 @@ export default function UserProfilePage() {
           </div>
           <h2 style={{ fontSize: "1.5rem", margin: 0, border: "none", padding: 0 }}>{getT("notFound")}</h2>
           <button 
-            onClick={() => router.push(`/${language}/dashboard`)}
+            onClick={() => router.push(`/${language}/home`)}
             className="profile-btn profile-btn-secondary"
             style={{ width: "100%", justifyContent: "center" }}
           >
@@ -544,7 +544,7 @@ export default function UserProfilePage() {
         {/* Navigation Head */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <button 
-            onClick={() => router.push(`/${language}/dashboard`)}
+            onClick={() => router.push(`/${language}/home`)}
             onMouseEnter={handleBtnSecondaryMouseEnter}
             onMouseLeave={handleBtnSecondaryMouseLeave}
             style={{ ...styles.btn, ...styles.btnSecondary }}
@@ -553,7 +553,7 @@ export default function UserProfilePage() {
           </button>
           
           <button 
-            onClick={() => router.push(`/${language}/dashboard`)}
+            onClick={() => router.push(`/${language}/home`)}
             onMouseEnter={handleBtnSecondaryMouseEnter}
             onMouseLeave={handleBtnSecondaryMouseLeave}
             style={{ ...styles.btn, ...styles.btnSecondary, padding: "0.7rem" }}

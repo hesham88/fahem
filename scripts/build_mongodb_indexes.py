@@ -35,7 +35,14 @@ def build_indexes():
         print("\n--- 1. Tuning 'users' Collection Indexes ---")
         # Ensure userId has an ascending index and is unique
         users_idx = db["users"].create_index([("userId", ASCENDING)], unique=True, name="idx_userId_unique")
-        print(f"Created index on 'users': {users_idx}")
+        print(f"Created index on 'users' (userId): {users_idx}")
+        
+        # Ensure email and username_clean have unique, sparse indexes
+        email_idx = db["users"].create_index([("email", ASCENDING)], unique=True, sparse=True, name="idx_email_unique")
+        print(f"Created unique sparse index on 'users' (email): {email_idx}")
+        
+        username_idx = db["users"].create_index([("username_clean", ASCENDING)], unique=True, sparse=True, name="idx_username_clean_unique")
+        print(f"Created unique sparse index on 'users' (username_clean): {username_idx}")
         
         print("\n--- 2. Tuning 'messages' Collection Indexes ---")
         # Build composite index on senderId and recipientId for fast chat retrieval

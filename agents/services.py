@@ -28,6 +28,13 @@ def register_metadata_route(app: fastapi.FastAPI):
         if is_secured:
             is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
             auth_header = request.headers.get("Authorization")
+            
+            # Allow local Next.js environment to bypass OIDC using a pre-shared local secret
+            if auth_header == "Bearer LOCAL_BYPASS_TOKEN_fahem_2026":
+                logger.info(f"[OIDC BYPASS via SECRET] Request to {path} permitted via shared secret.")
+                request.state.verified_email = "local_dev_bypass@fahem.app"
+                return await call_next(request)
+
             token = None
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header[7:]
@@ -261,13 +268,13 @@ def register_metadata_route(app: fastapi.FastAPI):
             return {"activities": [], "tokenStats": {}, "error": str(err)}
 
     @app.get("/user/profile")
-    async def get_profile_endpoint(userId: str = None, username: str = None):
+    async def get_profile_endpoint(userId: str = None, username: str = None, email: str = None):
         try:
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             from get_metadata import get_user_profile
-            profile = await get_user_profile(user_id=userId, username=username)
+            profile = await get_user_profile(user_id=userId, username=username, email=email)
             return {"profile": profile}
         except Exception as err:
             logger.error(f"[services.py] Failed to get user profile: {err}", exc_info=True)

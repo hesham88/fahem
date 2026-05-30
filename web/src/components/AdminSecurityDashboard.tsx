@@ -7,6 +7,7 @@ import {
   FiDatabase, 
   FiLayers, 
   FiArrowRight, 
+  FiArrowLeft,
   FiCheckCircle, 
   FiLock, 
   FiSettings, 
@@ -329,7 +330,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   const renderArrow = () => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--card-border-active)", padding: "0 0.5rem" }} className="pulse-icon">
-      <FiArrowRight style={{ fontSize: "1.5rem" }} />
+      {language === "ar" ? <FiArrowLeft style={{ fontSize: "1.5rem" }} /> : <FiArrowRight style={{ fontSize: "1.5rem" }} />}
     </div>
   );
 
