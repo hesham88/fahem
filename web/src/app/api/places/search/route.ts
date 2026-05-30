@@ -44,6 +44,15 @@ const FALLBACK_INSTITUTIONS: Record<string, Array<{ name: string; type: "school"
       name: "Heliopolis Language School (مدرسة مصر الجديدة للغات)",
       type: "school",
       branches: ["Heliopolis Branch (فرع مصر الجديدة)", "Sherouk City Branch (فرع الشروق)"]
+    },
+    {
+      name: "Gamal Abdel Nasser Language School (مدرسة جمال عبد الناصر التجريبية للغات)",
+      type: "school",
+      branches: [
+        "72 Nakhla Al Motieai, Heliopolis, Cairo (مصر الجديدة، القاهرة)",
+        "2 El Fayoum St., Dokki, Giza (الدقي، الجيزة)",
+        "Alexandria Branch (فرع الإسكندرية)"
+      ]
     }
   ],
   uae: [
@@ -137,13 +146,13 @@ export async function GET(req: NextRequest) {
     if (apiKey && query.length >= 2) {
       try {
         // Find schools/universities in the given country
-        const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + " educational in " + country)}&key=${apiKey}`;
+        const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + " " + country)}&key=${apiKey}`;
         const googleRes = await fetch(googleUrl);
         if (googleRes.ok) {
           const data = await googleRes.json();
           if (data.results && data.results.length > 0) {
             // Group similar named places to create virtual branches or return unique locations
-            const results = data.results.slice(0, 10).map((p: any) => {
+            const results = data.results.slice(0, 20).map((p: any) => {
               // Generate some virtual branches for demonstration if no distinct branches are returned
               const defaultBranches = [
                 "Main Campus (الحرم الرئيسي)",

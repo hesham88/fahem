@@ -2668,19 +2668,19 @@ export default function Home() {
                 {placesResults.length > 0 && !selectedPlaceForBranch && (
                   <div style={{
                     position: "absolute",
-                    top: "100%",
+                    bottom: "100%",
                     left: 0,
                     right: 0,
-                    marginTop: "0.25rem",
-                    maxHeight: "180px",
+                    marginBottom: "0.25rem",
+                    maxHeight: "220px",
                     overflowY: "auto",
                     border: "1px solid var(--card-border)",
                     borderRadius: "var(--border-radius-md)",
                     background: "#ffffff",
                     display: "flex",
                     flexDirection: "column",
-                    zIndex: 15,
-                    boxShadow: "var(--shadow-md)"
+                    zIndex: 25,
+                    boxShadow: "0 -4px 16px rgba(0,0,0,0.12)"
                   }} className="custom-scrollbar">
                     {placesResults.map((place: any, index) => (
                       <button
@@ -2714,10 +2714,10 @@ export default function Home() {
                 {/* Popover Branch Selector */}
                 {selectedPlaceForBranch && (
                   <div style={{
-                    position: "absolute", top: "100%", left: 0, right: 0, marginTop: "0.5rem",
+                    position: "absolute", bottom: "100%", left: 0, right: 0, marginBottom: "0.5rem",
                     padding: "1rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--primary)",
-                    background: "rgba(255, 255, 255, 0.98)", backdropFilter: "blur(10px)", zIndex: 20,
-                    boxShadow: "var(--shadow-md)", display: "flex", flexDirection: "column", gap: "0.75rem"
+                    background: "rgba(255, 255, 255, 0.98)", backdropFilter: "blur(10px)", zIndex: 30,
+                    boxShadow: "0 -4px 16px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", gap: "0.75rem"
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", fontFamily: "var(--font-display)" }}>
