@@ -48,3 +48,14 @@ A systematic, technical breakdown of all files, databases, collections, and pipe
 - ⏳ **Active Execution**: Current thread.
 - 📋 **Pending Queue**: Tasks registered for next execution.
 - 🚀 **Next Milestone**: Immediate target.
+
+---
+
+## 4. Responsive Mobile-Friendly UI Protocol (`responsive_mobile_friendly_UI`)
+To ensure high accessibility and professional visual aesthetics across all platforms, the project implements the following mandatory responsiveness rules:
+1. **Desktop-First Component Degradation**: On screen widths smaller than `900px`, layout structures must dynamically shift. Flex containers should wrap, and sidebars must transition to space-saving horizontal navigation bars or swipeable, scrollable tab strips.
+2. **Tab-Strip Simplification**: In mobile navigation bars, redundant section labels, complex descriptions, and decorative dividers must be hidden to prioritize raw workspace area. Less essential outer headers (such as raw chat lists or static badges) must be collapsed or hidden on mobile viewports.
+3. **Fluid Grid Systems**: On screens smaller than `600px`, multi-column grid containers (such as preset grids or stat blocks) must wrap to a clean `1fr` single-column layout with reduced gap spacing.
+4. **Auto-Scrolling Data Tables**: Database markdown structures, query results, and tables returned by agents must utilize responsive wrapping wrappers (`overflow-x: auto`) to prevent viewport breaking on small mobile devices.
+5. **Dynamic Typography Scaling**: Base font sizes, heading weights, and card padding must scale down on screen widths `< 600px` to maintain balanced visual hierarchy.
+

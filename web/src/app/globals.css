@@ -1134,7 +1134,241 @@ a:hover {
   animation: pulse-gentle 4s ease-in-out infinite;
 }
 
+/* ========================================================================= */
+/* 📱 responsive_mobile_friendly_UI PROTOCOL COMPLIANCE SPECIFICATIONS       */
+/* ========================================================================= */
+/* Under this protocol, the interface must scale fluidly across all devices. 
+   On screens < 900px, the vertical sidebar morphs into a sticky top bar with 
+   horizontal swipeable tab links. On screens < 600px, grids wrap to single-column, 
+   typography scales dynamically, and tables are made scrollable. */
 
+@media (max-width: 900px) {
+  .app-layout {
+    flex-direction: column !important;
+  }
 
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: sticky !important;
+    top: 0 !important;
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    align-items: center !important;
+    gap: 0.5rem 1rem !important;
+    padding: 0.5rem 1rem !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(235, 220, 185, 0.4) !important;
+    background: rgba(253, 251, 247, 0.92) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    z-index: 1000 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+  }
 
+  .sidebar-top {
+    display: contents !important;
+  }
 
+  .sidebar-footer {
+    display: contents !important;
+  }
+
+  .sidebar-logo {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    font-size: 1.2rem !important;
+  }
+
+  .sidebar-logo div {
+    padding: 0.35rem !important;
+  }
+
+  .sidebar-logo span {
+    font-size: 1.2rem !important;
+  }
+
+  .sidebar-status {
+    display: none !important; /* Hide cluster badge on mobile to conserve header space */
+  }
+
+  .sidebar-nav {
+    grid-column: 1 / span 3 !important;
+    grid-row: 2 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+    overflow-x: auto !important;
+    width: 100% !important;
+    padding: 0.25rem 0 !important;
+    margin-top: 0 !important;
+    max-height: none !important;
+    scrollbar-width: none !important; /* Hide scrollbars (Firefox) */
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none !important; /* Hide scrollbars (Chrome/Safari) */
+  }
+
+  .sidebar-nav-btn {
+    flex-shrink: 0 !important;
+    padding: 0.45rem 1rem !important;
+    font-size: 0.85rem !important;
+    gap: 0.4rem !important;
+    border-radius: var(--border-radius-sm) !important;
+  }
+
+  .sidebar-nav-btn:hover {
+    transform: none !important;
+  }
+
+  /* Hide category titles like ADMIN CONTROLS inside horizontal swipeable tab bar */
+  .sidebar-nav div {
+    display: none !important;
+  }
+
+  .sidebar-language-select {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important;
+    justify-self: end !important;
+    margin-bottom: 0 !important;
+  }
+
+  .sidebar-user-card {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: var(--border-radius-md) !important;
+    gap: 0.5rem !important;
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  .sidebar-user-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-width: 1px !important;
+  }
+
+  .sidebar-user-info {
+    display: none !important; /* Hide raw email and name strings, avatar is sufficient for top bar */
+  }
+
+  .main-content {
+    padding: 1.25rem !important;
+  }
+
+  /* Hide raw chat saves inside the mobile header to avoid overflow */
+  .sidebar-top > div:last-child {
+    display: none !important;
+  }
+
+  /* Glassmorphic landing page navbar responsiveness */
+  .glass-nav {
+    padding: 0 1rem !important;
+    height: 60px !important;
+  }
+
+  .glass-nav-links {
+    gap: 0.75rem !important;
+  }
+
+  /* Filter out less essential links in the horizontal navigation list to fit any small screen */
+  .glass-nav-links li:nth-child(1),
+  .glass-nav-links li:nth-child(2),
+  .glass-nav-links li:nth-child(3),
+  .glass-nav-links li:nth-child(4),
+  .glass-nav-links li:nth-child(5) {
+    display: none !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .preset-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  .title-section h1 {
+    font-size: 1.85rem !important;
+  }
+
+  .page-title-section {
+    padding: 1rem 1.25rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .page-title-section h1 {
+    font-size: 1.7rem !important;
+  }
+
+  .page-title-section p {
+    font-size: 0.95rem !important;
+  }
+
+  .panel-card {
+    padding: 1.25rem !important;
+    border-radius: var(--border-radius-md) !important;
+  }
+
+  .panel-card h2 {
+    font-size: 1.25rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .glass-card {
+    padding: 1.5rem 1rem !important;
+    border-radius: 16px !important;
+  }
+
+  .glass-card h2 {
+    font-size: 1.5rem !important;
+  }
+
+  .glass-card p {
+    font-size: 0.88rem !important;
+  }
+
+  .sphere-1 { width: 140px !important; height: 140px !important; }
+  .sphere-2 { width: 160px !important; height: 160px !important; }
+  .sphere-3 { width: 150px !important; height: 150px !important; }
+
+  /* Ensure deep logs terminals and response layouts fit any width screen without clipping */
+  .logs-console {
+    padding: 0.85rem !important;
+    font-size: 0.82rem !important;
+    max-height: 300px !important;
+  }
+}
+
+/* Force markdown tables produced by agents to render fluidly with swipeable horizontal overflow scrolling */
+table {
+  display: block !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-collapse: collapse !important;
+}
+th, td {
+  white-space: nowrap !important;
+  padding: 0.4rem 0.6rem !important;
+}
