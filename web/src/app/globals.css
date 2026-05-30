@@ -1057,7 +1057,7 @@ a:hover {
 
 /* RTL Layout support for Sidebar */
 [dir="rtl"] .app-layout {
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 [dir="rtl"] .sidebar {
