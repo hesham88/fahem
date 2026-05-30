@@ -182,16 +182,11 @@ export async function GET(req: NextRequest) {
 
             // Group similar named places to create virtual branches or return unique locations
             const results = filteredResults.slice(0, 20).map((p: any) => {
-              // Generate some virtual branches for demonstration if no distinct branches are returned
               return {
                 name: p.name,
                 address: p.formatted_address || "",
                 type: p.types && (p.types.includes("university") || p.types.includes("research_institute")) ? "university" : "school",
-                branches: [p.formatted_address || "Main Branch"].concat(
-                  p.name.includes("University") || p.name.includes("جامعة") 
-                    ? ["New Extension Campus (الحرم الجديد)"] 
-                    : ["East Branch (فرع الشرق)"]
-                )
+                branches: [p.formatted_address || "Main Branch"]
               };
             });
             return NextResponse.json({ results });

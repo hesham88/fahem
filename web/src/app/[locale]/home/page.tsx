@@ -1060,6 +1060,17 @@ export default function Home() {
         sender: "user",
         text: onboardingSchool ? onboardingSchool : (isArabic ? "تخطي" : "Skipped")
       });
+
+      if (onboardingUserType === "teacher") {
+        list.push({
+          sender: "fahem",
+          text: isArabic
+            ? "رائع جداً! لقد أكملنا البيانات الأساسية. الآن، اختر صورتك الرمزية المفضلة لملفك الشخصي من المكتبة المتنوعة أدناه:"
+            : "Excellent! We have captured your core info. Now, select your preferred avatar from our diverse library below to complete onboarding:"
+        });
+        return list;
+      }
+
       list.push({
         sender: "fahem",
         text: isArabic ? "كم عدد أطفالك بشكل عام؟ 👪" : "How many children do you have in general? 👪"
@@ -1352,7 +1363,7 @@ export default function Home() {
         { sender: "user", text: schoolName ? schoolName : (language === "ar" ? "تخطي" : "Skipped") }
       ]);
 
-      if (onboardingUserType === "student") {
+      if (onboardingUserType === "student" || onboardingUserType === "teacher") {
         setOnboardingMessages(prev => [
           ...prev,
           { 
@@ -1362,9 +1373,9 @@ export default function Home() {
               : "Excellent! We have captured your core info. Now, select your preferred avatar from our diverse library below to complete onboarding:"
           }
         ]);
-        setOnboardingStep(7); // Student goes to avatar selection
+        setOnboardingStep(7); // Student or Teacher goes to avatar selection
       } else {
-        // Teacher or Parent children count prompt (Item 7)
+        // Parent children count prompt (Item 7)
         setOnboardingMessages(prev => [
           ...prev,
           { 
