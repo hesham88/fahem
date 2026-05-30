@@ -773,43 +773,48 @@ export default function Home() {
     { sender: "fahem", text: "To begin, what is your role on our platform today? Select from the cards below:" }
   ]);
 
-  // Handle Dynamic Translation for Onboarding
-  useEffect(() => {
-    setOnboardingMessages([
-      { sender: "fahem", text: language === "ar" 
-        ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية." 
-        : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps." },
-      { sender: "fahem", text: language === "ar" 
-        ? "في البداية، ما هو دورك في منصتنا اليوم؟ اختر من البطاقات أدناه:" 
-        : "To begin, what is your role on our platform today? Select from the cards below:" }
-    ]);
-  }, [language]);
-
-  // Smooth scroll to the latest message during onboarding without scroll-fighting
-  useEffect(() => {
-    const scrollContainer = onboardingScrollContainerRef.current;
-    if (scrollContainer) {
-      // Instant scroll lock
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      // Smooth layout transition adjustment
-      const timer = setTimeout(() => {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: "smooth"
-        });
-      }, 50);
-      return () => clearTimeout(timer);
+  // Country Localizer Helper
+  const getLocalizedCountryName = (country: string, isArabic: boolean) => {
+    switch (country) {
+      case "Egypt":
+        return isArabic ? "مصر 🇪🇬" : "Egypt 🇪🇬";
+      case "Saudi Arabia":
+        return isArabic ? "المملكة العربية السعودية 🇸🇦" : "Saudi Arabia 🇸🇦";
+      case "UAE":
+        return isArabic ? "الإمارات العربية المتحدة 🇦🇪" : "UAE 🇦🇪";
+      case "Qatar":
+        return isArabic ? "قطر 🇶🇦" : "Qatar 🇶🇦";
+      case "Kuwait":
+        return isArabic ? "الكويت 🇰🇼" : "Kuwait 🇰🇼";
+      case "Oman":
+        return isArabic ? "عمان 🇴🇲" : "Oman 🇴🇲";
+      case "Jordan":
+        return isArabic ? "الأردن 🇯🇴" : "Jordan 🇯🇴";
+      case "USA":
+        return isArabic ? "الولايات المتحدة الأمريكية 🇺🇸" : "USA 🇺🇸";
+      case "UK":
+        return isArabic ? "المملكة المتحدة 🇬🇧" : "UK 🇬🇧";
+      case "Other":
+        return isArabic ? "بلد آخر 🌍" : "Other Country 🌍";
+      default:
+        return country;
     }
-  }, [onboardingMessages, onboardingStep]);
+  };
 
   // Grade Suggestion Helper
   const getGradeSuggestion = (ageStr: string, country: string, isArabic: boolean) => {
     const age = parseInt(ageStr);
     if (isNaN(age) || age <= 0) {
-      return isArabic ? "متعلم مدى الحياة" : "Lifelong Learner";
+      return isArabic ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠";
+    }
+    if (age < 4) {
+      return isArabic ? "مرحلة الحضانة 👶" : "Preschool / Toddler 👶";
+    }
+    if (age === 4 || age === 5) {
+      return isArabic ? "مرحلة الروضة / التمهيدي 🧸" : "Kindergarten / Preschool 🧸";
     }
     if (age >= 18) {
-      return isArabic ? "طالب جامعي / متعلم مدى الحياة" : "University Student / Lifelong Learner";
+      return isArabic ? "طالب جامعي / متعلم مدى الحياة 🎓" : "University Student / Lifelong Learner 🎓";
     }
     
     const egyptGradesAr: Record<number, string> = {
@@ -869,6 +874,242 @@ export default function Home() {
       return standardGradesEn[age] || `Grade ${age - 5}`;
     }
   };
+
+  // Reconstruct onboarding messages history for seamless translation without losing progress
+  const getOnboardingHistory = (isArabic: boolean) => {
+    const list: Array<{ sender: "fahem" | "user"; text: string }> = [];
+
+    // Welcome messages (Step 0)
+    list.push({
+      sender: "fahem",
+      text: isArabic
+        ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية."
+        : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps."
+    });
+    list.push({
+      sender: "fahem",
+      text: isArabic
+        ? "في البداية، ما هو دورك في منصتنا اليوم؟ اختر من البطاقات أدناه:"
+        : "To begin, what is your role on our platform today? Select from the cards below:"
+    });
+
+    if (onboardingStep === 0) return list;
+
+    // Step 1: User chose user type
+    const roleText = onboardingUserType === "student" ? (isArabic ? "طالب" : "Student") :
+                     onboardingUserType === "teacher" ? (isArabic ? "معلم" : "Teacher") :
+                     onboardingUserType === "parent" ? (isArabic ? "ولي أمر" : "Parent") :
+                     (isArabic ? "مشرف" : "Admin");
+    list.push({ sender: "user", text: roleText });
+    list.push({
+      sender: "fahem",
+      text: isArabic ? "مرحباً بك! ما هو اسمك الكامل؟ 👋" : "Excellent! What is your full name? 👋"
+    });
+
+    if (onboardingStep === 1) return list;
+
+    // Step 8: User typed full name, now asking for Username
+    list.push({ sender: "user", text: onboardingName });
+    list.push({
+      sender: "fahem",
+      text: isArabic
+        ? `سعدت بلقائك يا ${onboardingName}! 🌟 يرجى اختيار اسم مستخدم (Username) فريد لحسابك. سيتم استخدامه في رابط ملفك الشخصي بدلاً من الأرقام:`
+        : `Nice to meet you, ${onboardingName}! 🌟 Please choose a unique username for your account. This will be used in your profile URL instead of numbers:`
+    });
+
+    if (onboardingStep === 8) return list;
+
+    // Step 2/3: User chose username
+    list.push({ sender: "user", text: `@${onboardingUsername}` });
+
+    if (onboardingUserType === "admin") {
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? "رائع جداً! بصفتك مشرفاً، سننتقل الآن مباشرةً لاختيار صورتك الرمزية (الرمز التعبيري) لإتمام الإعداد:"
+          : "Awesome! As an Admin, we will now skip directly to choosing your profile avatar to finish:"
+      });
+      return list;
+    }
+
+    if (onboardingUserType === "student") {
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? `رائع جداً! اسم المستخدم @${onboardingUsername} متاح لحسابك. كم عمرك الآن؟ 🎂`
+          : `Awesome! Username @${onboardingUsername} is available. How old are you? 🎂`
+      });
+
+      if (onboardingStep === 2) return list;
+
+      // User typed age
+      list.push({
+        sender: "user",
+        text: isArabic ? `عمري ${onboardingAge} عاماً` : `I am ${onboardingAge} years old`
+      });
+      list.push({
+        sender: "fahem",
+        text: isArabic ? `رائع! ما هي بلد إقامتك؟ 🌍` : `Great! What is your country of residence? 🌍`
+      });
+
+      if (onboardingStep === 3) return list;
+
+      // User selected country
+      const localizedCountry = getLocalizedCountryName(onboardingCountry, isArabic);
+      list.push({
+        sender: "user",
+        text: isArabic ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}`
+      });
+
+      const proposedGradeText = getGradeSuggestion(onboardingAge, onboardingCountry, isArabic);
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? `بناءً على عمرك (${onboardingAge} سنة) وإقامتك في (${localizedCountry})، نقترح عليك المسار الدراسي: **${proposedGradeText}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
+          : `Based on your age of ${onboardingAge} and residing in ${localizedCountry}, we recommend: **${proposedGradeText}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`
+      });
+
+      if (onboardingStep === 4) return list;
+
+      // User chose grade option
+      let choiceText = "";
+      if (onboardingGradeOption === "recommended") {
+        choiceText = proposedGradeText;
+      } else if (onboardingGradeOption === "lifelong") {
+        choiceText = isArabic ? "متعلم مدى الحياة" : "Lifelong Learner";
+      } else if (onboardingGradeOption === "skip") {
+        choiceText = isArabic ? "تخطي هذه الخطوة" : "Skip Step";
+      } else {
+        choiceText = `${isArabic ? "صف مخصص:" : "Custom Grade:"} ${onboardingCustomGrade}`;
+      }
+      list.push({ sender: "user", text: choiceText });
+
+      const ageVal = parseInt(onboardingAge) || 0;
+      if (ageVal < 13) {
+        list.push({
+          sender: "fahem",
+          text: isArabic
+            ? "تنبيه الأمان والرقابة الأبوية 🛡️: بما أن عمرك أقل من 13 سنة، فإننا نطبق معايير الخصوصية لحماية الأطفال. يرجى كتابة البريد الإلكتروني لولي أمرك ليقوم بالموافقة على تفعيل حسابك من لوحته الخاصة:"
+            : "Safety & Parental Consent Notice 🛡️: Since you are under 13, standard age limit protections apply. Please enter your parent's email address so they can approve your account from their portal:"
+        });
+
+        if (onboardingStep === 6) return list;
+
+        // User typed parent email
+        list.push({ sender: "user", text: onboardingParentEmail });
+        list.push({
+          sender: "fahem",
+          text: isArabic
+            ? "شكراً لك! تم تسجيل البريد الأبوي للموافقة الأمنية. الآن، ما هو اسم المدرسة أو الجامعة التي تدرس بها حالياً؟ 🏫 (اكتب للبحث)"
+            : "Thank you! Parental email registered for approval check. Now, what is the name of the school or university where you study? 🏫 (Type to search)"
+        });
+      } else {
+        list.push({
+          sender: "fahem",
+          text: isArabic
+            ? "رائع جداً! ما هو اسم المدرسة أو الجامعة التي تدرس بها حالياً؟ 🏫 (اكتب للبحث في الخريطة)"
+            : "Awesome! What is the name of the school or university where you currently study? 🏫 (Type to search)"
+        });
+      }
+
+      if (onboardingStep === 5) return list;
+
+      // User chose school
+      list.push({
+        sender: "user",
+        text: onboardingSchool ? onboardingSchool : (isArabic ? "تخطي" : "Skipped")
+      });
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? "رائع جداً! لقد أكملنا البيانات الأساسية. الآن، اختر صورتك الرمزية المفضلة لملفك الشخصي من المكتبة المتنوعة أدناه:"
+          : "Excellent! We have captured your core info. Now, select your preferred avatar from our diverse library below to complete onboarding:"
+      });
+
+      return list;
+
+    } else {
+      // Teacher or Parent flow
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? `رائع جداً! اسم المستخدم @${onboardingUsername} متاح لحسابك. ما هي بلد إقامتك؟ 🌍`
+          : `Awesome! Username @${onboardingUsername} is available. What is your country of residence? 🌍`
+      });
+
+      if (onboardingStep === 3) return list;
+
+      // User selected country
+      const localizedCountry = getLocalizedCountryName(onboardingCountry, isArabic);
+      list.push({
+        sender: "user",
+        text: isArabic ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}`
+      });
+
+      const nextMsg = onboardingUserType === "teacher"
+        ? (isArabic ? "ممتاز! ما هو اسم المدرسة أو المؤسسة التعليمية التي تعمل بها حالياً؟ 🏫 (اكتب للبحث)" : "Excellent! What is the name of the school or educational institution where you work? 🏫 (Type to search)")
+        : (isArabic ? "ممتاز! ما هو اسم مدرسة أو جامعة أطفالك؟ 🏫 (اكتب للبحث)" : "Excellent! What is the name of your children's school or university? 🏫 (Type to search)");
+      list.push({ sender: "fahem", text: nextMsg });
+
+      if (onboardingStep === 5) return list;
+
+      // User chose school
+      list.push({
+        sender: "user",
+        text: onboardingSchool ? onboardingSchool : (isArabic ? "تخطي" : "Skipped")
+      });
+      list.push({
+        sender: "fahem",
+        text: isArabic ? "كم عدد أطفالك بشكل عام؟ 👪" : "How many children do you have in general? 👪"
+      });
+
+      if (onboardingStep === 10) return list;
+
+      // User typed children count
+      list.push({ sender: "user", text: onboardingChildrenCount });
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? "منهم، كم عدد الأطفال الذين يدرسون حالياً في المدارس أو الجامعات؟ 🏫"
+          : "Out of those, how many are studying in schools or universities? 🏫"
+      });
+
+      if (onboardingStep === 11) return list;
+
+      // User typed children in school count
+      list.push({ sender: "user", text: onboardingChildrenInSchool });
+      list.push({
+        sender: "fahem",
+        text: isArabic
+          ? "رائع جداً! لقد أكملنا كل التفاصيل الخاصة بك. أخيراً، اختر صورتك الرمزية المفضلة والحديثة من المكتبة الفاخرة أدناه:"
+          : "Wonderful! We have gathered all details. Finally, select your favorite, modern avatar from our premium library below to complete onboarding:"
+      });
+
+      return list;
+    }
+  };
+
+  // Handle Dynamic Translation for Onboarding
+  useEffect(() => {
+    setOnboardingMessages(getOnboardingHistory(language === "ar"));
+  }, [language]);
+
+  // Smooth scroll to the latest message during onboarding without scroll-fighting
+  useEffect(() => {
+    const scrollContainer = onboardingScrollContainerRef.current;
+    if (scrollContainer) {
+      // Instant scroll lock
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      // Smooth layout transition adjustment
+      const timer = setTimeout(() => {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: "smooth"
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [onboardingMessages, onboardingStep]);
 
   // Google Places API integration helper
   const fetchPlaces = async (query: string) => {
@@ -1003,16 +1244,18 @@ export default function Home() {
     } else if (onboardingStep === 3) { // Country step
       if (!onboardingCountry.trim()) return;
       
+      const localizedCountry = getLocalizedCountryName(onboardingCountry, language === "ar");
+
       if (onboardingUserType === "student") {
         const proposedGradeText = getGradeSuggestion(onboardingAge, onboardingCountry, language === "ar");
         setOnboardingMessages(prev => [
           ...prev,
-          { sender: "user", text: language === "ar" ? `أقيم في ${onboardingCountry}` : `I live in ${onboardingCountry}` },
+          { sender: "user", text: language === "ar" ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}` },
           { 
             sender: "fahem", 
             text: language === "ar"
-              ? `بناءً على عمرك (${onboardingAge} سنة) وإقامتك في (${onboardingCountry})، نقترح عليك المسار الدراسي: **${proposedGradeText}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
-              : `Based on your age of ${onboardingAge} and residing in ${onboardingCountry}, we recommend: **${proposedGradeText}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`
+              ? `بناءً على عمرك (${onboardingAge} سنة) وإقامتك في (${localizedCountry})، نقترح عليك المسار الدراسي: **${proposedGradeText}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
+              : `Based on your age of ${onboardingAge} and residing in ${localizedCountry}, we recommend: **${proposedGradeText}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`
           }
         ]);
         setOnboardingStep(4);
@@ -1024,7 +1267,7 @@ export default function Home() {
         
         setOnboardingMessages(prev => [
           ...prev,
-          { sender: "user", text: language === "ar" ? `أقيم في ${onboardingCountry}` : `I live in ${onboardingCountry}` },
+          { sender: "user", text: language === "ar" ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}` },
           { sender: "fahem", text: nextMsg }
         ]);
         setOnboardingStep(5);
