@@ -325,8 +325,31 @@ Here are the fields to collect in order, along with how to recognize if they are
    - If they provide an invalid or unrealistic age (e.g., 0, 1, 2, or >120), politely ask for a realistic age.
    - Special Rule: If Role is "student" and Age is under 13 (< 13), you MUST ask for their parent's email address and save it in 'parentEmail'.
 5. **Country**: The user's country (e.g., Egypt, Saudi Arabia, etc.).
-6. **Educational Grade Level** (Only if role is "student"):
-   - Recommend a standard school grade based on their age and country, or let them specify a custom grade or "lifelong learning" or skip.
+6. **Educational Grade Level** (Only if role is 'student'):
+   - How to recognize if COLLECTED: The user has chosen a grade level (either by accepting the recommendation via 'Accept recommended grade', 'Accept', 'قبول المسار المقترح', or typing a custom grade, selecting lifelong learning, or skipping).
+   - Action: If role is 'student', you MUST recommend a standard school grade based on their age and country of residence using the **Exact Grade Prediction Formula** below:
+     - **Exact Grade Prediction Formula**:
+       - If Age < 4: Recommended Grade is 'Preschool / Toddler 👶' (or 'مرحلة الحضانة 👶' in Arabic)
+       - If Age is 4 or 5: Recommended Grade is 'Kindergarten / Preschool 🧸' (or 'مرحلة الروضة / التمهيدي 🧸' in Arabic)
+       - If Age >= 18: Recommended Grade is 'University Student / Lifelong Learner 🎓' (or 'طالب جامعي / متعلم مدى الحياة 🎓' in Arabic)
+       - If Age is between 6 and 17 inclusive:
+         - Calculate Grade Number as Age - 5.
+         - If Country is 'Egypt' (or 'مصر'):
+           - If Age is 6 to 11: Recommended Grade is 'الصف الأول الابتدائي' (for 6), 'الصف الثاني الابتدائي' (for 7), 'الصف الثالث الابتدائي' (for 8), 'الصف الرابع الابتدائي' (for 9), 'الصف الخامس الابتدائي' (for 10), 'الصف السادس الابتدائي' (for 11)
+           - If Age is 12 to 14: Recommended Grade is 'الصف الأول الإعدادي' (for 12), 'الصف الثاني الإعدادي' (for 13), 'الصف الثالث الإعدادي' (for 14)
+           - If Age is 15 to 17: Recommended Grade is 'الصف الأول الثانوي' (for 15), 'الصف الثاني الثانوي' (for 16), 'الصف الثالث الثانوي' (for 17)
+         - If Country is in the Gulf region (Saudi Arabia, UAE, Qatar, Kuwait, Oman) or other Arabic countries:
+           - If Age is 6 to 11: Recommended Grade is 'الصف الأول الابتدائي' (for 6), 'الصف الثاني الابتدائي' (for 7), 'الصف الثالث الابتدائي' (for 8), 'الصف الرابع الابتدائي' (for 9), 'الصف الخامس الابتدائي' (for 10), 'الصف السادس الابتدائي' (for 11)
+           - If Age is 12 to 14: Recommended Grade is 'الصف الأول المتوسط' (for 12), 'الصف الثاني المتوسط' (for 13), 'الصف الثالث المتوسط' (for 14)
+           - If Age is 15 to 17: Recommended Grade is 'الصف الأول الثانوي' (for 15), 'الصف الثاني الثانوي' (for 16), 'الصف الثالث الثانوي' (for 17)
+         - For all other countries:
+           - If Age is 6 to 11: Recommended Grade is 'Grade ' + Grade Number + ' (Primary)'
+           - If Age is 12 to 14: Recommended Grade is 'Grade ' + Grade Number + ' (Middle/Prep)'
+           - If Age is 15 to 17: Recommended Grade is 'Grade ' + Grade Number + ' (Secondary/High)'
+   - If the user says 'Accept recommended grade', 'Accept', or 'قبول المسار المقترح', or selects the recommendation chip, you MUST interpret this as accepting the Recommended Grade computed from the formula above, and save that exact Recommended Grade string in the 'grade' parameter of 'saveUserProfile'.
+   - If they specify a custom grade, save their custom grade string in the 'grade' parameter.
+   - If they select 'lifelong learning' or 'متعلم مدى الحياة', save 'Lifelong Learner' or 'متعلم مدى الحياة' in the 'grade' parameter.
+   - If they choose to skip, save 'Skipped' in the 'grade' parameter.
 7. **School Name** (Only if role is "student" or "teacher"):
    - Ask for their school name. They can type it or search. They can specify "Home school" / "None" / "Skip".
 8. **Children Count & Children in School Count** (Only if role is "parent" or "teacher"):
@@ -346,7 +369,7 @@ CRITICAL BEHAVIORAL PROTOCOLS:
 
 METADATA STATE SYNCHRONIZATION:
 At the very end of EVERY single assistant response, you MUST append a synchronization metadata tag on a new line, containing a JSON payload of the current onboarding state:
-[METADATA] state: {"step": "<current_step_name>", "role": "<collected_role_or_empty>", "country": "<collected_country_or_empty>", "name": "<collected_name_or_empty>", "username": "<collected_username_or_empty>"}
+[METADATA] state: {"step": "<current_step_name>", "role": "<collected_role_or_empty>", "country": "<collected_country_or_empty>", "name": "<collected_name_or_empty>", "username": "<collected_username_or_empty>", "age": "<collected_age_or_empty>", "grade": "<collected_grade_or_empty>"}
 
 Replace the placeholders with the actual values collected so far (or empty string if not yet collected).
 The "step" field must be one of the following exact string values representing the field you are currently asking for:
@@ -364,9 +387,9 @@ The "step" field must be one of the following exact string values representing t
 - "complete" (if onboarding is completed successfully)
 
 Examples:
-- [METADATA] state: {"step": "name", "role": "student", "country": "", "name": "", "username": ""}
-- [METADATA] state: {"step": "country", "role": "student", "country": "", "name": "Hesham", "username": "hesham123"}
-- [METADATA] state: {"step": "avatar", "role": "student", "country": "Egypt", "name": "Hesham", "username": "hesham123"}
+- [METADATA] state: {"step": "name", "role": "student", "country": "", "name": "", "username": "", "age": "", "grade": ""}
+- [METADATA] state: {"step": "country", "role": "student", "country": "", "name": "Hesham", "username": "hesham123", "age": "15", "grade": ""}
+- [METADATA] state: {"step": "avatar", "role": "student", "country": "Egypt", "name": "Hesham", "username": "hesham123", "age": "15", "grade": "الصف الأول الثانوي"}
 `;
 
             // Call Gemini

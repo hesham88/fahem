@@ -880,3 +880,15 @@ the recaptha icon and the floating compainon icon are overlapping in english and
 **Response Summary**:
 Resolved the visual collision and layout overlap of the Google reCAPTCHA Enterprise badge container with the custom glassmorphic study companion icon and sidebar navigation menus. Appended a global CSS rule in `web/src/app/globals.css` targeting `.grecaptcha-badge` using visibility and opacity rules to completely hide the badge container without affecting client-side token generation or server-side risk assessments. Successfully verified error-free Next.js production compilation and updated all project planning, task tracking, and walkthrough memories to Version 71.0.
 
+
+
+---
+
+## Turn 74
+**Timestamp**: 2026-05-31T07:40:00.548048  
+**User Prompt**:
+```text
+remove Skip Setup button from onboarding and put our language picker instead
+```
+**Response Summary**:
+Removed the Skip Setup button from the conversational onboarding dialog header and replaced it with a premium glassmorphic, multi-language select picker.

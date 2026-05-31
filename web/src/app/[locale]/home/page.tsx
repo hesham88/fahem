@@ -471,6 +471,7 @@ export default function Home() {
   const [onboardingVerifyingCode, setOnboardingVerifyingCode] = useState(false);
   const [onboardingRecaptchaVerifier, setOnboardingRecaptchaVerifier] = useState<any>(null);
   const [onboardingPhoneError, setOnboardingPhoneError] = useState("");
+  const [onboardingTestMode, setOnboardingTestMode] = useState(false);
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
   const [onboardingCountry, setOnboardingCountry] = useState("");
@@ -1251,6 +1252,14 @@ export default function Home() {
       if (!container) return null;
       container.innerHTML = '<div id="onboarding-recaptcha-widget"></div>';
 
+      // Respect the user's test mode state on localhost/127.0.0.1
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        auth.settings.appVerificationDisabledForTesting = onboardingTestMode;
+        console.log("[Firebase Auth] App verification disabled for testing on localhost?", onboardingTestMode);
+      } else {
+        auth.settings.appVerificationDisabledForTesting = false;
+      }
+
       const verifier = new RecaptchaVerifier(auth, "onboarding-recaptcha-widget", {
         size: "normal",
         callback: (response: any) => {
@@ -1475,6 +1484,8 @@ export default function Home() {
                 if (stateObj.country) setOnboardingCountry(stateObj.country);
                 if (stateObj.name) setOnboardingName(stateObj.name);
                 if (stateObj.username) setOnboardingUsername(stateObj.username);
+                if (stateObj.age) setOnboardingAge(stateObj.age.toString());
+                if (stateObj.grade) setOnboardingCustomGrade(stateObj.grade);
               }
             } catch (err) {
               console.error("Error parsing metadata state:", err);
@@ -1536,6 +1547,8 @@ export default function Home() {
               if (stateObj.country) setOnboardingCountry(stateObj.country);
               if (stateObj.name) setOnboardingName(stateObj.name);
               if (stateObj.username) setOnboardingUsername(stateObj.username);
+              if (stateObj.age) setOnboardingAge(stateObj.age.toString());
+              if (stateObj.grade) setOnboardingCustomGrade(stateObj.grade);
             }
           } catch (err) {
             console.error("Error parsing metadata state:", err);
@@ -1937,6 +1950,8 @@ export default function Home() {
                         let lastCountry = "";
                         let lastName = "";
                         let lastUsername = "";
+                        let lastAge = "";
+                        let lastGrade = "";
 
                         for (const m of assistantMsgs) {
                           const lines = (m.content || "").split("\n");
@@ -1952,6 +1967,8 @@ export default function Home() {
                                   if (stateObj.country) lastCountry = stateObj.country;
                                   if (stateObj.name) lastName = stateObj.name;
                                   if (stateObj.username) lastUsername = stateObj.username;
+                                  if (stateObj.age) lastAge = stateObj.age.toString();
+                                  if (stateObj.grade) lastGrade = stateObj.grade;
                                 }
                               } catch (e) {
                                 console.error("Error parsing historical metadata:", e);
@@ -1965,6 +1982,8 @@ export default function Home() {
                         setOnboardingCountry(lastCountry);
                         setOnboardingName(lastName);
                         setOnboardingUsername(lastUsername);
+                        setOnboardingAge(lastAge);
+                        setOnboardingCustomGrade(lastGrade);
                       }
                     }
                   })
@@ -2487,12 +2506,20 @@ export default function Home() {
             { label: language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴", value: "Jordan" }
           ];
 
-        case "grade":
+        case "grade": {
+          const isArabic = language === "ar";
+          const proposed = getGradeSuggestion(onboardingAge, onboardingCountry, isArabic);
           return [
-            { label: language === "ar" ? "قبول المسار المقترح 👍" : "Accept Recommendation 👍", value: "Accept recommended grade" },
-            { label: language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠", value: "Lifelong Learner" },
-            { label: language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
+            { 
+              label: isArabic 
+                ? `قبول المقترح: ${proposed} 👍` 
+                : `Accept Recommendation: ${proposed} 👍`, 
+              value: `Accept recommended grade: ${proposed}` 
+            },
+            { label: isArabic ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠", value: "Lifelong Learner" },
+            { label: isArabic ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
           ];
+        }
 
         case "school":
           return [
@@ -2677,19 +2704,43 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            {!["phone", "role", "name", "username", "age"].includes(currentOnboardingStep?.trim().toLowerCase()) && (
-              <button
-                onClick={() => skipOnboarding()}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              background: "rgba(16, 107, 163, 0.06)",
+              border: "1px solid rgba(16, 107, 163, 0.15)",
+              padding: "6px 14px",
+              borderRadius: "20px",
+              color: "var(--primary)",
+              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.02)",
+              transition: "all 0.2s"
+            }}>
+              <FiGlobe style={{ fontSize: "0.95rem" }} />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
                 style={{
-                  fontSize: "0.82rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)",
-                  padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--primary)",
+                  fontSize: "0.82rem",
+                  fontWeight: 700,
+                  outline: "none",
+                  cursor: "pointer",
+                  paddingRight: language === "ar" ? "0" : "4px",
+                  paddingLeft: language === "ar" ? "4px" : "0",
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.15)"; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
               >
-                {language === "ar" ? "تخطي الإعداد" : "Skip Setup"}
-              </button>
-            )}
+                <option value="en" style={{ color: "#111827", background: "#ffffff" }}>English</option>
+                <option value="ar" style={{ color: "#111827", background: "#ffffff" }}>العربية</option>
+                <option value="es" style={{ color: "#111827", background: "#ffffff" }}>Español</option>
+                <option value="fr" style={{ color: "#111827", background: "#ffffff" }}>Français</option>
+                <option value="de" style={{ color: "#111827", background: "#ffffff" }}>Deutsch</option>
+                <option value="zh" style={{ color: "#111827", background: "#ffffff" }}>中文</option>
+                <option value="it" style={{ color: "#111827", background: "#ffffff" }}>Italiano</option>
+              </select>
+            </div>
           </div>
 
           {/* Conversational Scroll Log */}
@@ -2882,6 +2933,68 @@ export default function Home() {
                 )}
 
                 <div id="onboarding-recaptcha-container" style={{ margin: "0.2rem 0", display: "flex", justifyContent: "center" }}></div>
+
+                {/* Developer Test Mode Toggle (only visible on localhost) */}
+                {(typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) && (
+                  <div style={{
+                    margin: "0.5rem 0",
+                    padding: "0.85rem",
+                    borderRadius: "14px",
+                    background: "rgba(16, 107, 163, 0.05)",
+                    border: "1px dashed rgba(16, 107, 163, 0.25)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--primary)", display: "flex", alignItems: "center", gap: "5px" }}>
+                        🛠️ {language === "ar" ? "وضع الاختبار للمطورين" : "Developer Test Mode"}
+                      </span>
+                      <label style={{ position: "relative", display: "inline-block", width: "44px", height: "22px" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={onboardingTestMode}
+                          onChange={(e) => {
+                            setOnboardingTestMode(e.target.checked);
+                            // Clear any current error when toggling
+                            setOnboardingPhoneError("");
+                          }}
+                          style={{ opacity: 0, width: 0, height: 0 }} 
+                        />
+                        <span style={{
+                          position: "absolute",
+                          cursor: "pointer",
+                          top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundColor: onboardingTestMode ? "var(--primary)" : "rgba(16, 107, 163, 0.15)",
+                          transition: "0.3s",
+                          borderRadius: "22px"
+                        }}>
+                          <span style={{
+                            position: "absolute",
+                            content: "''",
+                            height: "16px", width: "16px",
+                            left: onboardingTestMode ? "24px" : "3px",
+                            bottom: "3px",
+                            backgroundColor: "white",
+                            transition: "0.3s",
+                            borderRadius: "50%"
+                          }} />
+                        </span>
+                      </label>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.72rem", color: "#6a7c88", lineHeight: "1.3" }}>
+                      {onboardingTestMode ? (
+                        language === "ar" 
+                          ? "💡 مفعّل: لتخطي التحقق البشري (reCAPTCHA). استخدم رقم هاتف وهمي مسجل في كونسول Firebase (مثال: 3434-555-650-1+) مع الرمز 654321."
+                          : "💡 Enabled: Bypasses reCAPTCHA. Must use a whitelisted fictional phone number from your Firebase Console (e.g., +16505553434) with mock code 654321."
+                      ) : (
+                        language === "ar"
+                          ? "💡 معطّل: لتجربة إرسال رسائل SMS حقيقية إلى هاتفك. يتطلب حل كابتشا reCAPTCHA."
+                          : "💡 Disabled: Sends real SMS verification codes to your physical phone. Requires solving the reCAPTCHA below."
+                      )}
+                    </p>
+                  </div>
+                )}
 
                 {onboardingPhoneError && (
                   <div style={{
