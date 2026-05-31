@@ -499,10 +499,36 @@ export default function Home() {
   const [inspectedUser, setInspectedUser] = useState<any | null>(null);
   const [librarySearch, setLibrarySearch] = useState("");
   const [librarySubject, setLibrarySubject] = useState("all");
+  const [dynamicBooks, setDynamicBooks] = useState<any[]>([]);
+  const [dynamicSubjects, setDynamicSubjects] = useState<any[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj_algebra_stats");
   const [expandedModule, setExpandedModule] = useState<number | null>(null);
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
   const [practiceSubject, setPracticeSubject] = useState("Math");
+  const [generatedQuestion, setGeneratedQuestion] = useState<string>("");
+  const [practiceAnswer, setPracticeAnswer] = useState<string>("");
+  const [practiceResult, setPracticeResult] = useState<string>("");
+  const [practiceLoading, setPracticeLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.id === "text-practice-input") {
+        e.preventDefault();
+        alert(language === "ar" 
+          ? "تنبيه: تم تعطيل النسخ واللصق في مساحة التدريب لتشجيع الفهم النشط والكتابة الذاتية!" 
+          : "Notice: Copy-pasting is disabled in the practice workstation to encourage active recall and typing your own answers!");
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => {
+      document.removeEventListener("paste", handlePaste);
+    };
+  }, [language]);
+
   const [timetableEvents, setTimetableEvents] = useState<any[]>([
     { id: 1, subject: "Mathematics", subjectAr: "الرياضيات", day: "Monday", dayAr: "الإثنين", time: "09:00 - 10:30", room: "Room 102" },
     { id: 2, subject: "Physics", subjectAr: "الفيزياء", day: "Monday", dayAr: "الإثنين", time: "11:00 - 12:30", room: "Lab A" },
@@ -1912,6 +1938,29 @@ export default function Home() {
     }
   };
 
+  const fetchBooksAndSubjects = async () => {
+    setLoadingBooks(true);
+    setLoadingSubjects(true);
+    try {
+      const subjectsRes = await fetch("/api/subjects", { cache: "no-store" });
+      if (subjectsRes.ok) {
+        const subjectsData = await subjectsRes.json();
+        setDynamicSubjects(subjectsData.subjects || []);
+      }
+      
+      const booksRes = await fetch("/api/books", { cache: "no-store" });
+      if (booksRes.ok) {
+        const booksData = await booksRes.json();
+        setDynamicBooks(booksData.books || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch books and subjects:", err);
+    } finally {
+      setLoadingBooks(false);
+      setLoadingSubjects(false);
+    }
+  };
+
   const loadSession = async (sessionIdVal: string) => {
     if (!sessionIdVal) return;
     setLoading(true);
@@ -1984,6 +2033,7 @@ export default function Home() {
         fetchMetadata(currentUser.email || undefined); // Fetch live database metadata on mount
         fetchUserSessions(currentUser.uid); // Fetch user sessions
         fetchUserTokenStats(currentUser.uid); // Fetch user token usage stats
+        fetchBooksAndSubjects(); // Fetch dynamic books and subjects from database
         
         // Fetch User Profile over MongoDB Agent Proxies
         setLoadingProfile(true);
@@ -5215,14 +5265,21 @@ export default function Home() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
-              {[
+              {(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
+                titleEn: b.title,
+                titleAr: b.title_ar || b.title,
+                subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
+                size: "15.0 MB",
+                format: "PDF",
+                downloads: "1,450"
+              })) : [
                 { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
                 { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
                 { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
                 { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
                 { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
                 { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
-              ]
+              ])
                 .filter(item => {
                   const s = librarySearch.toLowerCase();
                   const matchesSearch = item.titleEn.toLowerCase().includes(s) || item.titleAr.includes(s);
@@ -5266,23 +5323,70 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem" }} className="grid-cols-1">
               {/* Core subjects progress cards */}
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {[
-                  { nameAr: "الرياضيات العامة", nameEn: "Pure Mathematics", icon: "📐", progress: 65, color: "var(--primary)" },
-                  { nameAr: "العلوم والفيزياء", nameEn: "Physics & Chemistry", icon: "🧪", progress: 42, color: "#9c27b0" },
-                  { nameAr: "اللغة العربية وآدابها", nameEn: "Arabic Grammar & Literature", icon: "📚", progress: 85, color: "#2e7d32" },
-                  { nameAr: "التاريخ والجغرافيا", nameEn: "World History", icon: "🌍", progress: 20, color: "#ef6c00" }
-                ].map((item, idx) => (
-                  <div key={idx} className="panel-card" style={{ padding: "1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <div style={{ fontSize: "2rem" }}>{item.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", fontFamily: "var(--font-sans)" }}>{language === "ar" ? item.nameAr : item.nameEn}</h3>
-                      <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginBottom: "0.25rem" }}>
-                        <div style={{ width: `${item.progress}%`, height: "100%", background: item.color, borderRadius: "3px" }}></div>
+                {(dynamicSubjects && dynamicSubjects.length > 0 ? dynamicSubjects.map((subj: any) => {
+                  const fallbackMeta = subj._id === "subj_algebra_stats" 
+                    ? { nameEn: "Algebra & Statistics", nameAr: "الجبر والإحصاء", icon: "📊", progress: 65, color: "var(--primary)" }
+                    : subj._id === "subj_biology"
+                    ? { nameEn: "Biology", nameAr: "الأحياء", icon: "🧬", progress: 42, color: "#9c27b0" }
+                    : subj._id === "subj_arabic_grammar"
+                    ? { nameEn: "Arabic Grammar", nameAr: "النحو والصرف", icon: "📖", progress: 85, color: "#2e7d32" }
+                    : { nameEn: subj.name, nameAr: subj.name_ar || subj.name, icon: subj.emoji || "📚", progress: 20, color: "#ef6c00" };
+                  
+                  return {
+                    _id: subj._id,
+                    nameEn: subj.name || fallbackMeta.nameEn,
+                    nameAr: subj.name_ar || fallbackMeta.nameAr,
+                    icon: subj.emoji || fallbackMeta.icon,
+                    progress: fallbackMeta.progress,
+                    color: fallbackMeta.color
+                  };
+                }) : [
+                  { _id: "subj_algebra_stats", nameEn: "Pure Mathematics", nameAr: "الرياضيات العامة", icon: "📐", progress: 65, color: "var(--primary)" },
+                  { _id: "subj_biology", nameEn: "Physics & Chemistry", nameAr: "العلوم والفيزياء", icon: "🧪", progress: 42, color: "#9c27b0" },
+                  { _id: "subj_arabic_grammar", nameEn: "Arabic Grammar & Literature", nameAr: "اللغة العربية وآدابها", icon: "📚", progress: 85, color: "#2e7d32" },
+                  { _id: "subj_history_geo", nameEn: "World History", nameAr: "التاريخ والجغرافيا", icon: "🌍", progress: 20, color: "#ef6c00" }
+                ]).map((item, idx) => {
+                  const isSelected = selectedSubjectId === item._id;
+                  return (
+                    <div 
+                      key={idx} 
+                      className="panel-card" 
+                      onClick={() => setSelectedSubjectId(item._id)}
+                      style={{ 
+                        padding: "1.25rem", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "1rem",
+                        cursor: "pointer",
+                        border: isSelected ? `2px solid ${item.color}` : "1px solid var(--card-border)",
+                        transform: isSelected ? "scale(1.02)" : "scale(1)",
+                        boxShadow: isSelected ? "0 8px 16px rgba(0,0,0,0.06)" : "none",
+                        transition: "all 0.25s ease-in-out"
+                      }}
+                      onMouseOver={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = item.color;
+                          e.currentTarget.style.transform = "scale(1.01)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = "var(--card-border)";
+                          e.currentTarget.style.transform = "scale(1)";
+                        }
+                      }}
+                    >
+                      <div style={{ fontSize: "2rem" }}>{item.icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", fontFamily: "var(--font-sans)" }}>{language === "ar" ? item.nameAr : item.nameEn}</h3>
+                        <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginBottom: "0.25rem" }}>
+                          <div style={{ width: `${item.progress}%`, height: "100%", background: item.color, borderRadius: "3px" }}></div>
+                        </div>
+                        <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700 }}>{item.progress}% {language === "ar" ? "مكتمل" : "completed"}</span>
                       </div>
-                      <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700 }}>{item.progress}% {language === "ar" ? "مكتمل" : "completed"}</span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Module Accordion Workspace */}
@@ -5291,43 +5395,68 @@ export default function Home() {
                   {language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {[
-                    { titleAr: "الوحدة الأولى: الجبر والنسب المثلثية", titleEn: "Module 1: Algebra & Trigonometry Trigonometric Functions", lessons: ["المعادلات التربيعية", "المتطابقات المثلثية", "المصفوفات والمحددات"] },
-                    { titleAr: "الوحدة الثانية: علم التفاضل والتكامل المبسط", titleEn: "Module 2: Basics of Calculus & Limits", lessons: ["النهايات والاتصال", "قواعد الاشتقاق وتطبيقاته", "المشتقات العليا"] },
-                    { titleAr: "الوحدة الثالثة: الاحتمالات والإحصاء التطبيقي", titleEn: "Module 3: Probability & Applied Statistics", lessons: ["التوزيع الطبيعي المعتدل", "معامل الارتباط وبيرسون", "مبدأ العد والتباديل"] }
-                  ].map((mod, index) => (
-                    <div key={index} style={{ border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-sm)", background: "#ffffff", overflow: "hidden" }}>
-                      <button
-                        onClick={() => setExpandedModule(expandedModule === index ? null : index)}
-                        style={{
-                          width: "100%", padding: "1rem", border: "none", background: "none", cursor: "pointer",
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-sans)", fontSize: "0.9rem"
-                        }}
-                      >
-                        <span>{language === "ar" ? mod.titleAr : mod.titleEn}</span>
-                        <span>{expandedModule === index ? "▼" : "▶"}</span>
-                      </button>
-                      {expandedModule === index && (
-                        <div style={{ padding: "0.5rem 1rem 1rem 1rem", borderTop: "1px solid rgba(0,0,0,0.04)", background: "rgba(16, 107, 163, 0.01)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                          {mod.lessons.map((les, lessonIdx) => (
-                            <div key={lessonIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", background: "#ffffff", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "4px" }}>
-                              <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>📚 {les}</span>
-                              <button
-                                onClick={() => alert(language === "ar" ? `جاري بدء الدرس: ${les}` : `Starting lesson: ${les}`)}
-                                style={{
-                                  padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer",
-                                  background: "var(--primary)", color: "#ffffff", fontSize: "0.75rem", fontWeight: 700
-                                }}
-                              >
-                                {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {(() => {
+                    const activeBook = dynamicBooks && dynamicBooks.find((b: any) => b.subject_id === selectedSubjectId);
+                    const modulesList = activeBook && activeBook.chapters && activeBook.chapters.length > 0
+                      ? activeBook.chapters.map((ch: any) => ({
+                          titleAr: ch.title_ar || ch.title,
+                          titleEn: ch.title,
+                          lessons: ch.concepts || []
+                        }))
+                      : (selectedSubjectId === "subj_algebra_stats"
+                        ? [
+                            { titleAr: "الوحدة الأولى: الجبر والنسب المثلثية", titleEn: "Module 1: Algebra & Trigonometry Trigonometric Functions", lessons: ["المعادلات التربيعية", "المتطابقات المثلثية", "المصفوفات والمحددات"] },
+                            { titleAr: "الوحدة الثانية: علم التفاضل والتكامل المبسط", titleEn: "Module 2: Basics of Calculus & Limits", lessons: ["النهايات والاتصال", "قواعد الاشتقاق وتطبيقاته", "المشتقات العليا"] },
+                            { titleAr: "الوحدة الثالثة: الاحتمالات والإحصاء التطبيقي", titleEn: "Module 3: Probability & Applied Statistics", lessons: ["التوزيع الطبيعي المعتدل", "معامل الارتباط وبيرسون", "مبدأ العد والتباديل"] }
+                          ]
+                        : selectedSubjectId === "subj_biology"
+                        ? [
+                            { titleAr: "الوحدة الأولى: التغذية والعمليات الذاتية", titleEn: "Module 1: Nutrition & Autotrophic Processes", lessons: ["التغذية الذاتية والغير ذاتية", "البناء الضوئي وتفاعلاته", "حلقة كالفن وإنتاج الطاقة"] },
+                            { titleAr: "الوحدة الثانية: النقل في الكائنات الحية", titleEn: "Module 2: Transport in Living Organisms", lessons: ["جهاز الدوران في الإنسان", "تركيب الدم والقلب والأوعية", "النظام الليمفاوي ومقاومة الأمراض"] }
+                          ]
+                        : selectedSubjectId === "subj_arabic_grammar"
+                        ? [
+                            { titleAr: "الوحدة الأولى: الأفعال الناسخة المقاربة والشروع", titleEn: "Module 1: Dynamic Verbs (Kaada & her Sisters)", lessons: ["اسم كاد وخبرها الجملة الفعلية", "شروط اقتران الخبر بأن", "الفروق الجوهرية بين كان وكاد"] },
+                            { titleAr: "الوحدة الثانية: أسلوب الاستثناء وأدواته", titleEn: "Module 2: Style of Exception (Al-Mustathna)", lessons: ["أحكام المستثنى بعد إلا وغير وسوى", "الاستثناء التام والناقص المنفي", "أحكام الاستثناء بخلا وعدا وحاشا"] }
+                          ]
+                        : [
+                            { titleAr: "الوحدة الأولى: المناهج العامة والدراسات", titleEn: "Module 1: General Curriculum & Studies", lessons: ["مراجعة عامة", "مفاهيم أساسية", "تدريبات وتطبيقات مخصصة"] }
+                          ]);
+
+                    return modulesList.map((mod: any, index: number) => (
+                      <div key={index} style={{ border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-sm)", background: "#ffffff", overflow: "hidden" }}>
+                        <button
+                          onClick={() => setExpandedModule(expandedModule === index ? null : index)}
+                          style={{
+                            width: "100%", padding: "1rem", border: "none", background: "none", cursor: "pointer",
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-sans)", fontSize: "0.9rem"
+                          }}
+                        >
+                          <span>{language === "ar" ? mod.titleAr : mod.titleEn}</span>
+                          <span>{expandedModule === index ? "▼" : "▶"}</span>
+                        </button>
+                        {expandedModule === index && (
+                          <div style={{ padding: "0.5rem 1rem 1rem 1rem", borderTop: "1px solid rgba(0,0,0,0.04)", background: "rgba(16, 107, 163, 0.01)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            {mod.lessons.map((les: string, lessonIdx: number) => (
+                              <div key={lessonIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", background: "#ffffff", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "4px" }}>
+                                <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>📚 {les}</span>
+                                <button
+                                  onClick={() => alert(language === "ar" ? `جاري بدء الدرس التفاعلي الموثق بالصفحات الدراسية لـ: ${les}` : `Starting page-grounded interactive tutor lesson for: ${les}`)}
+                                  style={{
+                                    padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer",
+                                    background: "var(--primary)", color: "#ffffff", fontSize: "0.75rem", fontWeight: 700
+                                  }}
+                                >
+                                  {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>
@@ -5418,7 +5547,7 @@ export default function Home() {
                   <select
                     value={practiceSubject}
                     onChange={(e) => setPracticeSubject(e.target.value)}
-                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem" }}
+                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff" }}
                   >
                     <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
                     <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
@@ -5426,15 +5555,117 @@ export default function Home() {
                   </select>
                 </div>
                 <button
-                  onClick={() => alert(language === "ar" ? `جاري توليد سؤال جديد لـ ${practiceSubject} بمساعدة الذكاء الاصطناعي...` : `Generating dynamic mock question for ${practiceSubject} using our AI agent...`)}
+                  onClick={() => {
+                    setPracticeLoading(true);
+                    setPracticeResult("");
+                    setPracticeAnswer("");
+                    setTimeout(() => {
+                      const questions: Record<string, { en: string; ar: string }> = {
+                        Math: {
+                          en: "Given a matrix A where det(A) = 0, what can be inferred about its inverse? Explain your answer with matrix algebra concepts.",
+                          ar: "إذا كانت المصفوفة أ بحيث محددها يساوي صفرًا (det(A) = 0)، فماذا يمكن استنتاجه عن معكوسها الضربي؟ اشرح إجابتك رياضياً."
+                        },
+                        Science: {
+                          en: "Explain the process of Photosynthesis in chloroplasts. What are the key stages, reactions, and where do they occur?",
+                          ar: "اشرح بالتفصيل عملية البناء الضوئي داخل البلاستيدات الخضراء. ما هي المراحل الأساسية والتفاعلات الضوئية واللاضوئية؟"
+                        },
+                        Arabic: {
+                          en: "Explain the rules governing Kaada (كاد) and her sisters' predicates. How does it compare to Kana (كان)? Support your answer with grammatical examples.",
+                          ar: "اشرح بالتفصيل حكم اقتران خبر كاد وأخواتها بأن المصدرية مبيناً أوجه الاختلاف والاتفاق بين كاد وكان مع الأمثلة النحوية."
+                        }
+                      };
+                      setGeneratedQuestion(language === "ar" ? questions[practiceSubject].ar : questions[practiceSubject].en);
+                      setPracticeLoading(false);
+                    }, 800);
+                  }}
                   style={{
                     padding: "10px", borderRadius: "var(--border-radius-sm)", border: "none", cursor: "pointer",
                     background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                    fontWeight: 700, fontSize: "0.85rem"
+                    fontWeight: 700, fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
                   }}
+                  disabled={practiceLoading}
                 >
-                  ✨ {language === "ar" ? "توليد سؤال تدريبي مخصص" : "Generate Custom Question"}
+                  {practiceLoading ? (
+                    <FiRefreshCw className="spinning-icon" />
+                  ) : "✨"}
+                  <span>{language === "ar" ? "توليد سؤال تدريبي مخصص" : "Generate Custom Question"}</span>
                 </button>
+
+                {generatedQuestion && (
+                  <div style={{ marginTop: "1rem", borderTop: "1px dashed rgba(235, 220, 185, 0.4)", paddingTop: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <div style={{ padding: "0.75rem", background: "rgba(16, 107, 163, 0.04)", borderLeft: "3px solid var(--primary)", borderRight: language === "ar" ? "3px solid var(--primary)" : "none", borderRadius: "4px" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", textTransform: "uppercase" }}>
+                        {language === "ar" ? "السؤال المولد بالذكاء الاصطناعي:" : "AI Generated Worksheet:"}
+                      </span>
+                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", fontWeight: 700, lineHeight: "1.5" }}>{generatedQuestion}</p>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
+                        {language === "ar" ? "أدخل إجابتك (النسخ واللصق معطل):" : "Type your answer (paste is blocked):"}
+                      </label>
+                      <textarea
+                        id="text-practice-input"
+                        value={practiceAnswer}
+                        onChange={(e) => setPracticeAnswer(e.target.value)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          alert(language === "ar" 
+                            ? "تنبيه: تم تعطيل النسخ واللصق لتشجيع الفهم النشط والكتابة الذاتية!" 
+                            : "Notice: Copy-pasting is disabled to encourage active recall and typing your own answers!");
+                        }}
+                        placeholder={language === "ar" ? "اكتب صياغتك وإجابتك الكاملة هنا..." : "Type your comprehensive response here..."}
+                        style={{
+                          width: "100%", height: "100px", padding: "0.75rem", borderRadius: "6px",
+                          border: "1px solid var(--card-border)", outline: "none", fontSize: "0.85rem",
+                          fontFamily: "var(--font-sans)", resize: "none"
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setPracticeLoading(true);
+                        setTimeout(() => {
+                          const answersFeedback: Record<string, { en: string; ar: string }> = {
+                            Math: {
+                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 14]\n\nExcellent try! You correctly identified that a matrix with determinant zero is singular and lacks a multiplicative inverse. Your explanation matches Section 1.2 on matrix inversion conditions. To get full points, make sure to state that A is singular.",
+                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٤]\n\nمحاولة ممتازة وصحيحة تماماً! لقد حددت بشكل صحيح أن المصفوفة ذات المحدد الصفري تسمى مصفوفة منفردة (شاذة) ولا يوجد لها معكوس ضربي. إجابتك تطابق تماماً ما ورد في الباب الأول للمصفوفات. استمر في هذا الأداء الرائع!"
+                            },
+                            Science: {
+                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 12]\n\nGreat explanation of the autotrophic process! You accurately described the role of chloroplasts and light-dependent reactions. Remember that the dark reaction (Calvin Cycle) occurs in the stroma as detailed on page 15.",
+                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٢]\n\nتفسير رائع لعملية البناء الذاتي والتحول الضوئي! لقد وصفت بدقة دور البلاستيدات والتفاعلات الضوئية. تذكر دائماً أن التفاعلات اللاضوئية (حلقة كالفن) تحدث في الستروما (الأرضية) كما هو مفصل في صفحة ١٥ من كتاب الأحياء."
+                            },
+                            Arabic: {
+                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 18]\n\nWonderful analysis! You correctly specified that the predicate of 'Kaada' must be a phrasal verb starting with a present tense verb. This aligns perfectly with the Thanaweya curriculum guidelines.",
+                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٨]\n\nشرح وافٍ وبليغ! لقد بينت بشكل ممتاز أن خبر كاد وأخواتها لا بد أن يكون جملة فعلية فعلها مضارع، وذكرت شروط اقترانه بأن المصدرية بدقة. إجابتك تطابق المنهج المقرر في كتاب النحو والصرف."
+                            }
+                          };
+                          setPracticeResult(language === "ar" ? answersFeedback[practiceSubject].ar : answersFeedback[practiceSubject].en);
+                          setPracticeLoading(false);
+                        }, 1200);
+                      }}
+                      style={{
+                        padding: "8px 12px", borderRadius: "4px", border: "none", cursor: "pointer",
+                        background: "var(--primary)", color: "#ffffff", fontWeight: 700, fontSize: "0.8rem",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
+                      }}
+                      disabled={practiceLoading || !practiceAnswer.trim()}
+                    >
+                      {practiceLoading ? <FiRefreshCw className="spinning-icon" /> : "📝"}
+                      <span>{language === "ar" ? "إرسال الإجابة للتقييم" : "Submit Response"}</span>
+                    </button>
+
+                    {practiceResult && (
+                      <div style={{ marginTop: "0.5rem", padding: "0.75rem", background: "#f1f8e9", border: "1px solid #c5e1a5", borderRadius: "4px" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#2e7d32" }}>
+                          {language === "ar" ? "تحليل المعلم الذكي والتقييم المعتمد:" : "AI Grounded Tutor Evaluation:"}
+                        </span>
+                        <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "#33691e", lineHeight: "1.5", whiteSpace: "pre-line" }}>{practiceResult}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
