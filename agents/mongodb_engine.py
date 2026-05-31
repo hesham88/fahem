@@ -39,6 +39,8 @@ class UserProfileSchema(BaseModel):
     friends: List[str] = Field(default_factory=list, description="List of friend userIds")
     groupsJoined: List[str] = Field(default_factory=list, description="List of joined group IDs")
     parentEmail: Optional[str] = Field(None, description="Parent's email address if underage student")
+    phoneNumber: Optional[str] = Field(None, description="Verified phone number of the user")
+    phoneVerified: bool = Field(False, description="Whether the phone number is verified")
     createdAt: Optional[str] = Field(None, description="ISO timestamp of record creation")
     updatedAt: Optional[str] = Field(None, description="ISO timestamp of record update")
 

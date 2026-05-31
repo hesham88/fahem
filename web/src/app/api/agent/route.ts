@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
                   },
                   {
                     name: "saveUserProfile",
-                    description: "Saves or updates the user profile in MongoDB. Call this once ALL required onboarding fields (role, name, username, age, country, grade/school/children, and avatar if applicable) have been collected and verified.",
+                    description: "Saves or updates the user profile in MongoDB. Call this once ALL required onboarding fields (phone, role, name, username, age, country, grade/school/children, and avatar if applicable) have been collected and verified.",
                     parameters: {
                       type: "OBJECT" as const,
                       properties: {
@@ -278,9 +278,11 @@ export async function POST(req: NextRequest) {
                             avatar: { type: "STRING" as const },
                             childrenCount: { type: "INTEGER" as const },
                             childrenInSchool: { type: "INTEGER" as const },
+                            phoneNumber: { type: "STRING" as const },
+                            phoneVerified: { type: "BOOLEAN" as const },
                             onboardingCompleted: { type: "BOOLEAN" as const }
                           },
-                          required: ["username", "email", "name", "role", "age", "country"]
+                          required: ["username", "email", "name", "role", "age", "country", "phoneNumber"]
                         }
                       },
                       required: ["userId", "profileData"]
@@ -305,6 +307,9 @@ You must analyze the entire conversation history from the very beginning to buil
 A field is "COLLECTED" if there is ANY mention or clear implication of it in the chat history. Once a field is "COLLECTED", you must NEVER ask for it again or backtrack to it, regardless of what language the user changes to!
 
 Here are the fields to collect in order, along with how to recognize if they are already COLLECTED:
+0. **Phone Number (Step 0 - MANDATORY)**: The user's phone number has been verified client-side via Firebase SMS link auth before the conversational flow starts.
+   - How to recognize if COLLECTED: You will see a system log message like `[SYSTEM] Phone number verified: <phone_number>` at the very beginning of the chat log.
+   - Action if COLLECTED: Mark as COLLECTED. You MUST extract this phone number and pass it as `phoneNumber` and `phoneVerified: true` in `profileData` when calling the `saveUserProfile` tool. Never ask the user for their phone number since it is already verified!
 1. **Role / User Type**: Must be "student", "teacher", "parent", or "admin".
    - How to recognize if COLLECTED: The user has said "student", "طالب", "معلم", "teacher", "parent", "ولي أمر", "admin", "مسؤول", or chose a card representing one.
    - Action if COLLECTED: Mark as COLLECTED. Never ask "What is your role?" or "Are you joining as student, teacher...?" again.

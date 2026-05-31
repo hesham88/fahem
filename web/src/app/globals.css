@@ -1646,3 +1646,11 @@ th, td {
   white-space: nowrap !important;
   padding: 0.4rem 0.6rem !important;
 }
+
+/* Hide floating reCAPTCHA badge to prevent collision with premium study companion */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
