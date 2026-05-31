@@ -19,7 +19,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             "/db-metadata", "/audit-logs", "/user/activity", "/user/chat-session",
             "/user/token-usage", "/user/token-stats", "/admin/global-stats",
             "/user/profile", "/user/account", "/user/list", "/user/friend",
-            "/chat/message", "/parent/children", "/parent/approve"
+            "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db"
         ]
         
         path = request.url.path
@@ -136,6 +136,293 @@ def register_telemetry_route(app: fastapi.FastAPI):
             }
         except Exception as err:
             logger.error(f"[services.py] DB Diagnostic failed: {err}", exc_info=True)
+            return {
+                "status": "error",
+                "error": str(err)
+            }
+
+    @app.post("/admin/seed-db")
+    async def custom_db_seed(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            # --- 1. SEED SUBJECTS ---
+            subjects_data = [
+                {
+                    "_id": "subj_algebra_stats",
+                    "name": "Algebra and Statistics",
+                    "name_ar": "الجبر والإحصاء",
+                    "emoji": "📊",
+                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                },
+                {
+                    "_id": "subj_biology",
+                    "name": "Biology",
+                    "name_ar": "الأحياء",
+                    "emoji": "🧬",
+                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                },
+                {
+                    "_id": "subj_arabic_grammar",
+                    "name": "Arabic Grammar",
+                    "name_ar": "النحو والصرف",
+                    "emoji": "📖",
+                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                }
+            ]
+            
+            # Insert or replace subjects
+            for subj in subjects_data:
+                db["subjects"].replace_one({"_id": subj["_id"]}, subj, upsert=True)
+                
+            # --- 2. SEED BOOKS ---
+            books_data = [
+                {
+                    "_id": "book_moe_alg_g10_t1",
+                    "subject_id": "subj_algebra_stats",
+                    "title": "High School Algebra and Analytic Geometry",
+                    "title_ar": "الجبر الهندسة التحليلية للمرحلة الثانوية",
+                    "grade": "Grade 10",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "core", 
+                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Algebra_G10.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/alg_g10_t1.pdf",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Linear Equations and Matrices",
+                            "title_ar": "المعادلات الخطية والمصفوفات",
+                            "page_start": 4,
+                            "page_end": 28,
+                            "concepts": ["Matrix Inversion", "Determinants", "Cramer's Rule"]
+                        },
+                        {
+                            "id": "ch_2",
+                            "title": "Vectors and Linear Spaces",
+                            "title_ar": "المتجهات والفراغات الخطية",
+                            "page_start": 29,
+                            "page_end": 50,
+                            "concepts": ["Vector Dot Product", "Cross Product", "Geometric Dimension"]
+                        }
+                    ],
+                    "mindmap": {
+                        "root": "Matrices & Vectors",
+                        "children": [
+                            { "name": "Linear Algebra", "children": [{ "name": "Matrices" }, { "name": "Determinants" }] },
+                            { "name": "Analytic Geometry", "children": [{ "name": "Vectors" }, { "name": "Lines in Space" }] }
+                        ]
+                    },
+                    "keywords": ["matrix", "determinant", "vector", "linear system", "cramer"]
+                },
+                {
+                    "_id": "book_moe_bio_g11_t1",
+                    "subject_id": "subj_biology",
+                    "title": "High School Biology",
+                    "title_ar": "الأحياء للمرحلة الثانوية",
+                    "grade": "Grade 11",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "core",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Biology_G11.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/bio_g11_t1.pdf",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Nutrition and Autotrophic Processes",
+                            "title_ar": "التغذية والعمليات الذاتية",
+                            "page_start": 5,
+                            "page_end": 35,
+                            "concepts": ["Photosynthesis", "Chloroplasts", "Light Reactions", "Calvin Cycle"]
+                        },
+                        {
+                            "id": "ch_2",
+                            "title": "Human Transport System",
+                            "title_ar": "النقل في الإنسان",
+                            "page_start": 36,
+                            "page_end": 65,
+                            "concepts": ["Heart Chambers", "Blood Vessels", "Blood Composition", "Lymphatic System"]
+                        }
+                    ],
+                    "mindmap": {
+                        "root": "Biology Grade 11",
+                        "children": [
+                            { "name": "Plant Physiology", "children": [{ "name": "Photosynthesis" }, { "name": "Nutrition" }] },
+                            { "name": "Human Physiology", "children": [{ "name": "Circulation" }, { "name": "Respiration" }] }
+                        ]
+                    },
+                    "keywords": ["photosynthesis", "nutrition", "chloroplast", "heart", "circulatory", "blood"]
+                },
+                {
+                    "_id": "book_moe_grammar_g12",
+                    "subject_id": "subj_arabic_grammar",
+                    "title": "High School Arabic Grammar & Rhetoric",
+                    "title_ar": "النحو والصرف والبلاغة للمرحلة الثانوية العامة",
+                    "grade": "Grade 12",
+                    "term": "Full Year",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "core",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Arabic_Grammar_G12.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/arabic_grammar_g12.pdf",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "The Dynamic Verbs (Kaada and her Sisters)",
+                            "title_ar": "كاد وأخواتها (أفعال المقاربة والرجاء والشروع)",
+                            "page_start": 10,
+                            "page_end": 22,
+                            "concepts": ["Subject of Kaada", "Predicate conditions (An + Present verb)", "Differences with Kana"]
+                        },
+                        {
+                            "id": "ch_2",
+                            "title": "The Excepted (Al-Mustathna)",
+                            "title_ar": "الاستثناء وأحكامه (إلا، غير، سوى، خلا، عدا، حاشا)",
+                            "page_start": 23,
+                            "page_end": 38,
+                            "concepts": ["Tam Mitbah (Complete Affirmative)", "Tam Manfi (Complete Negative)", "Naqis Manfi (Defective Negative)"]
+                        }
+                    ],
+                    "mindmap": {
+                        "root": "Arabic Grammar",
+                        "children": [
+                            { "name": "Verbs & Nouns", "children": [{ "name": "Kaada" }, { "name": "Kana" }] },
+                            { "name": "Grammatical Styles", "children": [{ "name": "Excepted Style" }, { "name": "Exclamatory Style" }] }
+                        ]
+                    },
+                    "keywords": ["kaada", "mustathna", "nahw", "arabic grammar", "thanaweya", "بلاغة"]
+                }
+            ]
+            
+            for bk in books_data:
+                db["books"].replace_one({"_id": bk["_id"]}, bk, upsert=True)
+                
+            # --- 3. SEED QUESTION BANK ---
+            questions_data = [
+                {
+                    "_id": "q_mat_001",
+                    "book_id": "book_moe_alg_g10_t1",
+                    "chapter_id": "ch_1",
+                    "page_reference": 14,
+                    "type": "MCQ",
+                    "complexity_rating": "intermediate",
+                    "question_text": "Given a matrix A where det(A) = 0, what can be inferred about its inverse?",
+                    "question_text_ar": "إذا كانت المصفوفة أ بحيث محددها يساوي صفرًا (det(A) = 0)، فماذا يمكن استنتاجه عن معكوسها الضربي؟",
+                    "distractors": [
+                        "The inverse is equal to its transpose.",
+                        "The inverse is an identity matrix.",
+                        "The inverse can be found using Cramer's rule."
+                    ],
+                    "distractors_ar": [
+                        "المعكوس الضربي يساوي مدور المصفوفة.",
+                        "المعكوس الضربي هو مصفوفة الوحدة.",
+                        "يمكن إيجاد المعكوس الضربي باستخدام طريقة كرامر."
+                    ],
+                    "correct_answer": "The matrix does not possess an inverse.",
+                    "correct_answer_ar": "المصفوفة ليس لها معكوس ضربي (مصفوفة منفردة).",
+                    "pedagogical_intent": "Testing understanding of singular matrices and inverse criteria.",
+                    "embedding": [0.0123, -0.0456, 0.2389, 0.7182]
+                },
+                {
+                    "_id": "q_mat_002",
+                    "book_id": "book_moe_alg_g10_t1",
+                    "chapter_id": "ch_1",
+                    "page_reference": 22,
+                    "type": "MCQ",
+                    "complexity_rating": "hard",
+                    "question_text": "Under what condition is Cramer's rule inapplicable to a system of linear equations?",
+                    "question_text_ar": "تحت أي شرط تكون طريقة كرامر غير قابلة للتطبيق لحل نظام من المعادلات الخطية؟",
+                    "distractors": [
+                        "When the constant vector contains zeros.",
+                        "When the determinant of the coefficients matrix is positive.",
+                        "When the number of equations is greater than three."
+                    ],
+                    "distractors_ar": [
+                        "عندما يحتوي متجه الثوابت على أصفار.",
+                        "عندما يكون محدد مصفوفة المعاملات موجبًا.",
+                        "عندما يكون عدد المعادلات أكبر من ثلاثة."
+                    ],
+                    "correct_answer": "When the determinant of the coefficients matrix is zero.",
+                    "correct_answer_ar": "عندما يكون محدد مصفوفة المعاملات مساويًا للصفر.",
+                    "pedagogical_intent": "Check comprehension of Cramer's rule applicability bounds.",
+                    "embedding": [-0.02, 0.051, 0.118, 0.612]
+                },
+                {
+                    "_id": "q_bio_001",
+                    "book_id": "book_moe_bio_g11_t1",
+                    "chapter_id": "ch_1",
+                    "page_reference": 18,
+                    "type": "MCQ",
+                    "complexity_rating": "intermediate",
+                    "question_text": "Which wavelength of light is least absorbed by chlorophyll a and b during photosynthesis?",
+                    "question_text_ar": "أي الأطوال الموجية للضوء هي الأقل امتصاصاً بواسطة الكلوروفيل (أ) و(ب) أثناء عملية البناء الضوئي؟",
+                    "distractors": [
+                        "Blue light (430-450 nm)",
+                        "Red light (640-660 nm)",
+                        "Violet light (400-420 nm)"
+                    ],
+                    "distractors_ar": [
+                        "الضوء الأزرق (430-450 نانومتر)",
+                        "الضوء الأحمر (640-660 نانومتر)",
+                        "الضوء البنفسجي (400-420 نانومتر)"
+                    ],
+                    "correct_answer": "Green light (500-550 nm)",
+                    "correct_answer_ar": "الضوء الأخضر (500-550 نانومتر)",
+                    "pedagogical_intent": "Understand light absorption profiles and why chlorophyll appears green.",
+                    "embedding": [0.089, -0.112, 0.301, 0.154]
+                },
+                {
+                    "_id": "q_ara_001",
+                    "book_id": "book_moe_grammar_g12",
+                    "chapter_id": "ch_1",
+                    "page_reference": 12,
+                    "type": "MCQ",
+                    "complexity_rating": "hard",
+                    "question_text": "In the sentence 'أنشأ المهندس يبني المصنع', what is the grammatical position of the verb 'أنشأ' and its predicate?",
+                    "question_text_ar": "في الجملة 'أنشأ المهندس يبني المصنع'، ما هو الموقع الإعرابي للفعل 'أنشأ' وخبره؟",
+                    "distractors": [
+                        "Ansha is a standard transitive verb, and the sentence 'yabni' is an adjective clause.",
+                        "Ansha is an inchoative verb, and its predicate 'yabni' can be prefixed with 'An'.",
+                        "Ansha behaves exactly like Kana and its predicate must be a singular noun."
+                    ],
+                    "distractors_ar": [
+                        "أنشأ فعل تام متعدٍ، وجملة 'يبني' في محل نصب نعت.",
+                        "أنشأ فعل شروع، ويجوز اقتران خبره 'يبني' بـ 'أن'.",
+                        "أنشأ يعمل عمل كان تماماً وخبره يجب أن يكون مفرداً."
+                    ],
+                    "correct_answer": "Ansha is an inchoative verb (verb of beginning) whose predicate 'yabni' must be an un-associated present tense clause.",
+                    "correct_answer_ar": "أنشأ فعل شروع ناقص جامد، وخبره الجملة الفعلية 'يبني' يمتنع اقترانه بـ 'أن'.",
+                    "pedagogical_intent": "Verify understanding of Shuroo' verbs (Ansha) predicate association rules.",
+                    "embedding": [0.03, 0.22, -0.12, 0.81]
+                }
+            ]
+            
+            for q in questions_data:
+                db["question_bank"].replace_one({"_id": q["_id"]}, q, upsert=True)
+                
+            # Create indexes for the new collections
+            db["subjects"].create_index([("name", 1)])
+            db["books"].create_index([("subject_id", 1)])
+            db["question_bank"].create_index([("book_id", 1), ("chapter_id", 1)])
+            
+            return {
+                "status": "success",
+                "message": "Database seeded successfully with dynamic Egyptian curriculum models!",
+                "seeded_counts": {
+                    "subjects": len(subjects_data),
+                    "books": len(books_data),
+                    "question_bank": len(questions_data)
+                }
+            }
+        except Exception as err:
+            logger.error(f"[services.py] DB Seed failed: {err}", exc_info=True)
             return {
                 "status": "error",
                 "error": str(err)

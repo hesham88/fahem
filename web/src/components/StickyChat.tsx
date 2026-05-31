@@ -63,8 +63,8 @@ export default function StickyChat() {
           id: "welcome",
           role: "assistant",
           text: language === "ar" 
-            ? "مرحباً! أنا فاهم، شريكك في الذكاء الاصطناعي المسؤول. كيف يمكنني مساعدتك في عمليات وقضايا قواعد البيانات أو تدقيق تكوينات الأمان اليوم؟" 
-            : "Hello! I am Fahem, your Responsible AI Partner. How can I assist you with database operations, queries, or security configuration audits today?",
+            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب الوزارة المصرية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
+            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the Egyptian Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
           timestamp: new Date()
         }
       ]);
@@ -187,8 +187,8 @@ export default function StickyChat() {
         id: "welcome",
         role: "assistant",
         text: language === "ar" 
-          ? "مرحباً! أنا فاهم، شريكك في الذكاء الاصطناعي المسؤول. كيف يمكنني مساعدتك في عمليات وقضايا قواعد البيانات أو تدقيق تكوينات الأمان اليوم؟" 
-          : "Hello! I am Fahem, your Responsible AI Partner. How can I assist you with database operations, queries, or security configuration audits today?",
+          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب الوزارة المصرية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
+          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the Egyptian Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
         timestamp: new Date()
       }
     ]);
@@ -340,9 +340,24 @@ export default function StickyChat() {
   };
 
   const presetQueries = [
-    { label: language === "ar" ? "عرض المجموعات" : "List collections", query: "Show me list of active collections in the database" },
-    { label: language === "ar" ? "فحص التكوينات" : "Check my configurations", query: "Show current configuration setup and active security guardrails" },
-    { label: language === "ar" ? "إحصائيات مسموحة" : "Whitelisted DB Stats", query: "Retrieve only whitelisted db stats metrics" }
+    { 
+      label: language === "ar" ? "تدريب مصفوفات (ص١٤)" : "Matrix Practice (p.14)", 
+      query: language === "ar" 
+        ? "أعطني سؤالاً تدريبياً على معكوس المصفوفة من كتاب الجبر صفحة 14." 
+        : "Give me a practice question on Matrix Inversion from Algebra on page 14." 
+    },
+    { 
+      label: language === "ar" ? "دورة كالفن (الأحياء)" : "Calvin Cycle (Biology)", 
+      query: language === "ar" 
+        ? "اشرح لي دورة كالفن في الأحياء وما هي الأطوال الموجية الأقل امتصاصاً." 
+        : "Explain the Calvin Cycle in Biology and what wavelengths chlorophyll absorbs least." 
+    },
+    { 
+      label: language === "ar" ? "أفعال الشروع (النحو)" : "Inchoative Verbs (Grammar)", 
+      query: language === "ar" 
+        ? "اشرح لي قاعدة كاد وأخواتها ومتى يمتنع اقتران خبرها بـ 'أن'." 
+        : "Explain Kaada and her Sisters and when its predicate must not be associated with 'An'." 
+    }
   ];
 
   return (
