@@ -1,0 +1,4 @@
+{
+  "name": "quiz_agent",
+  "description": "Fahem Parallel Quiz Generator capable of concurrent multi-chapter question generation"
+}

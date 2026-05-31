@@ -771,7 +771,7 @@ a:hover {
 }
 
 /* Ensure language toggles adapt typographic elements without layout overlap */
-body[dir="rtl"] .landing-nav-links {
+body[dir="rtl"] .glass-nav-links {
   font-family: var(--font-arabic-calligraphy, sans-serif);
   letter-spacing: 0;  /* Clear custom latin adjustments for clean Arabic display */
 }
@@ -857,9 +857,6 @@ body[dir="rtl"] .landing-nav-links {
   border-bottom-color: var(--primary);
 }
 
-[dir="rtl"] .nav-tabs {
-  flex-direction: row-reverse;
-}
 
 [dir="rtl"] .tab-btn {
   font-family: var(--font-sans), sans-serif;

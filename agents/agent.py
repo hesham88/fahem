@@ -123,6 +123,23 @@ try:
 except ImportError:
     from agents.onboarding_agent.agent import onboarding_agent
 
+# -------------------------------------------------------------
+# 2c. Swarm Specialist Agents Setup (Imported)
+# -------------------------------------------------------------
+try:
+    from zatona_agent.agent import zatona_agent
+    from quiz_agent.agent import quiz_agent
+    from planner_agent.agent import planner_agent
+    from insights_agent.agent import insights_agent
+except ImportError:
+    try:
+        from agents.zatona_agent.agent import zatona_agent
+        from agents.quiz_agent.agent import quiz_agent
+        from agents.planner_agent.agent import planner_agent
+        from agents.insights_agent.agent import insights_agent
+    except ImportError:
+        pass
+
 
 
 # -------------------------------------------------------------
@@ -325,12 +342,52 @@ async def onboarding_node_func(ctx, node_input: Any) -> str:
     ctx.state["final_output"] = res
     return res
 
+async def swarm_execution_node_func(ctx, node_input: Any) -> str:
+    """Classifies student intent and runs the corresponding specialized swarm worker node."""
+    prompt = ctx.state.get("original_prompt", "").lower()
+    
+    # 1. Zatona Agent (Summarization)
+    if any(w in prompt for w in ["summarize", "summary", "zatona", "ملخص", "تلخيص", "اختصار"]):
+        print("[Swarm Router] Routing standard request to Zatona (Synthesis Expert) Agent")
+        res = await ctx.run_node(zatona_agent, ctx.state.get("original_prompt", ""))
+        ctx.state["database_results"] = res
+        ctx.state["execution_success"] = True
+        return res
+        
+    # 2. Quiz Agent (Parallel MCQ / Question Generation)
+    elif any(w in prompt for w in ["quiz", "exam", "question", "test", "parallel", "اختبار", "اسئلة", "امتحان"]):
+        print("[Swarm Router] Routing standard request to Quiz (Parallel Engine) Agent")
+        res = await ctx.run_node(quiz_agent, ctx.state.get("original_prompt", ""))
+        ctx.state["database_results"] = res
+        ctx.state["execution_success"] = True
+        return res
+        
+    # 3. Planner Agent (Schedules and Calendars)
+    elif any(w in prompt for w in ["plan", "schedule", "calendar", "roadmap", "خطة", "جدول", "مسار"]):
+        print("[Swarm Router] Routing standard request to Planner (Scheduling) Agent")
+        res = await ctx.run_node(planner_agent, ctx.state.get("original_prompt", ""))
+        ctx.state["database_results"] = res
+        ctx.state["execution_success"] = True
+        return res
+        
+    # 4. Insights Agent (Performance Diagnostics)
+    elif any(w in prompt for w in ["insight", "performance", "diagnostic", "weakness", "score", "تقرير", "احصائيات", "نقاط ضعف"]):
+        print("[Swarm Router] Routing standard request to Insights (Student Diagnostic) Agent")
+        res = await ctx.run_node(insights_agent, ctx.state.get("original_prompt", ""))
+        ctx.state["database_results"] = res
+        ctx.state["execution_success"] = True
+        return res
+        
+    # 5. Default: MongoDB query retrieval fallback
+    print("[Swarm Router] Routing standard request to MongoDB Core Agent Node")
+    return await mongodb_node_func(ctx, node_input)
+
 # -------------------------------------------------------------
 # 4. Compile the Workflow Graph DAG
 # -------------------------------------------------------------
 orchestrator_node = FunctionNode(name="orchestrator_node", func=orchestrator_node_func, rerun_on_resume=True)
 guardrail_node = FunctionNode(name="guardrail_node", func=guardrail_node_func, rerun_on_resume=True)
-mongodb_node = FunctionNode(name="mongodb_node", func=mongodb_node_func, rerun_on_resume=True)
+mongodb_node = FunctionNode(name="mongodb_node", func=swarm_execution_node_func, rerun_on_resume=True)
 presenter_node = FunctionNode(name="presenter_node", func=presenter_node_func, rerun_on_resume=True)
 onboarding_node = FunctionNode(name="onboarding_node", func=onboarding_node_func, rerun_on_resume=True)
 

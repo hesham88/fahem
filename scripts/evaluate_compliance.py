@@ -74,7 +74,7 @@ def scan_files():
                     content = f.read()
                     
                 # Skip checking competitor keywords in documentation/reports/guides to prevent false-positives
-                is_doc_file = rel_path.startswith("doc") or "compliance" in rel_path.lower() or "guide" in rel_path.lower()
+                is_doc_file = rel_path.startswith("doc") or rel_path.startswith("artifacts") or "compliance" in rel_path.lower() or "guide" in rel_path.lower()
                 
                 # 1. Check for competitor keywords (skip for doc files)
                 if not is_doc_file:

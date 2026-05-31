@@ -597,6 +597,42 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to get global stats: {err}", exc_info=True)
             return {"activities": [], "tokenStats": {}, "error": str(err)}
 
+    @app.get("/user/books")
+    async def get_books_endpoint(subject_id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            query = {}
+            if subject_id:
+                query["subject_id"] = subject_id
+                
+            books = list(db["books"].find(query))
+            return {"books": books}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get books: {err}", exc_info=True)
+            return {"books": [], "error": str(err)}
+
+    @app.get("/user/subjects")
+    async def get_subjects_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            subjects = list(db["subjects"].find({}))
+            return {"subjects": subjects}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get subjects: {err}", exc_info=True)
+            return {"subjects": [], "error": str(err)}
+
     @app.get("/user/profile")
     async def get_profile_endpoint(userId: str = None, username: str = None, email: str = None):
         try:

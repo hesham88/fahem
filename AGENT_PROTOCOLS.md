@@ -65,11 +65,22 @@ Fahem is a premium, localized, pocket-sized companion. The interface must look e
 
 ---
 
-## 📁 6. Workspace File Structure References
+## 📁 6. Workspace Artifact Archival & Mirroring
+
+To ensure persistent workspace-level tracking, compliance transparency, and version accountability:
+* **Automatic Mirroring**: All generated system brain artifacts (e.g. plans, blueprints, audits, milestones) **MUST** be persistently mirrored into the workspace `/artifacts` folder.
+* **Revision Tracking**: When an artifact is updated, save a timestamped copy under `/artifacts/revisions` (e.g. `artifact_name_rev_YYYYMMDD_HHMMSS.md`) before writing the updated version to `/artifacts`. This preserves the complete historical trajectory.
+* **Verification**: Keep this directory unignored in `.gitignore` to guarantee full inclusion in Git commits and remote push pushes.
+
+---
+
+## 📁 7. Workspace File Structure References
 
 * **`/agents`**: The Python ADK agent workspace.
 * **`/web`**: Next.js App Router workspace (Vanilla CSS/TypeScript).
+* **`/artifacts`**: Persistent mirrored project artifacts and version revisions.
 * **`security.md`**: Master security architecture, rate-limiting, and WAF rules.
 * **`readme.md`**: Quickstart setup guide and general project summary.
 
 *Keep these protocols unchanged and always verify your modifications against them. Let's make Fahem the ultimate educational swarm!*
+

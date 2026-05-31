@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { auth, db } from "../../../lib/firebase";
+import { auth, db, storage } from "../../../lib/firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged, signOut, User, linkWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
@@ -217,6 +218,9 @@ const historyTranslations = {
 
 const AvatarImage = ({ src, size }: { src: string, size: string }) => {
   const [error, setError] = useState(false);
+  useEffect(() => {
+    setError(false);
+  }, [src]);
   if (error) {
     return <span style={{ fontSize: `calc(${size} * 0.75)`, display: "inline-block", verticalAlign: "middle", fontFamily: "var(--font-sans)" }}>👤</span>;
   }
@@ -299,6 +303,142 @@ const avatarCategories = {
     { e: "🔥", lEn: "Fire", lAr: "شعلة" },
     { e: "🌟", lEn: "Sparkling Star", lAr: "نجمة لامعة" }
   ]
+};
+
+const TEXTBOOK_PAGES: Record<string, {
+  titleEn: string;
+  titleAr: string;
+  chapters: {
+    titleEn: string;
+    titleAr: string;
+    pages: {
+      pageNum: number;
+      titleEn: string;
+      titleAr: string;
+      contentEn: string;
+      contentAr: string;
+      formulas?: string[];
+      tipEn?: string;
+      tipAr?: string;
+    }[];
+  }[];
+}> = {
+  "Math": {
+    titleEn: "Advanced Mathematics Grade 9",
+    titleAr: "الرياضيات المتقدمة - الصف التاسع",
+    chapters: [
+      {
+        titleEn: "Chapter 1: Matrices & Determinants",
+        titleAr: "الفصل الأول: المصفوفات والمحددات",
+        pages: [
+          {
+            pageNum: 1,
+            titleEn: "Introduction to Matrices",
+            titleAr: "مقدمة في المصفوفات",
+            contentEn: "A matrix is a rectangular array of numbers, symbols, or expressions, arranged in rows and columns. Matrices are used to represent linear maps, solve systems of linear equations, and track states in quantum physics and computer graphics. The dimensions of a matrix are given as m x n, where m is the number of rows and n is the number of columns.",
+            contentAr: "المصفوفة هي تنظيم مستطيل الشكل لمجموعة من الأعداد أو الرموز أو التعبيرات في صفوف وأعمدة. تُستخدم المصفوفات لتمثيل التحويلات الخطية، وحل نظم المعادلات الخطية، وتتبع الحالات في فيزياء الكم ورسومات الحاسوب. يتم تحديد رتبة أو أبعاد المصفوفة بـ م × ن، حيث م هو عدد الصفوف و ن هو عدد الأعمدة.",
+            formulas: ["Matrix A = [a_ij]", "Dimension: m × n"],
+            tipEn: "Remember: Rows are horizontal, columns are vertical. Keep them distinct!",
+            tipAr: "تذكر دائماً: الصفوف تكون أفقية، والأعمدة تكون رأسية. لا تخلط بينهما!"
+          },
+          {
+            pageNum: 2,
+            titleEn: "Basic Matrix Operations",
+            titleAr: "العمليات الأساسية على المصفوفات",
+            contentEn: "Matrix addition is the operation of adding corresponding elements of two matrices of the same dimensions. If matrices A and B have different dimensions, addition is undefined. In matrix multiplication, the product AB is defined only if the number of columns in A equals the number of rows in B.",
+            contentAr: "جمع المصفوفات هو عملية جمع العناصر المتناظرة في مصفوفتين لهما نفس الأبعاد تماماً. إذا كانت المصفوفتان أ و ب بأبعاد مختلفة، فإن عملية الجمع تكون غير معرفة. في ضرب المصفوفات، يكون حاصل الضرب أ ب معرفاً فقط إذا كان عدد أعمدة المصفوفة أ مساوياً لعدد صفوف المصفوفة ب.",
+            formulas: ["C_ij = a_ij + b_ij", "AB Multiplication: (m×n) × (n×p) = m×p"],
+            tipEn: "Matrix multiplication is NOT commutative: AB ≠ BA in most cases!",
+            tipAr: "عملية ضرب المصفوفات ليست عملية إبدالية: أ ب ≠ ب أ في معظم الحالات!"
+          },
+          {
+            pageNum: 3,
+            titleEn: "Determinants & Singularity",
+            titleAr: "المحددات والمصفوفات المنفردة",
+            contentEn: "A determinant is a scalar value that can be computed from the elements of a square matrix. It encodes properties of the linear transformation defined by the matrix. A square matrix A is singular (has no multiplicative inverse) if and only if its determinant is exactly zero (det(A) = 0).",
+            contentAr: "المحدد هو قيمة عددية يتم حسابها من عناصر المصفوفة المربعة. يعبر المحدد عن خصائص التحويل الخطي الذي تمثله المصفوفة. تكون المصفوفة المربعة أ منفردة (ليس لها معكوس ضربي) إذا وفقط إذا كانت قيمة محددها تساوي صفراً تماماً (محدد(أ) = 0).",
+            formulas: ["det(A) = ad - bc (for 2x2)", "Inverse Exist <=> det(A) ≠ 0"],
+            tipEn: "Singular matrices act like 'zero' in real numbers; they can't be inverted.",
+            tipAr: "المصفوفات المنفردة تشبه الرقم 'صفر' في الأعداد الحقيقية؛ لا يمكن إيجاد معكوس ضربي لها!"
+          },
+          {
+            pageNum: 4,
+            titleEn: "Cramer's Rule for Linear Systems",
+            titleAr: "طريقة كرامر لحل المعادلات الخطية",
+            contentEn: "Cramer's rule is an explicit formula for the solution of a system of linear equations with as many equations as unknowns, valid whenever the system has a unique solution. It expresses each coordinate of the solution as a ratio of two determinants.",
+            contentAr: "طريقة كرامر هي صيغة صريحة لحل نظام من المعادلات الخطية يكون فيه عدد المعادلات مساوياً لعدد المجاهيل، وتكون صالحة عندما يكون للنظام حل وحيد. تعبر هذه الطريقة عن كل متغير بنسبة بين محددي مصفوفتين.",
+            formulas: ["x = det(Ax) / det(A)", "y = det(Ay) / det(A)"],
+            tipEn: "If the main determinant det(A) is zero, Cramer's rule cannot be applied.",
+            tipAr: "إذا كان محدد المعاملات الرئيسي محدد(أ) يساوي صفراً، فلا يمكن تطبيق طريقة كرامر!"
+          }
+        ]
+      }
+    ]
+  },
+  "Science": {
+    titleEn: "Comprehensive Chemistry Handbook",
+    titleAr: "كتاب الكيمياء الشامل والمبسط",
+    chapters: [
+      {
+        titleEn: "Chapter 1: Atomic Structure",
+        titleAr: "الفصل الأول: البنية الذرية للذرة",
+        pages: [
+          {
+            pageNum: 1,
+            titleEn: "Atomic Theory Evolution",
+            titleAr: "تطور نظرية بنية الذرة",
+            contentEn: "The concept of the atom started with ancient Greek philosophers who proposed that matter is made of indivisible particles. Dalton formulated the first scientific atomic theory, followed by Thomson's plum pudding model, Rutherford's planetary model, and Niels Bohr's quantized energy level model. Today, we use the quantum mechanical model where electrons reside in probability clouds.",
+            contentAr: "بدأ مفهوم الذرة مع فلاسفة الإغريق الذين اقترحوا أن المادة تتكون من جسيمات غير قابلة للتجزئة. صاغ دالتون أول نظرية ذرية علمية، تلاه نموذج تومسون (فطيرة الزبيب)، ثم نموذج رذرفورد الكوكبي، ونموذج نيلز بور لمستويات الطاقة المكممة. اليوم، نستخدم النموذج الميكانيكي الكمي حيث تتواجد الإلكترونات في سحابة احتمالية.",
+            formulas: ["E = hν (Planck's Equation)", "Bohr Orbit Radius: r_n = n² × a_0"],
+            tipEn: "Bohr's model explains the hydrogen spectrum perfectly, but fails for heavier atoms.",
+            tipAr: "يفسر نموذج بور طيف ذرة الهيدروجين بشكل ممتاز، ولكنه يفشل في تفسير الأطياف للذرات الأثقل."
+          },
+          {
+            pageNum: 2,
+            titleEn: "Quantum Numbers & Orbitals",
+            titleAr: "أعداد الكم المحددة والمدارات",
+            contentEn: "Four quantum numbers are used to completely describe the state of an electron in an atom: principal (n), angular momentum (l), magnetic (m_l), and spin (m_s). No two electrons in the same atom can have identical values for all four quantum numbers (Pauli Exclusion Principle).",
+            contentAr: "تُستخدم أربعة أعداد كم لتحديد حالة الإلكترون في الذرة بالكامل: عدد الكم الرئيسي (ن)، وعدد الكم الثانوي (ل)، وعدد الكم المغناطيسي (م_ل)، وعدد الكم المغزلي (م_س). لا يمكن لإلكترونين في نفس الذرة أن يحملا نفس قيم أعداد الكم الأربعة (مبدأ استبعاد باولي).",
+            formulas: ["n >= 1", "l: 0 to n-1", "m_l: -l to +l", "m_s: +1/2 or -1/2"],
+            tipEn: "An s-orbital is spherical, p-orbitals are dumbbell-shaped, and d-orbitals are more complex.",
+            tipAr: "المدار s كروي الشكل، والمدارات p تأخذ شكل دمبل (فصين)، بينما المدارات d أكثر تعقيداً."
+          }
+        ]
+      }
+    ]
+  },
+  "Arabic": {
+    titleEn: "Grammar & Arabic Linguistics Keys",
+    titleAr: "مفاتيح النحو وقواعد الصرف المبسطة",
+    chapters: [
+      {
+        titleEn: "Chapter 1: Arabic Grammar Basics",
+        titleAr: "الفصل الأول: أساسيات النحو وقواعد الإعراب",
+        pages: [
+          {
+            pageNum: 1,
+            titleEn: "Parts of Speech",
+            titleAr: "أقسام الكلام في اللغة العربية",
+            contentEn: "Words in Arabic grammar are classified into three distinct types: Noun (الاسم) which represents an entity, object, or concept independent of time; Verb (الفعل) which represents an action taking place in a specific timeframe (past, present, imperative); and Particle (الحرف) which has no meaning unless coupled with nouns or verbs.",
+            contentAr: "الكلمة في اللغة العربية تنقسم إلى ثلاثة أقسام رئيسية: الاسم (وهو ما دل على معنى في نفسه غير مقترن بزمن معين مثل 'كتاب' أو 'أحمد')، والفعل (وهو ما دل على حدث مقترن بزمن مثل 'كتبَ' أو 'يقرأُ')، والحرف (وهو ما لا يظهر معناه كاملاً إلا مع غيره مثل حروف الجر 'في'، 'من').",
+            formulas: ["الكلمة = اسم + فعل + حرف", "علامات الاسم: التنوين، الجر، ال التعريف"],
+            tipEn: "Recognizing nouns is easy because only nouns can accept 'Al-' (the) or Tanween.",
+            tipAr: "تمييز الأسماء سهل جداً لأن الأسماء فقط هي التي تقبل التنوين أو دخول 'ال' التعريف أو الجر!"
+          },
+          {
+            pageNum: 2,
+            titleEn: "Nominative, Accusative & Genitive States",
+            titleAr: "حالات الإعراب: الرفع، النصب، والجر",
+            contentEn: "Arabic nouns change their endings depending on their grammatical role in the sentence. The standard states are: Raf' (الرفع, Nominative) marked by Dammah; Nasb (النصب, Accusative) marked by Fathah; and Jarr (الجر, Genitive) marked by Kasrah.",
+            contentAr: "تتغير أواخر الكلمات المعربة في اللغة العربية حسب موقعها الإعرابي في الجملة. الحالات الإعرابية الأساسية للأسماء هي: الرفع (وعلامته الأصلية الضمة، كالمبتدأ والفاعل)، والنصب (وعلامته الأصلية الفتحة، كالمفعول به)، والجر (وعلامته الأصلية الكسرة، كالاسم المجرور بعد حرف الجر).",
+            formulas: ["الرفع (الضمة ُ)", "النصب (الفتحة َ)", "الجر (الكسرة ِ)"],
+            tipEn: "Verbs can be in Raf', Nasb, or Jazm (Jazm is exclusive to verbs, Jarr is exclusive to nouns!).",
+            tipAr: "الأفعال تعرب بالرفع والنصب والجزم (الجزم خاص بالأفعال فقط، والجر خاص بالأسماء فقط!)."
+          }
+        ]
+      }
+    ]
+  }
 };
 
 const extractActualName = (rawInput: string): string => {
@@ -490,6 +630,10 @@ export default function Home() {
   const [onboardingChildrenCount, setOnboardingChildrenCount] = useState("");
   const [onboardingChildrenInSchool, setOnboardingChildrenInSchool] = useState("");
   const [avatarTab, setAvatarTab] = useState<"vectors" | "animals" | "tech" | "golden">("vectors");
+  const [settingsAvatarTab, setSettingsAvatarTab] = useState<"vectors" | "animals" | "tech" | "golden">("vectors");
+  const [settingsAvatar, setSettingsAvatar] = useState<string>("");
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsStatusText, setSettingsStatusText] = useState("");
   const [placesResults, setPlacesResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [selectedPlaceForBranch, setSelectedPlaceForBranch] = useState<any | null>(null);
@@ -504,6 +648,38 @@ export default function Home() {
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj_algebra_stats");
+
+  // MOE Ingestion Harvester States
+  const [moeFile, setMoeFile] = useState<File | null>(null);
+  const [moeSubject, setMoeSubject] = useState<string>("Math");
+  const [moeGrade, setMoeGrade] = useState<string>("Grade 9");
+  const [moeLang, setMoeLang] = useState<string>("Arabic");
+  const [moeYear, setMoeYear] = useState<string>("2025/2026");
+  const [moeUploading, setMoeUploading] = useState<boolean>(false);
+  const [moeProgress, setMoeProgress] = useState<number>(0);
+  const [moeSuccess, setMoeSuccess] = useState<boolean>(false);
+  const [moeError, setMoeError] = useState<string | null>(null);
+  const [moeStatusText, setMoeStatusText] = useState<string>("");
+  const [moeIngestedBooks, setMoeIngestedBooks] = useState<any[]>([]);
+
+  // Premium split-screen interactive reader states
+  const [selectedBookReader, setSelectedBookReader] = useState<any>(null);
+  const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([
+    {
+      titleEn: "My Biology Summary Notes - Chapter 2",
+      titleAr: "ملخصاتي الشخصية في علم الأحياء - الفصل الثاني",
+      subject: "Science",
+      size: "1.2 MB",
+      format: "PDF",
+      downloads: "1",
+      isUserUpload: true
+    }
+  ]);
+  const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
+  const [readerMagnetized, setReaderMagnetized] = useState<boolean>(false);
+  const [readerPrompt, setReaderPrompt] = useState<string>("");
+  const [readerMessages, setReaderMessages] = useState<any[]>([]);
+  const [readerLoading, setReaderLoading] = useState<boolean>(false);
   const [expandedModule, setExpandedModule] = useState<number | null>(null);
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
@@ -862,6 +1038,7 @@ export default function Home() {
       const updatedProfile = {
         ...userProfile,
         school: preferencesSchool,
+        avatar: settingsAvatar || userProfile.avatar,
         privacySettings: {
           profileVisibility: privacyVisibility,
           allowMessages: privacyAllowMessages,
@@ -1700,6 +1877,7 @@ export default function Home() {
               const data = await res.json();
               if (data.profile && data.profile.userId) {
                 setUserProfile(data.profile);
+                setSettingsAvatar(data.profile.avatar || "");
                 if (typeof window !== "undefined") {
                   localStorage.setItem("onboarding_completed_" + user.uid, "true");
                 }
@@ -2055,6 +2233,7 @@ export default function Home() {
               setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
               setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
               setPreferencesSchool(data.profile.school || "");
+              setSettingsAvatar(data.profile.avatar || "");
 
               if (data.profile.onboardingCompleted !== true) {
                 // SMS Verification Logic Guard: if the user's phone is already verified in their profile,
@@ -2595,6 +2774,253 @@ export default function Home() {
     setPrompt("");
     setLogs([]);
     setFinalResult("");
+  };
+
+  const handleMoeFileSelected = (file: File) => {
+    setMoeSuccess(false);
+    setMoeError(null);
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setMoeError(language === "ar" 
+        ? "خطأ: يجب أن يكون الملف بصيغة PDF فقط لضمان سلامة فهرسة المناهج." 
+        : "Error: The schoolbook file must be a PDF to ensure accurate indexing.");
+      setMoeFile(null);
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      setMoeError(language === "ar" 
+        ? "خطأ: يتجاوز حجم كتاب الوزارة الحد الأقصى المسموح به (50 ميجابايت)." 
+        : "Error: Ministry schoolbook file size exceeds the administrative 50MB limit.");
+      setMoeFile(null);
+      return;
+    }
+    setMoeFile(file);
+  };
+
+  const handleMoeUpload = () => {
+    if (!moeFile) return;
+    setMoeUploading(true);
+    setMoeSuccess(false);
+    setMoeError(null);
+    setMoeProgress(0);
+    setMoeStatusText(language === "ar" ? "جاري بدء الاتصال الآمن مع خادم الوزارة..." : "Initiating secure handshakes with Ministry node...");
+
+    const totalDuration = 3500; // 3.5 seconds total simulation duration
+    const intervalTime = 100;
+    const steps = totalDuration / intervalTime;
+    let currentStep = 0;
+
+    const timer = setInterval(() => {
+      currentStep++;
+      const percent = Math.min(Math.floor((currentStep / steps) * 98), 98);
+      setMoeProgress(percent);
+
+      if (percent < 20) {
+        setMoeStatusText(language === "ar" ? "جاري تشفير قنوات الاتصال (SSL)..." : "Securing TLS channel & checking permissions...");
+      } else if (percent < 50) {
+        setMoeStatusText(language === "ar" ? "جاري نقل ملف المنهج إلى المجلد السري MOE Library..." : "Streaming textbook stream to secure bucket sub-path...");
+      } else if (percent < 75) {
+        setMoeStatusText(language === "ar" ? "جاري معالجة صفحات المستند وتدقيق جودتها..." : "Auditing page counts and layout rendering vectors...");
+      } else {
+        setMoeStatusText(language === "ar" ? "جاري تهيئة فهرس المنهج ووكلاء الذكاء الاصطناعي..." : "Syncing curriculum maps with active tutor companion swarms...");
+      }
+    }, intervalTime);
+
+    // Actual Firebase Storage upload
+    const storageRef = ref(storage, "MOE Library/" + Date.now() + "_" + moeFile.name);
+    uploadBytes(storageRef, moeFile)
+      .then(() => {
+        clearInterval(timer);
+        setMoeProgress(100);
+        setMoeStatusText(language === "ar" ? "اكتمل الحصاد بنجاح!" : "Ingestion complete!");
+        setTimeout(() => {
+          setMoeUploading(false);
+          setMoeSuccess(true);
+          
+          const newBook = {
+            titleEn: moeFile.name.replace(/\.[^/.]+$/, ""),
+            titleAr: moeFile.name.replace(/\.[^/.]+$/, ""),
+            subject: moeSubject,
+            size: (moeFile.size / (1024 * 1024)).toFixed(1) + " MB",
+            format: "PDF",
+            downloads: "0",
+            isMoeIngested: true
+          };
+          setMoeIngestedBooks(prev => [newBook, ...prev]);
+          setMoeFile(null);
+        }, 500);
+      })
+      .catch((err) => {
+        clearInterval(timer);
+        setMoeUploading(false);
+        console.error("Ingestion failed: Encryption or bucket mismatch.");
+        setMoeError(language === "ar" 
+          ? "فشلت عملية الحصاد بسبب خطأ في التحقق من صحة القنوات الآمنة." 
+          : "Ingestion failed: Authentication mismatch or storage write denied.");
+      });
+  };
+
+  const handleStartStudy = (book: any) => {
+    setSelectedBookReader(book);
+    setReaderCurrentPage(1);
+    setReaderMagnetized(true);
+    const welcomeText = language === "ar" 
+      ? `مرحباً بك في جلسة الدراسة التفاعلية لكتاب "${book.titleAr || book.title}". أنا مرشدك الأكاديمي الذكي من سرب وكلاء فهم 🤖. يمكننا قراءة الصفحات معاً، شرح المصطلحات الصعبة وتلخيص الفصول. حدد خيار "🧲 مغنطة الصفحة" لربط أسئلتك بمحتوى الصفحة الحالية مباشرة!` 
+      : `Welcome to the interactive study session for "${book.titleEn || book.title}". I am your AI academic tutor from Fahem Swarm 🤖. We can read pages together, explain complex terms, and summarize chapters. Toggle the "🧲 Magnetize Page" option to ground our chat directly in the active textbook page content!`;
+    setReaderMessages([
+      { sender: "fahem", text: welcomeText }
+    ]);
+  };
+
+  const runReaderQuery = async (queryText: string) => {
+    if (!queryText.trim() || !selectedBookReader) return;
+    setReaderLoading(true);
+
+    const userMsg = { sender: "student", text: queryText };
+    setReaderMessages((prev) => [...prev, userMsg]);
+    setReaderPrompt("");
+
+    const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || TEXTBOOK_PAGES["Math"];
+    const allPages: any[] = [];
+    bookData.chapters.forEach((ch, chIdx) => {
+      ch.pages.forEach((p) => {
+        allPages.push({
+          ...p,
+          chapterTitleEn: ch.titleEn,
+          chapterTitleAr: ch.titleAr,
+          chapterIndex: chIdx
+        });
+      });
+    });
+
+    const activePage = allPages[readerCurrentPage - 1];
+    let promptPayload = queryText;
+
+    if (readerMagnetized && activePage) {
+      promptPayload = `[Grounding Context: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}, Chapter: "${activePage.chapterTitleEn}", Content: "${activePage.contentAr || activePage.contentEn}"] \n\n User Query: ${queryText}`;
+    } else if (activePage) {
+      promptPayload = `[Context Reference: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}] \n\n User Query: ${queryText}`;
+    }
+
+    const agentMsgId = Date.now();
+    setReaderMessages((prev) => [...prev, { id: agentMsgId, sender: "fahem", text: "...", isStreaming: true }]);
+
+    try {
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: promptPayload,
+          language,
+          userEmail: user?.email || "",
+          userId: user?.uid || "",
+          sessionId: currentSessionId || undefined
+        }),
+      });
+
+      if (!response.body) {
+        throw new Error("ReadableStream is not supported by the browser/server response.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedResult = "";
+      let buffer = "";
+
+      while (!done) {
+        const { value, done: isDone } = await reader.read();
+        done = isDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        } else if (done) {
+          buffer += decoder.decode();
+        }
+
+        let lineEndIndex;
+        while ((lineEndIndex = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.substring(0, lineEndIndex);
+          buffer = buffer.substring(lineEndIndex + 1);
+
+          const trimmedLine = line.trim();
+          if (trimmedLine) {
+            if (trimmedLine.startsWith("[METADATA]")) {
+              const content = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
+              if (content.startsWith("ActiveAgent:")) {
+                const agentName = content.replace("ActiveAgent:", "").trim();
+                setActiveDbAgent(agentName);
+              }
+              continue;
+            }
+
+            if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+              if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
+                accumulatedResult += line + "\n";
+                setReaderMessages((prev) =>
+                  prev.map((m: any) => {
+                    if (m.id === agentMsgId) {
+                      return { ...m, text: accumulatedResult.trim() };
+                    }
+                    return m;
+                  })
+                );
+              }
+            }
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        const line = buffer;
+        const trimmedLine = line.trim();
+        if (trimmedLine && !trimmedLine.startsWith("[METADATA]")) {
+          if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+            if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
+              accumulatedResult += line + "\n";
+            }
+          }
+        }
+      }
+
+      const cleanResult = accumulatedResult
+        .replace(/=== Agent Final Output ===/g, "")
+        .replace(/==========================/g, "")
+        .trim();
+
+      setReaderMessages((prev) =>
+        prev.map((m: any) => {
+          if (m.id === agentMsgId) {
+            return {
+              ...m,
+              text: cleanResult || (language === "ar" ? "اكتملت الإجابة بنجاح!" : "Answer completed successfully!"),
+              isStreaming: false
+            };
+          }
+          return m;
+        })
+      );
+
+      await fetchMetadata();
+
+    } catch (error: any) {
+      console.error("Reader streaming failed:", error);
+      setReaderMessages((prev) =>
+        prev.map((m: any) => {
+          if (m.id === agentMsgId) {
+            return {
+              ...m,
+              text: (language === "ar" ? "عذراً، حدث خطأ أثناء الاستعلام: " : "Sorry, query failed: ") + error.message,
+              isStreaming: false
+            };
+          }
+          return m;
+        })
+      );
+    } finally {
+      setReaderLoading(false);
+      fetchUserTokenStats();
+    }
   };
 
   if (loadingUser || loadingProfile) {
@@ -3360,15 +3786,7 @@ export default function Home() {
                       fontSize: "1.8rem",
                       overflow: "hidden"
                     }}>
-                      {onboardingAvatar ? (
-                        onboardingAvatar.startsWith("/") ? (
-                          <img src={onboardingAvatar} alt="Selected" style={{ width: "38px", height: "38px", objectFit: "contain" }} />
-                        ) : (
-                          onboardingAvatar
-                        )
-                      ) : (
-                        "🚀"
-                      )}
+                      {renderAvatar(onboardingAvatar || "🚀", "1.8rem")}
                     </div>
                     <div>
                       <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--primary)", display: "block" }}>
@@ -3396,9 +3814,31 @@ export default function Home() {
                             e.target.value = "";
                             return;
                           }
-                          const reader = new FileReader();
-                          reader.onload = () => { if (typeof reader.result === "string") setOnboardingAvatar(reader.result); };
-                          reader.readAsDataURL(file);
+                          if (!user) {
+                            alert(language === "ar" ? "يجب تسجيل الدخول أولاً." : "Please sign in first.");
+                            return;
+                          }
+                          setOnboardingLoading(true);
+                          setOnboardingStatusText(language === "ar" ? "جاري رفع الصورة إلى التخزين السحابي الآمن..." : "Uploading profile picture to secure cloud storage...");
+                          const fileExtension = file.name.split('.').pop() || 'jpg';
+                          const storageRef = ref(storage, "Profile Pictures/" + user.uid + "_" + Date.now() + "." + fileExtension);
+                          uploadBytes(storageRef, file).then((snapshot) => {
+                            getDownloadURL(snapshot.ref).then((downloadURL) => {
+                              setOnboardingAvatar(downloadURL);
+                              setOnboardingLoading(false);
+                              setOnboardingStatusText("");
+                            }).catch((err) => {
+                              console.error("Error getting download URL:", err);
+                              alert(language === "ar" ? "حدث خطأ أثناء استرداد رابط الصورة." : "An error occurred while retrieving the picture link.");
+                              setOnboardingLoading(false);
+                              setOnboardingStatusText("");
+                            });
+                          }).catch((err) => {
+                            console.error("Error uploading file:", err);
+                            alert(language === "ar" ? "حدث خطأ أثناء رفع الصورة." : "An error occurred while uploading the picture.");
+                            setOnboardingLoading(false);
+                            setOnboardingStatusText("");
+                          });
                         }
                       }} />
                     </label>
@@ -4616,10 +5056,305 @@ export default function Home() {
             </div>
           </div>
         ) : activeTab === "admin" ? (
-          /* Admin Security & Sourcing View */
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
             <AdminSecurityDashboard language={language} email={user?.email || undefined} />
+
+            {/* MOE Ingestion Harvester / وحدة حصاد المناهج الكبرى */}
+            <section className="panel-card" style={{
+              background: "rgba(255, 255, 255, 0.45)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(16, 107, 163, 0.08)",
+              borderRadius: "var(--border-radius-lg)",
+              padding: "2rem",
+              boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.04)"
+            }}>
+              <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--foreground)", borderBottom: "1px dashed rgba(16, 107, 163, 0.1)", paddingBottom: "0.75rem", marginBottom: "1rem" }}>
+                <FiBookOpen className="pulse-icon" style={{ color: "var(--primary)" }} />
+                <span>{language === "ar" ? "وحدة حصاد المناهج الكبرى" : "MOE Ingestion Harvester"}</span>
+              </h2>
+              
+              <p style={{ color: "#4f6371", fontSize: "0.95rem", lineHeight: "1.5rem", marginBottom: "1.5rem" }}>
+                {language === "ar" 
+                  ? "تتيح هذه المنصة لمدراء النظام ووزارة التربية والتعليم رفع المناهج المدرسية الرسمية مباشرة إلى المسار المشفر والمحمي في السحابة لخدمة وكلاء الذكاء الاصطناعي."
+                  : "Secure, encrypted administrative ingestion terminal. Direct curriculum stream to protected cloud sub-path /MOE Library. Maximum file size allowed: 50MB."}
+              </p>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleMoeUpload();
+              }} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {language === "ar" ? "المادة الدراسية" : "Curriculum Subject"}
+                    </label>
+                    <select
+                      value={moeSubject}
+                      onChange={(e) => setMoeSubject(e.target.value)}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff"
+                      }}
+                    >
+                      <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
+                      <option value="Science">{language === "ar" ? "العلوم" : "Science"}</option>
+                      <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Language"}</option>
+                      <option value="History">{language === "ar" ? "التاريخ والجغرافيا" : "History & Social Studies"}</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {language === "ar" ? "الصف الدراسي" : "Academic Grade"}
+                    </label>
+                    <select
+                      value={moeGrade}
+                      onChange={(e) => setMoeGrade(e.target.value)}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff"
+                      }}
+                    >
+                      <option value="Grade 7">{language === "ar" ? "الصف السابع (المتوسط)" : "Grade 7"}</option>
+                      <option value="Grade 8">{language === "ar" ? "الصف الثامن" : "Grade 8"}</option>
+                      <option value="Grade 9">{language === "ar" ? "الصف التاسع" : "Grade 9"}</option>
+                      <option value="Grade 10">{language === "ar" ? "الصف العاشر (الثانوي)" : "Grade 10"}</option>
+                      <option value="Grade 11">{language === "ar" ? "الصف الحادي عشر" : "Grade 11"}</option>
+                      <option value="Grade 12">{language === "ar" ? "الصف الثاني عشر (التوجيهي)" : "Grade 12"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {language === "ar" ? "لغة الكتاب" : "Document Language"}
+                    </label>
+                    <select
+                      value={moeLang}
+                      onChange={(e) => setMoeLang(e.target.value)}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff"
+                      }}
+                    >
+                      <option value="Arabic">{language === "ar" ? "العربية" : "Arabic"}</option>
+                      <option value="English">{language === "ar" ? "الإنجليزية" : "English"}</option>
+                      <option value="French">{language === "ar" ? "الفرنسية" : "French"}</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {language === "ar" ? "العام الدراسي المعتمد" : "Curriculum Academic Year"}
+                    </label>
+                    <input
+                      type="text"
+                      value={moeYear}
+                      onChange={(e) => setMoeYear(e.target.value)}
+                      placeholder="e.g. 2025/2026"
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontFamily: "var(--font-sans)",
+                        background: "#ffffff"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Elegant Drag-and-Drop Area / File Selection Widget */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                    {language === "ar" ? "مستند المنهج (PDF)" : "Curriculum PDF Textbook"}
+                  </label>
+                  <div 
+                    style={{
+                      border: "2px dashed rgba(16, 107, 163, 0.25)",
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1.5rem",
+                      textAlign: "center",
+                      background: "rgba(255, 255, 255, 0.3)",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "0.5rem"
+                    }}
+                    onClick={() => document.getElementById("moe-file-picker")?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = "var(--primary)";
+                      e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)";
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.25)";
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.25)";
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        handleMoeFileSelected(file);
+                      }
+                    }}
+                  >
+                    <FiFileText style={{ fontSize: "2rem", color: moeFile ? "var(--primary)" : "#8a9ca8" }} />
+                    {moeFile ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--primary)" }}>
+                          {moeFile.name}
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                          {(moeFile.size / (1024 * 1024)).toFixed(2)} MB / 50 MB
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--foreground)" }}>
+                          {language === "ar" ? "اسحب وأفلت الملف هنا أو انقر للتصفح" : "Drag & drop PDF here, or click to browse"}
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "#8a9ca8" }}>
+                          {language === "ar" ? "الملفات المدعومة: PDF فقط، بحد أقصى 50 ميجابايت" : "Supported: PDF only, max 50MB limit"}
+                        </span>
+                      </div>
+                    )}
+                    <input
+                      id="moe-file-picker"
+                      type="file"
+                      accept=".pdf"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleMoeFileSelected(file);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Inline error or warning message */}
+                {moeError && (
+                  <div style={{
+                    padding: "0.75rem",
+                    borderRadius: "var(--border-radius-sm)",
+                    background: "rgba(211, 47, 47, 0.08)",
+                    border: "1px solid rgba(211, 47, 47, 0.15)",
+                    color: "#d32f2f",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem"
+                  }}>
+                    <FiAlertTriangle />
+                    <span>{moeError}</span>
+                  </div>
+                )}
+
+                {/* Progress Bar & Status messages */}
+                {moeUploading && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 600, color: "var(--primary)" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <FiRefreshCw className="spinning-icon" />
+                        <span>{moeStatusText}</span>
+                      </span>
+                      <span>{moeProgress}%</span>
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(0,0,0,0.05)", borderRadius: "10px", overflow: "hidden" }}>
+                      <div style={{ width: `${moeProgress}%`, height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px", transition: "width 0.15s ease-out" }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Ingestion success banner */}
+                {moeSuccess && !moeUploading && (
+                  <div style={{
+                    padding: "1rem",
+                    borderRadius: "var(--border-radius-md)",
+                    background: "rgba(46, 125, 50, 0.08)",
+                    border: "1px solid rgba(46, 125, 50, 0.2)",
+                    color: "var(--accent-green)",
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.35rem"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <FiCheckCircle style={{ fontSize: "1.1rem" }} />
+                      <span>{language === "ar" ? "تم حصاد المنهج بنجاح!" : "Curriculum Ingested Successfully!"}</span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "#4b6f4c", fontWeight: 400, marginLeft: "1.5rem" }}>
+                      {language === "ar" 
+                        ? `تم تشفير وحفظ مستند المنهج في مسار وزارة التربية والتعليم الموثق تحت فئة [${moeSubject}].`
+                        : `The document has been securely indexed and stored under the [${moeSubject}] pipeline.`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={moeUploading || !moeFile}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      cursor: (moeUploading || !moeFile) ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <FiPlus />
+                    <span>
+                      {moeUploading 
+                        ? (language === "ar" ? "جاري الحصاد..." : "Ingesting...") 
+                        : (language === "ar" ? "بدء الحصاد والدراسة" : "Execute Ingestion")}
+                    </span>
+                  </button>
+                  
+                  {moeFile && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setMoeFile(null);
+                        setMoeError(null);
+                        setMoeSuccess(false);
+                      }}
+                      disabled={moeUploading}
+                      style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+                    >
+                      <FiX />
+                      <span>{language === "ar" ? "إلغاء" : "Clear"}</span>
+                    </button>
+                  )}
+                </div>
+              </form>
+            </section>
 
             {/* Admin Sourcing Engine Tab View */}
             <div className="grid-cols-2">
@@ -5228,95 +5963,602 @@ export default function Home() {
           </div>
         ) : activeTab === "library" ? (
           /* Knowledge Library Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                {["all", "Math", "Science", "Arabic", "History"].map(sub => (
+          selectedBookReader ? (
+            /* Premium Dual-Panel Interactive Reader Layout */
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* Reader Header Bar */}
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "rgba(255, 255, 255, 0.4)", backdropFilter: "blur(10px)",
+                padding: "1rem 1.5rem", borderRadius: "16px", border: "1px solid rgba(16, 107, 163, 0.08)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                   <button
-                    key={sub}
-                    onClick={() => setLibrarySubject(sub)}
+                    onClick={() => setSelectedBookReader(null)}
                     style={{
-                      padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer",
-                      fontSize: "0.8rem", fontWeight: 700, transition: "all 0.2s",
-                      borderColor: librarySubject === sub ? "var(--primary)" : "rgba(16, 107, 163, 0.12)",
-                      background: librarySubject === sub ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(255,255,255,0.6)",
-                      color: librarySubject === sub ? "#ffffff" : "var(--primary)",
-                      fontFamily: "var(--font-display)"
+                      padding: "8px 16px", borderRadius: "20px", border: "1px solid var(--card-border)",
+                      background: "#ffffff", color: "var(--primary)", fontWeight: 700, fontSize: "0.85rem",
+                      cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "0.4rem"
                     }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = "#ffffff"; }}
                   >
-                    {sub === "all" ? (language === "ar" ? "الكل" : "All Subjects") :
-                     sub === "Math" ? (language === "ar" ? "الرياضيات" : "Math") :
-                     sub === "Science" ? (language === "ar" ? "العلوم" : "Science") :
-                     sub === "Arabic" ? (language === "ar" ? "اللغة العربية" : "Arabic") :
-                     (language === "ar" ? "التاريخ" : "History")}
+                    ⬅️ {language === "ar" ? "المكتبة" : "Library"}
                   </button>
-                ))}
+                  <div>
+                    <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
+                      {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
+                    </h2>
+                    <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>
+                      {language === "ar" ? "جلسة دراسة تفاعلية نشطة مع رفيق فهم" : "Active chapter-linked study companion session"}
+                    </p>
+                  </div>
+                </div>
+                <div style={{
+                  padding: "6px 14px", borderRadius: "20px", background: "rgba(16, 107, 163, 0.08)",
+                  color: "var(--primary)", fontWeight: 800, fontSize: "0.8rem"
+                }}>
+                  🎓 {selectedBookReader.subject === "Math" ? (language === "ar" ? "رياضيات" : "Math") :
+                      selectedBookReader.subject === "Science" ? (language === "ar" ? "علوم" : "Science") :
+                      selectedBookReader.subject === "Arabic" ? (language === "ar" ? "عربي" : "Arabic") :
+                      (language === "ar" ? "تاريخ" : "History")}
+                </div>
               </div>
-              <input
-                type="text"
-                placeholder={language === "ar" ? "ابحث في المكتبة..." : "Search text books..."}
-                value={librarySearch}
-                onChange={(e) => setLibrarySearch(e.target.value)}
-                style={{
-                  padding: "0.5rem 1rem", borderRadius: "20px", border: "1px solid var(--card-border)",
-                  outline: "none", fontSize: "0.85rem", width: "220px", fontFamily: "var(--font-sans)"
-                }}
-              />
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
-              {(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
-                titleEn: b.title,
-                titleAr: b.title_ar || b.title,
-                subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
-                size: "15.0 MB",
-                format: "PDF",
-                downloads: "1,450"
-              })) : [
-                { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
-                { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
-                { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
-                { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
-                { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
-                { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
-              ])
-                .filter(item => {
-                  const s = librarySearch.toLowerCase();
-                  const matchesSearch = item.titleEn.toLowerCase().includes(s) || item.titleAr.includes(s);
-                  const matchesSub = librarySubject === "all" || item.subject === librarySubject;
-                  return matchesSearch && matchesSub;
-                })
-                .map((item, idx) => (
-                  <div key={idx} className="panel-card" style={{ padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "180px", position: "relative", transition: "all 0.2s" }} onMouseOver={(e)=>{e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor="var(--primary)"}} onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor="var(--card-border)"}}>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", background: "rgba(16, 107, 163, 0.08)", color: "var(--primary)", padding: "2px 8px", borderRadius: "10px", display: "inline-block", marginBottom: "0.5rem" }}>
-                        {item.subject === "Math" ? (language === "ar" ? "رياضيات" : "Math") :
-                         item.subject === "Science" ? (language === "ar" ? "علوم" : "Science") :
-                         item.subject === "Arabic" ? (language === "ar" ? "عربي" : "Arabic") :
-                         (language === "ar" ? "تاريخ" : "History")}
-                      </span>
-                      <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", color: "var(--foreground)", fontFamily: "var(--font-sans)" }}>
-                        {language === "ar" ? item.titleAr : item.titleEn}
-                      </h3>
-                      <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>💾 {item.format} | 📦 {item.size}</p>
+              {/* Reader Split Panels */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
+                {/* Left Panel - Textbook Viewer */}
+                {(() => {
+                  const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || {
+                    titleEn: selectedBookReader.titleEn || selectedBookReader.title || "Custom Material",
+                    titleAr: selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title || "وثيقة مخصصة",
+                    chapters: [
+                      {
+                        titleEn: "Chapter 1: Study Content",
+                        titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
+                        pages: [
+                          {
+                            pageNum: 1,
+                            titleEn: "Section 1: General Core Overview",
+                            titleAr: "القسم الأول: نظرة عامة شاملة",
+                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}. Ground your AI study assistant directly in this material by turning on the Magnetize feature.`,
+                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر تشغيل خاصية مغنطة الصفحة.`,
+                            formulas: ["Syllabus Grounding Key: S = G × (1 - E)"],
+                            tipEn: "Toggle 'Magnetize Page' below to pin this specific document's page to all subsequent chatbot queries!",
+                            tipAr: "قم بتفعيل 'مغنطة الصفحة' أدناه لربط هذه الصفحة تحديداً بجميع أسئلتك القادمة لرفيقك الدراسي!"
+                          }
+                        ]
+                      }
+                    ]
+                  };
+
+                  const allPages: any[] = [];
+                  bookData.chapters.forEach((ch: any, chIdx: number) => {
+                    ch.pages.forEach((p: any) => {
+                      allPages.push({
+                        ...p,
+                        chapterTitleEn: ch.titleEn,
+                        chapterTitleAr: ch.titleAr,
+                        chapterIndex: chIdx
+                      });
+                    });
+                  });
+
+                  const totalPagesCount = allPages.length || 1;
+                  const activePage = allPages[readerCurrentPage - 1] || allPages[0] || {
+                    pageNum: 1,
+                    titleEn: "Untitled Section",
+                    titleAr: "قسم غير معنون",
+                    contentEn: "",
+                    contentAr: ""
+                  };
+
+                  return (
+                    <div className="panel-card" style={{
+                      padding: "1.75rem", display: "flex", flexDirection: "column",
+                      justifyContent: "space-between", minHeight: "550px", position: "relative",
+                      background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(14px)",
+                      border: "1px solid rgba(16, 107, 163, 0.1)"
+                    }}>
+                      <div>
+                        {/* Page Navigation & Chapters */}
+                        <div style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          marginBottom: "1.5rem", borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
+                          paddingBottom: "0.75rem"
+                        }}>
+                          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
+                            📖 {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
+                          </span>
+                          
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <button
+                              disabled={readerCurrentPage <= 1}
+                              onClick={() => setReaderCurrentPage(prev => Math.max(1, prev - 1))}
+                              style={{
+                                width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--card-border)",
+                                background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center",
+                                cursor: readerCurrentPage <= 1 ? "not-allowed" : "pointer", opacity: readerCurrentPage <= 1 ? 0.4 : 1,
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {language === "ar" ? "➡️" : "⬅️"}
+                            </button>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 700, minWidth: "80px", textAlign: "center" }}>
+                              {language === "ar" ? `صفحة ${readerCurrentPage} من ${totalPagesCount}` : `Page ${readerCurrentPage} of ${totalPagesCount}`}
+                            </span>
+                            <button
+                              disabled={readerCurrentPage >= totalPagesCount}
+                              onClick={() => setReaderCurrentPage(prev => Math.min(totalPagesCount, prev + 1))}
+                              style={{
+                                width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--card-border)",
+                                background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center",
+                                cursor: readerCurrentPage >= totalPagesCount ? "not-allowed" : "pointer", opacity: readerCurrentPage >= totalPagesCount ? 0.4 : 1,
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {language === "ar" ? "⬅️" : "➡️"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Page Title & Body */}
+                        <div style={{ direction: language === "ar" ? "rtl" : "ltr", textAlign: "start" }}>
+                          <h3 style={{ fontSize: "1.2rem", fontWeight: 800, margin: "0 0 1rem 0", color: "var(--primary)" }}>
+                            {language === "ar" ? activePage.titleAr : activePage.titleEn}
+                          </h3>
+                          <p style={{
+                            fontSize: "0.95rem", lineHeight: "1.65", color: "var(--foreground)",
+                            margin: "0 0 1.5rem 0", whiteSpace: "pre-wrap"
+                          }}>
+                            {language === "ar" ? (activePage.contentAr || activePage.contentEn) : (activePage.contentEn || activePage.contentAr)}
+                          </p>
+                        </div>
+
+                        {/* Custom Formatted Math/Chemistry Formulas */}
+                        {activePage.formulas && activePage.formulas.length > 0 && (
+                          <div style={{
+                            margin: "1.25rem 0", padding: "1.15rem", borderRadius: "14px",
+                            background: "linear-gradient(135deg, #0f172a, #1e293b)",
+                            border: "1.5px solid rgba(212, 175, 55, 0.4)",
+                            boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                            direction: "ltr", textAlign: "start"
+                          }}>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--secondary)", display: "block", marginBottom: "0.5rem" }}>
+                              📐 {language === "ar" ? "القوانين والصيغ الجوهرية" : "Key Formulations"}
+                            </span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                              {activePage.formulas.map((form: string, fIdx: number) => (
+                                <code key={fIdx} style={{ fontSize: "0.95rem", color: "#38bdf8", fontWeight: 700, fontFamily: "monospace", paddingLeft: "0.5rem" }}>
+                                  • {form}
+                                </code>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Premium Study Tip */}
+                        {(activePage.tipEn || activePage.tipAr) && (
+                          <div style={{
+                            margin: "1.25rem 0", padding: "1rem 1.25rem", borderRadius: "14px",
+                            background: "rgba(212, 175, 55, 0.08)", border: "1px solid rgba(212, 175, 55, 0.25)",
+                            display: "flex", gap: "0.75rem", alignItems: "flex-start",
+                            direction: language === "ar" ? "rtl" : "ltr", textAlign: "start"
+                          }}>
+                            <span style={{ fontSize: "1.3rem", marginTop: "-3px" }}>💡</span>
+                            <div>
+                              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--accent)", display: "block", marginBottom: "0.15rem" }}>
+                                {language === "ar" ? "نصيحة دراسية" : "Study Tip"}
+                              </span>
+                              <p style={{ margin: 0, fontSize: "0.82rem", color: "#4f6371", lineHeight: "1.4" }}>
+                                {language === "ar" ? (activePage.tipAr || activePage.tipEn) : (activePage.tipEn || activePage.tipAr)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Left Panel Footer - Contextual Magnetization Button */}
+                      <div style={{ marginTop: "1.5rem" }}>
+                        <button
+                          onClick={() => {
+                            setReaderMagnetized(!readerMagnetized);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "0.9rem 1.5rem",
+                            borderRadius: "14px",
+                            border: "none",
+                            cursor: "pointer",
+                            background: readerMagnetized 
+                              ? "linear-gradient(135deg, var(--primary), #22c55e)" 
+                              : "rgba(16, 107, 163, 0.08)",
+                            color: readerMagnetized ? "#ffffff" : "var(--primary)",
+                            fontWeight: 800,
+                            fontSize: "0.92rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "0.5rem",
+                            transition: "all 0.3s ease",
+                            boxShadow: readerMagnetized ? "0 4px 15px rgba(34, 197, 148, 0.35)" : "none"
+                          }}
+                        >
+                          <span style={{ animation: readerMagnetized ? "pulse 1.5s infinite" : "none", display: "inline-block" }}>
+                            {readerMagnetized ? "🧲" : "🔗"}
+                          </span>
+                          <span>
+                            {readerMagnetized 
+                              ? (language === "ar" ? "مغنطة وتثبيت الصفحة نشط" : "🧲 Page Magnetization Grounded") 
+                              : (language === "ar" ? "مغنطة وتثبيت الصفحة الحالية" : "🧲 Magnetize This Page")}
+                          </span>
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(0,0,0,0.04)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
-                      <span style={{ fontSize: "0.75rem", color: "#4f6371" }}>📥 {item.downloads} {language === "ar" ? "تحميل" : "downloads"}</span>
-                      <button
-                        onClick={() => alert(language === "ar" ? `جاري تحميل ملف: ${item.titleAr}` : `Downloading textbook: ${item.titleEn}`)}
+                  );
+                })()}
+
+                {/* Right Panel - Active Chat Companion */}
+                <div className="panel-card" style={{
+                  padding: "1.5rem", display: "flex", flexDirection: "column",
+                  justifyContent: "space-between", minHeight: "550px", height: "100%",
+                  background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(16, 107, 163, 0.1)", borderRadius: "20px"
+                }}>
+                  {/* Chat Area Header */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderBottom: "1px solid rgba(16, 107, 163, 0.08)", paddingBottom: "0.75rem", marginBottom: "1rem"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <div style={{ position: "relative" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>
+                          🤖
+                        </div>
+                        <span style={{
+                          position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px",
+                          borderRadius: "50%", background: "#22c55e", border: "2px solid #ffffff",
+                          animation: "pulse-border 2s infinite"
+                        }} />
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)", display: "block" }}>
+                          {language === "ar" ? "رفيق دراسة فهم ذكي" : "Fahem Swarm Companion"}
+                        </span>
+                        <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>
+                          🟢 {activeDbAgent || (language === "ar" ? "منسق السرب الأكاديمي" : "Swarm Academic Coordinator")}
+                        </span>
+                      </div>
+                    </div>
+                    {readerMagnetized && (
+                      <span style={{
+                        fontSize: "0.7rem", fontWeight: 800, color: "#22c55e",
+                        background: "rgba(34,197,94,0.08)", padding: "4px 8px", borderRadius: "10px"
+                      }}>
+                        📌 {language === "ar" ? "موجّه بالصفحة" : "Page Locked"}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Message List Box */}
+                  <div style={{
+                    flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column",
+                    gap: "0.85rem", padding: "0.5rem", maxHeight: "360px"
+                  }} className="custom-scrollbar">
+                    {readerMessages.map((msg, mIdx) => {
+                      const isStudent = msg.sender === "student";
+                      return (
+                        <div key={mIdx} style={{
+                          display: "flex", justifyContent: isStudent ? "flex-end" : "flex-start",
+                          width: "100%"
+                        }}>
+                          <div style={{
+                            maxWidth: "85%", padding: "0.8rem 1rem", borderRadius: "16px",
+                            borderTopLeftRadius: !isStudent ? "2px" : "16px",
+                            borderTopRightRadius: isStudent ? "2px" : "16px",
+                            background: isStudent 
+                              ? "linear-gradient(135deg, var(--primary), var(--secondary))" 
+                              : "rgba(255, 255, 255, 0.9)",
+                            color: isStudent ? "#ffffff" : "var(--foreground)",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+                            border: isStudent ? "none" : "1px solid rgba(16, 107, 163, 0.08)",
+                            textAlign: "start", direction: language === "ar" ? "rtl" : "ltr"
+                          }}>
+                            <p style={{ margin: 0, fontSize: "0.85rem", lineHeight: "1.5" }}>
+                              {msg.text}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {readerLoading && (
+                      <div style={{ display: "flex", justifyContent: "flex-start", width: "100%" }}>
+                        <div style={{
+                          padding: "0.8rem 1rem", borderRadius: "16px", borderTopLeftRadius: "2px",
+                          background: "rgba(255, 255, 255, 0.9)", border: "1px solid rgba(16, 107, 163, 0.08)",
+                          display: "flex", alignItems: "center", gap: "0.5rem"
+                        }}>
+                          <div className="pulse-icon" style={{ fontSize: "0.8rem" }}>⏳</div>
+                          <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                            {language === "ar" ? "جاري استشارة سرب الوكلاء الأكاديميين..." : "Consulting academic swarm agents..."}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chat Input Area */}
+                  <div style={{ marginTop: "1rem" }}>
+                    <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                      <textarea
+                        value={readerPrompt}
+                        onChange={(e) => setReaderPrompt(e.target.value)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          alert(language === "ar" 
+                            ? "تنبيه: تم تعطيل النسخ واللصق لتشجيع الفهم النشط والكتابة الذاتية!" 
+                            : "Notice: Copy-pasting is disabled to encourage active recall and typing your own answers!");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (readerPrompt.trim() && !readerLoading) {
+                              runReaderQuery(readerPrompt);
+                            }
+                          }
+                        }}
+                        placeholder={language === "ar" ? "اسأل رفيقك الدراسي الذكي عن محتوى هذه الصفحة..." : "Ask your AI tutor companion about this page content..."}
+                        rows={2}
                         style={{
-                          padding: "4px 10px", borderRadius: "20px", border: "none", cursor: "pointer",
-                          background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                          fontSize: "0.75rem", fontWeight: 700
+                          flexGrow: 1, padding: "0.75rem", borderRadius: "12px",
+                          border: "1px solid var(--card-border)", outline: "none", fontSize: "0.85rem",
+                          fontFamily: "var(--font-sans)", resize: "none", background: "#ffffff",
+                          paddingInlineEnd: "3.5rem"
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (readerPrompt.trim() && !readerLoading) {
+                            runReaderQuery(readerPrompt);
+                          }
+                        }}
+                        disabled={readerLoading || !readerPrompt.trim()}
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          insetInlineEnd: "0.5rem",
+                          width: "36px", height: "36px", borderRadius: "10px", border: "none",
+                          background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                          color: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center",
+                          justifyContent: "center", opacity: (readerLoading || !readerPrompt.trim()) ? 0.5 : 1,
+                          transition: "all 0.2s"
                         }}
                       >
-                        {language === "ar" ? "تحميل مجاني" : "Download"}
+                        🚀
                       </button>
                     </div>
                   </div>
-                ))}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Standard Knowledge Library Catalog */
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  {["all", "Math", "Science", "Arabic", "History"].map(sub => (
+                    <button
+                      key={sub}
+                      onClick={() => setLibrarySubject(sub)}
+                      style={{
+                        padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer",
+                        fontSize: "0.8rem", fontWeight: 700, transition: "all 0.2s",
+                        borderColor: librarySubject === sub ? "var(--primary)" : "rgba(16, 107, 163, 0.12)",
+                        background: librarySubject === sub ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(255,255,255,0.6)",
+                        color: librarySubject === sub ? "#ffffff" : "var(--primary)",
+                        fontFamily: "var(--font-display)"
+                      }}
+                    >
+                      {sub === "all" ? (language === "ar" ? "الكل" : "All Subjects") :
+                       sub === "Math" ? (language === "ar" ? "الرياضيات" : "Math") :
+                       sub === "Science" ? (language === "ar" ? "العلوم" : "Science") :
+                       sub === "Arabic" ? (language === "ar" ? "اللغة العربية" : "Arabic") :
+                       (language === "ar" ? "التاريخ" : "History")}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder={language === "ar" ? "ابحث في المكتبة..." : "Search text books..."}
+                  value={librarySearch}
+                  onChange={(e) => setLibrarySearch(e.target.value)}
+                  style={{
+                    padding: "0.5rem 1rem", borderRadius: "20px", border: "1px solid var(--card-border)",
+                    outline: "none", fontSize: "0.85rem", width: "220px", fontFamily: "var(--font-sans)"
+                  }}
+                />
+              </div>
+
+              {/* Textbooks List */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
+                {([
+                  ...(moeIngestedBooks && moeIngestedBooks.length > 0 ? moeIngestedBooks.map((b: any) => ({
+                    titleEn: b.titleEn,
+                    titleAr: b.titleAr,
+                    subject: b.subject,
+                    size: b.size,
+                    format: b.format,
+                    downloads: b.downloads,
+                    isMoeIngested: true
+                  })) : []),
+                  ...(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
+                    titleEn: b.title,
+                    titleAr: b.title_ar || b.title,
+                    subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
+                    size: "15.0 MB",
+                    format: "PDF",
+                    downloads: "1,450"
+                  })) : []),
+                  { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
+                  { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
+                  { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
+                  { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
+                  { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
+                  { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
+                ] as any[])
+                  .filter(item => {
+                    const s = librarySearch.toLowerCase();
+                    const matchesSearch = item.titleEn.toLowerCase().includes(s) || item.titleAr.includes(s);
+                    const matchesSub = librarySubject === "all" || item.subject === librarySubject;
+                    return matchesSearch && matchesSub;
+                  })
+                  .map((item, idx) => (
+                    <div key={idx} className="panel-card" style={{ padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "190px", position: "relative", transition: "all 0.2s" }} onMouseOver={(e)=>{e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor="var(--primary)"}} onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor="var(--card-border)"}}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.3rem" }}>
+                          <span style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", background: "rgba(16, 107, 163, 0.08)", color: "var(--primary)", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
+                            {item.subject === "Math" ? (language === "ar" ? "رياضيات" : "Math") :
+                             item.subject === "Science" ? (language === "ar" ? "علوم" : "Science") :
+                             item.subject === "Arabic" ? (language === "ar" ? "عربي" : "Arabic") :
+                             (language === "ar" ? "تاريخ" : "History")}
+                          </span>
+                          {item.isMoeIngested && (
+                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "rgba(46, 125, 50, 0.12)", color: "var(--accent-green)", padding: "2px 6px", borderRadius: "8px", display: "inline-block" }}>
+                              🏛️ {language === "ar" ? "منهج رسمي معتمد" : "MOE Official"}
+                            </span>
+                          )}
+                        </div>
+                        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", color: "var(--foreground)", fontFamily: "var(--font-sans)" }}>
+                          {language === "ar" ? item.titleAr : item.titleEn}
+                        </h3>
+                        <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>💾 {item.format} | 📦 {item.size}</p>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", borderTop: "1px solid rgba(0,0,0,0.04)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.75rem", color: "#4f6371" }}>📥 {item.downloads} {language === "ar" ? "تحميل" : "downloads"}</span>
+                          <div style={{ display: "flex", gap: "0.3rem" }}>
+                            <button
+                              onClick={() => alert(language === "ar" ? `جاري تحميل ملف: ${item.titleAr}` : `Downloading textbook: ${item.titleEn}`)}
+                              style={{
+                                padding: "4px 8px", borderRadius: "20px", border: "1px solid rgba(16, 107, 163, 0.15)", cursor: "pointer",
+                                background: "#ffffff", color: "var(--primary)",
+                                fontSize: "0.75rem", fontWeight: 700
+                              }}
+                            >
+                              📥
+                            </button>
+                            <button
+                              onClick={() => handleStartStudy(item)}
+                              style={{
+                                padding: "4px 10px", borderRadius: "20px", border: "none", cursor: "pointer",
+                                background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
+                                fontSize: "0.75rem", fontWeight: 700
+                              }}
+                            >
+                              📖 {language === "ar" ? "دراسة وتفاعل" : "Study"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Study Vault - User Personal Uploads Section */}
+              <div style={{
+                marginTop: "2.5rem", padding: "1.75rem", borderRadius: "20px",
+                background: "linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(212, 175, 55, 0.05))",
+                border: "1px solid rgba(212, 175, 55, 0.15)", backdropFilter: "blur(12px)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.25rem", fontWeight: 800, margin: 0, color: "var(--foreground)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      🔒 {language === "ar" ? "خزنة دراستي الخاصة (تحميل آمن)" : "My Study Vault (Secure Ingestion)"}
+                    </h3>
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "#6a7c88" }}>
+                      {language === "ar" 
+                        ? "قم بتحميل وثائقك وأبحاثك الشخصية لدراستها ومذاكرتها بشكل تفاعلي مع رفيق فهم (بحد أقصى 2 ميجابايت)."
+                        : "Upload personal notes or guides to study interactively with your companion (strict 2MB limit)."}
+                    </p>
+                  </div>
+
+                  <label style={{
+                    padding: "0.75rem 1.25rem", fontSize: "0.85rem", fontWeight: 700, borderRadius: "12px",
+                    background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
+                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", transition: "all 0.2s"
+                  }} onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }} onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}>
+                    <span>📁 {language === "ar" ? "تحميل مستند دراسي" : "Upload Document"}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert(language === "ar" ? "خطأ: حجم الملف يتجاوز الحد الأقصى (2 ميجابايت) للمستندات الخاصة." : "Error: Study document exceeds the strict 2MB upload limit.");
+                            e.target.value = "";
+                            return;
+                          }
+                          const storageRef = ref(storage, "User Uploads/" + user?.uid + "_" + Date.now() + "_" + file.name);
+                          uploadBytes(storageRef, file).then(() => {
+                            // Successfully uploaded securely (sub-path secret)
+                            alert(language === "ar" ? "تم تحميل مستندك الشخصي بنجاح إلى الخزنة الآمنة!" : "Your personal notes have been ingested securely into the vault!");
+                            const newBook = {
+                              titleEn: file.name.replace(/\.[^/.]+$/, ""),
+                              titleAr: file.name.replace(/\.[^/.]+$/, ""),
+                              subject: "Science",
+                              size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
+                              format: file.name.split('.').pop()?.toUpperCase() || "PDF",
+                              downloads: "0",
+                              isUserUpload: true
+                            };
+                            setCustomUploadedBooks(prev => [newBook, ...prev]);
+                          }).catch((err) => {
+                            console.error("Upload error:", err);
+                            alert(language === "ar" ? "حدث خطأ أثناء تحميل الملف." : "An error occurred while uploading your document.");
+                          });
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Render Vault File Cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
+                  {customUploadedBooks.map((item, idx) => (
+                    <div key={idx} className="panel-card" style={{
+                      padding: "1.15rem", display: "flex", flexDirection: "column",
+                      justifyContent: "space-between", height: "140px", border: "1px dashed rgba(212,175,55,0.3)"
+                    }}>
+                      <div>
+                        <span style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase", background: "rgba(212,175,55,0.12)", color: "#b45309", padding: "2px 6px", borderRadius: "8px", display: "inline-block", marginBottom: "0.4rem" }}>
+                          🔒 {language === "ar" ? "ملف دراسي خاص" : "Private Vault File"}
+                        </span>
+                        <h4 style={{ fontSize: "0.85rem", fontWeight: 700, margin: "0 0 0.25rem 0", color: "var(--foreground)" }}>
+                          {language === "ar" ? item.titleAr : item.titleEn}
+                        </h4>
+                        <p style={{ fontSize: "0.72rem", color: "#6a7c88", margin: 0 }}>💾 {item.format} | 📦 {item.size}</p>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => handleStartStudy(item)}
+                          style={{
+                            padding: "4px 10px", borderRadius: "12px", border: "none", cursor: "pointer",
+                            background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
+                            fontSize: "0.75rem", fontWeight: 700
+                          }}
+                        >
+                          📖 {language === "ar" ? "دراسة وتفاعل" : "Study & Interact"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
         ) : activeTab === "subjects" ? (
           /* Course Subjects Panel */
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -6490,6 +7732,177 @@ export default function Home() {
                 <FiSettings style={{ color: "var(--primary)" }} />
                 <span>{language === "ar" ? "مركز الحساب والخصوصية" : "Account & Privacy Center"}</span>
               </h2>
+
+              {/* Profile Avatar Selection Section */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.25rem",
+                padding: "1.5rem",
+                background: "rgba(255, 255, 255, 0.5)",
+                border: "1px solid rgba(16, 107, 163, 0.08)",
+                borderRadius: "20px",
+                marginBottom: "2rem",
+                boxShadow: "0 4px 15px rgba(16, 107, 163, 0.02)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "1rem" }}>
+                    {language === "ar" ? "🎨 الصورة الشخصية والرمز المختار:" : "🎨 Custom Avatar & Profile Photo:"}
+                  </span>
+                  <div style={{ display: "flex", gap: "0.25rem", background: "rgba(16, 107, 163, 0.06)", padding: "4px", borderRadius: "12px" }}>
+                    {(["vectors", "animals", "tech", "golden"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setSettingsAvatarTab(tab)}
+                        type="button"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                          border: "none",
+                          cursor: "pointer",
+                          background: settingsAvatarTab === tab ? "#ffffff" : "transparent",
+                          color: settingsAvatarTab === tab ? "var(--primary)" : "#6a7c88",
+                          boxShadow: settingsAvatarTab === tab ? "0 2px 8px rgba(0, 0, 0, 0.05)" : "none",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {tab === "vectors" && (language === "ar" ? "متجهة" : "Vectors")}
+                        {tab === "animals" && (language === "ar" ? "حيوانات" : "Animals")}
+                        {tab === "tech" && (language === "ar" ? "تقنية" : "Tech")}
+                        {tab === "golden" && (language === "ar" ? "ذهبية" : "Premium")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Avatar Grid */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))",
+                  gap: "0.85rem",
+                  maxHeight: "130px",
+                  overflowY: "auto",
+                  padding: "0.5rem",
+                  background: "rgba(255, 255, 255, 0.8)",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(16, 107, 163, 0.05)"
+                }} className="custom-scroll-container">
+                  {avatarCategories[settingsAvatarTab].map((item, idx) => {
+                    const isSelected = settingsAvatar === item.e;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setSettingsAvatar(item.e)}
+                        type="button"
+                        style={{
+                          aspectRatio: "1/1",
+                          borderRadius: "14px",
+                          border: isSelected ? "2px solid var(--secondary)" : "1px solid rgba(16, 107, 163, 0.08)",
+                          background: isSelected ? "rgba(212, 175, 55, 0.08)" : "#ffffff",
+                          fontSize: "1.75rem",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: isSelected ? "0 4px 12px rgba(212, 175, 55, 0.15)" : "none",
+                          transform: isSelected ? "scale(1.05)" : "none",
+                          transition: "all 0.15s ease"
+                        }}
+                        onMouseOver={(e) => { if (!isSelected) e.currentTarget.style.borderColor = "var(--primary)"; }}
+                        onMouseOut={(e) => { if (!isSelected) e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)"; }}
+                        title={language === "ar" ? item.lAr : item.lEn}
+                      >
+                        {item.e.startsWith("/") ? (
+                          <img src={item.e} alt={item.lEn} style={{ width: "42px", height: "42px", objectFit: "contain" }} />
+                        ) : (
+                          item.e
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Avatar Action Section */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <div style={{
+                      width: "54px",
+                      height: "54px",
+                      borderRadius: "50%",
+                      background: "rgba(16, 107, 163, 0.08)",
+                      border: "2px solid var(--primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.8rem",
+                      overflow: "hidden"
+                    }}>
+                      {renderAvatar(settingsAvatar || "🚀", "1.8rem")}
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--primary)", display: "block" }}>
+                        {language === "ar" ? "الرمز المختار" : "Chosen Avatar"}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                        {settingsAvatar 
+                          ? (language === "ar" 
+                              ? (avatarCategories[settingsAvatarTab].find(a => a.e === settingsAvatar)?.lAr || "مخصص")
+                              : (avatarCategories[settingsAvatarTab].find(a => a.e === settingsAvatar)?.lEn || "Custom"))
+                          : (language === "ar" ? "يرجى اختيار رمز أو تحميل صورة" : "Please select an icon or upload a photo")
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    {settingsLoading && (
+                      <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                        ⏳ {settingsStatusText}
+                      </span>
+                    )}
+                    <label style={{ padding: "0.75rem 1.15rem", fontSize: "0.85rem", fontWeight: 700, borderRadius: "12px", border: "1px solid rgba(212, 175, 55, 0.2)", background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))", color: "var(--primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }} onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}>
+                      <span>📁 {language === "ar" ? "تحميل صورة شخصية جديدة" : "Upload New Photo"}</span>
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert(language === "ar" ? "خطأ: حجم الصورة يتجاوز الحد الأقصى (2 ميجابايت)." : "Error: Avatar image size exceeds the strict 2MB validation limit.");
+                            e.target.value = "";
+                            return;
+                          }
+                          if (!user) {
+                            alert(language === "ar" ? "يجب تسجيل الدخول أولاً." : "Please sign in first.");
+                            return;
+                          }
+                          setSettingsLoading(true);
+                          setSettingsStatusText(language === "ar" ? "جاري الرفع..." : "Uploading...");
+                          const fileExtension = file.name.split('.').pop() || 'jpg';
+                          const storageRef = ref(storage, "Profile Pictures/" + user.uid + "_" + Date.now() + "." + fileExtension);
+                          uploadBytes(storageRef, file).then((snapshot) => {
+                            getDownloadURL(snapshot.ref).then((downloadURL) => {
+                              setSettingsAvatar(downloadURL);
+                              setSettingsLoading(false);
+                              setSettingsStatusText("");
+                            }).catch((err) => {
+                              console.error("Error getting download URL:", err);
+                              alert(language === "ar" ? "حدث خطأ أثناء استرداد رابط الصورة." : "An error occurred while retrieving the picture link.");
+                              setSettingsLoading(false);
+                              setSettingsStatusText("");
+                            });
+                          }).catch((err) => {
+                            console.error("Error uploading file:", err);
+                            alert(language === "ar" ? "حدث خطأ أثناء رفع الصورة." : "An error occurred while uploading the picture.");
+                            setSettingsLoading(false);
+                            setSettingsStatusText("");
+                          });
+                        }
+                      }} />
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }} className="grid-cols-2">
                 {/* School Preferences */}

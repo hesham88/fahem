@@ -41,6 +41,8 @@ A systematic, technical breakdown of all files, databases, collections, and pipe
 *   **Code Modifications**: File-by-file accounting of additions or modifications (with links to modified lines).
 *   **Pipeline & Build Metrics**: Verification of local static compilations, build times, and continuous deployment triggers.
 *   **Compliance Status**: Explicit findings from the automated audit sweep (`evaluate_compliance.py`).
+*   **Artifact Mirroring & Revisions**: Status of automated artifact syncing (`mirror_artifacts.py`) to local `/artifacts` and `/artifacts/revisions` folders.
+
 
 ### III. QUICK SHORT RECAP
 *A high-density, bulleted list representing the exact state of active features, finished tasks, pending queue items, and immediate next steps.*
