@@ -1345,6 +1345,29 @@ export default function Home() {
         console.log("[Onboarding Phone] Successfully linked phone:", result.user.phoneNumber);
         cleanupOnboardingRecaptcha();
         
+        // Persist verified phone state in user profile in DB immediately
+        const updatedProfile = {
+          ...userProfile,
+          phoneVerified: true,
+          phone_verified: true,
+          phoneNumber: result.user.phoneNumber || onboardingPhoneNumber
+        };
+        setUserProfile(updatedProfile);
+        
+        try {
+          await fetch("/api/user/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.uid,
+              profile: updatedProfile
+            })
+          });
+          console.log("[Onboarding Phone] Profile phone_verified flag persisted in DB");
+        } catch (dbErr) {
+          console.error("Failed to save phone verification state to DB profile:", dbErr);
+        }
+        
         // Trigger conversational onboarding transition
         await sendOnboardingMessage("[SYSTEM] Phone number verified: " + onboardingPhoneNumber);
       }
@@ -1926,6 +1949,13 @@ export default function Home() {
               setPreferencesSchool(data.profile.school || "");
 
               if (data.profile.onboardingCompleted !== true) {
+                // SMS Verification Logic Guard: if the user's phone is already verified in their profile,
+                // bypass the phone verification step entirely and default to the next logical step ("role")
+                const isPhoneVerified = data.profile.phoneVerified === true || data.profile.phone_verified === true;
+                if (isPhoneVerified) {
+                  setCurrentOnboardingStep("role");
+                }
+
                 // Fetch onboarding history
                 fetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
                   .then((res) => res.json())
@@ -1979,6 +2009,11 @@ export default function Home() {
                               }
                             }
                           }
+                        }
+
+                        // Override loaded state step if phone is already verified
+                        if (lastStep === "phone" && isPhoneVerified) {
+                          lastStep = "role";
                         }
 
                         const loadedState = {

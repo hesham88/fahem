@@ -759,8 +759,21 @@ a:hover {
   text-align: right;
 }
 
-[dir="rtl"] .glass-nav-links {
-  flex-direction: row-reverse;
+/* Update layout component alignments to prevent directional fracturing */
+.landing-navbar-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Replaces directional margins to support dual RTL/LTR rendering naturally */
+  margin-inline-start: auto;
+  padding-inline-end: 1.5rem;
+  flex-direction: row;
+}
+
+/* Ensure language toggles adapt typographic elements without layout overlap */
+body[dir="rtl"] .landing-nav-links {
+  font-family: var(--font-arabic-calligraphy, sans-serif);
+  letter-spacing: 0;  /* Clear custom latin adjustments for clean Arabic display */
 }
 
 [dir="rtl"] .feature-bullets {
