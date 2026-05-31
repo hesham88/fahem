@@ -134,6 +134,37 @@ export async function POST(req: NextRequest) {
     const { prompt, language, userEmail, userId, sessionId, onboarding, recaptchaToken } = await req.json();
     if (recaptchaToken) {
       console.log(`[reCAPTCHA Enterprise Server-Side] Received action protection token: ${recaptchaToken.substring(0, 15)}...`);
+      try {
+        const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
+        if (cloudRunUrl) {
+          const actionName = onboarding ? "ONBOARDING" : "REPORT_SUBMIT";
+          const verifyRes = await fetch(`${cloudRunUrl}/verify-recaptcha`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              token: recaptchaToken,
+              action: actionName
+            })
+          });
+          if (verifyRes.ok) {
+            const assessment = await verifyRes.json();
+            console.log("[reCAPTCHA Enterprise Server-Side] Assessment result:", assessment);
+            if (assessment.success === false) {
+              console.warn(`[reCAPTCHA Enterprise Server-Side] Token assessment failed (${assessment.status}). Rejecting request.`);
+              return new Response(JSON.stringify({ error: "Access Denied: reCAPTCHA Enterprise verification failed." }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+            }
+          } else {
+            console.warn(`[reCAPTCHA Enterprise Server-Side] Verification endpoint returned status: ${verifyRes.status}`);
+          }
+        }
+      } catch (err) {
+        console.error("[reCAPTCHA Enterprise Server-Side] Connection error during microservice verification:", err);
+      }
     } else {
       console.log("[reCAPTCHA Enterprise Server-Side] No action protection token provided (Fail-Open or Direct Action).");
     }
@@ -170,79 +201,262 @@ export async function POST(req: NextRequest) {
           if (onboarding) {
             controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Onboarding\n"));
             controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running conversational onboarding agent...\n"));
-            
-            const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
-            if (!cloudRunUrl) {
-              throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
+
+            // Initialize local Gemini AI client
+            const geminiApiKey = process.env.GEMINI_API_KEY;
+            if (!geminiApiKey) {
+              throw new Error("GEMINI_API_KEY environment variable is not configured.");
+            }
+            const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+            const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+
+            const activeSessionId = sessionId || `onboarding_session_${userId || "anonymous"}`;
+
+            // 1. Fetch chat history from DB to maintain conversational context
+            let existingMessages: any[] = [];
+            try {
+              const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
+              if (res.ok) {
+                const data = await res.json();
+                if (data?.session?.messages) {
+                  existingMessages = data.session.messages;
+                }
+              }
+            } catch (err) {
+              console.warn("Failed to fetch existing session for onboarding:", err);
             }
 
-            let oidcToken = await getOidcToken();
-            if (!oidcToken) {
-              oidcToken = "LOCAL_BYPASS_TOKEN_fahem_2026";
-            }
-            const requestHeaders: Record<string, string> = {
-              "Content-Type": "application/json"
-            };
-            if (oidcToken) {
-              requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-            }
+            // 2. Map existing messages to Gemini format (note: Gemini uses "model" instead of "assistant")
+            const contents: any[] = existingMessages.map(msg => ({
+              role: msg.role === "assistant" || msg.role === "model" ? "model" as const : "user" as const,
+              parts: [{ text: msg.content || msg.text || "" }]
+            }));
 
-            const serializedContext = JSON.stringify({
-              prompt: prompt,
-              language: language || "en",
-              user_email: userEmail || "",
-              user_id: userId || "",
-              username: userEmail ? userEmail.split("@")[0] : "anonymous",
-              credits: 100,
-              onboarding: true
+            // Append new user prompt
+            contents.push({
+              role: "user" as const,
+              parts: [{ text: prompt }]
             });
 
-            const payload = {
-              user_id: userId || "anonymous",
-              session_id: sessionId || `onboarding_session_${userId || "anonymous"}`,
-              app_name: "app",
-              new_message: {
-                role: "user",
-                parts: [{ text: serializedContext }]
-              },
-              streaming: false
-            };
-
-            // Start a keep-alive heartbeat interval to keep the chunked connection open 
-            // during the long-running (5-10s) Cloud Run orchestration flow.
-            const keepAliveInterval = setInterval(() => {
-              try {
-                controller.enqueue(encoder.encode(" ")); // Space character is ignored by client parser but keeps socket open
-              } catch (e) {
-                clearInterval(keepAliveInterval);
+            // 3. Define local validated tools for checking username and saving profiles
+            const tools: any[] = [
+              {
+                functionDeclarations: [
+                  {
+                    name: "checkUsernameAvailability",
+                    description: "Checks if a username is available in the database. Returns true if available (not taken), false if already taken.",
+                    parameters: {
+                      type: "OBJECT" as const,
+                      properties: {
+                        username: { type: "STRING" as const, description: "The username to check." }
+                      },
+                      required: ["username"]
+                    }
+                  },
+                  {
+                    name: "saveUserProfile",
+                    description: "Saves or updates the user profile in MongoDB. Call this once ALL required onboarding fields (role, name, username, age, country, grade/school/children if applicable) have been collected and verified.",
+                    parameters: {
+                      type: "OBJECT" as const,
+                      properties: {
+                        userId: { type: "STRING" as const, description: "The unique user identifier." },
+                        profileData: {
+                          type: "OBJECT" as const,
+                          description: "The JSON object containing the profile fields to save.",
+                          properties: {
+                            username: { type: "STRING" as const },
+                            email: { type: "STRING" as const },
+                            name: { type: "STRING" as const },
+                            role: { type: "STRING" as const },
+                            age: { type: "INTEGER" as const },
+                            parentEmail: { type: "STRING" as const },
+                            country: { type: "STRING" as const },
+                            grade: { type: "STRING" as const },
+                            school: { type: "STRING" as const },
+                            childrenCount: { type: "INTEGER" as const },
+                            childrenInSchool: { type: "INTEGER" as const },
+                            onboardingCompleted: { type: "BOOLEAN" as const }
+                          },
+                          required: ["username", "email", "name", "role", "age", "country"]
+                        }
+                      },
+                      required: ["userId", "profileData"]
+                    }
+                  }
+                ]
               }
-            }, 1500);
+            ];
 
-            let response;
-            try {
-              response = await fetch(`${cloudRunUrl}/run`, {
-                method: "POST",
-                headers: requestHeaders,
-                body: JSON.stringify(payload),
-                cache: "no-store",
-                next: { revalidate: 0 } as any
+            const onboardingSystemInstruction = `
+You are the Fahem Conversational Onboarding Assistant.
+Your sole goal is to naturally, warmly, and politely onboard a new user into the Fahem platform.
+
+The user has selected their preferred language as '${langName}' (from the 7 languages we support: English, Arabic, French, German, Spanish, Italian, and Chinese).
+You MUST speak, respond, and formulate all questions, validation feedback, and welcoming statements strictly and exclusively in '${langName}' at all times. Do NOT randomly switch languages or translate things into other languages.
+
+The current user's authenticated ID is '${userId || "anonymous"}' and their email is '${userEmail || ""}'.
+Your tone must be highly empathetic, friendly, premium, and human-like.
+
+CONVERSATIONAL STATE CHECKLIST & PROTOCOL:
+You must analyze the entire conversation history from the very beginning to build a strict checklist of what fields have already been provided.
+A field is "COLLECTED" if there is ANY mention or clear implication of it in the chat history. Once a field is "COLLECTED", you must NEVER ask for it again or backtrack to it, regardless of what language the user changes to!
+
+Here are the fields to collect in order, along with how to recognize if they are already COLLECTED:
+1. **Role / User Type**: Must be "student", "teacher", "parent", or "admin".
+   - How to recognize if COLLECTED: The user has said "student", "طالب", "معلم", "teacher", "parent", "ولي أمر", "admin", "مسؤول", or chose a card representing one.
+   - Action if COLLECTED: Mark as COLLECTED. Never ask "What is your role?" or "Are you joining as student, teacher...?" again.
+2. **Full Name**: The user's real or preferred name.
+   - How to recognize if COLLECTED: The user has said their name (e.g. "my name is Hesham", "اسمى هشام", "Hesham", "هشام").
+   - Action if COLLECTED: Mark as COLLECTED. Never ask "What is your name?" again. Use their name in greeting.
+3. **Username**: A unique identifier (at least 3 characters, alphanumeric or underscores).
+   - Action: Ask the user to choose a username.
+   - CRITICAL: Once the user suggests a username, you MUST call 'checkUsernameAvailability' to verify if it is available.
+     - If the tool returns available = true, tell them it is available and move to the next field (Mark Username as COLLECTED).
+     - If the tool returns available = false, politely inform them it's taken, suggest 1 or 2 options, and ask for a different one.
+4. **Age**: The user's age (must be a realistic human age between 3 and 120).
+   - If they provide an invalid or unrealistic age (e.g., 0, 1, 2, or >120), politely ask for a realistic age.
+   - Special Rule: If Role is "student" and Age is under 13 (< 13), you MUST ask for their parent's email address and save it in 'parentEmail'.
+5. **Country**: The user's country (e.g., Egypt, Saudi Arabia, etc.).
+6. **Educational Grade Level** (Only if role is "student"):
+   - Recommend a standard school grade based on their age and country, or let them specify a custom grade or "lifelong learning" or skip.
+7. **School Name** (Only if role is "student" or "teacher"):
+   - Ask for their school name. They can type it or specify "Home school" / "None" / "Skip".
+8. **Children Count & Children in School Count** (Only if role is "parent" or "teacher"):
+   - Ask how many children they have and how many of them are in school.
+
+CRITICAL BEHAVIORAL PROTOCOLS:
+- **NO LOOPS**: Keep moving forward. If Role is collected, move to Name. If Name is collected, move to Username. If Username is collected, move to Age, and so on. Never repeat a question or ask for information you already have.
+- **LANGUAGE HARMONY**: Speak in the language of the user's latest input. If they write in English, respond in natural English. If they write in Arabic, respond in natural Arabic. Do NOT mix languages in a single message.
+- **NATURAL TRANSITIONS**: Use smooth, conversational transitions. (e.g. "Perfect, Hesham! Since you are a student, let's now select a unique username for your profile...").
+- **NO TECHNICAL OR SCHEMA DISCLOSURES**: Do not mention tools, MongoDB, JSON, collections, or fields. Talk like a friendly human companion guide.
+- **SAVE PROFILE**: Once ALL required fields for the user's chosen role have been successfully collected and verified, you MUST call 'saveUserProfile' with the gathered information.
+- Ensure 'onboardingCompleted' is set to true in the profileData parameter.
+- After 'saveUserProfile' returns success, write a beautiful, warm final welcoming message indicating that their custom learning space is set up and they are ready to explore.
+- **CRITICAL COMPLETION TOKEN**: You MUST append the exact word "SUCCESS_ONBOARDING_COMPLETE" at the very end of your final response after the profile has been successfully saved. This token is required for the platform to proceed.
+`;
+
+            // Call Gemini
+            let response = await ai.models.generateContent({
+              model: modelName,
+              contents,
+              config: {
+                systemInstruction: onboardingSystemInstruction,
+                tools
+              }
+            });
+
+            // Loop to handle function calls dynamically
+            let loops = 0;
+            while (response.candidates?.[0]?.content?.parts?.some(p => p.functionCall) && loops < 5) {
+              loops++;
+              const parts = response.candidates[0].content.parts;
+              
+              // Add the model's response (containing function calls) to history
+              contents.push({
+                role: "model" as const,
+                parts
               });
-            } finally {
-              clearInterval(keepAliveInterval);
+
+              const responseParts: any[] = [];
+
+              for (const part of parts) {
+                if (part.functionCall) {
+                  const { name, args } = part.functionCall;
+                  console.log(`[Onboarding Agent] Executing tool call: ${name} with args:`, args);
+
+                  let result: any;
+                  if (name === "checkUsernameAvailability") {
+                    const checkUsername = (args as any).username;
+                    try {
+                      const checkRes = await proxyRequest(`/user/username/check?username=${encodeURIComponent(checkUsername)}`, "GET");
+                      if (checkRes.ok) {
+                        const checkData = await checkRes.json();
+                        result = { available: checkData.available };
+                      } else {
+                        result = { available: false, error: "Check endpoint returned error" };
+                      }
+                    } catch (err: any) {
+                      result = { available: false, error: err.message };
+                    }
+                  } else if (name === "saveUserProfile") {
+                    const uId = (args as any).userId;
+                    const profileData = (args as any).profileData;
+                    if (profileData && typeof profileData === "object") {
+                      profileData.onboardingCompleted = true;
+                    }
+                    try {
+                      const saveRes = await proxyRequest("/user/profile", "POST", {
+                        userId: uId,
+                        profile: profileData
+                      });
+                      if (saveRes.ok) {
+                        result = { success: true, message: "Profile saved successfully." };
+                      } else {
+                        const errText = await saveRes.text();
+                        result = { success: false, error: `Save endpoint failed: ${errText}` };
+                      }
+                    } catch (err: any) {
+                      result = { success: false, error: err.message };
+                    }
+                  }
+
+                  responseParts.push({
+                    functionResponse: {
+                      name,
+                      response: result
+                    }
+                  });
+                }
+              }
+
+              // Add function responses to history
+              contents.push({
+                role: "user" as const,
+                parts: responseParts
+              });
+
+              // Generate next response from model
+              response = await ai.models.generateContent({
+                model: modelName,
+                contents,
+                config: {
+                  systemInstruction: onboardingSystemInstruction,
+                  tools
+                }
+              });
             }
 
-            if (response.ok) {
-              const resData: any = await response.json();
-              const onboardingResult = extractFinalAgentOutput(resData);
+            // Get final text response
+            const finalText = response.text || "";
 
-              controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-              controller.enqueue(encoder.encode(onboardingResult));
-              controller.enqueue(encoder.encode("\n==========================\n"));
-              controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
-            } else {
-              const errorText = await response.text();
-              throw new Error(`Microservice HTTP error: ${response.status} - ${errorText}`);
+            // Save new messages to DB
+            const newMessages = [
+              ...existingMessages,
+              { role: "user", content: prompt, timestamp: new Date().toISOString() },
+              { role: "assistant", content: finalText, timestamp: new Date().toISOString() }
+            ];
+
+            try {
+              await proxyRequest("/user/chat-session", "POST", {
+                sessionId: activeSessionId,
+                userId,
+                userEmail,
+                title: "Onboarding Chat Session",
+                messages: newMessages
+              });
+            } catch (err) {
+              console.warn("Failed to save onboarding session history:", err);
             }
+
+            // Stream final response to client using chunked simulation
+            controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+            const chunkSize = 20;
+            for (let i = 0; i < finalText.length; i += chunkSize) {
+              controller.enqueue(encoder.encode(finalText.substring(i, i + chunkSize)));
+              await new Promise(resolve => setTimeout(resolve, 15));
+            }
+            controller.enqueue(encoder.encode("\n==========================\n"));
+            controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
 
             safeClose();
             return;
@@ -303,6 +517,7 @@ You must perform these strict checks:
 1. **Authentication Gate**: Inspect if a valid 'user_email' or 'user_id' is provided. For standard inspections or queries (read-only), allow anonymous/unauthenticated access. For WRITE operations (inserting, updating, deleting, or reporting), a valid user email is STRICTLY REQUIRED. If empty or anonymous during a write operation, reject with 'UNAUTHORIZED: User must be signed-in to perform write operations'.
 2. **Administrative Lock**: Strictly reject any commands or tools starting with 'atlas-'. Standard users should never manage clusters or projects.
 3. **Injection and Drop Protection**: Block malicious injection payloads or destructive operations like dropping/deleting databases, unless it's a valid and authenticated report creation.
+4. **Data Context and Database Inspection Isolation**: Prevent standard users from listing database collections, examining/checking schemas, reading system/database statistics, or reading or querying profiles of other users. Standard users must never be allowed to access these technical database internals or telemetry. These features are strictly reserved for authorized administrators / superadmins. If a standard user attempts to run any database diagnostic, telemetry, schema check, collection listing, or searches for another user's profile, immediately deny the request with an appropriate message.
 
 If all criteria are fully met, respond exactly with "CONFIRMED: Authorized".
 If any criteria fail, respond with "DENIED: <clear explanation in the user's requested language>".
@@ -425,14 +640,17 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
 You are the Fahem Multi-Agent Orchestrator.
 Your job is to receive, process, and beautifully format database operations or security alerts for the user dashboard.
 
+The user's selected preferred language is '${langName}' (one of the 7 supported languages: English, Arabic, French, German, Spanish, Italian, and Chinese).
+You MUST respond, present, and explain everything strictly and exclusively in '${langName}'.
+
 When compiling database output results:
 1. Avoid raw JSON or BSON dumps.
 2. Construct highly professional, premium Markdown tables, lists, or structured cards.
-3. Localize explanations, text, table headers, and statuses fully into the user's selected language.
+3. Localize explanations, text, table headers, and statuses fully into the user's selected language: '${langName}'.
 4. Preserve technical names such as collection names, database names, or specific keys as-is.
 
 When presenting a security denial message:
-1. Explain politely in the requested language that security guardrails blocked the execution.
+1. Explain politely in the user's selected language ('${langName}') that security guardrails blocked the execution.
 2. Highlight the active safety enforcement without releasing internal developer secrets.
 `;
 

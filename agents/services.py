@@ -6,7 +6,7 @@ import fastapi
 logger = logging.getLogger("google_adk." + __name__)
 
 # Helper to register route on a FastAPI app
-def register_metadata_route(app: fastapi.FastAPI):
+def register_telemetry_route(app: fastapi.FastAPI):
     # Check if the route is already registered to avoid duplication
     for route in app.routes:
         if hasattr(route, "path") and route.path == "/db-metadata":
@@ -82,13 +82,13 @@ def register_metadata_route(app: fastapi.FastAPI):
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             
-            from get_metadata import get_metadata
+            from agent_communications import database_telemetry_engine
             
-            # Fetch metadata natively using get_metadata()
-            meta = await get_metadata()
+            # Fetch telemetry natively using database_telemetry_engine (Database Telemetry & Diagnostic Agent)
+            meta = await database_telemetry_engine()
             return meta
         except Exception as err:
-            logger.error(f"[services.py] Failed to retrieve DB metadata: {err}", exc_info=True)
+            logger.error(f"[services.py] Failed to retrieve DB telemetry: {err}", exc_info=True)
             return {
                 "databaseName": "fahem",
                 "collectionsCount": "...",
@@ -98,13 +98,56 @@ def register_metadata_route(app: fastapi.FastAPI):
                 "status": f"Disconnected (Error in custom endpoint: {str(err)})"
             }
             
+    @app.get("/db-diagnostic")
+    async def custom_db_diagnostic():
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            # Mask URI for display
+            masked_uri = uri
+            if "@" in uri:
+                prefix, suffix = uri.split("@", 1)
+                masked_uri = prefix.split("//")[0] + "//" + "fahem_mcp:****@" + suffix
+                
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            cols = db.list_collection_names()
+            
+            counts = {}
+            for col in cols:
+                counts[col] = db[col].count_documents({})
+                
+            test_prof = db["users"].find_one({"userId": "test_user_id_gemini_2026"})
+            if test_prof:
+                test_prof.pop("_id", None)
+                
+            return {
+                "status": "success",
+                "masked_uri": masked_uri,
+                "collections": cols,
+                "counts": counts,
+                "test_profile_exists": test_prof is not None,
+                "test_profile": test_prof
+            }
+        except Exception as err:
+            logger.error(f"[services.py] DB Diagnostic failed: {err}", exc_info=True)
+            return {
+                "status": "error",
+                "error": str(err)
+            }
+
     @app.get("/audit-logs")
     async def get_logs_endpoint():
         try:
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_audit_logs
+            from agent_communications import get_audit_logs
             logs = await get_audit_logs()
             return {"logs": logs}
         except Exception as err:
@@ -117,7 +160,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import log_audit_event
+            from agent_communications import log_audit_event
             data = await request.json()
             category = data.get("category", "INFO")
             agent = data.get("agent", "System")
@@ -135,7 +178,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import log_user_activity
+            from agent_communications import log_user_activity
             data = await request.json()
             user_id = data.get("userId", "")
             user_email = data.get("userEmail", "")
@@ -154,7 +197,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_user_activities
+            from agent_communications import get_user_activities
             activities = await get_user_activities(userId)
             return {"activities": activities}
         except Exception as err:
@@ -167,7 +210,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import save_chat_session
+            from agent_communications import save_chat_session
             data = await request.json()
             session_id = data.get("sessionId", "")
             user_id = data.get("userId", "")
@@ -186,7 +229,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_user_sessions
+            from agent_communications import get_user_sessions
             sessions = await get_user_sessions(userId)
             return {"sessions": sessions}
         except Exception as err:
@@ -199,7 +242,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_session_detail
+            from agent_communications import get_session_detail
             session = await get_session_detail(sessionId)
             return {"session": session}
         except Exception as err:
@@ -212,7 +255,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import delete_session
+            from agent_communications import delete_session
             success = await delete_session(sessionId)
             return {"status": "success" if success else "error"}
         except Exception as err:
@@ -225,7 +268,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import log_token_usage
+            from agent_communications import log_token_usage
             data = await request.json()
             user_id = data.get("userId", "")
             user_email = data.get("userEmail", "")
@@ -246,7 +289,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_user_token_stats
+            from agent_communications import get_user_token_stats
             stats = await get_user_token_stats(userId)
             return {"stats": stats}
         except Exception as err:
@@ -259,7 +302,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_all_activities, get_global_token_stats
+            from agent_communications import get_all_activities, get_global_token_stats
             activities = await get_all_activities()
             token_stats = await get_global_token_stats()
             return {"activities": activities, "tokenStats": token_stats}
@@ -273,7 +316,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_user_profile
+            from agent_communications import get_user_profile
             profile = await get_user_profile(user_id=userId, username=username, email=email)
             return {"profile": profile}
         except Exception as err:
@@ -286,7 +329,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import check_username_availability
+            from agent_communications import check_username_availability
             available = await check_username_availability(username)
             return {"available": available}
         except Exception as err:
@@ -299,7 +342,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import save_user_profile
+            from agent_communications import save_user_profile
             data = await request.json()
             user_id = data.get("userId", "")
             profile_data = data.get("profile", {})
@@ -317,7 +360,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import delete_user_account
+            from agent_communications import delete_user_account
             success = await delete_user_account(userId, email)
             return {"status": "success" if success else "error"}
         except Exception as err:
@@ -330,7 +373,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_all_users
+            from agent_communications import get_all_users
             users = await get_all_users()
             return {"users": users}
         except Exception as err:
@@ -343,7 +386,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import add_friend, remove_friend
+            from agent_communications import add_friend, remove_friend
             data = await request.json()
             user_id = data.get("userId", "")
             friend_id = data.get("friendId", "")
@@ -364,7 +407,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import save_chat_message
+            from agent_communications import save_chat_message
             data = await request.json()
             sender_id = data.get("senderId", "")
             sender_name = data.get("senderName", "")
@@ -383,7 +426,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_chat_history
+            from agent_communications import get_chat_history
             messages = await get_chat_history(senderId, recipientId, isGroup)
             return {"messages": messages}
         except Exception as err:
@@ -396,7 +439,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import get_pending_children
+            from agent_communications import get_pending_children
             children = await get_pending_children(parentEmail)
             return {"children": children}
         except Exception as err:
@@ -409,7 +452,7 @@ def register_metadata_route(app: fastapi.FastAPI):
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
-            from get_metadata import approve_child
+            from agent_communications import approve_child
             data = await request.json()
             parent_email = data.get("parentEmail", "")
             child_id = data.get("childId", "")
@@ -419,14 +462,34 @@ def register_metadata_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to approve child: {err}", exc_info=True)
             return {"status": "error", "error": str(err)}
 
-    logger.info("Mounted custom database, logging, activity, session, and token routes onto FastAPI application.")
+    @app.post("/verify-recaptcha")
+    async def post_verify_recaptcha_endpoint(request: fastapi.Request):
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from recaptcha_verification import verify_recaptcha_token_safely
+            data = await request.json()
+            token = data.get("token", "")
+            action = data.get("action", "LOGIN")
+            
+            if not token:
+                return {"status": "error", "error": "Token is required"}
+                
+            res = verify_recaptcha_token_safely(token, action)
+            return res
+        except Exception as err:
+            logger.error(f"[services.py] Failed to verify recaptcha: {err}", exc_info=True)
+            return {"success": True, "status": "fail_open_bypass", "error": str(err), "score": 1.0}
+
+    logger.info("Mounted custom database, logging, activity, session, token, and recaptcha routes onto FastAPI application.")
 
 # 1. Universal Patch: fastapi.FastAPI.__init__
 try:
     original_fastapi_init = fastapi.FastAPI.__init__
     def patched_fastapi_init(self, *args, **kwargs):
         original_fastapi_init(self, *args, **kwargs)
-        register_metadata_route(self)
+        register_telemetry_route(self)
     fastapi.FastAPI.__init__ = patched_fastapi_init
     logger.info("Successfully applied universal monkeypatch to fastapi.FastAPI.__init__")
 except Exception as e:
@@ -449,7 +512,7 @@ def patch_server_class(ServerClass):
             original_get_app = ServerClass.get_fast_api_app
             def patched_get_app(self, *args, **kwargs):
                 app = original_get_app(self, *args, **kwargs)
-                register_metadata_route(app)
+                register_telemetry_route(app)
                 return app
             ServerClass.get_fast_api_app = patched_get_app
             logger.info(f"Successfully applied monkeypatch to {ServerClass.__name__}.get_fast_api_app")

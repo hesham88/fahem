@@ -2,3 +2,4 @@ google-adk
 pymongo
 mcp
 dnspython
+google-cloud-recaptcha-enterprise
