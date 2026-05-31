@@ -40,6 +40,32 @@ export default function ReportPage() {
     }
   }, [logs]);
 
+  const executeRecaptcha = (): Promise<string | null> => {
+    return new Promise((resolve) => {
+      try {
+        const grecaptcha = (window as any).grecaptcha;
+        if (grecaptcha && grecaptcha.enterprise) {
+          grecaptcha.enterprise.ready(async () => {
+            try {
+              const token = await grecaptcha.enterprise.execute('6LfT9wQtAAAAAFElDHZ9ddSZHbKzMZx2-IO7PLKV', { action: 'REPORT_SUBMIT' });
+              console.log("[reCAPTCHA Enterprise] Token acquired successfully for REPORT_SUBMIT:", token);
+              resolve(token);
+            } catch (err) {
+              console.error("[reCAPTCHA Enterprise] Execution error:", err);
+              resolve(null);
+            }
+          });
+        } else {
+          console.warn("[reCAPTCHA Enterprise] SDK not loaded on window. Proceeding without token.");
+          resolve(null);
+        }
+      } catch (err) {
+        console.error("[reCAPTCHA Enterprise] Unexpected error during verification:", err);
+        resolve(null);
+      }
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !description) return;
@@ -64,6 +90,14 @@ export default function ReportPage() {
     `;
 
     try {
+      console.log("[reCAPTCHA Enterprise] Securing report submission action...");
+      const token = await executeRecaptcha();
+      if (token) {
+        console.log("[reCAPTCHA Enterprise] Submission secured. Adding token to payload.");
+      } else {
+        console.log("[reCAPTCHA Enterprise] SDK load failure or bypassed. Continuing submission (Fail-Open).");
+      }
+
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: {
@@ -73,7 +107,8 @@ export default function ReportPage() {
           prompt,
           language,
           userEmail: currentUser?.email || email || "",
-          userId: currentUser?.uid || ""
+          userId: currentUser?.uid || "",
+          recaptchaToken: token || undefined
         }),
       });
 

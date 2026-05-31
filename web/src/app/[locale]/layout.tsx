@@ -5,6 +5,7 @@ import { LanguageProvider, Language } from "../../context/LanguageContext";
 import StickyChat from "../../components/StickyChat";
 import AnalyticsProvider from "../../components/AnalyticsProvider";
 import React from "react";
+import Script from "next/script";
 
 const outfit = Outfit({
   variable: "--font-display",
@@ -213,6 +214,10 @@ export default async function LocaleLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <Script
+          src="https://www.google.com/recaptcha/enterprise.js?render=6LfT9wQtAAAAAFElDHZ9ddSZHbKzMZx2-IO7PLKV"
+          strategy="afterInteractive"
         />
       </head>
       <body>

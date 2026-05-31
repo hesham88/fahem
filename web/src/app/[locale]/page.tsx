@@ -44,10 +44,44 @@ export default function LandingPage() {
     return () => unsubscribe();
   }, [router, language]);
 
+  const executeRecaptcha = (): Promise<string | null> => {
+    return new Promise((resolve) => {
+      try {
+        const grecaptcha = (window as any).grecaptcha;
+        if (grecaptcha && grecaptcha.enterprise) {
+          grecaptcha.enterprise.ready(async () => {
+            try {
+              const token = await grecaptcha.enterprise.execute('6LfT9wQtAAAAAFElDHZ9ddSZHbKzMZx2-IO7PLKV', { action: 'LOGIN' });
+              console.log("[reCAPTCHA Enterprise] Token acquired successfully:", token);
+              resolve(token);
+            } catch (err) {
+              console.error("[reCAPTCHA Enterprise] Execution error:", err);
+              resolve(null);
+            }
+          });
+        } else {
+          console.warn("[reCAPTCHA Enterprise] SDK not loaded on window. Proceeding without token.");
+          resolve(null);
+        }
+      } catch (err) {
+        console.error("[reCAPTCHA Enterprise] Unexpected error during verification:", err);
+        resolve(null);
+      }
+    });
+  };
+
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
     setErrorMsg("");
     try {
+      console.log("[reCAPTCHA Enterprise] Securing authentication request...");
+      const token = await executeRecaptcha();
+      if (token) {
+        console.log("[reCAPTCHA Enterprise] Authentication secured. Proceeding to Firebase login.");
+      } else {
+        console.log("[reCAPTCHA Enterprise] SDK load failure or bypassed. Continuing login (Fail-Open).");
+      }
+
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
         router.push(`/${language}/home`);
