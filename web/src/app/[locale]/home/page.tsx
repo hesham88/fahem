@@ -463,6 +463,7 @@ export default function Home() {
   // Conversational Onboarding states
   const [localCompleted, setLocalCompleted] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
+  const [currentOnboardingStep, setCurrentOnboardingStep] = useState<string>("role");
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
   const [onboardingCountry, setOnboardingCountry] = useState("");
@@ -1317,6 +1318,22 @@ export default function Home() {
           const trimmed = line.trim();
           if (!trimmed) continue;
 
+          if (trimmed.startsWith("[METADATA] state:")) {
+            try {
+              const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
+              const stateObj = JSON.parse(jsonStr);
+              if (stateObj) {
+                if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
+                if (stateObj.role) setOnboardingUserType(stateObj.role);
+                if (stateObj.country) setOnboardingCountry(stateObj.country);
+                if (stateObj.name) setOnboardingName(stateObj.name);
+                if (stateObj.username) setOnboardingUsername(stateObj.username);
+              }
+            } catch (err) {
+              console.error("Error parsing metadata state:", err);
+            }
+          }
+
           if (trimmed.startsWith("[METADATA]")) {
             continue;
           }
@@ -1362,6 +1379,21 @@ export default function Home() {
       if (buffer.trim()) {
         const line = buffer;
         const trimmed = line.trim();
+        if (trimmed.startsWith("[METADATA] state:")) {
+          try {
+            const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
+            const stateObj = JSON.parse(jsonStr);
+            if (stateObj) {
+              if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
+              if (stateObj.role) setOnboardingUserType(stateObj.role);
+              if (stateObj.country) setOnboardingCountry(stateObj.country);
+              if (stateObj.name) setOnboardingName(stateObj.name);
+              if (stateObj.username) setOnboardingUsername(stateObj.username);
+            }
+          } catch (err) {
+            console.error("Error parsing metadata state:", err);
+          }
+        }
         if (trimmed && !trimmed.startsWith("[METADATA]") && !trimmed.includes("=== Agent Final Output ===") && !trimmed.includes("==========================") && !trimmed.startsWith("[Fahem Agent]") && !trimmed.startsWith("[SYSTEM]") && !trimmed.startsWith("[ERROR]")) {
           if (isFinalOutput || accumulatedText === "") {
             accumulatedText += line;
@@ -1728,6 +1760,71 @@ export default function Home() {
               setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
               setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
               setPreferencesSchool(data.profile.school || "");
+
+              if (data.profile.onboardingCompleted !== true) {
+                // Fetch onboarding history
+                fetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
+                  .then((res) => res.json())
+                  .then((histData) => {
+                    if (histData?.session?.messages && histData.session.messages.length > 0) {
+                      const cleanAssistantMessage = (text: string): string => {
+                        if (!text) return "";
+                        return text
+                          .split("\n")
+                          .filter(line => !line.trim().startsWith("[METADATA]") && !line.includes("=== Agent Final Output ===") && !line.includes("=========================="))
+                          .join("\n")
+                          .replace("SUCCESS_ONBOARDING_COMPLETE", "")
+                          .trim();
+                      };
+
+                      const msgs = histData.session.messages.map((m: any) => ({
+                        sender: m.role === "user" ? "user" : "fahem",
+                        text: m.role === "user" ? m.content : cleanAssistantMessage(m.content)
+                      }));
+                      setOnboardingMessages(msgs);
+
+                      const assistantMsgs = histData.session.messages.filter((m: any) => m.role === "assistant" || m.role === "model");
+                      if (assistantMsgs.length > 0) {
+                        let lastStep = "role";
+                        let lastRole = "student";
+                        let lastCountry = "";
+                        let lastName = "";
+                        let lastUsername = "";
+
+                        for (const m of assistantMsgs) {
+                          const lines = (m.content || "").split("\n");
+                          for (const line of lines) {
+                            const trimmed = line.trim();
+                            if (trimmed.startsWith("[METADATA] state:")) {
+                              try {
+                                const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
+                                const stateObj = JSON.parse(jsonStr);
+                                if (stateObj) {
+                                  if (stateObj.step) lastStep = stateObj.step;
+                                  if (stateObj.role) lastRole = stateObj.role;
+                                  if (stateObj.country) lastCountry = stateObj.country;
+                                  if (stateObj.name) lastName = stateObj.name;
+                                  if (stateObj.username) lastUsername = stateObj.username;
+                                }
+                              } catch (e) {
+                                console.error("Error parsing historical metadata:", e);
+                              }
+                            }
+                          }
+                        }
+
+                        setCurrentOnboardingStep(lastStep);
+                        setOnboardingUserType(lastRole as any);
+                        setOnboardingCountry(lastCountry);
+                        setOnboardingName(lastName);
+                        setOnboardingUsername(lastUsername);
+                      }
+                    }
+                  })
+                  .catch((histErr) => {
+                    console.warn("Failed to load onboarding history on mount:", histErr);
+                  });
+              }
             } else {
               // No user document found - this is first time onboarding trigger state
               const defaultProfile = {
@@ -2214,84 +2311,96 @@ export default function Home() {
     };
 
     const getQuickReplies = () => {
-      const lastText = getLastFahemMessage().toLowerCase();
-      if (!lastText) {
-        return [
-          { label: language === "ar" ? "🎓 طالب" : "🎓 Student", value: "student" },
-          { label: language === "ar" ? "🍎 معلم" : "🍎 Teacher", value: "teacher" },
-          { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" }
-        ];
-      }
+      const step = currentOnboardingStep ? currentOnboardingStep.trim().toLowerCase() : "";
 
-      // Check if asking for role/type
-      if (lastText.includes("role") || lastText.includes("user type") || lastText.includes("طالب") || lastText.includes("معلم") || lastText.includes("ولي أمر") || lastText.includes("نوع حسابك") || lastText.includes("دورك")) {
-        return [
-          { label: language === "ar" ? "🎓 طالب علم" : "🎓 Student", value: "student" },
-          { label: language === "ar" ? "🍎 معلم متميز" : "🍎 Teacher", value: "teacher" },
-          { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" },
-          { label: language === "ar" ? "🛡️ مشرف نظام" : "🛡️ Admin", value: "admin" }
-        ];
-      }
+      switch (step) {
+        case "role":
+          return [
+            { label: language === "ar" ? "🎓 طالب علم" : "🎓 Student", value: "student" },
+            { label: language === "ar" ? "🍎 معلم متميز" : "🍎 Teacher", value: "teacher" },
+            { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" },
+            { label: language === "ar" ? "🛡️ مشرف نظام" : "🛡️ Admin", value: "admin" }
+          ];
 
-      // Check if asking for age
-      if (lastText.includes("age") || lastText.includes("عمر") || lastText.includes("عاماً") || lastText.includes("سنة")) {
-        return [
-          { label: "12", value: "12" },
-          { label: "15", value: "15" },
-          { label: "18", value: "18" },
-          { label: "25", value: "25" },
-          { label: "35", value: "35" }
-        ];
-      }
+        case "age":
+          return [
+            { label: "10", value: "10" },
+            { label: "12", value: "12" },
+            { label: "15", value: "15" },
+            { label: "18", value: "18" },
+            { label: "22", value: "22" }
+          ];
 
-      // Check if asking for country
-      if (lastText.includes("country") || lastText.includes("بلد") || lastText.includes("إقامة") || lastText.includes("residing")) {
-        return [
-          { label: language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬", value: "Egypt" },
-          { label: language === "ar" ? "السعودية 🇸🇦" : "Saudi Arabia 🇸🇦", value: "Saudi Arabia" },
-          { label: language === "ar" ? "الإمارات 🇦🇪" : "UAE 🇦🇪", value: "UAE" },
-          { label: language === "ar" ? "قطر 🇶🇦" : "Qatar 🇶🇦", value: "Qatar" },
-          { label: language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴", value: "Jordan" }
-        ];
-      }
+        case "country":
+          return [
+            { label: language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬", value: "Egypt" },
+            { label: language === "ar" ? "السعودية 🇸🇦" : "Saudi Arabia 🇸🇦", value: "Saudi Arabia" },
+            { label: language === "ar" ? "الإمارات 🇦🇪" : "UAE 🇦🇪", value: "UAE" },
+            { label: language === "ar" ? "قطر 🇶🇦" : "Qatar 🇶🇦", value: "Qatar" },
+            { label: language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴", value: "Jordan" }
+          ];
 
-      // Check if asking for grade
-      if (lastText.includes("grade") || lastText.includes("صف") || lastText.includes("دراسي") || lastText.includes("مسار") || lastText.includes("الدرجة")) {
-        return [
-          { label: language === "ar" ? "قبول المسار المقترح 👍" : "Accept Recommendation 👍", value: "Accept recommended grade" },
-          { label: language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠", value: "Lifelong Learner" },
-          { label: language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
-        ];
-      }
+        case "grade":
+          return [
+            { label: language === "ar" ? "قبول المسار المقترح 👍" : "Accept Recommendation 👍", value: "Accept recommended grade" },
+            { label: language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠", value: "Lifelong Learner" },
+            { label: language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
+          ];
 
-      // Check if asking for children count
-      if (lastText.includes("children") || lastText.includes("أطفال") || lastText.includes("طفل")) {
-        return [
-          { label: "0", value: "0" },
-          { label: "1", value: "1" },
-          { label: "2", value: "2" },
-          { label: "3", value: "3" },
-          { label: "4+", value: "4" }
-        ];
-      }
+        case "school":
+          return [
+            { label: language === "ar" ? "تخطي خطوة المدرسة ⏭️" : "Skip School Step ⏭️", value: "Skip" }
+          ];
 
-      // Check if asking for school
-      if (lastText.includes("school") || lastText.includes("مدرسة") || lastText.includes("جامعة") || lastText.includes("مؤسسة")) {
-        return [
-          { label: language === "ar" ? "تخطي خطوة المدرسة ⏭️" : "Skip School Step ⏭️", value: "Skip" }
-        ];
-      }
+        case "children":
+        case "childreninschool":
+          return [
+            { label: "1", value: "1" },
+            { label: "2", value: "2" },
+            { label: "3", value: "3" },
+            { label: "4+", value: "4" }
+          ];
 
-      // General Yes/No replies
-      if (lastText.includes("?") || lastText.includes("هل") || lastText.includes("would you")) {
-        return [
-          { label: language === "ar" ? "نعم 👍" : "Yes 👍", value: "Yes" },
-          { label: language === "ar" ? "لا 👎" : "No 👎", value: "No" },
-          { label: language === "ar" ? "تخطي ⏭️" : "Skip ⏭️", value: "Skip" }
-        ];
+        default: {
+          // Fallback keyword parsing in case step is empty or laggy
+          const lastText = getLastFahemMessage().toLowerCase();
+          if (lastText.includes("role") || lastText.includes("user type") || lastText.includes("طالب") || lastText.includes("معلم") || lastText.includes("نوع حسابك")) {
+            return [
+              { label: language === "ar" ? "🎓 طالب علم" : "🎓 Student", value: "student" },
+              { label: language === "ar" ? "🍎 معلم متميز" : "🍎 Teacher", value: "teacher" },
+              { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" },
+              { label: language === "ar" ? "🛡️ مشرف نظام" : "🛡️ Admin", value: "admin" }
+            ];
+          }
+          if (lastText.includes("age") || lastText.includes("عمر") || lastText.includes("عاماً") || lastText.includes("سنة")) {
+            return [
+              { label: "12", value: "12" },
+              { label: "15", value: "15" },
+              { label: "18", value: "18" },
+              { label: "25", value: "25" },
+              { label: "35", value: "35" }
+            ];
+          }
+          if (lastText.includes("country") || lastText.includes("بلد") || lastText.includes("إقامة") || lastText.includes("residing")) {
+            return [
+              { label: language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬", value: "Egypt" },
+              { label: language === "ar" ? "السعودية 🇸🇦" : "Saudi Arabia 🇸🇦", value: "Saudi Arabia" },
+              { label: language === "ar" ? "الإمارات 🇦🇪" : "UAE 🇦🇪", value: "UAE" }
+            ];
+          }
+          if (lastText.includes("grade") || lastText.includes("صف") || lastText.includes("دراسي") || lastText.includes("مسار")) {
+            return [
+              { label: language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
+            ];
+          }
+          if (lastText.includes("school") || lastText.includes("مدرسة") || lastText.includes("جامعة") || lastText.includes("مؤسسة")) {
+            return [
+              { label: language === "ar" ? "تخطي خطوة المدرسة ⏭️" : "Skip School Step ⏭️", value: "Skip" }
+            ];
+          }
+          return [];
+        }
       }
-
-      return [];
     };
 
     const formatMessageText = (txt: string) => {
@@ -2529,69 +2638,424 @@ export default function Home() {
             padding: "1.5rem 2rem", borderTop: "1px solid rgba(16, 107, 163, 0.08)",
             background: "rgba(255, 255, 255, 0.6)", display: "flex", flexDirection: "column", gap: "1rem"
           }}>
-            {/* Quick Reply Chips Container */}
-            {quickReplies.length > 0 && !onboardingLoading && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
-                {quickReplies.map((chip, chipIdx) => (
+            {currentOnboardingStep === "avatar" ? (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.25rem",
+                padding: "1.25rem 1.5rem",
+                background: "rgba(255, 255, 255, 0.85)",
+                backdropFilter: "blur(12px)",
+                borderRadius: "20px",
+                border: "1px solid rgba(16, 107, 163, 0.12)",
+                boxShadow: "0 12px 30px rgba(16, 107, 163, 0.06)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "1rem" }}>
+                    {language === "ar" ? "🎨 اختر صورتك الرمزية المفضلة لتكتمل الهوية:" : "🎨 Select your preferred avatar to complete profile:"}
+                  </span>
+                  <div style={{ display: "flex", gap: "0.25rem", background: "rgba(16, 107, 163, 0.06)", padding: "4px", borderRadius: "12px" }}>
+                    {(["vectors", "animals", "tech", "golden"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setAvatarTab(tab)}
+                        type="button"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                          border: "none",
+                          cursor: "pointer",
+                          background: avatarTab === tab ? "#ffffff" : "transparent",
+                          color: avatarTab === tab ? "var(--primary)" : "#6a7c88",
+                          boxShadow: avatarTab === tab ? "0 2px 8px rgba(0, 0, 0, 0.05)" : "none",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {tab === "vectors" && (language === "ar" ? "متجهة" : "Vectors")}
+                        {tab === "animals" && (language === "ar" ? "حيوانات" : "Animals")}
+                        {tab === "tech" && (language === "ar" ? "تقنية" : "Tech")}
+                        {tab === "golden" && (language === "ar" ? "ذهبية" : "Premium")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Avatar Grid */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))",
+                  gap: "0.85rem",
+                  maxHeight: "160px",
+                  overflowY: "auto",
+                  padding: "0.5rem",
+                  background: "rgba(255, 255, 255, 0.5)",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(16, 107, 163, 0.05)"
+                }} className="custom-scroll-container">
+                  {avatarCategories[avatarTab].map((item, idx) => {
+                    const isSelected = onboardingAvatar === item.e;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setOnboardingAvatar(item.e)}
+                        type="button"
+                        style={{
+                          aspectRatio: "1/1",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "50%",
+                          background: isSelected 
+                            ? "linear-gradient(135deg, rgba(16, 107, 163, 0.12), rgba(212, 175, 55, 0.22))"
+                            : "#ffffff",
+                          border: isSelected 
+                            ? "3px solid var(--secondary)" 
+                            : "2px solid rgba(16, 107, 163, 0.08)",
+                          cursor: "pointer",
+                          fontSize: "1.8rem",
+                          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                          boxShadow: isSelected 
+                            ? "0 0 15px rgba(212, 175, 55, 0.5), inset 0 2px 4px rgba(0,0,0,0.05)" 
+                            : "0 4px 8px rgba(0, 0, 0, 0.02)",
+                          transform: isSelected ? "scale(1.08)" : "scale(1)"
+                        }}
+                        onMouseOver={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.transform = "scale(1.1)";
+                            e.currentTarget.style.borderColor = "var(--primary)";
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)";
+                          }
+                        }}
+                        title={language === "ar" ? item.lAr : item.lEn}
+                      >
+                        {item.e.startsWith("/") ? (
+                          <img src={item.e} alt={item.lEn} style={{ width: "42px", height: "42px", objectFit: "contain" }} />
+                        ) : (
+                          item.e
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Avatar Action Section */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <div style={{
+                      width: "54px",
+                      height: "54px",
+                      borderRadius: "50%",
+                      background: "rgba(16, 107, 163, 0.08)",
+                      border: "2px solid var(--primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.8rem",
+                      overflow: "hidden"
+                    }}>
+                      {onboardingAvatar ? (
+                        onboardingAvatar.startsWith("/") ? (
+                          <img src={onboardingAvatar} alt="Selected" style={{ width: "38px", height: "38px", objectFit: "contain" }} />
+                        ) : (
+                          onboardingAvatar
+                        )
+                      ) : (
+                        "🚀"
+                      )}
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--primary)", display: "block" }}>
+                        {language === "ar" ? "الرمز المختار" : "Chosen Avatar"}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                        {onboardingAvatar 
+                          ? (language === "ar" 
+                              ? (avatarCategories[avatarTab].find(a => a.e === onboardingAvatar)?.lAr || "مخصص")
+                              : (avatarCategories[avatarTab].find(a => a.e === onboardingAvatar)?.lEn || "Custom"))
+                          : (language === "ar" ? "يرجى تحديد رمز للمتابعة" : "Please select to continue")
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => sendOnboardingMessage("Skip")}
+                      style={{
+                        padding: "0.85rem 1.25rem",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        borderRadius: "14px",
+                        border: "1px solid rgba(16, 107, 163, 0.15)",
+                        background: "#ffffff",
+                        color: "var(--primary)",
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = "#ffffff"; }}
+                    >
+                      {language === "ar" ? "تخطي الخطوة ⏭️" : "Skip Step ⏭️"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={onboardingLoading}
+                      onClick={() => {
+                        const finalAvatar = onboardingAvatar || "/avatars/space_explorer.svg";
+                        sendOnboardingMessage(finalAvatar);
+                      }}
+                      style={{
+                        padding: "0.85rem 1.75rem",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                        borderRadius: "14px",
+                        border: "none",
+                        background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                        color: "#ffffff",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(16, 107, 163, 0.2)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {language === "ar" ? "تأكيد وإتمام التسجيل ✨" : "Confirm & Complete Onboarding ✨"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : currentOnboardingStep === "school" ? (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                width: "100%",
+                position: "relative"
+              }}>
+                {/* Google Places live search instruction */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0.5rem" }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>📍</span>
+                    {language === "ar" 
+                      ? `البحث عن المدارس والجامعات في ${onboardingCountry || "مصر"} عبر خرائط جوجل`
+                      : `Searching schools & universities in ${onboardingCountry || "Egypt"} via Google Places`}
+                  </span>
+                  {searchingPlaces && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span className="onboarding-dot" style={{ width: "6px", height: "6px", background: "var(--secondary)", margin: 0 }}></span>
+                      <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600 }}>
+                        {language === "ar" ? "جاري البحث..." : "Searching..."}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Floating Google Places suggestions container */}
+                {placesResults.length > 0 && (
+                  <div style={{
+                    position: "absolute",
+                    bottom: "105%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 1000,
+                    background: "rgba(255, 255, 255, 0.98)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid rgba(16, 107, 163, 0.15)",
+                    borderRadius: "16px",
+                    boxShadow: "0 -10px 30px rgba(0, 0, 0, 0.12), 0 10px 30px rgba(0,0,0,0.08)",
+                    maxHeight: "220px",
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    padding: "0.5rem"
+                  }} className="custom-scroll-container">
+                    {placesResults.map((place, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          sendOnboardingMessage(place.name);
+                          setPlacesResults([]);
+                        }}
+                        type="button"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          padding: "0.75rem 1rem",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          textAlign: language === "ar" ? "right" : "left",
+                          width: "100%",
+                          transition: "all 0.15s ease",
+                          direction: language === "ar" ? "rtl" : "ltr"
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        <span style={{ fontSize: "1.2rem" }}>
+                          {place.type === "university" ? "🎓" : "🏫"}
+                        </span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start", textAlign: "left", flex: 1 }}>
+                          <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>{place.name}</span>
+                          <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>{place.address}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Input Search Form */}
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (onboardingInput.trim() && !onboardingLoading) {
+                      sendOnboardingMessage(onboardingInput);
+                      setPlacesResults([]);
+                    }
+                  }}
+                  style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "center" }}
+                >
+                  <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      type="text"
+                      value={onboardingInput}
+                      onChange={(e) => {
+                        setOnboardingInput(e.target.value);
+                        fetchPlaces(e.target.value);
+                      }}
+                      disabled={onboardingLoading}
+                      placeholder={language === "ar" ? "اكتب اسم مدرستك أو ابحث بالخريطة..." : "Type your school name or search maps..."}
+                      style={{
+                        width: "100%", padding: "1rem 1.5rem", border: "1px solid rgba(16, 107, 163, 0.15)",
+                        borderRadius: "16px", outline: "none", fontFamily: "var(--font-sans)",
+                        fontSize: "0.98rem", background: "#ffffff",
+                        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.01)",
+                        transition: "border-color 0.2s ease"
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)"; }}
+                      autoFocus
+                    />
+                  </div>
+
                   <button
-                    key={chipIdx}
-                    className="onboarding-chip"
-                    onClick={() => sendOnboardingMessage(chip.value)}
                     type="button"
+                    onClick={() => {
+                      sendOnboardingMessage("Skip");
+                      setPlacesResults([]);
+                    }}
                     style={{
-                      padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(16, 107, 163, 0.15)",
-                      background: "#ffffff", color: "var(--primary)", fontSize: "0.88rem", fontWeight: 700,
-                      cursor: "pointer", transition: "all 0.25s"
+                      padding: "0.95rem 1.25rem",
+                      fontSize: "0.95rem",
+                      fontWeight: 700,
+                      borderRadius: "16px",
+                      border: "1px solid rgba(16, 107, 163, 0.15)",
+                      background: "#ffffff",
+                      color: "var(--primary)",
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = "#ffffff"; }}
+                  >
+                    {language === "ar" ? "تخطي ⏭️" : "Skip ⏭️"}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!onboardingInput.trim() || onboardingLoading}
+                    className="onboarding-send-btn btn btn-primary"
+                    style={{
+                      padding: "0.95rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "16px",
+                      display: "flex", alignItems: "center", gap: "0.5rem", border: "none",
+                      background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                      color: "#ffffff", cursor: "pointer"
                     }}
                   >
-                    {chip.label}
+                    <span>{language === "ar" ? "إرسال" : "Send"}</span>
+                    <FiSend style={{ fontSize: "1rem" }} />
                   </button>
-                ))}
+                </form>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Quick Reply Chips Container */}
+                {quickReplies.length > 0 && !onboardingLoading && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
+                    {quickReplies.map((chip, chipIdx) => (
+                      <button
+                        key={chipIdx}
+                        className="onboarding-chip"
+                        onClick={() => sendOnboardingMessage(chip.value)}
+                        type="button"
+                        style={{
+                          padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(16, 107, 163, 0.15)",
+                          background: "#ffffff", color: "var(--primary)", fontSize: "0.88rem", fontWeight: 700,
+                          cursor: "pointer", transition: "all 0.25s"
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-            {/* Main Chat Input Box */}
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (onboardingInput.trim() && !onboardingLoading) {
-                  sendOnboardingMessage(onboardingInput);
-                }
-              }}
-              style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "center" }}
-            >
-              <input
-                type="text"
-                value={onboardingInput}
-                onChange={(e) => setOnboardingInput(e.target.value)}
-                disabled={onboardingLoading}
-                placeholder={language === "ar" ? "اكتب إجابتك هنا وسلّمها للمساعد الذكي..." : "Type your response here and press send..."}
-                style={{
-                  flex: 1, padding: "1rem 1.5rem", border: "1px solid rgba(16, 107, 163, 0.15)",
-                  borderRadius: "16px", outline: "none", fontFamily: "var(--font-sans)",
-                  fontSize: "0.98rem", background: "#ffffff",
-                  boxShadow: "inset 0 2px 4px rgba(0,0,0,0.01)",
-                  transition: "border-color 0.2s ease"
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)"; }}
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={!onboardingInput.trim() || onboardingLoading}
-                className="onboarding-send-btn btn btn-primary"
-                style={{
-                  padding: "0.95rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "16px",
-                  display: "flex", alignItems: "center", gap: "0.5rem", border: "none",
-                  background: "linear-gradient(135deg, var(--primary), var(--secondary))",
-                  color: "#ffffff", cursor: "pointer"
-                }}
-              >
-                <span>{language === "ar" ? "إرسال" : "Send"}</span>
-                <FiSend style={{ fontSize: "1rem" }} />
-              </button>
-            </form>
+                {/* Main Chat Input Box */}
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (onboardingInput.trim() && !onboardingLoading) {
+                      sendOnboardingMessage(onboardingInput);
+                    }
+                  }}
+                  style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "center" }}
+                >
+                  <input
+                    type="text"
+                    value={onboardingInput}
+                    onChange={(e) => setOnboardingInput(e.target.value)}
+                    disabled={onboardingLoading}
+                    placeholder={language === "ar" ? "اكتب إجابتك هنا وسلّمها للمساعد الذكي..." : "Type your response here and press send..."}
+                    style={{
+                      flex: 1, padding: "1rem 1.5rem", border: "1px solid rgba(16, 107, 163, 0.15)",
+                      borderRadius: "16px", outline: "none", fontFamily: "var(--font-sans)",
+                      fontSize: "0.98rem", background: "#ffffff",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.01)",
+                      transition: "border-color 0.2s ease"
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)"; }}
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={!onboardingInput.trim() || onboardingLoading}
+                    className="onboarding-send-btn btn btn-primary"
+                    style={{
+                      padding: "0.95rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "16px",
+                      display: "flex", alignItems: "center", gap: "0.5rem", border: "none",
+                      background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                      color: "#ffffff", cursor: "pointer"
+                    }}
+                  >
+                    <span>{language === "ar" ? "إرسال" : "Send"}</span>
+                    <FiSend style={{ fontSize: "1rem" }} />
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>
