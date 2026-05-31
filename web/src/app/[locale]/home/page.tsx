@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { auth } from "../../../lib/firebase";
+import { auth, db } from "../../../lib/firebase";
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, User, linkWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
@@ -524,6 +525,63 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user || !chatRecipient) {
+      setTypingUsers([]);
+      return;
+    }
+
+    const activeBoardId = user.uid < chatRecipient.userId 
+      ? `${user.uid}_${chatRecipient.userId}` 
+      : `${chatRecipient.userId}_${user.uid}`;
+
+    const q = collection(db, "active_boards", activeBoardId, "typing");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const users: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.uid !== user.uid) {
+          users.push(data);
+        }
+      });
+      setTypingUsers(users);
+    }, (error) => {
+      console.error("Error listening to typing indicators:", error);
+    });
+
+    return () => {
+      unsubscribe();
+      try {
+        const myTypingRef = doc(db, "active_boards", activeBoardId, "typing", user.uid);
+        deleteDoc(myTypingRef);
+      } catch (e) {
+        console.error("Error cleaning up typing indicator:", e);
+      }
+    };
+  }, [chatRecipient, user]);
+
+  useEffect(() => {
+    if (!user || !chatRecipient) return;
+
+    const activeBoardId = user.uid < chatRecipient.userId 
+      ? `${user.uid}_${chatRecipient.userId}` 
+      : `${chatRecipient.userId}_${user.uid}`;
+
+    const myTypingRef = doc(db, "active_boards", activeBoardId, "typing", user.uid);
+
+    if (chatInput.trim()) {
+      setDoc(myTypingRef, {
+        uid: user.uid,
+        name: userProfile?.name || user.email?.split("@")[0] || "Someone",
+        isTyping: true,
+        lastActive: new Date().toISOString()
+      }).catch((err) => console.error("Error setting typing status:", err));
+    } else {
+      deleteDoc(myTypingRef).catch((err) => console.error("Error clearing typing status:", err));
+    }
+  }, [chatInput, chatRecipient, user, userProfile]);
   
   // Parental child approval panel states
   const [parentChildren, setParentChildren] = useState<any[]>([]);
@@ -1359,7 +1417,7 @@ export default function Home() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              userId: user.uid,
+              userId: user?.uid,
               profile: updatedProfile
             })
           });
@@ -2726,6 +2784,13 @@ export default function Home() {
           .custom-scroll-container::-webkit-scrollbar-thumb:hover {
             background: rgba(16, 107, 163, 0.3);
           }
+          @keyframes typing-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+          }
+          .typing-dot {
+            animation: typing-bounce 1.4s infinite ease-in-out;
+          }
         `}</style>
 
         <div style={{
@@ -3271,6 +3336,22 @@ export default function Home() {
                   </div>
 
                   <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <label style={{ padding: "0.85rem 1.25rem", fontSize: "0.9rem", fontWeight: 700, borderRadius: "14px", border: "1px solid rgba(212, 175, 55, 0.2)", background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))", color: "var(--primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }} onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}>
+                      <span>📁 {language === "ar" ? "تحميل صورة شخصية" : "Upload Picture"}</span>
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert(language === "ar" ? "خطأ: حجم الصورة يتجاوز الحد الأقصى (2 ميجابايت)." : "Error: Avatar image size exceeds the strict 2MB validation limit.");
+                            e.target.value = "";
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => { if (typeof reader.result === "string") setOnboardingAvatar(reader.result); };
+                          reader.readAsDataURL(file);
+                        }
+                      }} />
+                    </label>
                     <button
                       type="button"
                       onClick={() => sendOnboardingMessage("Skip")}
@@ -4032,6 +4113,10 @@ export default function Home() {
                       className="prompt-textarea"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        alert(language === "ar" ? "تم تعطيل النسخ واللصق لتشجيع التعلم النشط. يرجى كتابة إجابتك بنفسك!" : "Copy-pasting is disabled to encourage active learning. Please type your response!");
+                      }}
                       placeholder={t("input_placeholder")}
                       disabled={loading}
                     />
@@ -5895,6 +5980,33 @@ export default function Home() {
                         })
                       )}
                     </div>
+
+                    {/* Real-time Typing Indicators */}
+                    {typingUsers.length > 0 && (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.5rem 0.75rem",
+                        background: "rgba(16, 107, 163, 0.04)",
+                        borderRadius: "12px",
+                        fontSize: "0.8rem",
+                        color: "var(--primary)",
+                        alignSelf: "flex-start",
+                        marginBottom: "0.5rem",
+                        border: "1px solid rgba(16, 107, 163, 0.08)",
+                        animation: "pulse-ring 2s infinite"
+                      }}>
+                        <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
+                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out" }} />
+                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out 0.2s" }} />
+                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out 0.4s" }} />
+                        </div>
+                        <span style={{ fontWeight: 600 }}>
+                          {typingUsers.map(u => u.name).join(", ")} {language === "ar" ? "يكتب الآن..." : "is typing..."}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Messages Footer Form */}
                     <form
