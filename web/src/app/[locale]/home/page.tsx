@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { auth } from "../../../lib/firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User, linkWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
@@ -463,7 +463,14 @@ export default function Home() {
   // Conversational Onboarding states
   const [localCompleted, setLocalCompleted] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
-  const [currentOnboardingStep, setCurrentOnboardingStep] = useState<string>("role");
+  const [currentOnboardingStep, setCurrentOnboardingStep] = useState<string>("phone");
+  const [onboardingPhoneNumber, setOnboardingPhoneNumber] = useState("");
+  const [onboardingVerificationCode, setOnboardingVerificationCode] = useState("");
+  const [onboardingConfirmationResult, setOnboardingConfirmationResult] = useState<any>(null);
+  const [onboardingSendingCode, setOnboardingSendingCode] = useState(false);
+  const [onboardingVerifyingCode, setOnboardingVerifyingCode] = useState(false);
+  const [onboardingRecaptchaVerifier, setOnboardingRecaptchaVerifier] = useState<any>(null);
+  const [onboardingPhoneError, setOnboardingPhoneError] = useState("");
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
   const [onboardingCountry, setOnboardingCountry] = useState("");
@@ -836,7 +843,7 @@ export default function Home() {
   // Onboarding Chat Messages State
   const [onboardingMessages, setOnboardingMessages] = useState<Array<{ sender: "fahem" | "user"; text: string }>>([
     { sender: "fahem", text: "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps." },
-    { sender: "fahem", text: "To begin, what is your role on our platform today? Select from the cards below:" }
+    { sender: "fahem", text: "For security verification, please start by entering your mobile phone number. We will send you a verification code via SMS to activate your account:" }
   ]);
 
   // Country Localizer Helper
@@ -1170,24 +1177,41 @@ export default function Home() {
   useEffect(() => {
     setOnboardingMessages(prev => {
       if (prev.length <= 2) {
-        return [
-          {
-            sender: "fahem",
-            text: language === "ar"
-              ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية."
-              : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps."
-          },
-          {
-            sender: "fahem",
-            text: language === "ar"
-              ? "في البداية، ما هو دورك في منصتنا اليوم؟ (طالب، معلم، ولي أمر، أو مشرف)"
-              : "To begin, what is your role on our platform today? (student, teacher, parent, or admin)"
-          }
-        ];
+        if (currentOnboardingStep === "phone") {
+          return [
+            {
+              sender: "fahem",
+              text: language === "ar"
+                ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية."
+                : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps."
+            },
+            {
+              sender: "fahem",
+              text: language === "ar"
+                ? "لأسباب أمنية والتحقق من الهوية، يرجى البدء بالتحقق من رقم هاتفك المحمول لتفعيل الحساب:"
+                : "For security verification, please start by verifying your mobile phone number to activate your account:"
+            }
+          ];
+        } else {
+          return [
+            {
+              sender: "fahem",
+              text: language === "ar"
+                ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية."
+                : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps."
+            },
+            {
+              sender: "fahem",
+              text: language === "ar"
+                ? "في البداية، ما هو دورك في منصتنا اليوم؟ (طالب، معلم، ولي أمر، أو مشرف)"
+                : "To begin, what is your role on our platform today? (student, teacher, parent, or admin)"
+            }
+          ];
+        }
       }
       return prev;
     });
-  }, [language]);
+  }, [language, currentOnboardingStep]);
 
   // Smooth scroll to the latest message during onboarding without scroll-fighting
   useEffect(() => {
@@ -1205,6 +1229,129 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [onboardingMessages, onboardingStep]);
+
+  // Dynamic verifier cleanup for onboarding phone verification
+  useEffect(() => {
+    return () => {
+      if (onboardingRecaptchaVerifier) {
+        try {
+          onboardingRecaptchaVerifier.clear();
+        } catch (e) {
+          console.warn("[reCAPTCHA] Cleanup failed:", e);
+        }
+      }
+    };
+  }, [onboardingRecaptchaVerifier]);
+
+  // Phone verification methods for onboarding
+  const setupOnboardingRecaptcha = (containerId: string) => {
+    if (typeof window === "undefined") return null;
+    try {
+      const container = document.getElementById(containerId);
+      if (!container) return null;
+      container.innerHTML = '<div id="onboarding-recaptcha-widget"></div>';
+
+      const verifier = new RecaptchaVerifier(auth, "onboarding-recaptcha-widget", {
+        size: "normal",
+        callback: (response: any) => {
+          console.log("[reCAPTCHA] Onboarding resolved successfully");
+        },
+        "expired-callback": () => {
+          console.log("[reCAPTCHA] Onboarding expired");
+        }
+      });
+      return verifier;
+    } catch (error) {
+      console.error("[reCAPTCHA] Onboarding failed to initialize:", error);
+      return null;
+    }
+  };
+
+  const cleanupOnboardingRecaptcha = () => {
+    if (onboardingRecaptchaVerifier) {
+      try {
+        onboardingRecaptchaVerifier.clear();
+      } catch (e) {
+        console.warn("[reCAPTCHA] Error clearing onboarding verifier:", e);
+      }
+      setOnboardingRecaptchaVerifier(null);
+    }
+  };
+
+  const handleOnboardingSendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onboardingPhoneNumber.trim()) {
+      setOnboardingPhoneError(language === "ar" ? "يرجى إدخال رقم الهاتف" : "Please enter a phone number");
+      return;
+    }
+    setOnboardingSendingCode(true);
+    setOnboardingPhoneError("");
+
+    try {
+      cleanupOnboardingRecaptcha();
+      
+      const verifier = setupOnboardingRecaptcha("onboarding-recaptcha-container");
+      if (!verifier) {
+        throw new Error(language === "ar" ? "فشل تهيئة reCAPTCHA" : "reCAPTCHA failed to initialize");
+      }
+      setOnboardingRecaptchaVerifier(verifier);
+      
+      await verifier.render();
+
+      console.log("[Onboarding Phone] Attempting linkWithPhoneNumber for:", onboardingPhoneNumber);
+      if (!auth.currentUser) {
+        throw new Error(language === "ar" ? "لم يتم العثور على مستخدم تسجيل الدخول" : "No authenticated user found");
+      }
+      
+      const confirmation = await linkWithPhoneNumber(auth.currentUser, onboardingPhoneNumber, verifier);
+      setOnboardingConfirmationResult(confirmation);
+      console.log("[Onboarding Phone] SMS sent successfully");
+    } catch (error: any) {
+      console.error("[Onboarding Phone] Error sending SMS:", error);
+      setOnboardingPhoneError(error.message || (language === "ar" ? "فشل إرسال رمز التحقق" : "Failed to send verification code"));
+      cleanupOnboardingRecaptcha();
+    } finally {
+      setOnboardingSendingCode(false);
+    }
+  };
+
+  const handleOnboardingVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onboardingVerificationCode.trim()) {
+      setOnboardingPhoneError(language === "ar" ? "يرجى إدخال رمز التحقق" : "Please enter the verification code");
+      return;
+    }
+    if (!onboardingConfirmationResult) {
+      setOnboardingPhoneError(language === "ar" ? "انتهت صلاحية الجلسة، يرجى المحاولة مجدداً" : "Session expired, please try again");
+      return;
+    }
+    setOnboardingVerifyingCode(true);
+    setOnboardingPhoneError("");
+
+    try {
+      console.log("[Onboarding Phone] Verifying SMS code:", onboardingVerificationCode);
+      const result = await onboardingConfirmationResult.confirm(onboardingVerificationCode);
+      if (result.user) {
+        console.log("[Onboarding Phone] Successfully linked phone:", result.user.phoneNumber);
+        cleanupOnboardingRecaptcha();
+        
+        // Trigger conversational onboarding transition
+        await sendOnboardingMessage("[SYSTEM] Phone number verified: " + onboardingPhoneNumber);
+      }
+    } catch (error: any) {
+      console.error("[Onboarding Phone] Verification failed:", error);
+      setOnboardingPhoneError(error.message || (language === "ar" ? "رمز التحقق غير صحيح" : "Verification code is incorrect"));
+    } finally {
+      setOnboardingVerifyingCode(false);
+    }
+  };
+
+  const handleResetOnboardingPhoneAuth = () => {
+    setOnboardingConfirmationResult(null);
+    setOnboardingVerificationCode("");
+    setOnboardingPhoneError("");
+    cleanupOnboardingRecaptcha();
+  };
 
   const placesSearchTimeoutRef = useRef<any>(null);
   const placesAbortControllerRef = useRef<AbortController | null>(null);
@@ -2530,17 +2677,19 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => skipOnboarding()}
-              style={{
-                fontSize: "0.82rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)",
-                padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer", transition: "all 0.2s"
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.15)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
-            >
-              {language === "ar" ? "تخطي الإعداد" : "Skip Setup"}
-            </button>
+            {!["phone", "role", "name", "username", "age"].includes(currentOnboardingStep?.trim().toLowerCase()) && (
+              <button
+                onClick={() => skipOnboarding()}
+                style={{
+                  fontSize: "0.82rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)",
+                  padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.15)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
+              >
+                {language === "ar" ? "تخطي الإعداد" : "Skip Setup"}
+              </button>
+            )}
           </div>
 
           {/* Conversational Scroll Log */}
@@ -2580,6 +2729,178 @@ export default function Home() {
                 </div>
               );
             })}
+
+            {/* Custom Phone Verification Card */}
+            {currentOnboardingStep === "phone" && (
+              <div className="onboarding-message" style={{
+                alignSelf: "flex-start",
+                marginLeft: "2.85rem",
+                marginRight: language === "ar" ? "2.85rem" : "0",
+                maxWidth: "460px",
+                width: "calc(100% - 2.85rem)",
+                background: "rgba(255, 255, 255, 0.9)",
+                backdropFilter: "blur(20px)",
+                border: "1.5px solid rgba(16, 107, 163, 0.18)",
+                borderRadius: "20px",
+                boxShadow: "0 12px 30px rgba(16, 107, 163, 0.08)",
+                padding: "1.5rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.25rem",
+                boxSizing: "border-box"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                  <span style={{ fontSize: "1.3rem" }}>📱</span>
+                  <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "1.05rem" }}>
+                    {language === "ar" ? "التحقق من رقم الهاتف المحمول" : "Mobile Phone Verification"}
+                  </span>
+                </div>
+
+                {!onboardingConfirmationResult ? (
+                  <form onSubmit={handleOnboardingSendCode} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6a7c88" }}>
+                        {language === "ar" ? "رقم الهاتف (مع رمز الدولة، مثلاً: 201xxxxxxxxx+)" : "Phone Number (with country code, e.g., +201xxxxxxxxx)"}
+                      </label>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <input
+                          type="tel"
+                          value={onboardingPhoneNumber}
+                          onChange={(e) => setOnboardingPhoneNumber(e.target.value)}
+                          placeholder="+201234567890"
+                          disabled={onboardingSendingCode}
+                          style={{
+                            flex: 1,
+                            padding: "0.75rem 1rem",
+                            border: "1px solid rgba(16, 107, 163, 0.2)",
+                            borderRadius: "12px",
+                            fontSize: "0.95rem",
+                            outline: "none",
+                            transition: "all 0.2s"
+                          }}
+                          onFocus={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
+                          onBlur={(e) => e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.2)"}
+                        />
+                        <button
+                          type="submit"
+                          disabled={onboardingSendingCode || !onboardingPhoneNumber.trim()}
+                          style={{
+                            padding: "0.75rem 1.25rem",
+                            borderRadius: "12px",
+                            border: "none",
+                            background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                            color: "#ffffff",
+                            fontWeight: 700,
+                            fontSize: "0.88rem",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            opacity: (onboardingSendingCode || !onboardingPhoneNumber.trim()) ? 0.6 : 1
+                          }}
+                        >
+                          {onboardingSendingCode ? (
+                            <span>{language === "ar" ? "جاري..." : "Sending..."}</span>
+                          ) : (
+                            <span>{language === "ar" ? "أرسل الرمز" : "Send SMS"}</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleOnboardingVerifyCode} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6a7c88" }}>
+                        {language === "ar" 
+                          ? `أدخل رمز التحقق المكون من 6 أرقام المرسل إلى ${onboardingPhoneNumber}:` 
+                          : `Enter the 6-digit verification code sent to ${onboardingPhoneNumber}:`}
+                      </label>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={onboardingVerificationCode}
+                          onChange={(e) => setOnboardingVerificationCode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="123456"
+                          disabled={onboardingVerifyingCode}
+                          style={{
+                            flex: 1,
+                            padding: "0.75rem 1rem",
+                            border: "1px solid rgba(16, 107, 163, 0.2)",
+                            borderRadius: "12px",
+                            fontSize: "1.1rem",
+                            letterSpacing: "0.2em",
+                            textAlign: "center",
+                            outline: "none",
+                            transition: "all 0.2s"
+                          }}
+                          onFocus={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
+                          onBlur={(e) => e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.2)"}
+                        />
+                        <button
+                          type="submit"
+                          disabled={onboardingVerifyingCode || onboardingVerificationCode.length !== 6}
+                          style={{
+                            padding: "0.75rem 1.25rem",
+                            borderRadius: "12px",
+                            border: "none",
+                            background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                            color: "#ffffff",
+                            fontWeight: 700,
+                            fontSize: "0.88rem",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            opacity: (onboardingVerifyingCode || onboardingVerificationCode.length !== 6) ? 0.6 : 1
+                          }}
+                        >
+                          {onboardingVerifyingCode ? (
+                            <span>{language === "ar" ? "جاري..." : "Verifying..."}</span>
+                          ) : (
+                            <span>{language === "ar" ? "تحقق" : "Verify Code"}</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        onClick={handleResetOnboardingPhoneAuth}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--primary)",
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          textDecoration: "underline"
+                        }}
+                      >
+                        {language === "ar" ? "تغيير رقم الهاتف أو إعادة الإرسال" : "Change phone number / Resend SMS"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div id="onboarding-recaptcha-container" style={{ margin: "0.2rem 0", display: "flex", justifyContent: "center" }}></div>
+
+                {onboardingPhoneError && (
+                  <div style={{
+                    color: "#dc2626",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    background: "rgba(220, 38, 38, 0.05)",
+                    border: "1px solid rgba(220, 38, 38, 0.1)",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <span>⚠️ {onboardingPhoneError}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Bouncing Dots Loading Bubble */}
             {onboardingLoading && onboardingMessages[onboardingMessages.length - 1]?.text === "" && (
@@ -2988,6 +3309,15 @@ export default function Home() {
                     <FiSend style={{ fontSize: "1rem" }} />
                   </button>
                 </form>
+              </div>
+            ) : currentOnboardingStep === "phone" ? (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                padding: "1.25rem", background: "rgba(16, 107, 163, 0.05)", border: "1px dashed rgba(16, 107, 163, 0.2)",
+                borderRadius: "16px", color: "var(--primary)", fontWeight: 700, fontSize: "0.92rem",
+                textAlign: "center"
+              }}>
+                <span>🔐 {language === "ar" ? "يرجى إكمال عملية التحقق من رقم الهاتف أعلاه للمتابعة..." : "Please complete phone verification above to proceed..."}</span>
               </div>
             ) : (
               <>

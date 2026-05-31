@@ -308,8 +308,8 @@ A field is "COLLECTED" if there is ANY mention or clear implication of it in the
 
 Here are the fields to collect in order, along with how to recognize if they are already COLLECTED:
 0. **Phone Number (Step 0 - MANDATORY)**: The user's phone number has been verified client-side via Firebase SMS link auth before the conversational flow starts.
-   - How to recognize if COLLECTED: You will see a system log message like `[SYSTEM] Phone number verified: <phone_number>` at the very beginning of the chat log.
-   - Action if COLLECTED: Mark as COLLECTED. You MUST extract this phone number and pass it as `phoneNumber` and `phoneVerified: true` in `profileData` when calling the `saveUserProfile` tool. Never ask the user for their phone number since it is already verified!
+   - How to recognize if COLLECTED: You will see a system log message like '[SYSTEM] Phone number verified: <phone_number>' at the very beginning of the chat log.
+   - Action if COLLECTED: Mark as COLLECTED. You MUST extract this phone number and pass it as 'phoneNumber' and 'phoneVerified: true' in 'profileData' when calling the 'saveUserProfile' tool. Never ask the user for their phone number since it is already verified!
 1. **Role / User Type**: Must be "student", "teacher", "parent", or "admin".
    - How to recognize if COLLECTED: The user has said "student", "طالب", "معلم", "teacher", "parent", "ولي أمر", "admin", "مسؤول", or chose a card representing one.
    - Action if COLLECTED: Mark as COLLECTED. Never ask "What is your role?" or "Are you joining as student, teacher...?" again.

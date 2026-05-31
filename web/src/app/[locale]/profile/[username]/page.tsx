@@ -17,7 +17,9 @@ import {
   FiCalendar,
   FiHome,
   FiUser,
-  FiCpu
+  FiCpu,
+  FiPhone,
+  FiShield
 } from "react-icons/fi";
 
 const profileTranslations = {
@@ -756,6 +758,49 @@ export default function UserProfilePage() {
                   <div>
                     <p style={{ color: "#6a7c88", fontSize: "0.75rem", margin: 0, fontWeight: 700 }}>{getT("role")}</p>
                     <p style={{ fontWeight: 700, color: "#b5912d", margin: "2px 0 0 0", textTransform: "capitalize" }}>{targetProfile.role}</p>
+                  </div>
+                )}
+                {targetProfile.phoneNumber && (
+                  <div>
+                    <p style={{ color: "#6a7c88", fontSize: "0.75rem", margin: 0, fontWeight: 700 }}>
+                      {language === "ar" ? "رقم الهاتف" : "Phone Number"}
+                    </p>
+                    <p style={{ fontWeight: 700, color: "#0f172a", margin: "2px 0 0 0", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <FiPhone style={{ color: "#106ba3" }} />
+                      <span>{targetProfile.phoneNumber}</span>
+                      {targetProfile.phoneVerified ? (
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "2px",
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          color: "#10b981",
+                          background: "rgba(16, 185, 129, 0.08)",
+                          padding: "2px 6px",
+                          borderRadius: "20px",
+                          marginLeft: "4px"
+                        }}>
+                          <FiShield style={{ fontSize: "0.75rem" }} />
+                          {language === "ar" ? "مؤكد" : "Verified"}
+                        </span>
+                      ) : (
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "2px",
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          color: "#ef4444",
+                          background: "rgba(239, 68, 68, 0.08)",
+                          padding: "2px 6px",
+                          borderRadius: "20px",
+                          marginLeft: "4px"
+                        }}>
+                          {language === "ar" ? "غير مؤكد" : "Unverified"}
+                        </span>
+                      )}
+                    </p>
                   </div>
                 )}
                 {targetProfile.createdAt && (
