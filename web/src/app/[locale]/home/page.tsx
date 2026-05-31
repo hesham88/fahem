@@ -936,7 +936,8 @@ export default function Home() {
       17: "Grade 12 (Secondary/High)"
     };
 
-    const isEgypt = country.toLowerCase().includes("egypt") || country.includes("مصر");
+    const safeCountry = country || "";
+    const isEgypt = safeCountry.toLowerCase().includes("egypt") || safeCountry.includes("مصر");
     
     if (isArabic) {
       if (isEgypt) {
@@ -1364,6 +1365,7 @@ export default function Home() {
 
   const placesSearchTimeoutRef = useRef<any>(null);
   const placesAbortControllerRef = useRef<AbortController | null>(null);
+  const latestOnboardingStateRef = useRef<any>(null);
 
   // Google Places API integration helper
   const fetchPlaces = (query: string) => {
@@ -1479,6 +1481,7 @@ export default function Home() {
               const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
               const stateObj = JSON.parse(jsonStr);
               if (stateObj) {
+                latestOnboardingStateRef.current = stateObj;
                 if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
                 if (stateObj.role) setOnboardingUserType(stateObj.role);
                 if (stateObj.country) setOnboardingCountry(stateObj.country);
@@ -1542,6 +1545,7 @@ export default function Home() {
             const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
             const stateObj = JSON.parse(jsonStr);
             if (stateObj) {
+              latestOnboardingStateRef.current = stateObj;
               if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
               if (stateObj.role) setOnboardingUserType(stateObj.role);
               if (stateObj.country) setOnboardingCountry(stateObj.country);
@@ -1977,6 +1981,16 @@ export default function Home() {
                           }
                         }
 
+                        const loadedState = {
+                          step: lastStep,
+                          role: lastRole,
+                          country: lastCountry,
+                          name: lastName,
+                          username: lastUsername,
+                          age: lastAge,
+                          grade: lastGrade
+                        };
+                        latestOnboardingStateRef.current = loadedState;
                         setCurrentOnboardingStep(lastStep);
                         setOnboardingUserType(lastRole as any);
                         setOnboardingCountry(lastCountry);
@@ -2508,7 +2522,9 @@ export default function Home() {
 
         case "grade": {
           const isArabic = language === "ar";
-          const proposed = getGradeSuggestion(onboardingAge, onboardingCountry, isArabic);
+          const age = latestOnboardingStateRef.current?.age?.toString() || onboardingAge;
+          const country = latestOnboardingStateRef.current?.country || onboardingCountry;
+          const proposed = getGradeSuggestion(age, country, isArabic);
           return [
             { 
               label: isArabic 
