@@ -453,12 +453,51 @@ a:hover {
   opacity: 0.45;
 }
 
+/* Premium hardware-accelerated floating keyframe animations for the ambient spheres */
+@keyframes float-sphere-1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(60px, -45px, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes float-sphere-2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-50px, 50px, 0) scale(0.92);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes float-sphere-3 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(40px, 30px, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 .sphere-1 {
   top: 15%;
   left: 10%;
   width: 300px;
   height: 300px;
   background: radial-gradient(circle, rgba(16, 107, 163, 0.25) 0%, rgba(16, 107, 163, 0) 70%);
+  animation: float-sphere-1 18s infinite ease-in-out alternate;
+  will-change: transform;
 }
 
 .sphere-2 {
@@ -467,15 +506,18 @@ a:hover {
   width: 400px;
   height: 400px;
   background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0) 70%);
+  animation: float-sphere-2 22s infinite ease-in-out alternate;
+  will-change: transform;
 }
 
 .sphere-3 {
   top: 40%;
   left: 50%;
-  transform: translate(-50%, -50%);
   width: 350px;
   height: 350px;
   background: radial-gradient(circle, rgba(243, 123, 29, 0.15) 0%, rgba(243, 123, 29, 0) 70%);
+  animation: float-sphere-3 20s infinite ease-in-out alternate;
+  will-change: transform;
 }
 
 /* Glass Navbar */
@@ -1132,6 +1174,128 @@ a:hover {
 
 .pulse-icon {
   animation: pulse-gentle 4s ease-in-out infinite;
+}
+
+/* 🌀 PREMIUM CIRCULAR GLASSMORPHIC LOADER ANIMATIONS */
+.loader-container {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.loader-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 4px solid transparent;
+}
+
+/* Outer Ring - Slow rotate, primary blue gradient shadow */
+.loader-ring-outer {
+  width: 130px;
+  height: 130px;
+  border-top-color: var(--primary);
+  border-bottom-color: rgba(37, 99, 235, 0.1);
+  animation: spin-clockwise 2.2s linear infinite;
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.15);
+}
+
+/* Middle Ring - Faster counter-rotate, orange gradient shadow */
+.loader-ring-middle {
+  width: 100px;
+  height: 100px;
+  border-left-color: var(--secondary);
+  border-right-color: rgba(249, 115, 22, 0.15);
+  animation: spin-counter-clockwise 1.6s linear infinite;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.15);
+}
+
+/* Inner Ring - Pulsating, mint green shadow */
+.loader-ring-inner {
+  width: 70px;
+  height: 70px;
+  border-top-color: var(--accent-green);
+  border-bottom-color: rgba(13, 148, 136, 0.2);
+  animation: spin-clockwise 1.1s cubic-bezier(0.53, 0.21, 0.29, 0.67) infinite, pulse-scale 1.8s ease-in-out infinite alternate;
+  box-shadow: 0 0 10px rgba(13, 148, 136, 0.2);
+}
+
+/* Central floating glass circle for the CPU icon */
+.loader-center {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+  animation: float-center 3s ease-in-out infinite;
+}
+
+/* CPU Icon pulsing and color shifting */
+.loader-cpu-icon {
+  font-size: 1.45rem;
+  color: var(--primary);
+  animation: cpu-pulse 2.2s ease-in-out infinite;
+}
+
+/* Text glow pulsing animation */
+.loader-text-glow {
+  text-shadow: 0 0 8px rgba(37, 99, 235, 0.05);
+  animation: text-pulse-glow 2.2s ease-in-out infinite;
+}
+
+/* Keyframes for premium transitions */
+@keyframes spin-clockwise {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes spin-counter-clockwise {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes pulse-scale {
+  0% { transform: scale(0.92); opacity: 0.75; }
+  100% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes float-center {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes cpu-pulse {
+  0%, 100% {
+    color: var(--primary);
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    color: var(--secondary);
+    transform: scale(1.12) rotate(15deg);
+    filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.35));
+  }
+}
+
+@keyframes text-pulse-glow {
+  0%, 100% {
+    opacity: 0.8;
+    text-shadow: 0 0 8px rgba(37, 99, 235, 0.05);
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 15px rgba(37, 99, 235, 0.25), 0 0 5px rgba(249, 115, 22, 0.15);
+    transform: scale(1.02);
+  }
 }
 
 /* ========================================================================= */

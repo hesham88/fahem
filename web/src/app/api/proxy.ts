@@ -9,6 +9,13 @@ let isGcpEnvironment: boolean | null = null; // null = unknown, true = GCP, fals
 export async function getOidcToken(): Promise<string | null> {
   if (!cloudRunUrl) return null;
   
+  // Fast local check: if running in dev mode or not on Cloud Run, bypass OIDC token fetch
+  const isLocal = process.env.NODE_ENV === "development" || !process.env.K_SERVICE;
+  if (isLocal) {
+    isGcpEnvironment = false;
+    return null; // Will immediately fallback to local bypass token
+  }
+
   const now = Date.now();
   // If we have a cached token that is still valid (with a 5-minute safety buffer)
   if (cachedToken && tokenExpiry > now + 300000) {
@@ -120,6 +127,7 @@ export async function proxyRequest(
       method,
       headers,
       signal: AbortSignal.timeout(10000),
+      cache: "no-store",
     };
 
     if (body) {

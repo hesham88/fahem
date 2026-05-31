@@ -1,0 +1,60 @@
+{
+  "users": [
+    {
+      "userId": "C14rf5K4VhYHDSELKZ2AokPOKEw2",
+      "username": "hesham88",
+      "username_clean": "hesham88",
+      "email": "hesham1988@gmail.com",
+      "role": "student",
+      "name": "Hesham",
+      "age": 16,
+      "country": "Egypt",
+      "grade": "الصف الثاني الثانوي",
+      "avatar": "🐬",
+      "school": "Gamal Abdel Nasser Official Distinguished Language School",
+      "userType": "student",
+      "onboardingCompleted": true,
+      "onboardingSkipped": false,
+      "skippedStep": null,
+      "isApproved": true,
+      "childrenCount": 0,
+      "childrenInSchoolCount": 0,
+      "friends": [],
+      "groupsJoined": [],
+      "parentEmail": "",
+      "createdAt": "2026-05-30T21:23:56.566317Z",
+      "updatedAt": "2026-05-30T21:23:56.566317Z",
+      "privacySettings": {
+        "profileVisibility": "public",
+        "allowMessages": true,
+        "showActivity": true
+      },
+      "skippedAtStep": null
+    },
+    {
+      "userId": "test_user_id_gemini_2026",
+      "username": "test_user_gemini",
+      "username_clean": "test_user_gemini",
+      "email": "test_gemini@fahem.app",
+      "role": "student",
+      "name": "Gemini Agent",
+      "age": 25,
+      "country": "Egypt",
+      "grade": "Lifelong",
+      "avatar": "🤖",
+      "school": "Fahem Academy",
+      "userType": "student",
+      "onboardingCompleted": true,
+      "onboardingSkipped": false,
+      "skippedStep": null,
+      "isApproved": true,
+      "childrenCount": 0,
+      "childrenInSchoolCount": 0,
+      "friends": [],
+      "groupsJoined": [],
+      "parentEmail": null,
+      "createdAt": "2026-05-30T22:21:25.001919Z",
+      "updatedAt": "2026-05-30T22:21:25.001919Z"
+    }
+  ]
+}

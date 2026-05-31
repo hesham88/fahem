@@ -215,12 +215,28 @@ async def _run_mcp_tool(tool_name: str, args: dict) -> json:
         
     if text_val is not None:
         text_val_stripped = text_val.strip()
-        if (text_val_stripped.startswith("{") and text_val_stripped.endswith("}")) or \
-           (text_val_stripped.startswith("[") and text_val_stripped.endswith("]")):
+        try:
+            return json.loads(text_val_stripped)
+        except Exception:
+            pass
+            
+        # Robust substring JSON extraction (handling potential text wrapper around array/object)
+        start_arr = text_val_stripped.find("[")
+        end_arr = text_val_stripped.rfind("]")
+        if start_arr != -1 and end_arr != -1 and end_arr > start_arr:
             try:
-                return json.loads(text_val_stripped)
+                return json.loads(text_val_stripped[start_arr:end_arr+1])
             except Exception:
                 pass
+                
+        start_obj = text_val_stripped.find("{")
+        end_obj = text_val_stripped.rfind("}")
+        if start_obj != -1 and end_obj != -1 and end_obj > start_obj:
+            try:
+                return json.loads(text_val_stripped[start_obj:end_obj+1])
+            except Exception:
+                pass
+                
         return text_val
         
     return res
@@ -502,9 +518,12 @@ async def get_all_activities() -> list:
 
 async def save_chat_session(session_id: str, user_id: str, user_email: str, title: str, messages: list) -> bool:
     """Creates or updates a user chat session in chat_sessions collection."""
+    success = False
     if db_engine and db_engine._db is not None:
         try:
-            return await db_engine.save_chat_session(session_id, user_id, user_email, title, messages)
+            success = await db_engine.save_chat_session(session_id, user_id, user_email, title, messages)
+            if success:
+                return True
         except Exception as e:
             logger.warning(f"Direct save_chat_session failed: {e}; falling back to MCP.")
     try:
@@ -616,7 +635,6 @@ async def get_session_detail(session_id: str) -> dict:
             session = await db_engine.get_session_detail(session_id)
             if session:
                 return session.model_dump(by_alias=True)
-            return {}
         except Exception as e:
             logger.warning(f"Direct get_session_detail failed: {e}; falling back to MCP.")
     try:

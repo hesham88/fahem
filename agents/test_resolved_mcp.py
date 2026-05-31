@@ -16,7 +16,7 @@ async def test_mcp_with_resolved_uri():
     print("\nTesting connect with RESOLVED URI...")
     try:
         res = await tools_map["connect"].run_async(
-            args={"connectionStringOrClusterName": resolved_uri},
+            args={"connectionString": resolved_uri},
             tool_context=None
         )
         print("Connect result:", res)

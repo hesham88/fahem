@@ -16,7 +16,12 @@ import {
   FiTerminal,
   FiCornerDownRight,
   FiCompass,
-  FiGlobe
+  FiGlobe,
+  FiClock,
+  FiPlus,
+  FiTrash2,
+  FiRefreshCw,
+  FiFileText
 } from "react-icons/fi";
 
 interface Message {
@@ -30,14 +35,7 @@ interface Message {
 export default function StickyChat() {
   const [user, setUser] = useState<User | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text: "Hello! I am Fahem, your Responsible AI Partner. How can I assist you with database operations, queries, or security configuration audits today?",
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [useGrounded, setUseGrounded] = useState(false);
@@ -46,10 +44,32 @@ export default function StickyChat() {
   const [showLogs, setShowLogs] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
 
+  // Saved Chats States
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [showHistory, setShowHistory] = useState(false);
+
   const { language, dir, t } = useTranslation();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatLogsEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize welcome message based on language
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          text: language === "ar" 
+            ? "مرحباً! أنا فاهم، شريكك في الذكاء الاصطناعي المسؤول. كيف يمكنني مساعدتك في عمليات وقضايا قواعد البيانات أو تدقيق تكوينات الأمان اليوم؟" 
+            : "Hello! I am Fahem, your Responsible AI Partner. How can I assist you with database operations, queries, or security configuration audits today?",
+          timestamp: new Date()
+        }
+      ]);
+    }
+  }, [language, messages.length]);
 
   // Sync authentication state
   useEffect(() => {
@@ -58,6 +78,13 @@ export default function StickyChat() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Fetch Saved Chats on Open
+  useEffect(() => {
+    if (user && isOpen) {
+      fetchSessions(user.uid);
+    }
+  }, [user, isOpen]);
 
   // Scroll messages to bottom on change
   useEffect(() => {
@@ -74,6 +101,100 @@ export default function StickyChat() {
   }, [sessionLogs]);
 
   if (!user) return null; // Only show after successful sign-in
+
+  const fetchSessions = async (userIdVal?: string) => {
+    const activeUserId = userIdVal || user?.uid;
+    if (!activeUserId) return;
+    setIsSessionsLoading(true);
+    try {
+      const response = await fetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data.sessions || []);
+      }
+    } catch (err) {
+      console.error("Error fetching sessions in companion:", err);
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  };
+
+  const loadSession = async (sessionIdVal: string) => {
+    if (!sessionIdVal) return;
+    setIsSessionsLoading(true);
+    try {
+      const response = await fetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const sess = data.session;
+        if (sess) {
+          setCurrentSessionId(sess.sessionId);
+          // Map session messages to Message interface
+          const mappedMsgs: Message[] = (sess.messages || []).map((m: any, index: number) => ({
+            id: `msg-${index}-${Date.now()}`,
+            role: m.role === "assistant" || m.role === "model" ? "assistant" : "user",
+            text: m.content || m.text || "",
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date()
+          }));
+          setMessages(mappedMsgs.length > 0 ? mappedMsgs : [
+            {
+              id: "welcome",
+              role: "assistant",
+              text: language === "ar"
+                ? "مرحباً بك مجدداً في هذه المحادثة! كيف يمكنني مساعدتك أكثر؟"
+                : "Welcome back to this conversation! How can I assist you further?",
+              timestamp: new Date()
+            }
+          ]);
+          setShowHistory(false); // Close history drawer
+        }
+      }
+    } catch (err) {
+      console.error("Error loading session in companion:", err);
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  };
+
+  const deleteSession = async (sessionIdVal: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!sessionIdVal) return;
+    const confirmMsg = language === "ar" 
+      ? "هل أنت متأكد من حذف هذه المحادثة؟" 
+      : "Are you sure you want to delete this chat session?";
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
+        method: "DELETE"
+      });
+      if (response.ok) {
+        if (currentSessionId === sessionIdVal) {
+          startNewChat();
+        }
+        await fetchSessions();
+      }
+    } catch (err) {
+      console.error("Error deleting session in companion:", err);
+    }
+  };
+
+  const startNewChat = () => {
+    setCurrentSessionId("");
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        text: language === "ar" 
+          ? "مرحباً! أنا فاهم، شريكك في الذكاء الاصطناعي المسؤول. كيف يمكنني مساعدتك في عمليات وقضايا قواعد البيانات أو تدقيق تكوينات الأمان اليوم؟" 
+          : "Hello! I am Fahem, your Responsible AI Partner. How can I assist you with database operations, queries, or security configuration audits today?",
+        timestamp: new Date()
+      }
+    ]);
+    setSessionLogs([]);
+    setShowHistory(false);
+  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const queryText = (textToSend || inputValue).trim();
@@ -113,7 +234,8 @@ export default function StickyChat() {
           prompt: queryText,
           language,
           userEmail: user.email || "",
-          userId: user.uid || ""
+          userId: user.uid || "",
+          sessionId: currentSessionId || undefined
         }),
       });
 
@@ -149,6 +271,9 @@ export default function StickyChat() {
                       msg.id === assistantMsgId ? { ...msg, activeAgent: currentAgent } : msg
                     )
                   );
+                } else if (metaContent.startsWith("SessionId:")) {
+                  const activeSessId = metaContent.replace("SessionId:", "").trim();
+                  setCurrentSessionId(activeSessId);
                 } else if (metaContent.startsWith("Duration:")) {
                   setSessionLogs((prev) => [...prev, `[Telemetry] ${metaContent}`]);
                 } else if (metaContent.startsWith("Credits:")) {
@@ -192,6 +317,7 @@ export default function StickyChat() {
       }
 
       setSessionLogs((prev) => [...prev, "[System] Streaming complete successfully."]);
+      await fetchSessions(); // Refresh list to catch updated or new chats
     } catch (err: any) {
       console.error("[sticky-chat] Stream retrieval failed:", err);
       setSessionLogs((prev) => [...prev, `[Error] ${err.message}`]);
@@ -214,9 +340,9 @@ export default function StickyChat() {
   };
 
   const presetQueries = [
-    { label: "List collections", query: "Show me list of active collections in the database" },
-    { label: "Check my configurations", query: "Show current configuration setup and active security guardrails" },
-    { label: "Whitelisted DB Stats", query: "Retrieve only whitelisted db stats metrics" }
+    { label: language === "ar" ? "عرض المجموعات" : "List collections", query: "Show me list of active collections in the database" },
+    { label: language === "ar" ? "فحص التكوينات" : "Check my configurations", query: "Show current configuration setup and active security guardrails" },
+    { label: language === "ar" ? "إحصائيات مسموحة" : "Whitelisted DB Stats", query: "Retrieve only whitelisted db stats metrics" }
   ];
 
   return (
@@ -244,7 +370,7 @@ export default function StickyChat() {
           outline: "none"
         }}
         className="floating-chat-trigger"
-        title="Talk with Fahem AI"
+        title={language === "ar" ? "تحدث مع فاهم" : "Talk with Fahem AI"}
       >
         {isOpen ? (
           <FiX style={{ fontSize: "1.5rem", transition: "transform 0.3s ease" }} />
@@ -290,6 +416,7 @@ export default function StickyChat() {
           transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
           overflow: "hidden"
         }}
+        dir={dir}
       >
         {/* Header Design */}
         <div
@@ -319,27 +446,47 @@ export default function StickyChat() {
             </div>
             <div>
               <h3 style={{ fontSize: "1.1rem", margin: 0, fontFamily: "var(--font-display)", fontWeight: 700 }}>
-                Fahem Companion
+                {language === "ar" ? "رفيق فاهم الذكي" : "Fahem Companion"}
               </h3>
               <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", color: "var(--accent-green)" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--accent-green)" }}></span>
-                <span>Responsible AI Active</span>
+                <span>{language === "ar" ? "الذكاء الاصطناعي المسؤول نشط" : "Responsible AI Active"}</span>
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--foreground)",
-              opacity: 0.6,
-              cursor: "pointer",
-              padding: "0.25rem"
-            }}
-          >
-            <FiX style={{ fontSize: "1.2rem" }} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              style={{
+                background: "none",
+                border: "none",
+                color: showHistory ? "var(--primary)" : "var(--foreground)",
+                opacity: showHistory ? 1 : 0.6,
+                cursor: "pointer",
+                padding: "0.25rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                transition: "all 0.2s"
+              }}
+              title={language === "ar" ? "سجل المحادثات" : "Chat History"}
+            >
+              <FiClock style={{ fontSize: "1.2rem" }} />
+            </button>
+            <button
+              onClick={() => setIsOpen(false)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--foreground)",
+                opacity: 0.6,
+                cursor: "pointer",
+                padding: "0.25rem"
+              }}
+            >
+              <FiX style={{ fontSize: "1.2rem" }} />
+            </button>
+          </div>
         </div>
 
         {/* User Context & Guardrail Badge */}
@@ -360,7 +507,7 @@ export default function StickyChat() {
             <span>ID: <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem" }}>{user.uid.substring(0, 8)}...</code></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span>Email: <strong style={{ color: "var(--foreground)" }}>{user.email}</strong></span>
+            <span>{language === "ar" ? "الحساب:" : "Email:"} <strong style={{ color: "var(--foreground)" }}>{user.email}</strong></span>
             {credits !== null && (
               <span style={{
                 background: credits > 20 ? "rgba(46, 125, 50, 0.15)" : "rgba(198, 40, 40, 0.15)",
@@ -375,6 +522,168 @@ export default function StickyChat() {
                 <FiZap style={{ fontSize: "0.6rem" }} />
                 {credits} CR
               </span>
+            )}
+          </div>
+        </div>
+
+        {/* Sliding History Panel */}
+        <div
+          style={{
+            position: "absolute",
+            top: "5rem", // Below the header
+            bottom: 0,
+            left: dir === "rtl" ? (showHistory ? 0 : "-100%") : "auto",
+            right: dir === "rtl" ? "auto" : (showHistory ? 0 : "-100%"),
+            width: "100%",
+            backgroundColor: "rgba(253, 251, 247, 0.96)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            zIndex: 10,
+            display: "flex",
+            flexDirection: "column",
+            padding: "1.25rem",
+            transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+            opacity: showHistory ? 1 : 0,
+            pointerEvents: showHistory ? "all" : "none"
+          }}
+        >
+          {/* Header of History Panel */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem"
+          }}>
+            <h4 style={{
+              margin: 0,
+              fontSize: "1rem",
+              fontWeight: 800,
+              color: "var(--primary)",
+              fontFamily: "var(--font-display)"
+            }}>
+              {language === "ar" ? "المحادثات المحفوظة" : "Saved Chats"}
+            </h4>
+            <span style={{
+              fontSize: "0.75rem",
+              background: "rgba(16, 107, 163, 0.08)",
+              color: "var(--primary)",
+              padding: "2px 8px",
+              borderRadius: "10px",
+              fontWeight: 700
+            }}>
+              {sessions.length}
+            </span>
+          </div>
+
+          {/* New Chat Button */}
+          <button
+            onClick={startNewChat}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              width: "100%",
+              padding: "0.65rem",
+              background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "var(--border-radius-md)",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              cursor: "pointer",
+              boxShadow: "var(--shadow-sm)",
+              transition: "all 0.25s",
+              marginBottom: "1rem"
+            }}
+          >
+            <FiPlus style={{ fontSize: "1rem" }} />
+            <span>{language === "ar" ? "محادثة جديدة" : "New Chat"}</span>
+          </button>
+
+          {/* Scrollable Saved Sessions */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              minHeight: 0
+            }}
+            className="custom-scrollbar"
+          >
+            {isSessionsLoading ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", color: "#8a9ca8" }}>
+                <FiRefreshCw className="spin-icon" style={{ marginRight: "0.5rem", animation: "spin 2s linear infinite" }} />
+                <span style={{ fontSize: "0.8rem" }}>{language === "ar" ? "جاري تحميل المحادثات..." : "Loading chats..."}</span>
+              </div>
+            ) : sessions.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", color: "#8a9ca8", textAlign: "center" }}>
+                <FiFileText style={{ fontSize: "2rem", opacity: 0.3, marginBottom: "0.5rem" }} />
+                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{language === "ar" ? "لا توجد محادثات محفوظة بعد" : "No saved chats yet"}</span>
+              </div>
+            ) : (
+              sessions.map((sess) => {
+                const isActive = currentSessionId === sess.sessionId;
+                return (
+                  <div
+                    key={sess.sessionId}
+                    onClick={() => loadSession(sess.sessionId)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.65rem 0.85rem",
+                      borderRadius: "var(--border-radius-md)",
+                      background: isActive ? "rgba(16, 107, 163, 0.08)" : "rgba(255, 255, 255, 0.6)",
+                      border: `1px solid ${isActive ? "rgba(16, 107, 163, 0.25)" : "rgba(235, 220, 185, 0.25)"}`,
+                      cursor: "pointer",
+                      transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                      gap: "0.5rem"
+                    }}
+                    className="history-session-item"
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden", flex: 1 }}>
+                      <FiFileText style={{ color: isActive ? "var(--primary)" : "#8a9ca8", flexShrink: 0, fontSize: "1rem" }} />
+                      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}>
+                        <span style={{
+                          fontSize: "0.85rem",
+                          fontWeight: isActive ? 700 : 600,
+                          color: isActive ? "var(--primary)" : "var(--foreground)",
+                          whiteSpace: "nowrap",
+                          textOverflow: "ellipsis",
+                          overflow: "hidden"
+                        }} title={sess.title || "Untitled Chat"}>
+                          {sess.title || (language === "ar" ? "محادثة بدون عنوان" : "Untitled Chat")}
+                        </span>
+                        <span style={{ fontSize: "0.72rem", color: "#8a9ca8" }}>
+                          {sess.messageCount} {language === "ar" ? "رسائل" : "messages"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => deleteSession(sess.sessionId, e)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "6px",
+                        cursor: "pointer",
+                        color: "#8a9ca8",
+                        borderRadius: "var(--border-radius-sm)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s"
+                      }}
+                      className="delete-session-btn"
+                    >
+                      <FiTrash2 style={{ fontSize: "0.9rem" }} />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -405,7 +714,9 @@ export default function StickyChat() {
                 style={{
                   maxWidth: "85%",
                   padding: "0.85rem 1rem",
-                  borderRadius: msg.role === "user" ? "16px 16px 0 16px" : "16px 16px 16px 0",
+                  borderRadius: msg.role === "user" 
+                    ? (dir === "rtl" ? "16px 16px 16px 0" : "16px 16px 0 16px") 
+                    : (dir === "rtl" ? "16px 16px 0 16px" : "16px 16px 16px 0"),
                   backgroundColor: msg.role === "user" ? "var(--primary)" : "rgba(255, 255, 255, 0.8)",
                   color: msg.role === "user" ? "#ffffff" : "var(--foreground)",
                   border: msg.role === "user" ? "none" : "1px solid var(--card-border)",
@@ -419,7 +730,9 @@ export default function StickyChat() {
                 {msg.text || (
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span className="dot-typing"></span>
-                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>Thinking...</span>
+                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                      {language === "ar" ? "جاري التفكير..." : "Thinking..."}
+                    </span>
                   </div>
                 )}
               </div>
@@ -517,7 +830,7 @@ export default function StickyChat() {
             />
             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: useGrounded ? "var(--primary)" : "#5a6e7c", fontWeight: useGrounded ? 600 : 400 }}>
               <FiGlobe />
-              <span>Ground with Google Search</span>
+              <span>{language === "ar" ? "البحث في جوجل" : "Ground with Google Search"}</span>
             </div>
           </label>
 
@@ -536,7 +849,7 @@ export default function StickyChat() {
             }}
           >
             <FiTerminal />
-            <span>Logs ({sessionLogs.length})</span>
+            <span>{language === "ar" ? "السجلات" : "Logs"} ({sessionLogs.length})</span>
           </button>
         </div>
 
@@ -555,10 +868,12 @@ export default function StickyChat() {
             }}
           >
             {sessionLogs.length === 0 ? (
-              <div style={{ color: "#6a7c88", fontStyle: "italic" }}>No runtime execution logs yet.</div>
+              <div style={{ color: "#6a7c88", fontStyle: "italic" }}>
+                {language === "ar" ? "لا توجد سجلات تشغيل بعد." : "No runtime execution logs yet."}
+              </div>
             ) : (
               sessionLogs.map((log, i) => (
-                <div key={i} style={{ marginBottom: "0.2rem", display: "flex", gap: "0.25rem" }}>
+                <div key={i} style={{ marginBottom: "0.2rem", display: "flex", gap: "0.25rem" }} dir="ltr">
                   <span style={{ color: "var(--secondary)" }}><FiCornerDownRight style={{ display: "inline" }} /></span>
                   <span style={{
                     color: log.includes("[Error]") ? "#f44336" : log.includes("[Telemetry]") ? "var(--secondary)" : "#a4b3c0"
@@ -589,7 +904,7 @@ export default function StickyChat() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isSending}
-            placeholder="Type your security check or query..."
+            placeholder={language === "ar" ? "اكتب استفسارك أو فحص الأمان هنا..." : "Type your security check or query..."}
             style={{
               flex: 1,
               padding: "0.75rem 1rem",
@@ -619,7 +934,7 @@ export default function StickyChat() {
               transition: "all 0.2s"
             }}
           >
-            <FiSend style={{ fontSize: "1rem" }} />
+            <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />
           </button>
         </form>
       </div>
@@ -659,6 +974,14 @@ export default function StickyChat() {
         .floating-chat-trigger:hover {
           transform: scale(1.1) translateY(-2px);
           box-shadow: 0 12px 40px rgba(16, 107, 163, 0.4), 0 0 20px rgba(212, 175, 55, 0.3) !important;
+        }
+        .delete-session-btn:hover {
+          color: var(--accent-red) !important;
+          background-color: rgba(235, 87, 87, 0.1) !important;
+        }
+        .history-session-item:hover {
+          background-color: rgba(16, 107, 163, 0.04) !important;
+          border-color: rgba(16, 107, 163, 0.12) !important;
         }
       `}</style>
     </>

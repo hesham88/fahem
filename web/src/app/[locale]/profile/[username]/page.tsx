@@ -16,7 +16,8 @@ import {
   FiBookOpen, 
   FiCalendar,
   FiHome,
-  FiUser
+  FiUser,
+  FiCpu
 } from "react-icons/fi";
 
 const profileTranslations = {
@@ -406,21 +407,29 @@ export default function UserProfilePage() {
     return (
       <div style={{
         minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-        backgroundColor: "#faf8f5", color: "#0f172a", fontFamily: "var(--font-sans), sans-serif"
+        backgroundColor: "var(--background)", fontFamily: "var(--font-display)", position: "relative", overflow: "hidden"
       }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-          <div className="spinning-icon" style={{
-            width: "48px", height: "48px", borderRadius: "50%",
-            border: "3px solid rgba(16, 107, 163, 0.1)", borderTop: "3px solid #106ba3"
-          }}></div>
-          <p className="pulse-icon" style={{ color: "#6a7c88", fontWeight: 700, fontSize: "1rem" }}>{getT("loading")}</p>
+        {/* Animated ambient background spheres for visual consistency */}
+        <div className="ambient-background" style={{ position: "absolute", width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }}>
+          <div className="sphere sphere-1" style={{ top: "-10%", left: "-10%", background: "radial-gradient(circle, rgba(16,107,163,0.15) 0%, rgba(16,107,163,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-2" style={{ bottom: "-10%", right: "-10%", background: "radial-gradient(circle, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-3" style={{ top: "40%", left: "40%", background: "radial-gradient(circle, rgba(243,123,29,0.1) 0%, rgba(243,123,29,0) 70%)", width: "500px", height: "500px", position: "absolute", filter: "blur(80px)" }}></div>
         </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          .spinning-icon { animation: spin 1s linear infinite; }
-          .pulse-icon { animation: pulse 2s infinite; }
-          @keyframes spin { 100% { transform: rotate(360deg); } }
-          @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-        `}} />
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem", zIndex: 1, position: "relative" }}>
+          {/* Concentric circular glassmorphic spinner */}
+          <div className="loader-container">
+            <div className="loader-ring loader-ring-outer"></div>
+            <div className="loader-ring loader-ring-middle"></div>
+            <div className="loader-ring loader-ring-inner"></div>
+            <div className="loader-center">
+              <FiCpu className="loader-cpu-icon" />
+            </div>
+          </div>
+          <div className="loader-text-glow" style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 600, letterSpacing: "1px" }}>
+            {getT("loading")}
+          </div>
+        </div>
       </div>
     );
   }

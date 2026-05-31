@@ -99,6 +99,7 @@ class WorkflowState(BaseModel):
     database_results: str = ""
     execution_success: bool = False
     final_output: str = ""
+    onboarding: bool = False
 
 # Import the Orchestrator Agent
 try:
@@ -114,6 +115,17 @@ except ImportError:
 
 
 # -------------------------------------------------------------
+# 2b. Conversational Onboarding Agent Setup (Imported)
+# -------------------------------------------------------------
+
+try:
+    from onboarding_agent.agent import onboarding_agent
+except ImportError:
+    from agents.onboarding_agent.agent import onboarding_agent
+
+
+
+# -------------------------------------------------------------
 # 3. Workflow Node Functions
 # -------------------------------------------------------------
 
@@ -123,16 +135,20 @@ async def orchestrator_node_func(ctx, node_input: Any) -> str:
     
     # Try parsing as JSON first to extract rich session/context variables
     is_json = False
+    is_onboarding = False
     try:
         data = json.loads(prompt_str)
-        if isinstance(data, dict) and "prompt" in data:
-            is_json = True
-            ctx.state["original_prompt"] = data.get("prompt", "")
-            ctx.state["language"] = data.get("language") or os.environ.get("LANGUAGE", "en")
-            ctx.state["user_email"] = data.get("user_email") or os.environ.get("USER_EMAIL", "")
-            ctx.state["user_id"] = data.get("user_id") or os.environ.get("USER_ID", "")
-            ctx.state["username"] = data.get("username") or os.environ.get("USERNAME", "anonymous")
-            ctx.state["credits"] = int(data.get("credits", 100))
+        if isinstance(data, dict):
+            if "prompt" in data:
+                is_json = True
+                ctx.state["original_prompt"] = data.get("prompt", "")
+                ctx.state["language"] = data.get("language") or os.environ.get("LANGUAGE", "en")
+                ctx.state["user_email"] = data.get("user_email") or os.environ.get("USER_EMAIL", "")
+                ctx.state["user_id"] = data.get("user_id") or os.environ.get("USER_ID", "")
+                ctx.state["username"] = data.get("username") or os.environ.get("USERNAME", "anonymous")
+                ctx.state["credits"] = int(data.get("credits", 100))
+            if data.get("onboarding") is True:
+                is_onboarding = True
     except Exception:
         pass
         
@@ -143,6 +159,13 @@ async def orchestrator_node_func(ctx, node_input: Any) -> str:
         ctx.state["user_id"] = os.environ.get("USER_ID", "")
         ctx.state["username"] = os.environ.get("USERNAME", "anonymous")
         ctx.state["credits"] = 100
+        
+    if is_onboarding:
+        ctx.state["onboarding"] = True
+        ctx.route = "onboarding"
+    else:
+        ctx.state["onboarding"] = False
+        ctx.route = "standard"
         
     return f"Orchestrator seed prompt: {ctx.state['original_prompt']}"
 
@@ -262,6 +285,46 @@ async def presenter_node_func(ctx, node_input: Any) -> str:
     ctx.state["final_output"] = final_output
     return final_output
 
+async def onboarding_node_func(ctx, node_input: Any) -> str:
+    """Conversational Onboarding Agent Node."""
+    user_id = ctx.state.get("user_id", "")
+    email = ctx.state.get("user_email", "")
+    
+    onboarding_agent.instruction = f"""
+        You are the Fahem Conversational Onboarding Assistant.
+        Your sole goal is to naturally, warmly, and politely onboard a new user into the Fahem platform.
+        You support both English and Arabic. Respond in the language used by the user.
+        
+        The current user's authenticated ID is '{user_id}' and their email is '{email}'.
+        Use this user_id '{user_id}' when calling 'save_user_profile_tool'.
+        
+        Ensure you gather the following fields:
+        1. Role / User Type: Must be "student", "teacher", "parent", or "admin". Explain what each does if asked.
+        2. Full Name: Smartly extract the actual name (e.g. remove polite prefixes like "My name is", "اسمي هو", "انا").
+        3. Username: Ask for a unique username (e.g. jane_doe). It must be at least 3 chars and alphanumeric/underscores.
+           - CRITICAL: You MUST verify username availability by calling 'check_username_availability_tool' before proceeding! If taken, suggest alternatives or ask for another.
+        4. Age: Ask for their age.
+           - CRITICAL: Enforce common-sense human age limits (3 to 120 years). If a user provides an invalid age (e.g. 0, 1, 2, or > 120), politely ask for a realistic age.
+           - If they are a "student" and age < 13: You MUST ask for their parent's email address.
+        5. Country: Ask for their country.
+        6. Educational Grade Level: (Only if they are a "student").
+           - Offer a recommended grade based on their age and country, or let them specify a custom grade, select lifelong learning, or skip.
+        7. School Name: (Only if "student" or "teacher"). Ask for their school. You can suggest common ones or let them type.
+        8. Children Count & Children in School Count: (Only if "parent" or "teacher"). Ask how many children they have, and how many are in school.
+        
+        IMPORTANT RULES:
+        - Converse naturally. Do not ask for all fields at once! Ask for 1 or 2 fields at a time to keep it a premium, conversational experience.
+        - DO NOT disclose any internal database schemas, collections, or technical metrics. You are a conversational counselor, not a database administrator!
+        - If the user asks "what can you do?" or other general questions, politely explain your role as an onboarding assistant here to guide them through setting up their custom space, explaining clearly what fields you need to collect.
+        - When all required fields are collected and validated, call 'save_user_profile_tool' with the user's ID '{user_id}' and all fields in the JSON payload!
+        - Ensure 'onboardingCompleted' is set to True in the payload.
+        - Once the save tool reports success, output a final welcoming message telling the user their profile is ready and onboarding is complete. Include the phrase "SUCCESS_ONBOARDING_COMPLETE" in your final response when the profile has been successfully saved.
+    """
+    
+    res = await ctx.run_node(onboarding_agent, ctx.state.get("original_prompt", ""))
+    ctx.state["final_output"] = res
+    return res
+
 # -------------------------------------------------------------
 # 4. Compile the Workflow Graph DAG
 # -------------------------------------------------------------
@@ -269,10 +332,12 @@ orchestrator_node = FunctionNode(name="orchestrator_node", func=orchestrator_nod
 guardrail_node = FunctionNode(name="guardrail_node", func=guardrail_node_func, rerun_on_resume=True)
 mongodb_node = FunctionNode(name="mongodb_node", func=mongodb_node_func, rerun_on_resume=True)
 presenter_node = FunctionNode(name="presenter_node", func=presenter_node_func, rerun_on_resume=True)
+onboarding_node = FunctionNode(name="onboarding_node", func=onboarding_node_func, rerun_on_resume=True)
 
 edges = [
     Edge(from_node=START, to_node=orchestrator_node),
-    Edge(from_node=orchestrator_node, to_node=guardrail_node),
+    Edge(from_node=orchestrator_node, to_node=onboarding_node, route="onboarding"),
+    Edge(from_node=orchestrator_node, to_node=guardrail_node, route="standard"),
     Edge(from_node=guardrail_node, to_node=mongodb_node, route="execute"),
     Edge(from_node=guardrail_node, to_node=presenter_node, route="deny"),
     Edge(from_node=mongodb_node, to_node=presenter_node)
@@ -286,4 +351,5 @@ fahem_workflow = Workflow(
 
 # Expose 'app' for compatibility with Next.js frontend calling /run with app_name: "app"
 app = local_mongodb_agent
+
 

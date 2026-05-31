@@ -94,6 +94,18 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let isClosed = false;
+        const safeClose = () => {
+          if (!isClosed) {
+            try {
+              controller.close();
+            } catch (e) {
+              console.warn("[ReadableStream] SafeClose ignored error:", e);
+            }
+            isClosed = true;
+          }
+        };
+
         try {
           const langName = getLanguageName(language || "en");
           const activeSessionId = sessionId || "sess_" + Date.now();
@@ -127,7 +139,7 @@ export async function POST(req: NextRequest) {
               }).catch(() => {});
             }
 
-            controller.close();
+            safeClose();
             return;
           }
           controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
@@ -303,7 +315,7 @@ ${rawFacts}
           console.error("[grounded-api] Orchestration failed:", err);
           controller.enqueue(encoder.encode(`\n[ERROR] Grounded Orchestration failed: ${err.message}\n`));
         } finally {
-          controller.close();
+          safeClose();
         }
       }
     });
@@ -311,7 +323,6 @@ ${rawFacts}
     return new Response(stream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
         "Cache-Control": "no-cache, no-transform"
       }
     });

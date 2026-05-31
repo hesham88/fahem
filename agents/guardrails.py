@@ -21,7 +21,7 @@ import asyncio
 def run_log_audit_task(category: str, agent: str, message: str, details: str = None):
     """Enqueues an audit log insertion to the MongoDB collection asynchronously."""
     try:
-        from get_metadata import log_audit_event
+        from agent_communications import log_audit_event
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(log_audit_event(category, agent, message, details))

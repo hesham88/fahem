@@ -96,10 +96,27 @@ export default function LandingPage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-          <FiCpu className="spinning-icon" style={{ fontSize: "3rem", color: "var(--primary)" }} />
-          <div style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 500 }}>{t("loading_ambient")}</div>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)", position: "relative", overflow: "hidden" }}>
+        {/* Animated ambient background spheres for the loading state to create immersive depth */}
+        <div className="ambient-background" style={{ position: "absolute", width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }}>
+          <div className="sphere sphere-1" style={{ top: "-10%", left: "-10%", background: "radial-gradient(circle, rgba(37,99,235,0.15) 0%, rgba(37,99,235,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-2" style={{ bottom: "-10%", right: "-10%", background: "radial-gradient(circle, rgba(249,115,22,0.1) 0%, rgba(249,115,22,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-3" style={{ top: "40%", left: "40%", background: "radial-gradient(circle, rgba(13,148,136,0.1) 0%, rgba(13,148,136,0) 70%)", width: "500px", height: "500px", position: "absolute", filter: "blur(80px)" }}></div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem", zIndex: 1, position: "relative" }}>
+          {/* Concentric circular glassmorphic spinner */}
+          <div className="loader-container">
+            <div className="loader-ring loader-ring-outer"></div>
+            <div className="loader-ring loader-ring-middle"></div>
+            <div className="loader-ring loader-ring-inner"></div>
+            <div className="loader-center">
+              <FiCpu className="loader-cpu-icon" />
+            </div>
+          </div>
+          <div className="loader-text-glow" style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 600, letterSpacing: "1px" }}>
+            {t("loading_ambient")}
+          </div>
         </div>
       </div>
     );

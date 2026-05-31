@@ -44,7 +44,7 @@ async def _run_mcp_tool(tool_name: str, args: dict) -> Any:
             try:
                 uri = get_mongodb_uri()
                 await tools_map["connect"].run_async(
-                    args={"connectionStringOrClusterName": uri},
+                    args={"connectionString": uri},
                     tool_context=None
                 )
                 _mcp_connected = True

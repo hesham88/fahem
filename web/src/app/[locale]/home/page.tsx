@@ -300,6 +300,64 @@ const avatarCategories = {
   ]
 };
 
+const extractActualName = (rawInput: string): string => {
+  let cleaned = rawInput.trim();
+  
+  // English patterns
+  const englishPatterns = [
+    /^(?:hey|hi|hello|dear)?\s*,?\s*my\s+name\s+is\s+/i,
+    /^(?:hey|hi|hello|dear)?\s*,?\s*my\s+name's\s+/i,
+    /^(?:hey|hi|hello|dear)?\s*,?\s*i\s+am\s+/i,
+    /^(?:hey|hi|hello|dear)?\s*,?\s*i'm\s+/i,
+    /^(?:hey|hi|hello|dear)?\s*,?\s*call\s+me\s+/i,
+    /^(?:hey|hi|hello|dear)?\s*,?\s*this\s+is\s+/i
+  ];
+
+  // Arabic patterns
+  const arabicPatterns = [
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*اسمي\s+هو\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*اسمي\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*أنا\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*انا\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*يدعونني\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*نادني\s+بـ\s*/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*نادني\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*معكم\s+/i,
+    /^(?:مرحبا|مرحباً|أهلاً|اهلا|يا هلا)?\s*,?\s*معك\s+/i
+  ];
+
+  let matched = true;
+  while (matched) {
+    matched = false;
+    for (const regex of [...englishPatterns, ...arabicPatterns]) {
+      if (regex.test(cleaned)) {
+        cleaned = cleaned.replace(regex, "").trim();
+        matched = true;
+        break;
+      }
+    }
+  }
+
+  // Remove any trailing or leading punctuation like periods, exclamation marks, etc.
+  cleaned = cleaned.replace(/^[\s,.\-!?;:]+|[\s,.\-!?;:]+$/g, "").trim();
+
+  return cleaned || rawInput.trim();
+};
+
+const extractAgeNumber = (rawInput: string): number => {
+  // Convert any Arabic/Indic digits to standard English digits
+  let cleaned = rawInput.trim()
+    .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1776));
+  
+  // Find any sequence of digits in the string
+  const match = cleaned.match(/\d+/);
+  if (match) {
+    return parseInt(match[0], 10);
+  }
+  return NaN;
+};
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -403,6 +461,7 @@ export default function Home() {
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
   
   // Conversational Onboarding states
+  const [localCompleted, setLocalCompleted] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
@@ -416,6 +475,7 @@ export default function Home() {
   const [onboardingUsername, setOnboardingUsername] = useState("");
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState("");
+  const [ageError, setAgeError] = useState("");
   const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
   const [onboardingChildrenCount, setOnboardingChildrenCount] = useState("");
   const [onboardingChildrenInSchool, setOnboardingChildrenInSchool] = useState("");
@@ -1107,7 +1167,25 @@ export default function Home() {
 
   // Handle Dynamic Translation for Onboarding
   useEffect(() => {
-    setOnboardingMessages(getOnboardingHistory(language === "ar"));
+    setOnboardingMessages(prev => {
+      if (prev.length <= 2) {
+        return [
+          {
+            sender: "fahem",
+            text: language === "ar"
+              ? "مرحباً بك في منصة فاهم التعليمية! 🚀 أنا مرشدك الذكي، وسأساعدك في تهيئة حسابك الشخصي بخطوات بسيطة وممتعة تفاعلية."
+              : "Welcome to Fahem Educational Platform! 🚀 I'm your AI guide, and I will help you set up your custom profile in a few simple and interactive steps."
+          },
+          {
+            sender: "fahem",
+            text: language === "ar"
+              ? "في البداية، ما هو دورك في منصتنا اليوم؟ (طالب، معلم، ولي أمر، أو مشرف)"
+              : "To begin, what is your role on our platform today? (student, teacher, parent, or admin)"
+          }
+        ];
+      }
+      return prev;
+    });
   }, [language]);
 
   // Smooth scroll to the latest message during onboarding without scroll-fighting
@@ -1179,302 +1257,205 @@ export default function Home() {
     }, 250);
   };
 
-  const handleOnboardingNext = async (
-    overrideGradeOption?: "recommended" | "custom" | "lifelong" | "skip",
-    overrideSchool?: string
-  ) => {
-    if (onboardingStep === 0) { // User type selection
-      const roleText = onboardingUserType === "student" ? (language === "ar" ? "طالب" : "Student") :
-                       onboardingUserType === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
-                       onboardingUserType === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
-                       (language === "ar" ? "مشرف" : "Admin");
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: roleText },
-        { sender: "fahem", text: language === "ar" ? "مرحباً بك! ما هو اسمك الكامل؟ 👋" : "Excellent! What is your full name? 👋" }
-      ]);
-      setOnboardingStep(1);
-    } else if (onboardingStep === 1) { // Name step
-      if (!onboardingName.trim()) return;
+  const [onboardingInput, setOnboardingInput] = useState("");
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [onboardingStatusText, setOnboardingStatusText] = useState("");
 
-      // Generate username suggestions based on the user's full name
-      const cleanParts = onboardingName.trim().toLowerCase().replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter(Boolean);
-      const suggestionsList: string[] = [];
-      if (cleanParts.length > 0) {
-        const p1 = cleanParts[0];
-        const p2 = cleanParts[1] || "";
-        suggestionsList.push(p2 ? `${p1}_${p2}` : `${p1}_fahem`);
-        suggestionsList.push(`${p1}${Math.floor(100 + Math.random() * 900)}`);
-        suggestionsList.push(p2 ? `${p2}_${p1}` : `${p1}_active`);
-      } else {
-        suggestionsList.push("user_" + Math.floor(1000 + Math.random() * 9000));
-        suggestionsList.push("fahem_learner");
+  const sendOnboardingMessage = async (msgText: string) => {
+    if (!msgText.trim() || !user) return;
+    setOnboardingInput("");
+    setOnboardingLoading(true);
+    setOnboardingStatusText(language === "ar" ? "جاري الإرسال للذكاء الاصطناعي..." : "Sending to AI assistant...");
+
+    // 1. Add user message to history
+    setOnboardingMessages(prev => [...prev, { sender: "user", text: msgText }]);
+
+    // 2. Prepare streaming placeholder message from the assistant
+    setOnboardingMessages(prev => [...prev, { sender: "fahem", text: "" }]);
+
+    try {
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: msgText,
+          language,
+          userEmail: user.email || "",
+          userId: user.uid,
+          sessionId: `onboarding_session_${user.uid}`,
+          onboarding: true
+        }),
+      });
+
+      if (!response.body) {
+        throw new Error("Streaming is not supported by the response.");
       }
-      setUsernameSuggestions(suggestionsList);
 
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: onboardingName },
-        { 
-          sender: "fahem", 
-          text: language === "ar" 
-            ? `سعدت بلقائك يا ${onboardingName}! 🌟 يرجى اختيار اسم مستخدم (Username) فريد لحسابك. سيتم استخدامه في رابط ملفك الشخصي بدلاً من الأرقام:` 
-            : `Nice to meet you, ${onboardingName}! 🌟 Please choose a unique username for your account. This will be used in your profile URL instead of numbers:`
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedText = "";
+      let isFinalOutput = false;
+      let buffer = "";
+
+      while (!done) {
+        const { value, done: isDone } = await reader.read();
+        done = isDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        } else if (done) {
+          buffer += decoder.decode();
         }
-      ]);
-      setOnboardingStep(8); // Go to username selection
-    } else if (onboardingStep === 8) { // Username step
-      const inputUsername = onboardingUsername.trim();
-      if (!inputUsername) return;
 
-      // Alphanumeric and underscores between 3 and 20 chars
-      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-      if (!usernameRegex.test(inputUsername)) {
-        setUsernameError(
-          language === "ar"
-            ? "يجب أن يتراوح اسم المستخدم بين 3 إلى 20 حرفاً، ويحتوي فقط على أحرف إنجليزية وأرقام وشرطة سفلية (_)"
-            : "Username must be 3-20 characters, containing only English letters, numbers, and underscores (_)"
-        );
-        return;
-      }
+        let lineEndIndex;
+        while ((lineEndIndex = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.substring(0, lineEndIndex);
+          buffer = buffer.substring(lineEndIndex + 1);
 
-      setUsernameError("");
-      setCheckingUsername(true);
-      try {
-        const checkRes = await fetch(`/api/user/username/check?username=${encodeURIComponent(inputUsername)}`);
-        if (checkRes.ok) {
-          const checkData = await checkRes.json();
-          if (checkData.available) {
-            if (onboardingUserType === "admin") {
-              setOnboardingMessages(prev => [
-                ...prev,
-                { sender: "user", text: `@${inputUsername}` },
-                { sender: "fahem", text: language === "ar" ? "رائع جداً! بصفتك مشرفاً، سننتقل الآن مباشرةً لاختيار صورتك الرمزية (الرمز التعبيري) لإتمام الإعداد:" : "Awesome! As an Admin, we will now skip directly to choosing your profile avatar to finish:" }
-              ]);
-              setOnboardingStep(7); // Admins go straight to avatar selection
-            } else {
-              setOnboardingMessages(prev => [
-                ...prev,
-                { sender: "user", text: `@${inputUsername}` },
-                onboardingUserType === "student"
-                  ? { sender: "fahem", text: language === "ar" ? `رائع جداً! اسم المستخدم @${inputUsername} متاح لحسابك. كم عمرك الآن؟ 🎂` : `Awesome! Username @${inputUsername} is available. How old are you? 🎂` }
-                  : { sender: "fahem", text: language === "ar" ? `رائع جداً! اسم المستخدم @${inputUsername} متاح لحسابك. ما هي بلد إقامتك؟ 🌍` : `Awesome! Username @${inputUsername} is available. What is your country of residence? 🌍` }
-              ]);
-              setOnboardingStep(onboardingUserType === "student" ? 2 : 3);
-            }
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          if (trimmed.startsWith("[METADATA]")) {
+            continue;
+          }
+          if (trimmed.includes("=== Agent Final Output ===")) {
+            isFinalOutput = true;
+            continue;
+          }
+          if (trimmed.includes("==========================")) {
+            isFinalOutput = false;
+            continue;
+          }
+          if (trimmed.startsWith("[Fahem Agent]") || trimmed.startsWith("[SYSTEM]") || trimmed.startsWith("[ERROR]")) {
+            setOnboardingStatusText(trimmed.replace("[Fahem Agent]", "").replace("[SYSTEM]", "").trim());
+            continue;
+          }
+
+          if (isFinalOutput) {
+            accumulatedText += line + "\n";
+            setOnboardingMessages(prev => {
+              const nextMsgs = [...prev];
+              if (nextMsgs.length > 0) {
+                nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
+              }
+              return nextMsgs;
+            });
           } else {
-            setUsernameError(
-              language === "ar"
-                ? "عذراً، اسم المستخدم هذا محجوز مسبقاً! يرجى تجربة اسم آخر أو اختيار أحد الاقتراحات أدناه."
-                : "Sorry, this username is already taken! Please try another one or choose from the suggestions below."
-            );
+            // Fallback for responses that aren't wrapped in Agent Final Output tags
+            if (!trimmed.startsWith("[") && !trimmed.startsWith("=") && accumulatedText === "") {
+              accumulatedText += line + "\n";
+              setOnboardingMessages(prev => {
+                const nextMsgs = [...prev];
+                if (nextMsgs.length > 0) {
+                  nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
+                }
+                return nextMsgs;
+              });
+            }
           }
-        } else {
-          setUsernameError(language === "ar" ? "فشل التحقق من اسم المستخدم. يرجى المحاولة مرة أخرى." : "Failed to verify username. Please try again.");
         }
-      } catch (err) {
-        console.error("Error checking username:", err);
-        setUsernameError(language === "ar" ? "فشل الاتصال بالخادم." : "Connection failed.");
-      } finally {
-        setCheckingUsername(false);
       }
-    } else if (onboardingStep === 2) { // Age step (Student only)
-      if (!onboardingAge.trim()) return;
-      const ageVal = parseInt(onboardingAge);
-      if (isNaN(ageVal) || ageVal <= 0) return;
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: language === "ar" ? `عمري ${onboardingAge} عاماً` : `I am ${onboardingAge} years old` },
-        { sender: "fahem", text: language === "ar" ? `رائع! ما هي بلد إقامتك؟ 🌍` : `Great! What is your country of residence? 🌍` }
-      ]);
-      setOnboardingStep(3);
-    } else if (onboardingStep === 3) { // Country step
-      if (!onboardingCountry.trim()) return;
-      
-      const localizedCountry = getLocalizedCountryName(onboardingCountry, language === "ar");
 
-      if (onboardingUserType === "student") {
-        const proposedGradeText = getGradeSuggestion(onboardingAge, onboardingCountry, language === "ar");
-        setOnboardingMessages(prev => [
-          ...prev,
-          { sender: "user", text: language === "ar" ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}` },
-          { 
-            sender: "fahem", 
-            text: language === "ar"
-              ? `بناءً على عمرك (${onboardingAge} سنة) وإقامتك في (${localizedCountry})، نقترح عليك المسار الدراسي: **${proposedGradeText}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
-              : `Based on your age of ${onboardingAge} and residing in ${localizedCountry}, we recommend: **${proposedGradeText}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`
+      // Handle any leftover in buffer (no trailing newline)
+      if (buffer.trim()) {
+        const line = buffer;
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("[METADATA]") && !trimmed.includes("=== Agent Final Output ===") && !trimmed.includes("==========================") && !trimmed.startsWith("[Fahem Agent]") && !trimmed.startsWith("[SYSTEM]") && !trimmed.startsWith("[ERROR]")) {
+          if (isFinalOutput || accumulatedText === "") {
+            accumulatedText += line;
+            setOnboardingMessages(prev => {
+              const nextMsgs = [...prev];
+              if (nextMsgs.length > 0) {
+                nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
+              }
+              return nextMsgs;
+            });
           }
-        ]);
-        setOnboardingStep(4);
+        }
+      }
+
+      // 3. Post-stream processing: check if the onboarding was completed successfully
+      if (accumulatedText.includes("SUCCESS_ONBOARDING_COMPLETE")) {
+        const cleanedText = accumulatedText.replace("SUCCESS_ONBOARDING_COMPLETE", "").trim();
+        setOnboardingMessages(prev => {
+          const nextMsgs = [...prev];
+          if (nextMsgs.length > 0) {
+            nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: cleanedText };
+          }
+          return nextMsgs;
+        });
+
+        setOnboardingStatusText(language === "ar" ? "✨ اكتمل الإعداد بنجاح! جاري تحميل المنصة..." : "✨ Onboarding complete! Loading dashboard...");
+
+        setTimeout(async () => {
+          setLoadingProfile(true);
+          try {
+            const res = await fetch(`/api/user/profile?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email || "")}&t=${Date.now()}`, { cache: "no-store" });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.profile && data.profile.userId) {
+                setUserProfile(data.profile);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("onboarding_completed_" + user.uid, "true");
+                }
+                await logActivity("onboarding_completed", "success", "Completed onboarding via conversational agent");
+              }
+            }
+          } catch (err) {
+            console.error("Error reloading profile on completion:", err);
+          } finally {
+            setLoadingProfile(false);
+          }
+        }, 2500);
       } else {
-        // Teacher or Parent school step prompt
-        const nextMsg = onboardingUserType === "teacher"
-          ? (language === "ar" ? "ممتاز! ما هو اسم المدرسة أو المؤسسة التعليمية التي تعمل بها حالياً؟ 🏫 (اكتب للبحث)" : "Excellent! What is the name of the school or educational institution where you work? 🏫 (Type to search)")
-          : (language === "ar" ? "ممتاز! ما هو اسم مدرسة أو جامعة أطفالك؟ 🏫 (اكتب للبحث)" : "Excellent! What is the name of your children's school or university? 🏫 (Type to search)");
-        
-        setOnboardingMessages(prev => [
-          ...prev,
-          { sender: "user", text: language === "ar" ? `أقيم في ${localizedCountry}` : `I live in ${localizedCountry}` },
-          { sender: "fahem", text: nextMsg }
-        ]);
-        setOnboardingStep(5);
+        setOnboardingStatusText("");
       }
-    } else if (onboardingStep === 4) { // Grade Proposal step (Student only)
-      const proposedGradeText = getGradeSuggestion(onboardingAge, onboardingCountry, language === "ar");
-      let choiceText = "";
-      const currentOpt = overrideGradeOption || onboardingGradeOption;
-      if (currentOpt === "recommended") choiceText = proposedGradeText;
-      else if (currentOpt === "lifelong") choiceText = language === "ar" ? "متعلم مدى الحياة" : "Lifelong Learner";
-      else if (currentOpt === "skip") choiceText = language === "ar" ? "تخطي هذه الخطوة" : "Skip Step";
-      else choiceText = `${language === "ar" ? "صف مخصص:" : "Custom Grade:"} ${onboardingCustomGrade}`;
 
-      const ageVal = parseInt(onboardingAge);
-      const isUnderage = ageVal < 13;
-
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: choiceText }
-      ]);
-
-      if (isUnderage) {
-        setOnboardingMessages(prev => [
-          ...prev,
-          { 
+    } catch (err: any) {
+      console.error("Onboarding streaming failed:", err);
+      setOnboardingStatusText("");
+      setOnboardingMessages(prev => {
+        const nextMsgs = [...prev];
+        if (nextMsgs.length > 0) {
+          nextMsgs[nextMsgs.length - 1] = { 
             sender: "fahem", 
-            text: language === "ar"
-              ? "تنبيه الأمان والرقابة الأبوية 🛡️: بما أن عمرك أقل من 13 سنة، فإننا نطبق معايير الخصوصية لحماية الأطفال. يرجى كتابة البريد الإلكتروني لولي أمرك ليقوم بالموافقة على تفعيل حسابك من لوحته الخاصة:"
-              : "Safety & Parental Consent Notice 🛡️: Since you are under 13, standard age limit protections apply. Please enter your parent's email address so they can approve your account from their portal:"
-          }
-        ]);
-        setOnboardingStep(6); // Underage student goes to parent email
-      } else {
-        setOnboardingMessages(prev => [
-          ...prev,
-          { 
-            sender: "fahem", 
-            text: language === "ar"
-              ? "رائع جداً! ما هو اسم المدرسة أو الجامعة التي تدرس بها حالياً؟ 🏫 (اكتب للبحث في الخريطة)"
-              : "Awesome! What is the name of the school or university where you currently study? 🏫 (Type to search)"
-          }
-        ]);
-        setOnboardingStep(5); // Student goes to school search
-      }
-    } else if (onboardingStep === 5) { // School search step
-      const schoolName = (overrideSchool !== undefined ? overrideSchool : onboardingSchool).trim();
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: schoolName ? schoolName : (language === "ar" ? "تخطي" : "Skipped") }
-      ]);
-
-      if (onboardingUserType === "student" || onboardingUserType === "teacher") {
-        setOnboardingMessages(prev => [
-          ...prev,
-          { 
-            sender: "fahem", 
-            text: language === "ar"
-              ? "رائع جداً! لقد أكملنا البيانات الأساسية. الآن، اختر صورتك الرمزية المفضلة لملفك الشخصي من المكتبة المتنوعة أدناه:"
-              : "Excellent! We have captured your core info. Now, select your preferred avatar from our diverse library below to complete onboarding:"
-          }
-        ]);
-        setOnboardingStep(7); // Student or Teacher goes to avatar selection
-      } else {
-        // Parent children count prompt (Item 7)
-        setOnboardingMessages(prev => [
-          ...prev,
-          { 
-            sender: "fahem", 
-            text: language === "ar"
-              ? "كم عدد أطفالك بشكل عام؟ 👪"
-              : "How many children do you have in general? 👪"
-          }
-        ]);
-        setOnboardingStep(10); // Go to children count step
-      }
-    } else if (onboardingStep === 6) { // Parent email step (Underage Student only)
-      if (!onboardingParentEmail.trim()) return;
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: onboardingParentEmail },
-        { 
-          sender: "fahem", 
-          text: language === "ar"
-            ? "شكراً لك! تم تسجيل البريد الأبوي للموافقة الأمنية. الآن، ما هو اسم المدرسة أو الجامعة التي تدرس بها حالياً؟ 🏫 (اكتب للبحث)"
-            : "Thank you! Parental email registered for approval check. Now, what is the name of the school or university where you study? 🏫 (Type to search)"
+            text: language === "ar" 
+              ? "عذراً، واجهت مشكلة أثناء الاتصال بالخادم. يرجى المحاولة مرة أخرى." 
+              : "Sorry, I encountered an issue connecting to the server. Please try again." 
+          };
         }
-      ]);
-      setOnboardingStep(5); // Go to school search step after parent email
-    } else if (onboardingStep === 10) { // Children count step (Teacher/Parent)
-      const count = onboardingChildrenCount.trim();
-      if (!count) return;
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: count },
-        { 
-          sender: "fahem", 
-          text: language === "ar"
-            ? "منهم، كم عدد الأطفال الذين يدرسون حالياً في المدارس أو الجامعات؟ 🏫"
-            : "Out of those, how many are studying in schools or universities? 🏫"
-        }
-      ]);
-      setOnboardingStep(11); // Go to children in school count step
-    } else if (onboardingStep === 11) { // Children in school/university count step (Teacher/Parent)
-      const inSchoolCount = onboardingChildrenInSchool.trim();
-      if (!inSchoolCount) return;
-      setOnboardingMessages(prev => [
-        ...prev,
-        { sender: "user", text: inSchoolCount },
-        { 
-          sender: "fahem", 
-          text: language === "ar"
-            ? "رائع جداً! لقد أكملنا كل التفاصيل الخاصة بك. أخيراً، اختر صورتك الرمزية المفضلة والحديثة من المكتبة الفاخرة أدناه:"
-            : "Wonderful! We have gathered all details. Finally, select your favorite, modern avatar from our premium library below to complete onboarding:"
-        }
-      ]);
-      setOnboardingStep(7); // Go to avatar selection
+        return nextMsgs;
+      });
+    } finally {
+      setOnboardingLoading(false);
     }
   };
 
-  const handleOnboardingComplete = async (avatarEmoji: string, isSkipped: boolean = false, skippedAtStep?: number) => {
+  const skipOnboarding = async () => {
     if (!user) return;
-    setOnboardingAvatar(avatarEmoji);
     setLoadingProfile(true);
-
-    const gradeVal = onboardingGradeOption === "recommended"
-      ? getGradeSuggestion(onboardingAge, onboardingCountry, language === "ar")
-      : onboardingGradeOption === "custom" ? onboardingCustomGrade
-      : onboardingGradeOption === "lifelong" ? "lifelong" : "skipped";
-
-    const isUnderage = onboardingUserType === "student" && parseInt(onboardingAge) < 13;
-
-    // Generate/Use a unique username
-    let usernameVal = onboardingUsername.trim();
-    if (!usernameVal) {
-      const emailPrefix = user.email ? user.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "") : "";
-      const cleanedPrefix = emailPrefix.slice(0, 15);
-      usernameVal = cleanedPrefix.length >= 3 
-        ? `${cleanedPrefix}_${Math.floor(100 + Math.random() * 900)}` 
-        : `user_${user.uid.slice(0, 6)}`;
-    }
+    const emailPrefix = user.email ? user.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "") : "";
+    const usernameVal = emailPrefix.length >= 3 
+      ? `${emailPrefix}_${Math.floor(100 + Math.random() * 900)}` 
+      : `user_${user.uid.slice(0, 6)}`;
 
     const profileData = {
       userId: user.uid,
       username: usernameVal,
       email: user.email || "",
-      name: onboardingName || user.displayName || user.email?.split("@")[0] || "User",
-      age: parseInt(onboardingAge) || 0,
-      country: onboardingCountry || "Egypt",
-      grade: onboardingUserType === "student" ? gradeVal : "N/A",
-      parentEmail: isUnderage ? onboardingParentEmail : "",
-      avatar: avatarEmoji,
-      school: onboardingSchool || "",
-      userType: onboardingUserType,
-      role: onboardingUserType,
+      name: user.displayName || user.email?.split("@")[0] || "User",
+      age: 18,
+      country: "Egypt",
+      grade: "N/A",
+      avatar: "🚀",
+      school: "N/A",
+      userType: "student",
+      role: "student",
       onboardingCompleted: true,
-      onboardingSkipped: isSkipped,
-      skippedAtStep: isSkipped && skippedAtStep !== undefined ? skippedAtStep : null,
-      isApproved: !isUnderage, // Pending parent approval if underage student
-      childrenCount: parseInt(onboardingChildrenCount) || 0,
-      childrenInSchoolCount: parseInt(onboardingChildrenInSchool) || 0,
+      onboardingSkipped: true,
+      isApproved: true,
       friends: [],
       groupsJoined: [],
       privacySettings: {
@@ -1494,36 +1475,14 @@ export default function Home() {
         })
       });
       if (res.ok) {
-        const resData = await res.json();
-        if (resData.status !== "error") {
-          setUserProfile(profileData);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("onboarding_completed_" + user.uid, "true");
-          }
-          await logActivity(
-            "onboarding_completed",
-            "success",
-            isSkipped 
-              ? `Skipped onboarding at step ${skippedAtStep} as ${onboardingUserType}` 
-              : `Completed onboarding as ${onboardingUserType}`
-          );
-        } else {
-          console.error("Failed to save onboarding profile: backend returned status error", resData.error || "");
-          alert(language === "ar"
-            ? `عذراً، فشل حفظ ملفك الشخصي في قاعدة البيانات: ${resData.error || "خطأ في خادم قاعدة البيانات"}`
-            : `Sorry, failed to save your profile to the database: ${resData.error || "database server error"}`
-          );
+        setUserProfile(profileData);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("onboarding_completed_" + user.uid, "true");
         }
-      } else {
-        const errorText = await res.text();
-        console.error("Failed to save onboarding profile:", errorText);
-        alert(language === "ar"
-          ? "حدث خطأ في الشبكة أثناء حفظ بياناتك. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى."
-          : "A network error occurred while saving your profile. Please check your connection and try again."
-        );
+        await logActivity("onboarding_skipped", "success", "Skipped onboarding via chatbot interface");
       }
     } catch (err) {
-      console.error("Error saving onboarding profile:", err);
+      console.error("Error skipping onboarding:", err);
     } finally {
       setLoadingProfile(false);
     }
@@ -2124,48 +2083,71 @@ export default function Home() {
       const decoder = new TextDecoder();
       let done = false;
       let accumulatedResult = "";
+      let buffer = "";
 
       while (!done) {
         const { value, done: isDone } = await reader.read();
         done = isDone;
         if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-          lines.forEach((line) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine) {
-              // Parse metadata lines
-              if (trimmedLine.startsWith("[METADATA]")) {
-                const content = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
-                if (content.startsWith("ActiveAgent:")) {
-                  const agentName = content.replace("ActiveAgent:", "").trim();
-                  setActiveDbAgent(agentName);
-                } else if (content.startsWith("SessionId:")) {
-                  const activeSessId = content.replace("SessionId:", "").trim();
-                  setCurrentSessionId(activeSessId);
-                } else if (content.startsWith("Duration:")) {
-                  const parts = content.replace("Duration:", "").trim().split(":");
-                  const metricName = parts[0]?.trim();
-                  const durationValue = parts[1]?.trim();
-                  if (metricName === "Guardrail Audit") {
-                    setDbGuardTime(durationValue);
-                  } else if (metricName === "Database Engine") {
-                    setDbEngineTime(durationValue);
-                  } else if (metricName === "Orchestrator") {
-                    setDbOrchTime(durationValue);
-                  }
-                }
-                return; // Do NOT add metadata line to visible terminal logs
-              }
+          buffer += decoder.decode(value, { stream: true });
+        } else if (done) {
+          buffer += decoder.decode();
+        }
 
-              setLogs((prev) => [...prev, line]);
-              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
-                if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
-                  accumulatedResult += line + "\n";
+        let lineEndIndex;
+        while ((lineEndIndex = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.substring(0, lineEndIndex);
+          buffer = buffer.substring(lineEndIndex + 1);
+
+          const trimmedLine = line.trim();
+          if (trimmedLine) {
+            // Parse metadata lines
+            if (trimmedLine.startsWith("[METADATA]")) {
+              const content = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
+              if (content.startsWith("ActiveAgent:")) {
+                const agentName = content.replace("ActiveAgent:", "").trim();
+                setActiveDbAgent(agentName);
+              } else if (content.startsWith("SessionId:")) {
+                const activeSessId = content.replace("SessionId:", "").trim();
+                setCurrentSessionId(activeSessId);
+              } else if (content.startsWith("Duration:")) {
+                const parts = content.replace("Duration:", "").trim().split(":");
+                const metricName = parts[0]?.trim();
+                const durationValue = parts[1]?.trim();
+                if (metricName === "Guardrail Audit") {
+                  setDbGuardTime(durationValue);
+                } else if (metricName === "Database Engine") {
+                  setDbEngineTime(durationValue);
+                } else if (metricName === "Orchestrator") {
+                  setDbOrchTime(durationValue);
                 }
+              }
+              continue; // Do NOT add metadata line to visible terminal logs
+            }
+
+            setLogs((prev) => [...prev, line]);
+            if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+              if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
+                accumulatedResult += line + "\n";
               }
             }
-          });
+          }
+        }
+      }
+
+      // Handle any leftover in buffer (no trailing newline)
+      if (buffer.trim()) {
+        const line = buffer;
+        const trimmedLine = line.trim();
+        if (trimmedLine) {
+          if (!trimmedLine.startsWith("[METADATA]")) {
+            setLogs((prev) => [...prev, line]);
+            if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+              if (line !== "=== Agent Final Output === " && line !== "=== Agent Final Output ===" && line !== "==========================") {
+                accumulatedResult += line + "\n";
+              }
+            }
+          }
         }
       }
 
@@ -2197,765 +2179,419 @@ export default function Home() {
 
   if (loadingUser || loadingProfile) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-          <FiCpu className="spinning-icon" style={{ fontSize: "3rem", color: "var(--primary)" }} />
-          <div style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 500 }}>
-            {language === "ar" ? "جاري تحميل بيانات الجلسة والملف الشخصي..." : "Loading session and user profile..."}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)", position: "relative", overflow: "hidden" }}>
+        {/* Animated ambient background spheres for visual consistency */}
+        <div className="ambient-background" style={{ position: "absolute", width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }}>
+          <div className="sphere sphere-1" style={{ top: "-10%", left: "-10%", background: "radial-gradient(circle, rgba(16,107,163,0.15) 0%, rgba(16,107,163,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-2" style={{ bottom: "-10%", right: "-10%", background: "radial-gradient(circle, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0) 70%)", width: "600px", height: "600px", position: "absolute", filter: "blur(80px)" }}></div>
+          <div className="sphere sphere-3" style={{ top: "40%", left: "40%", background: "radial-gradient(circle, rgba(243,123,29,0.1) 0%, rgba(243,123,29,0) 70%)", width: "500px", height: "500px", position: "absolute", filter: "blur(80px)" }}></div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem", zIndex: 1, position: "relative" }}>
+          {/* Concentric circular glassmorphic spinner */}
+          <div className="loader-container">
+            <div className="loader-ring loader-ring-outer"></div>
+            <div className="loader-ring loader-ring-middle"></div>
+            <div className="loader-ring loader-ring-inner"></div>
+            <div className="loader-center">
+              <FiCpu className="loader-cpu-icon" />
+            </div>
+          </div>
+          <div className="loader-text-glow" style={{ fontSize: "1.2rem", color: "var(--primary)", fontWeight: 600, letterSpacing: "1px" }}>
+            {language === "ar" ? "جاري التحميل..." : "Loading..."}
           </div>
         </div>
       </div>
     );
   }
 
-  if (profileLoadError) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--background)", fontFamily: "var(--font-display)", direction: language === "ar" ? "rtl" : "ltr" }}>
-        <div style={{
-          maxWidth: "480px", padding: "2.5rem", borderRadius: "var(--border-radius-lg)",
-          background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(20px)",
-          border: "1px solid rgba(16, 107, 163, 0.15)", boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
-          textAlign: "center", display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center"
-        }}>
-          <div style={{ background: "rgba(230, 92, 0, 0.1)", color: "var(--accent-orange)", width: "64px", height: "64px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <FiAlertTriangle style={{ fontSize: "2rem" }} />
-          </div>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)", margin: 0 }}>
-            {language === "ar" ? "خطأ في تحميل الملف الشخصي" : "Profile Load Failure"}
-          </h2>
-          <p style={{ fontSize: "0.95rem", color: "#6a7c88", lineHeight: "1.6", margin: 0 }}>
-            {language === "ar" 
-              ? `واجهت المنصة مشكلة أثناء استرداد بيانات ملفك الشخصي من قاعدة البيانات: (${profileLoadError}). يرجى إعادة المحاولة لتجنب حدوث أي حظر أو تكرار للحساب.`
-              : `The platform encountered an issue retrieving your profile from the database: (${profileLoadError}). Please retry to avoid account duplication loops.`}
-          </p>
-          <button
-            onClick={() => {
-              setProfileLoadError(null);
-              setLoadingProfile(true);
-              const currentUser = auth.currentUser;
-              if (currentUser) {
-                fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
-                  .then((res) => {
-                    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-                    return res.json();
-                  })
-                  .then((data) => {
-                    if (data.error) throw new Error(data.error);
-                    if (data.profile && data.profile.userId) {
-                      setUserProfile(data.profile);
-                      setPrivacyVisibility(data.profile.privacySettings?.profileVisibility || "public");
-                      setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
-                      setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
-                      setPreferencesSchool(data.profile.school || "");
-                    } else {
-                      const defaultProfile = {
-                        userId: currentUser.uid,
-                        email: currentUser.email || "",
-                        onboardingCompleted: false,
-                        userType: "student",
-                        role: "student",
-                        friends: [],
-                        groupsJoined: [],
-                        privacySettings: {
-                          profileVisibility: "public",
-                          allowMessages: true,
-                          showActivity: true
-                        }
-                      };
-                      setUserProfile(defaultProfile);
-                    }
-                  })
-                  .catch((err) => {
-                    console.error("Error loading user profile on retry:", err);
-                    setProfileLoadError(err.message || "Failed to fetch profile");
-                  })
-                  .finally(() => {
-                    setLoadingProfile(false);
-                  });
-              }
-            }}
-            style={{
-              width: "100%", padding: "0.85rem", background: "linear-gradient(135deg, var(--primary), var(--secondary))",
-              color: "#ffffff", border: "none", borderRadius: "var(--border-radius-md)", cursor: "pointer",
-              fontWeight: 700, fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
-            }}
-          >
-            <FiRefreshCw className="pulse-icon" />
-            {language === "ar" ? "إعادة محاولة الاتصال" : "Retry Connection"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const localCompleted = typeof window !== "undefined" && user && localStorage.getItem(`onboarding_completed_${user.uid}`) === "true";
   if (userProfile && userProfile.onboardingCompleted !== true && !localCompleted) {
+    // Determine dynamic suggestions based on conversation content
+    const getLastFahemMessage = () => {
+      const fahemMsgs = onboardingMessages.filter(m => m.sender === "fahem");
+      if (fahemMsgs.length === 0) return "";
+      return fahemMsgs[fahemMsgs.length - 1].text;
+    };
+
+    const getQuickReplies = () => {
+      const lastText = getLastFahemMessage().toLowerCase();
+      if (!lastText) {
+        return [
+          { label: language === "ar" ? "🎓 طالب" : "🎓 Student", value: "student" },
+          { label: language === "ar" ? "🍎 معلم" : "🍎 Teacher", value: "teacher" },
+          { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" }
+        ];
+      }
+
+      // Check if asking for role/type
+      if (lastText.includes("role") || lastText.includes("user type") || lastText.includes("طالب") || lastText.includes("معلم") || lastText.includes("ولي أمر") || lastText.includes("نوع حسابك") || lastText.includes("دورك")) {
+        return [
+          { label: language === "ar" ? "🎓 طالب علم" : "🎓 Student", value: "student" },
+          { label: language === "ar" ? "🍎 معلم متميز" : "🍎 Teacher", value: "teacher" },
+          { label: language === "ar" ? "👪 ولي أمر" : "👪 Parent", value: "parent" },
+          { label: language === "ar" ? "🛡️ مشرف نظام" : "🛡️ Admin", value: "admin" }
+        ];
+      }
+
+      // Check if asking for age
+      if (lastText.includes("age") || lastText.includes("عمر") || lastText.includes("عاماً") || lastText.includes("سنة")) {
+        return [
+          { label: "12", value: "12" },
+          { label: "15", value: "15" },
+          { label: "18", value: "18" },
+          { label: "25", value: "25" },
+          { label: "35", value: "35" }
+        ];
+      }
+
+      // Check if asking for country
+      if (lastText.includes("country") || lastText.includes("بلد") || lastText.includes("إقامة") || lastText.includes("residing")) {
+        return [
+          { label: language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬", value: "Egypt" },
+          { label: language === "ar" ? "السعودية 🇸🇦" : "Saudi Arabia 🇸🇦", value: "Saudi Arabia" },
+          { label: language === "ar" ? "الإمارات 🇦🇪" : "UAE 🇦🇪", value: "UAE" },
+          { label: language === "ar" ? "قطر 🇶🇦" : "Qatar 🇶🇦", value: "Qatar" },
+          { label: language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴", value: "Jordan" }
+        ];
+      }
+
+      // Check if asking for grade
+      if (lastText.includes("grade") || lastText.includes("صف") || lastText.includes("دراسي") || lastText.includes("مسار") || lastText.includes("الدرجة")) {
+        return [
+          { label: language === "ar" ? "قبول المسار المقترح 👍" : "Accept Recommendation 👍", value: "Accept recommended grade" },
+          { label: language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠", value: "Lifelong Learner" },
+          { label: language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip", value: "Skip" }
+        ];
+      }
+
+      // Check if asking for children count
+      if (lastText.includes("children") || lastText.includes("أطفال") || lastText.includes("طفل")) {
+        return [
+          { label: "0", value: "0" },
+          { label: "1", value: "1" },
+          { label: "2", value: "2" },
+          { label: "3", value: "3" },
+          { label: "4+", value: "4" }
+        ];
+      }
+
+      // Check if asking for school
+      if (lastText.includes("school") || lastText.includes("مدرسة") || lastText.includes("جامعة") || lastText.includes("مؤسسة")) {
+        return [
+          { label: language === "ar" ? "تخطي خطوة المدرسة ⏭️" : "Skip School Step ⏭️", value: "Skip" }
+        ];
+      }
+
+      // General Yes/No replies
+      if (lastText.includes("?") || lastText.includes("هل") || lastText.includes("would you")) {
+        return [
+          { label: language === "ar" ? "نعم 👍" : "Yes 👍", value: "Yes" },
+          { label: language === "ar" ? "لا 👎" : "No 👎", value: "No" },
+          { label: language === "ar" ? "تخطي ⏭️" : "Skip ⏭️", value: "Skip" }
+        ];
+      }
+
+      return [];
+    };
+
+    const formatMessageText = (txt: string) => {
+      if (!txt) return "";
+      const lines = txt.split("\n");
+      return lines.map((line, lineIdx) => {
+        // Simple markdown parsing of **bold** and `code`
+        const boldParts = line.split(/(\*\*[^*]+\*\*)/g);
+        const formattedLine = boldParts.map((part, i) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return <strong key={i} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+          }
+          // Parse code blocks/inline code inside line
+          const codeParts = part.split(/(`[^`]+`)/g);
+          return codeParts.map((subPart, j) => {
+            if (subPart.startsWith("`") && subPart.endsWith("`")) {
+              return <code key={j} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "2px 6px", borderRadius: "4px", fontSize: "0.85em", color: "var(--primary)", border: "1px solid rgba(16, 107, 163, 0.15)", fontFamily: "monospace" }}>{subPart.slice(1, -1)}</code>;
+            }
+            return subPart;
+          });
+        });
+
+        return (
+          <p key={lineIdx} style={{ margin: "0 0 0.5rem 0", lineHeight: "1.6" }}>
+            {formattedLine}
+          </p>
+        );
+      });
+    };
+
+    const quickReplies = getQuickReplies();
+
     return (
       <div className="onboarding-overlay" style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
-        background: "radial-gradient(circle at top right, rgba(212, 175, 55, 0.15), rgba(16, 107, 163, 0.05)), #f4ecd8",
+        background: "radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), rgba(16, 107, 163, 0.12)), rgba(15, 23, 42, 0.82)",
+        backdropFilter: "blur(16px)",
         display: "flex", justifyContent: "center", alignItems: "center", padding: "1.5rem",
         fontFamily: "var(--font-sans)", direction: language === "ar" ? "rtl" : "ltr"
       }}>
+        {/* CSS Keyframes & animations injected cleanly */}
+        <style>{`
+          @keyframes onboarding-fade-in {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes onboarding-dot-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-7px); }
+          }
+          @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+          }
+          .onboarding-message {
+            animation: onboarding-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .onboarding-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: onboarding-dot-bounce 1.4s infinite ease-in-out both;
+          }
+          .onboarding-dot:nth-child(1) { animation-delay: -0.32s; }
+          .onboarding-dot:nth-child(2) { animation-delay: -0.16s; }
+          .onboarding-dot:nth-child(3) { animation-delay: 0s; }
+          
+          .onboarding-chip {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .onboarding-chip:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(16, 107, 163, 0.16);
+            border-color: var(--primary) !important;
+            background: rgba(16, 107, 163, 0.08) !important;
+          }
+          .onboarding-send-btn {
+            transition: all 0.2s ease;
+          }
+          .onboarding-send-btn:hover:not(:disabled) {
+            transform: scale(1.04);
+            box-shadow: 0 4px 12px rgba(16, 107, 163, 0.2);
+          }
+          .custom-scroll-container::-webkit-scrollbar {
+            width: 6px;
+          }
+          .custom-scroll-container::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(16, 107, 163, 0.15);
+            border-radius: 10px;
+          }
+          .custom-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 107, 163, 0.3);
+          }
+        `}</style>
+
         <div style={{
-          width: "100%", maxWidth: "750px", height: "90vh", maxHeight: "680px",
-          background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(20px)",
-          border: "1px solid rgba(16, 107, 163, 0.15)", borderRadius: "var(--border-radius-lg)",
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.08)", display: "flex", flexDirection: "column",
+          width: "100%", maxWidth: "820px", height: "85vh", maxHeight: "720px",
+          background: "rgba(253, 251, 247, 0.88)", backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.45)", borderRadius: "24px",
+          boxShadow: "0 30px 60px rgba(0, 0, 0, 0.18)", display: "flex", flexDirection: "column",
           overflow: "hidden"
         }}>
           {/* Header */}
           <div style={{
-            padding: "1.25rem 1.5rem", borderBottom: "1px solid rgba(16, 107, 163, 0.1)",
+            padding: "1.25rem 2rem", borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
             display: "flex", justifyContent: "space-between", alignItems: "center",
-            background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))"
+            background: "linear-gradient(135deg, rgba(16, 107, 163, 0.06), rgba(212, 175, 55, 0.06))"
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.4rem", borderRadius: "8px", color: "#ffffff", display: "flex" }}>
-                <FiCpu className="pulse-icon" style={{ fontSize: "1.2rem" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "10px", color: "#ffffff", display: "flex", boxShadow: "0 4px 10px rgba(16, 107, 163, 0.25)" }}>
+                <FiCpu className="pulse-icon" style={{ fontSize: "1.3rem" }} />
               </div>
-              <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--primary)" }}>
-                {language === "ar" ? "إعداد حساب فاهم الذكي" : "Fahem Interactive Profile Setup"}
-              </span>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: "1.15rem", color: "var(--primary)", display: "block" }}>
+                  {language === "ar" ? "مساعد فاهم الذكي للتسجيل" : "Fahem Intelligent Onboarding"}
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981", display: "inline-block" }}></span>
+                  {language === "ar" ? "الذكاء الاصطناعي نشط" : "Conversational Setup (AI Active)"}
+                </span>
+              </div>
             </div>
-            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)", padding: "4px 10px", borderRadius: "20px" }}>
-              {language === "ar" ? `الخطوة ${onboardingStep + 1} من 8` : `Step ${onboardingStep + 1} of 8`}
-            </div>
+            <button
+              onClick={() => skipOnboarding()}
+              style={{
+                fontSize: "0.82rem", fontWeight: 700, color: "var(--primary)", background: "rgba(16, 107, 163, 0.08)",
+                padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer", transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.15)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
+            >
+              {language === "ar" ? "تخطي الإعداد" : "Skip Setup"}
+            </button>
           </div>
 
           {/* Conversational Scroll Log */}
           <div 
             ref={onboardingScrollContainerRef}
             style={{
-              flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem"
-            }} className="custom-scrollbar">
+              flex: 1, overflowY: "auto", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.25rem"
+            }} className="custom-scroll-container">
             {onboardingMessages.map((msg, index) => {
               const isFahem = msg.sender === "fahem";
+              // Skip rendering empty messages that might act as temporary stream holders
+              if (!isFahem && !msg.text) return null;
               return (
-                <div key={index} style={{
-                  display: "flex", gap: "0.75rem", alignSelf: isFahem ? "flex-start" : "flex-end",
+                <div key={index} className="onboarding-message" style={{
+                  display: "flex", gap: "0.85rem", alignSelf: isFahem ? "flex-start" : "flex-end",
                   flexDirection: isFahem ? "row" : "row-reverse", maxWidth: "80%"
                 }}>
                   <div style={{
-                    width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                    width: "38px", height: "36px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center",
                     background: isFahem ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(212, 175, 55, 0.2)",
-                    color: isFahem ? "#ffffff" : "var(--secondary-hover)", fontWeight: 700, fontSize: "1.1rem", flexShrink: 0
+                    color: isFahem ? "#ffffff" : "var(--secondary-hover)", fontWeight: 700, fontSize: "1.2rem", flexShrink: 0,
+                    boxShadow: isFahem ? "0 4px 8px rgba(16, 107, 163, 0.15)" : "none"
                   }}>
-                    {isFahem ? "🤖" : renderAvatar(onboardingAvatar, "1.1rem")}
+                    {isFahem ? "🤖" : "👤"}
                   </div>
                   <div style={{
-                    padding: "0.85rem 1.1rem", borderRadius: "16px",
-                    borderTopLeftRadius: isFahem ? "2px" : "16px", borderTopRightRadius: isFahem ? "16px" : "2px",
+                    padding: "1rem 1.25rem", borderRadius: "20px",
+                    borderTopLeftRadius: isFahem ? "4px" : "20px", borderTopRightRadius: isFahem ? "20px" : "4px",
                     background: isFahem ? "#ffffff" : "linear-gradient(135deg, var(--primary), rgba(16, 107, 163, 0.95))",
                     color: isFahem ? "var(--foreground)" : "#ffffff",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)",
+                    boxShadow: isFahem ? "0 4px 12px rgba(0, 0, 0, 0.02)" : "0 4px 12px rgba(16, 107, 163, 0.15)",
                     border: isFahem ? "1px solid rgba(16, 107, 163, 0.08)" : "none",
-                    lineHeight: "1.6", fontSize: "0.95rem"
+                    lineHeight: "1.6", fontSize: "0.98rem"
                   }}>
-                    {msg.text}
+                    {isFahem ? formatMessageText(msg.text) : msg.text}
                   </div>
                 </div>
               );
             })}
+
+            {/* Bouncing Dots Loading Bubble */}
+            {onboardingLoading && onboardingMessages[onboardingMessages.length - 1]?.text === "" && (
+              <div className="onboarding-message" style={{
+                display: "flex", gap: "0.85rem", alignSelf: "flex-start", maxWidth: "80%"
+              }}>
+                <div style={{
+                  width: "36px", height: "36px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                  color: "#ffffff", fontWeight: 700, fontSize: "1.2rem", flexShrink: 0,
+                  boxShadow: "0 4px 8px rgba(16, 107, 163, 0.15)"
+                }}>
+                  🤖
+                </div>
+                <div style={{
+                  padding: "1rem 1.25rem", borderRadius: "20px",
+                  borderTopLeftRadius: "4px", borderTopRightRadius: "20px",
+                  background: "#ffffff",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.02)",
+                  border: "1px solid rgba(16, 107, 163, 0.08)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "4px"
+                }}>
+                  <div className="onboarding-dot"></div>
+                  <div className="onboarding-dot"></div>
+                  <div className="onboarding-dot"></div>
+                </div>
+              </div>
+            )}
+
+            {/* Realtime Streaming Engine Status message */}
+            {onboardingStatusText && (
+              <div style={{
+                alignSelf: "center",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(16, 107, 163, 0.05)",
+                border: "1px solid rgba(16, 107, 163, 0.08)",
+                padding: "6px 14px",
+                borderRadius: "20px",
+                color: "var(--primary)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                marginTop: "0.5rem"
+              }}>
+                <FiServer className="pulse-icon" style={{ fontSize: "0.9rem", color: "var(--primary)", animation: "pulse-ring 2s infinite" }} />
+                <span>{onboardingStatusText}</span>
+              </div>
+            )}
+
             <div ref={onboardingEndRef} />
           </div>
 
-          {/* Interactive Input Section */}
+          {/* Interactive Footer & Input Section */}
           <div style={{
-            padding: "1.5rem", borderTop: "1px solid rgba(16, 107, 163, 0.1)",
-            background: "#ffffff", display: "flex", flexDirection: "column", gap: "1rem"
+            padding: "1.5rem 2rem", borderTop: "1px solid rgba(16, 107, 163, 0.08)",
+            background: "rgba(255, 255, 255, 0.6)", display: "flex", flexDirection: "column", gap: "1rem"
           }}>
-            {/* Step 0: User Type Grid */}
-            {onboardingStep === 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                {[
-                  { id: "student", emoji: "🎓", labelAr: "طالب علم", labelEn: "Student", descAr: "تعلم وتبادل الأفكار مع معلمنا الذكي", descEn: "Learn & chat with our advanced AI tutor" },
-                  { id: "teacher", emoji: "🍎", labelAr: "معلم متميز", labelEn: "Teacher", descAr: "قم بإدارة المجموعات والمحتوى الدراسي", descEn: "Manage student groups & educational content" },
-                  { id: "parent", emoji: "👪", labelAr: "ولي أمر", labelEn: "Parent", descAr: "أضف أطفالك، وافق على الطلبات وتابع التطور", descEn: "Add children, approve requests, monitor progress" },
-                  { id: "admin", emoji: "🛡️", labelAr: "مشرف نظام", labelEn: "Admin", descAr: "أشرف على الأمان وسياسات الاستخدام والتقارير", descEn: "Supervise safety, telemetry & audit reports" }
-                ].map((role) => (
+            {/* Quick Reply Chips Container */}
+            {quickReplies.length > 0 && !onboardingLoading && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
+                {quickReplies.map((chip, chipIdx) => (
                   <button
-                    key={role.id}
-                    onClick={() => {
-                      setOnboardingUserType(role.id as any);
-                    }}
+                    key={chipIdx}
+                    className="onboarding-chip"
+                    onClick={() => sendOnboardingMessage(chip.value)}
+                    type="button"
                     style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem",
-                      padding: "0.85rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                      background: onboardingUserType === role.id ? "rgba(16, 107, 163, 0.05)" : "rgba(255, 255, 255, 0.6)",
-                      borderColor: onboardingUserType === role.id ? "var(--primary)" : "var(--card-border)",
-                      cursor: "pointer", transition: "all 0.2s ease"
+                      padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(16, 107, 163, 0.15)",
+                      background: "#ffffff", color: "var(--primary)", fontSize: "0.88rem", fontWeight: 700,
+                      cursor: "pointer", transition: "all 0.25s"
                     }}
                   >
-                    <span style={{ fontSize: "1.8rem" }}>{role.emoji}</span>
-                    <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "0.95rem" }}>
-                      {language === "ar" ? role.labelAr : role.labelEn}
-                    </span>
-                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", textAlign: "center" }}>
-                      {language === "ar" ? role.descAr : role.descEn}
-                    </span>
+                    {chip.label}
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Step 1: Name Input */}
-            {onboardingStep === 1 && (
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="text"
-                  value={onboardingName}
-                  onChange={(e) => setOnboardingName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={language === "ar" ? "مثال: أحمد محمود" : "e.g., Jane Doe"}
-                  style={{
-                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Step 8: Username Selection */}
-            {onboardingStep === 8 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
-                <div style={{ display: "flex", gap: "0.5rem", position: "relative", alignItems: "center" }}>
-                  <span style={{
-                    position: "absolute",
-                    left: language === "ar" ? "auto" : "12px",
-                    right: language === "ar" ? "12px" : "auto",
-                    color: "var(--secondary)",
-                    fontWeight: 700,
-                    fontSize: "1.1rem"
-                  }}>@</span>
-                  <input
-                    type="text"
-                    value={onboardingUsername}
-                    onChange={(e) => {
-                      setOnboardingUsername(e.target.value.replace(/\s+/g, ""));
-                      if (usernameError) setUsernameError("");
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && !checkingUsername && handleOnboardingNext()}
-                    placeholder={language === "ar" ? "اسم_المستخدم" : "username_here"}
-                    style={{
-                      flex: 1,
-                      padding: "0.75rem",
-                      paddingLeft: language === "ar" ? "0.75rem" : "2rem",
-                      paddingRight: language === "ar" ? "2rem" : "0.75rem",
-                      border: "1px solid var(--card-border)",
-                      borderRadius: "var(--border-radius-md)",
-                      outline: "none",
-                      fontFamily: "var(--font-sans)",
-                      borderColor: usernameError ? "var(--accent-orange)" : "var(--card-border)",
-                      transition: "border-color 0.2s"
-                    }}
-                    autoFocus
-                  />
-                  {checkingUsername && (
-                    <div style={{
-                      position: "absolute",
-                      right: language === "ar" ? "auto" : "12px",
-                      left: language === "ar" ? "12px" : "auto",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <FiCpu className="spinning-icon" style={{ color: "var(--primary)" }} />
-                    </div>
-                  )}
-                </div>
-
-                {usernameError && (
-                  <div style={{
-                    color: "var(--accent-orange)",
-                    fontSize: "0.85rem",
-                    fontWeight: 500,
-                    marginTop: "-0.25rem"
-                  }}>
-                    ⚠️ {usernameError}
-                  </div>
-                )}
-
-                {usernameSuggestions.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>
-                      {language === "ar" ? "أسماء مقترحة لك:" : "Suggested usernames for you:"}
-                    </span>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                      {usernameSuggestions.map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          onClick={() => {
-                            setOnboardingUsername(suggestion);
-                            setUsernameError("");
-                          }}
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "15px",
-                            border: "1px solid rgba(16, 107, 163, 0.15)",
-                            background: onboardingUsername === suggestion ? "rgba(212, 175, 55, 0.12)" : "rgba(255, 255, 255, 0.6)",
-                            color: "var(--primary)",
-                            fontSize: "0.8rem",
-                            cursor: "pointer",
-                            fontWeight: onboardingUsername === suggestion ? 700 : 500,
-                            borderColor: onboardingUsername === suggestion ? "var(--secondary)" : "rgba(16, 107, 163, 0.15)",
-                            transition: "all 0.2s"
-                          }}
-                        >
-                          @{suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 2: Age Input */}
-            {onboardingStep === 2 && (
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="number"
-                  value={onboardingAge}
-                  onChange={(e) => setOnboardingAge(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={language === "ar" ? "أدخل عمرك" : "e.g., 14"}
-                  style={{
-                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Step 3: Country Input */}
-            {onboardingStep === 3 && (
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <select
-                  value={onboardingCountry}
-                  onChange={(e) => setOnboardingCountry(e.target.value)}
-                  style={{
-                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)",
-                    background: "#ffffff"
-                  }}
-                  autoFocus
-                >
-                  <option value="">{language === "ar" ? "اختر بلد إقامتك..." : "Select residence country..."}</option>
-                  <option value="Egypt">{language === "ar" ? "مصر 🇪🇬" : "Egypt 🇪🇬"}</option>
-                  <option value="Saudi Arabia">{language === "ar" ? "المملكة العربية السعودية 🇸🇦" : "Saudi Arabia 🇸🇦"}</option>
-                  <option value="UAE">{language === "ar" ? "الإمارات العربية المتحدة 🇦🇪" : "UAE 🇦🇪"}</option>
-                  <option value="Qatar">{language === "ar" ? "قطر 🇶🇦" : "Qatar 🇶🇦"}</option>
-                  <option value="Kuwait">{language === "ar" ? "الكويت 🇰🇼" : "Kuwait 🇰🇼"}</option>
-                  <option value="Oman">{language === "ar" ? "عمان 🇴🇲" : "Oman 🇴🇲"}</option>
-                  <option value="Jordan">{language === "ar" ? "الأردن 🇯🇴" : "Jordan 🇯🇴"}</option>
-                  <option value="USA">{language === "ar" ? "الولايات المتحدة الأمريكية 🇺🇸" : "USA 🇺🇸"}</option>
-                  <option value="UK">{language === "ar" ? "المملكة المتحدة 🇬🇧" : "UK 🇬🇧"}</option>
-                  <option value="Other">{language === "ar" ? "بلد آخر 🌍" : "Other Country 🌍"}</option>
-                </select>
-              </div>
-            )}
-
-            {/* Step 4: Grade Proposal (Student) */}
-            {onboardingStep === 4 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                  <button
-                    onClick={() => {
-                      setOnboardingGradeOption("recommended");
-                      setTimeout(() => handleOnboardingNext("recommended"), 150);
-                    }}
-                    type="button"
-                    style={{
-                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                      background: onboardingGradeOption === "recommended" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
-                      borderColor: onboardingGradeOption === "recommended" ? "var(--primary)" : "var(--card-border)",
-                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem",
-                      fontFamily: "var(--font-sans)"
-                    }}
-                  >
-                    {language === "ar" 
-                      ? `المقترح: ${getGradeSuggestion(onboardingAge, onboardingCountry, true)}` 
-                      : `Recommended: ${getGradeSuggestion(onboardingAge, onboardingCountry, false)}`}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOnboardingGradeOption("lifelong");
-                      setTimeout(() => handleOnboardingNext("lifelong"), 150);
-                    }}
-                    type="button"
-                    style={{
-                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                      background: onboardingGradeOption === "lifelong" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
-                      borderColor: onboardingGradeOption === "lifelong" ? "var(--primary)" : "var(--card-border)",
-                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem",
-                      fontFamily: "var(--font-sans)"
-                    }}
-                  >
-                    {language === "ar" ? "متعلم مدى الحياة 🧠" : "Lifelong Learner 🧠"}
-                  </button>
-                  <button
-                    onClick={() => setOnboardingGradeOption("custom")}
-                    type="button"
-                    style={{
-                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                      background: onboardingGradeOption === "custom" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
-                      borderColor: onboardingGradeOption === "custom" ? "var(--primary)" : "var(--card-border)",
-                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem",
-                      fontFamily: "var(--font-sans)"
-                    }}
-                  >
-                    {language === "ar" ? "صف مخصص آخر ✍️" : "Type Custom Grade ✍️"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOnboardingGradeOption("skip");
-                      setTimeout(() => handleOnboardingNext("skip"), 150);
-                    }}
-                    type="button"
-                    style={{
-                      padding: "0.75rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                      background: onboardingGradeOption === "skip" ? "rgba(16, 107, 163, 0.05)" : "rgba(255,255,255,0.6)",
-                      borderColor: onboardingGradeOption === "skip" ? "var(--primary)" : "var(--card-border)",
-                      cursor: "pointer", fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem",
-                      fontFamily: "var(--font-sans)"
-                    }}
-                  >
-                    {language === "ar" ? "تخطي هذه الخطوة ⏭️" : "Skip this step ⏭️"}
-                  </button>
-                </div>
-
-                {onboardingGradeOption === "custom" && (
-                  <input
-                    type="text"
-                    value={onboardingCustomGrade}
-                    onChange={(e) => setOnboardingCustomGrade(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext("custom")}
-                    placeholder={language === "ar" ? "مثال: المسار البريطاني السنة 8" : "e.g., Year 8 British Curriculum"}
-                    style={{
-                      padding: "0.75rem", border: "1px solid var(--card-border)",
-                      borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                    }}
-                    autoFocus
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Step 5: School Search with Google Places & Branches */}
-            {onboardingStep === 5 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", position: "relative" }}>
-                <div style={{ display: "flex", position: "relative", alignItems: "center", width: "100%" }}>
-                  <input
-                    type="text"
-                    value={onboardingSchool}
-                    onChange={(e) => {
-                      setOnboardingSchool(e.target.value);
-                      fetchPlaces(e.target.value);
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                    placeholder={
-                      onboardingUserType === "student"
-                        ? (language === "ar" ? "ابحث عن مدرستك أو جامعتك..." : "Search for your school or university...")
-                        : onboardingUserType === "teacher"
-                          ? (language === "ar" ? "ابحث عن مدرسة أو جامعة تعمل بها..." : "Search for school or university where you work...")
-                          : (language === "ar" ? "ابحث عن مدرسة أو جامعة أطفالك..." : "Search for your children's school or university...")
-                    }
-                    style={{
-                      flex: 1,
-                      padding: "0.75rem",
-                      paddingRight: language === "ar" ? "0.75rem" : "2.5rem",
-                      paddingLeft: language === "ar" ? "2.5rem" : "0.75rem",
-                      border: "1px solid var(--card-border)",
-                      borderRadius: "var(--border-radius-md)",
-                      outline: "none",
-                      fontFamily: "var(--font-sans)"
-                    }}
-                    autoFocus
-                  />
-                  {searchingPlaces && (
-                    <div style={{
-                      position: "absolute",
-                      right: language === "ar" ? "auto" : "12px",
-                      left: language === "ar" ? "12px" : "auto",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <FiCpu className="spinning-icon" style={{ color: "var(--primary)" }} />
-                    </div>
-                  )}
-                </div>
-
-                {placesResults.length > 0 && !selectedPlaceForBranch && (
-                  <div style={{
-                    position: "absolute",
-                    bottom: "100%",
-                    left: 0,
-                    right: 0,
-                    marginBottom: "0.25rem",
-                    maxHeight: "220px",
-                    overflowY: "auto",
-                    border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)",
-                    background: "#ffffff",
-                    display: "flex",
-                    flexDirection: "column",
-                    zIndex: 25,
-                    boxShadow: "0 -4px 16px rgba(0,0,0,0.12)"
-                  }} className="custom-scrollbar">
-                    {placesResults.map((place: any, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          if (place.branches && place.branches.length > 1) {
-                            setSelectedPlaceForBranch(place);
-                          } else {
-                            setOnboardingSchool(place.name);
-                            setPlacesResults([]);
-                            // Transition automatically with override to bypass state batched updates
-                            setTimeout(() => handleOnboardingNext(undefined, place.name), 150);
-                          }
-                        }}
-                        type="button"
-                        style={{
-                          padding: "0.75rem 1rem", border: "none", borderBottom: "1px solid rgba(0,0,0,0.05)",
-                          background: "none", textAlign: "start", cursor: "pointer", width: "100%",
-                          display: "flex", flexDirection: "column", gap: "0.15rem", fontFamily: "var(--font-sans)"
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"}
-                        onMouseOut={(e) => e.currentTarget.style.background = "none"}
-                      >
-                        <span style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.9rem" }}>{place.name}</span>
-                        <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>📍 {place.address}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Popover Branch Selector */}
-                {selectedPlaceForBranch && (
-                  <div style={{
-                    position: "absolute", bottom: "100%", left: 0, right: 0, marginBottom: "0.5rem",
-                    padding: "1rem", borderRadius: "var(--border-radius-md)", border: "1px solid var(--primary)",
-                    background: "rgba(255, 255, 255, 0.98)", backdropFilter: "blur(10px)", zIndex: 30,
-                    boxShadow: "0 -4px 16px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", gap: "0.75rem"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", fontFamily: "var(--font-display)" }}>
-                        {language === "ar"
-                          ? `اختر الفرع والموقع الجغرافي لـ ${selectedPlaceForBranch.name}`
-                          : `Select campus branch for ${selectedPlaceForBranch.name}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlaceForBranch(null)}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#6a7c88" }}
-                      >
-                        <FiX />
-                      </button>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                      {selectedPlaceForBranch.branches.map((branch: string) => (
-                        <button
-                          key={branch}
-                          type="button"
-                          onClick={() => {
-                            const fullBranchName = `${selectedPlaceForBranch.name} - ${branch}`;
-                            setOnboardingSchool(fullBranchName);
-                            setSelectedPlaceForBranch(null);
-                            setPlacesResults([]);
-                            // Transition automatically with override to bypass state batched updates
-                            setTimeout(() => handleOnboardingNext(undefined, fullBranchName), 150);
-                          }}
-                          style={{
-                            padding: "0.6rem 1rem", borderRadius: "var(--border-radius-sm)",
-                            border: "1px solid rgba(16, 107, 163, 0.15)", background: "rgba(16, 107, 163, 0.02)",
-                            color: "var(--primary)", fontWeight: 600, fontSize: "0.8rem", textAlign: "start",
-                            cursor: "pointer", transition: "all 0.2s", fontFamily: "var(--font-sans)"
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "var(--primary)";
-                            e.currentTarget.style.color = "#ffffff";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "rgba(16, 107, 163, 0.02)";
-                            e.currentTarget.style.color = "var(--primary)";
-                          }}
-                        >
-                          🏢 {branch}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 6: Parent Email (Underage Student only) */}
-            {onboardingStep === 6 && (
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="email"
-                  value={onboardingParentEmail}
-                  onChange={(e) => setOnboardingParentEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={language === "ar" ? "البريد الإلكتروني لولي الأمر" : "parent@example.com"}
-                  style={{
-                    flex: 1, padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Step 10: Children Count (Parent/Teacher) */}
-            {onboardingStep === 10 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-display)" }}>
-                  {language === "ar" ? "كم عدد أطفالك؟" : "How many children do you have?"}
-                </label>
-                <input
-                  type="number"
-                  value={onboardingChildrenCount}
-                  onChange={(e) => setOnboardingChildrenCount(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={language === "ar" ? "مثال: 3" : "e.g., 3"}
-                  style={{
-                    padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Step 11: Children in Education (Parent/Teacher) */}
-            {onboardingStep === 11 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-display)" }}>
-                  {language === "ar" ? "كم عدد الأطفال الذين يدرسون حالياً بالمدارس أو الجامعات؟" : "How many of them are in school or university?"}
-                </label>
-                <input
-                  type="number"
-                  value={onboardingChildrenInSchool}
-                  onChange={(e) => setOnboardingChildrenInSchool(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleOnboardingNext()}
-                  placeholder={language === "ar" ? "مثال: 2" : "e.g., 2"}
-                  style={{
-                    padding: "0.75rem", border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-md)", outline: "none", fontFamily: "var(--font-sans)"
-                  }}
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {/* Step 7: Beautiful Diverse Tabbed Avatar Selection Panel */}
-            {onboardingStep === 7 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
-                {/* Tab selectors */}
-                <div style={{
-                  display: "flex", gap: "0.4rem", borderBottom: "1px solid rgba(16, 107, 163, 0.1)",
-                  paddingBottom: "0.5rem", flexWrap: "wrap"
-                }}>
-                  {[
-                    { id: "vectors", labelAr: "متجهات متميزة", labelEn: "Vectors" },
-                    { id: "animals", labelAr: "مخلوقات وبحار 🐬", labelEn: "Animals & Sea 🐬" },
-                    { id: "tech", labelAr: "التقنية والمتعلمون", labelEn: "Tech & Learners" },
-                    { id: "golden", labelAr: "أيقونات ذهبية", labelEn: "Golden Icons" }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setAvatarTab(tab.id as any)}
-                      style={{
-                        padding: "6px 12px", borderRadius: "20px", border: "1px solid",
-                        borderColor: avatarTab === tab.id ? "var(--primary)" : "rgba(16, 107, 163, 0.12)",
-                        background: avatarTab === tab.id ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(255,255,255,0.6)",
-                        color: avatarTab === tab.id ? "#ffffff" : "var(--primary)",
-                        cursor: "pointer", fontSize: "0.8rem", fontWeight: 700, transition: "all 0.2s",
-                        fontFamily: "var(--font-display)"
-                      }}
-                    >
-                      {language === "ar" ? tab.labelAr : tab.labelEn}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Grid selection */}
-                <div style={{
-                  display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.5rem",
-                  maxHeight: "180px", overflowY: "auto", padding: "0.25rem"
-                }} className="custom-scrollbar">
-                  {(avatarCategories[avatarTab] || []).map((item) => (
-                    <button
-                      key={item.e}
-                      onClick={() => handleOnboardingComplete(item.e)}
-                      title={language === "ar" ? item.lAr : item.lEn}
-                      type="button"
-                      style={{
-                        padding: "0.85rem 0", borderRadius: "var(--border-radius-md)", border: "1px solid var(--card-border)",
-                        background: "#ffffff", cursor: "pointer", transition: "all 0.2s ease",
-                        display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem"
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = "var(--primary)";
-                        e.currentTarget.style.transform = "scale(1.05)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.borderColor = "var(--card-border)";
-                        e.currentTarget.style.transform = "scale(1)";
-                      }}
-                    >
-                      {item.e.startsWith("/") ? (
-                        <img src={item.e} alt={item.lEn} style={{ width: "2.5rem", height: "2.5rem", objectFit: "contain", borderRadius: "50%" }} />
-                      ) : (
-                        <span style={{ fontSize: "2rem" }}>{item.e}</span>
-                      )}
-                      <span style={{
-                        fontSize: "0.65rem", color: "#6a7c88", whiteSpace: "nowrap",
-                        overflow: "hidden", textOverflow: "ellipsis", width: "90%", textAlign: "center",
-                        fontFamily: "var(--font-sans)"
-                      }}>
-                        {language === "ar" ? item.lAr : item.lEn}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Action Bar */}
-            {onboardingStep < 7 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleOnboardingComplete("🚀", true, onboardingStep);
-                  }}
-                  style={{
-                    background: "none", border: "none", color: "#8a9ca8", cursor: "pointer",
-                    fontSize: "0.85rem", fontWeight: 600, padding: "0.5rem", fontFamily: "var(--font-sans)"
-                  }}
-                >
-                  {language === "ar" ? "تخطي الإعداد بالكامل ⏭️" : "Skip profile setup completely ⏭️"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOnboardingNext()}
-                  className="btn btn-primary"
-                  style={{
-                    padding: "0.6rem 1.75rem", fontSize: "0.9rem", fontWeight: 700, borderRadius: "var(--border-radius-md)",
-                    display: "flex", alignItems: "center", gap: "0.35rem", fontFamily: "var(--font-display)"
-                  }}
-                >
-                  <span>{language === "ar" ? "متابعة" : "Next / Send"}</span>
-                  <FiSend style={{ fontSize: "0.9rem" }} />
-                </button>
-              </div>
-            )}
+            {/* Main Chat Input Box */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (onboardingInput.trim() && !onboardingLoading) {
+                  sendOnboardingMessage(onboardingInput);
+                }
+              }}
+              style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "center" }}
+            >
+              <input
+                type="text"
+                value={onboardingInput}
+                onChange={(e) => setOnboardingInput(e.target.value)}
+                disabled={onboardingLoading}
+                placeholder={language === "ar" ? "اكتب إجابتك هنا وسلّمها للمساعد الذكي..." : "Type your response here and press send..."}
+                style={{
+                  flex: 1, padding: "1rem 1.5rem", border: "1px solid rgba(16, 107, 163, 0.15)",
+                  borderRadius: "16px", outline: "none", fontFamily: "var(--font-sans)",
+                  fontSize: "0.98rem", background: "#ffffff",
+                  boxShadow: "inset 0 2px 4px rgba(0,0,0,0.01)",
+                  transition: "border-color 0.2s ease"
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)"; }}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!onboardingInput.trim() || onboardingLoading}
+                className="onboarding-send-btn btn btn-primary"
+                style={{
+                  padding: "0.95rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "16px",
+                  display: "flex", alignItems: "center", gap: "0.5rem", border: "none",
+                  background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                  color: "#ffffff", cursor: "pointer"
+                }}
+              >
+                <span>{language === "ar" ? "إرسال" : "Send"}</span>
+                <FiSend style={{ fontSize: "1rem" }} />
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -3204,179 +2840,7 @@ export default function Home() {
             </a>
           </nav>
 
-          {/* Saved Chats Sidebar Section */}
-          <div style={{ 
-            display: "flex", 
-            flexDirection: "column", 
-            flex: 1, 
-            minHeight: 0, 
-            marginTop: "0.5rem",
-            borderTop: "1px dashed rgba(235, 220, 185, 0.4)",
-            paddingTop: "0.75rem"
-          }}>
-            <h3 style={{ 
-              fontSize: "0.85rem", 
-              fontWeight: 800, 
-              color: "#6a7c88", 
-              textTransform: "uppercase", 
-              letterSpacing: "0.5px",
-              marginBottom: "0.5rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between"
-            }}>
-              <span>{getHistoryT("savedChats")}</span>
-              {sessions.length > 0 && (
-                <span style={{
-                  fontSize: "0.75rem",
-                  background: "rgba(16, 107, 163, 0.08)",
-                  color: "var(--primary)",
-                  padding: "2px 6px",
-                  borderRadius: "10px",
-                  fontWeight: 700
-                }}>
-                  {sessions.length}
-                </span>
-              )}
-            </h3>
 
-            {/* New Chat Button */}
-            <button
-              onClick={startNewChat}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                width: "100%",
-                padding: "0.65rem",
-                background: "linear-gradient(135deg, var(--primary), var(--secondary))",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "var(--border-radius-md)",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-                boxShadow: "var(--shadow-sm)",
-                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-                marginBottom: "0.75rem",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.filter = "brightness(1.1)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.filter = "none";
-                e.currentTarget.style.transform = "none";
-              }}
-            >
-              <FiPlus style={{ fontSize: "1rem" }} />
-              <span>{getHistoryT("newChat")}</span>
-            </button>
-
-            {/* Scrollable Container */}
-            <div style={{
-              flex: 1,
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.4rem",
-              minHeight: 0
-            }} className="custom-scrollbar">
-              {isSessionsLoading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", color: "#8a9ca8" }}>
-                  <FiRefreshCw className="spin-icon" style={{ marginRight: "0.5rem", animation: "spin 2s linear infinite" }} />
-                  <span style={{ fontSize: "0.8rem" }}>{getHistoryT("loadingChats")}</span>
-                </div>
-              ) : sessions.length === 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1.5rem", color: "#8a9ca8", textAlign: "center" }}>
-                  <FiFileText style={{ fontSize: "1.5rem", opacity: 0.3, marginBottom: "0.5rem" }} />
-                  <span style={{ fontSize: "0.8rem" }}>{getHistoryT("noSavedChats")}</span>
-                </div>
-              ) : (
-                sessions.map((sess) => {
-                  const isActive = currentSessionId === sess.sessionId;
-                  return (
-                    <div
-                      key={sess.sessionId}
-                      onClick={() => loadSession(sess.sessionId)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "0.55rem 0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        background: isActive ? "rgba(16, 107, 163, 0.08)" : "rgba(255, 255, 255, 0.4)",
-                        border: `1px solid ${isActive ? "rgba(16, 107, 163, 0.15)" : "rgba(235, 220, 185, 0.25)"}`,
-                        cursor: "pointer",
-                        transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                        gap: "0.5rem"
-                      }}
-                      onMouseOver={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)";
-                          e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.1)";
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.4)";
-                          e.currentTarget.style.borderColor = "rgba(235, 220, 185, 0.25)";
-                        }
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden", flex: 1 }}>
-                        <FiFileText style={{ color: isActive ? "var(--primary)" : "#8a9ca8", flexShrink: 0, fontSize: "0.95rem" }} />
-                        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}>
-                          <span style={{
-                            fontSize: "0.82rem",
-                            fontWeight: isActive ? 700 : 600,
-                            color: isActive ? "var(--primary)" : "var(--text-color)",
-                            whiteSpace: "nowrap",
-                            textOverflow: "ellipsis",
-                            overflow: "hidden"
-                          }} title={sess.title || "Untitled Chat"}>
-                            {sess.title || (language === "ar" ? "محادثة بدون عنوان" : "Untitled Chat")}
-                          </span>
-                          <span style={{ fontSize: "0.7rem", color: "#8a9ca8" }}>
-                            {sess.messageCount} {language === "ar" ? "رسائل" : "messages"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <button
-                        onClick={(e) => deleteSession(sess.sessionId, e)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "4px",
-                          cursor: "pointer",
-                          color: "#8a9ca8",
-                          borderRadius: "var(--border-radius-sm)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          transition: "all 0.2s"
-                        }}
-                        onMouseOver={(e) => {
-                          e.stopPropagation();
-                          e.currentTarget.style.color = "var(--accent-red)";
-                          e.currentTarget.style.background = "rgba(235, 87, 87, 0.1)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.stopPropagation();
-                          e.currentTarget.style.color = "#8a9ca8";
-                          e.currentTarget.style.background = "transparent";
-                        }}
-                      >
-                        <FiTrash2 style={{ fontSize: "0.85rem" }} />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Sidebar Footer (Language + Profile + Sign Out) */}

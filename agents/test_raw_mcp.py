@@ -17,7 +17,7 @@ async def test_mcp_with_raw_uri():
     print("Testing connect with RAW SRV URI...")
     try:
         res = await tools_map["connect"].run_async(
-            args={"connectionStringOrClusterName": raw_uri},
+            args={"connectionString": raw_uri},
             tool_context=None
         )
         print("Connect result:", res)

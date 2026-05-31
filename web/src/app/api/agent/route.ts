@@ -215,6 +215,7 @@ export async function POST(req: NextRequest) {
             // 1. Fetch chat history from DB to maintain conversational context
             let existingMessages: any[] = [];
             try {
+              console.log(`[Onboarding API] Fetching existing session history for: ${activeSessionId}`);
               const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
               if (res.ok) {
                 const data = await res.json();
@@ -222,6 +223,7 @@ export async function POST(req: NextRequest) {
                   existingMessages = data.session.messages;
                 }
               }
+              console.log(`[Onboarding API] Session history load complete. Found ${existingMessages.length} existing messages.`);
             } catch (err) {
               console.warn("Failed to fetch existing session for onboarding:", err);
             }
@@ -255,7 +257,7 @@ export async function POST(req: NextRequest) {
                   },
                   {
                     name: "saveUserProfile",
-                    description: "Saves or updates the user profile in MongoDB. Call this once ALL required onboarding fields (role, name, username, age, country, grade/school/children if applicable) have been collected and verified.",
+                    description: "Saves or updates the user profile in MongoDB. Call this once ALL required onboarding fields (role, name, username, age, country, grade/school/children, and avatar if applicable) have been collected and verified.",
                     parameters: {
                       type: "OBJECT" as const,
                       properties: {
@@ -273,6 +275,7 @@ export async function POST(req: NextRequest) {
                             country: { type: "STRING" as const },
                             grade: { type: "STRING" as const },
                             school: { type: "STRING" as const },
+                            avatar: { type: "STRING" as const },
                             childrenCount: { type: "INTEGER" as const },
                             childrenInSchool: { type: "INTEGER" as const },
                             onboardingCompleted: { type: "BOOLEAN" as const }
@@ -298,7 +301,7 @@ The current user's authenticated ID is '${userId || "anonymous"}' and their emai
 Your tone must be highly empathetic, friendly, premium, and human-like.
 
 CONVERSATIONAL STATE CHECKLIST & PROTOCOL:
-You must analyze the entire conversation history from the very beginning to build a strict checklist of what fields have already been provided.
+You must analyze the entire conversation history from the very beginning to build a checklist of what fields have already been provided.
 A field is "COLLECTED" if there is ANY mention or clear implication of it in the chat history. Once a field is "COLLECTED", you must NEVER ask for it again or backtrack to it, regardless of what language the user changes to!
 
 Here are the fields to collect in order, along with how to recognize if they are already COLLECTED:
@@ -320,19 +323,45 @@ Here are the fields to collect in order, along with how to recognize if they are
 6. **Educational Grade Level** (Only if role is "student"):
    - Recommend a standard school grade based on their age and country, or let them specify a custom grade or "lifelong learning" or skip.
 7. **School Name** (Only if role is "student" or "teacher"):
-   - Ask for their school name. They can type it or specify "Home school" / "None" / "Skip".
+   - Ask for their school name. They can type it or search. They can specify "Home school" / "None" / "Skip".
 8. **Children Count & Children in School Count** (Only if role is "parent" or "teacher"):
    - Ask how many children they have and how many of them are in school.
+9. **Avatar**: Ask the user to choose an avatar/emoji to complete their profile. This is mandatory for ALL users (students, teachers, parents, admins).
+   - Once they pick their avatar, proceed directly to save the profile.
 
 CRITICAL BEHAVIORAL PROTOCOLS:
 - **NO LOOPS**: Keep moving forward. If Role is collected, move to Name. If Name is collected, move to Username. If Username is collected, move to Age, and so on. Never repeat a question or ask for information you already have.
 - **LANGUAGE HARMONY**: Speak in the language of the user's latest input. If they write in English, respond in natural English. If they write in Arabic, respond in natural Arabic. Do NOT mix languages in a single message.
-- **NATURAL TRANSITIONS**: Use smooth, conversational transitions. (e.g. "Perfect, Hesham! Since you are a student, let's now select a unique username for your profile...").
+- **NATURAL TRANSITIONS**: Use smooth, conversational transitions. (e.g. "Perfect, Hesham! Since you are a student, let's now select a unique username...").
 - **NO TECHNICAL OR SCHEMA DISCLOSURES**: Do not mention tools, MongoDB, JSON, collections, or fields. Talk like a friendly human companion guide.
-- **SAVE PROFILE**: Once ALL required fields for the user's chosen role have been successfully collected and verified, you MUST call 'saveUserProfile' with the gathered information.
+- **SAVE PROFILE**: Once ALL required fields for the user's chosen role (including their selected avatar!) have been successfully collected and verified, you MUST call 'saveUserProfile' with the gathered information.
 - Ensure 'onboardingCompleted' is set to true in the profileData parameter.
 - After 'saveUserProfile' returns success, write a beautiful, warm final welcoming message indicating that their custom learning space is set up and they are ready to explore.
 - **CRITICAL COMPLETION TOKEN**: You MUST append the exact word "SUCCESS_ONBOARDING_COMPLETE" at the very end of your final response after the profile has been successfully saved. This token is required for the platform to proceed.
+
+METADATA STATE SYNCHRONIZATION:
+At the very end of EVERY single assistant response, you MUST append a synchronization metadata tag on a new line, containing a JSON payload of the current onboarding state:
+[METADATA] state: {"step": "<current_step_name>", "role": "<collected_role_or_empty>", "country": "<collected_country_or_empty>", "name": "<collected_name_or_empty>", "username": "<collected_username_or_empty>"}
+
+Replace the placeholders with the actual values collected so far (or empty string if not yet collected).
+The "step" field must be one of the following exact string values representing the field you are currently asking for:
+- "role" (if asking for user type / role)
+- "name" (if asking for full name)
+- "username" (if asking for username)
+- "age" (if asking for age)
+- "parentEmail" (if student and age < 13 and asking for parental email)
+- "country" (if asking for country of residence)
+- "grade" (if student and asking for grade level)
+- "school" (if student or teacher and asking for school name)
+- "children" (if parent and asking for children count)
+- "childrenInSchool" (if parent and asking for children in school count)
+- "avatar" (if asking for avatar selection)
+- "complete" (if onboarding is completed successfully)
+
+Examples:
+- [METADATA] state: {"step": "name", "role": "student", "country": "", "name": "", "username": ""}
+- [METADATA] state: {"step": "country", "role": "student", "country": "", "name": "Hesham", "username": "hesham123"}
+- [METADATA] state: {"step": "avatar", "role": "student", "country": "Egypt", "name": "Hesham", "username": "hesham123"}
 `;
 
             // Call Gemini
