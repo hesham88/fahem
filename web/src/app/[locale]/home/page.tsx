@@ -676,10 +676,130 @@ export default function Home() {
     }
   ]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
-  const [readerMagnetized, setReaderMagnetized] = useState<boolean>(false);
+  const [isFullScreenCompanion, setIsFullScreenCompanion] = useState<boolean>(false);
+  const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
+  const [mentionSearch, setMentionQuery] = useState<string>("");
+  const [showMentionsDropdown, setShowMentionsDropdown] = useState<boolean>(false);
   const [readerPrompt, setReaderPrompt] = useState<string>("");
   const [readerMessages, setReaderMessages] = useState<any[]>([]);
   const [readerLoading, setReaderLoading] = useState<boolean>(false);
+
+  const getMentionOptions = () => {
+    if (mentionType === "subject") {
+      const opts = [
+        { id: "@math", label: language === "ar" ? "➕ الرياضيات" : "📊 Math", desc: language === "ar" ? "مواضيع الجبر والإحصاء" : "Algebra & Statistics" },
+        { id: "@science", label: language === "ar" ? "🧪 العلوم" : "🧬 Science", desc: language === "ar" ? "الأحياء والفيزياء والكيمياء" : "Biology, Physics, Chem" },
+        { id: "@arabic", label: language === "ar" ? "📖 اللغة العربية" : "✍️ Arabic", desc: language === "ar" ? "قواعد النحو واللغة" : "Arabic Linguistics & Grammar" },
+        { id: "@history", label: language === "ar" ? "🌍 التاريخ" : "🏛️ History", desc: language === "ar" ? "الدراسات الاجتماعية والتاريخية" : "Modern History & Social Studies" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    if (mentionType === "book") {
+      const opts = [
+        { id: "#college-algebra", label: "📚 College Algebra 2e", desc: language === "ar" ? "مرجع الجبر من OpenStax" : "OpenStax Algebra Textbook" },
+        { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: language === "ar" ? "مرجع الكيمياء العامة" : "OpenStax Chemistry Volume" },
+        { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: language === "ar" ? "كتاب شرح قواعد اللغة" : "Simplified Arabic Grammar Rules" },
+        { id: "#middleeast-history", label: "🌍 Middle East History", desc: language === "ar" ? "مرجع التاريخ الحديث والمعاصر" : "Modern Middle East History Guide" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    if (mentionType === "command") {
+      const opts = [
+        { id: "/explain", label: "💡 Explain Step-by-Step", desc: language === "ar" ? "شرح وافٍ ومفصل خطوة بخطوة" : "Detailed pedagogical explanation" },
+        { id: "/summary", label: "📝 Generate Summary", desc: language === "ar" ? "تخليص عالي الكثافة (الخلاصة والزتونة)" : "High-density concepts & formulas sheet" },
+        { id: "/practice", label: "✍️ Active Recall Challenge", desc: language === "ar" ? "سؤال تفاعلي يشجع المذاكرة النشطة" : "Generate interactive question to solve" },
+        { id: "/quiz", label: "⚡ Quick Mastery Quiz", desc: language === "ar" ? "اختبار قصير من 3 أسئلة مفاهيمية" : "Generate 3-question conceptual quiz" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    return [];
+  };
+
+  const handleSelectMention = (optionId: string) => {
+    const words = readerPrompt.split(/\s+/);
+    words[words.length - 1] = optionId;
+    setReaderPrompt(words.join(" ") + " ");
+    setShowMentionsDropdown(false);
+    setMentionType(null);
+    setMentionQuery("");
+  };
+
+  const formatMessageText = (txt: string) => {
+    if (!txt) return "";
+    
+    // Warm structured parser that breaks text by lines and formats markdown, headings, bold, bullet points
+    const lines = txt.split("\n");
+    return lines.map((line, lineIdx) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return <div key={lineIdx} style={{ height: "0.5rem" }} />;
+      }
+
+      // Headers (e.g. ### Header or ## Header)
+      if (trimmed.startsWith("###")) {
+        return <h4 key={lineIdx} style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.5rem", marginBottom: "0.25rem", textAlign: "start" }}>{trimmed.slice(3).trim()}</h4>;
+      }
+      if (trimmed.startsWith("##")) {
+        return <h3 key={lineIdx} style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.75rem", marginBottom: "0.35rem", textAlign: "start" }}>{trimmed.slice(2).trim()}</h3>;
+      }
+
+      // Check for bullet lists
+      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+        const rest = trimmed.substring(2);
+        return (
+          <ul key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "disc", textAlign: "start" }}>
+            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+              {parseInlineMarkdown(rest)}
+            </li>
+          </ul>
+        );
+      }
+
+      // Check for numbered lists
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+      if (numMatch) {
+        const rest = numMatch[2];
+        return (
+          <ol key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "decimal", textAlign: "start" }}>
+            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+              {parseInlineMarkdown(rest)}
+            </li>
+          </ol>
+        );
+      }
+
+      // Inline code or formulas
+      if (trimmed.startsWith("`") && trimmed.endsWith("`")) {
+        const rest = trimmed.slice(1, -1);
+        return (
+          <div key={lineIdx} style={{ margin: "0.4rem 0", padding: "0.4rem 0.6rem", borderRadius: "8px", background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.05)", fontFamily: "monospace", fontSize: "0.8rem", color: "var(--primary)", overflowX: "auto", textAlign: "start" }}>
+            {rest}
+          </div>
+        );
+      }
+
+      return (
+        <p key={lineIdx} style={{ margin: "0.25rem 0", fontSize: "0.85rem", lineHeight: "1.5", textAlign: "start" }}>
+          {parseInlineMarkdown(trimmed)}
+        </p>
+      );
+    });
+  };
+
+  const parseInlineMarkdown = (text: string) => {
+    // Support bolding (**text**) and code (`text`)
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
+  };
+
   const [expandedModule, setExpandedModule] = useState<number | null>(null);
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
@@ -2862,10 +2982,9 @@ export default function Home() {
   const handleStartStudy = (book: any) => {
     setSelectedBookReader(book);
     setReaderCurrentPage(1);
-    setReaderMagnetized(true);
     const welcomeText = language === "ar" 
-      ? `مرحباً بك في جلسة الدراسة التفاعلية لكتاب "${book.titleAr || book.title}". أنا مرشدك الأكاديمي الذكي من سرب وكلاء فهم 🤖. يمكننا قراءة الصفحات معاً، شرح المصطلحات الصعبة وتلخيص الفصول. حدد خيار "🧲 مغنطة الصفحة" لربط أسئلتك بمحتوى الصفحة الحالية مباشرة!` 
-      : `Welcome to the interactive study session for "${book.titleEn || book.title}". I am your AI academic tutor from Fahem Swarm 🤖. We can read pages together, explain complex terms, and summarize chapters. Toggle the "🧲 Magnetize Page" option to ground our chat directly in the active textbook page content!`;
+      ? `أهلاً بك يا بطل في مساحتك الدراسية التفاعلية الدافئة لكتاب "${book.titleAr || book.title}"! أنا رفيقك الدراسي الذكي وصديقك المقرب، متواجد هنا دائماً لأفكر وأحلل وأتعلم معك خطوة بخطوة 🌟. دعنا نجعل المذاكرة ممتعة وسهلة جداً! في أي وقت تحتاج توجيهي، استخدم الإشارات الذكية في الدردشة: اكتب @ لتحديد المادة، # لاختيار مرجع من الكتاب، أو / لتفعيل أحد الأوامر الدراسية السحرية مثل (/explain أو /summary) لمساعدتك فوراً. بمَ ترغب في أن نبدأ اليوم؟` 
+      : `Welcome to your cozy interactive study space for "${book.titleEn || book.title}"! I'm your friendly AI study partner, always here to think, solve, and explore with you 🌟. Let's make learning fun and painless! Whenever you need anything, just mention it: type @ to target a subject, # to reference a textbook chapter, or / to use one of my magical shortcuts (like /explain or /summary) to get helpful answers right away. What shall we learn today?`;
     setReaderMessages([
       { sender: "fahem", text: welcomeText }
     ]);
@@ -2894,11 +3013,35 @@ export default function Home() {
 
     const activePage = allPages[readerCurrentPage - 1];
     let promptPayload = queryText;
+    const lowerText = queryText.toLowerCase();
 
-    if (readerMagnetized && activePage) {
-      promptPayload = `[Grounding Context: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}, Chapter: "${activePage.chapterTitleEn}", Content: "${activePage.contentAr || activePage.contentEn}"] \n\n User Query: ${queryText}`;
-    } else if (activePage) {
-      promptPayload = `[Context Reference: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}] \n\n User Query: ${queryText}`;
+    // Contextual mentions parsing and grounding enrichment
+    let directive = "";
+    if (lowerText.includes("/explain")) {
+      directive += "\n[Command Directive: Provide a deep, step-by-step pedagogical explanation of the core concept. Break down complex points, use analogies, and end with an understanding-check question.]";
+    } else if (lowerText.includes("/summary")) {
+      directive += "\n[Command Directive: Synthesize a high-density, concise study summary. Outline key formulas, core laws, vocabulary definitions, and a quick-review 'Zatona' synthesis.]";
+    } else if (lowerText.includes("/practice")) {
+      directive += "\n[Command Directive: Generate an interactive learning challenge or active-recall question. Engage the student and prevent copy-pasting answers.]";
+    } else if (lowerText.includes("/quiz")) {
+      directive += "\n[Command Directive: Generate a mini-quiz of 3 quick-check conceptual questions to test the student's mastery.]";
+    }
+
+    let subjectGrounding = "";
+    if (lowerText.includes("@math") || lowerText.includes("#advancedmath")) {
+      subjectGrounding = "\n[Subject Grounding: Mathematics Grade 9 - Matrices & Algebra]";
+    } else if (lowerText.includes("@science") || lowerText.includes("#chemistryhandbook") || lowerText.includes("#biologynotes")) {
+      subjectGrounding = "\n[Subject Grounding: Science & Biology - Cell structure, transport systems & nutrition]";
+    } else if (lowerText.includes("@arabic") || lowerText.includes("#arabicgrammar")) {
+      subjectGrounding = "\n[Subject Grounding: Arabic Linguistics & Grammar Basics]";
+    } else if (lowerText.includes("@history") || lowerText.includes("#middleeasthistory")) {
+      subjectGrounding = "\n[Subject Grounding: Modern History & Social Studies]";
+    }
+
+    if (activePage) {
+      promptPayload = `[Context Reference: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}, Chapter: "${activePage.chapterTitleEn}"] ${subjectGrounding} ${directive} \n\nUser Question: ${queryText}`;
+    } else {
+      promptPayload = `${subjectGrounding} ${directive} \n\nUser Question: ${queryText}`;
     }
 
     const agentMsgId = Date.now();
@@ -3162,33 +3305,7 @@ export default function Home() {
       }
     };
 
-    const formatMessageText = (txt: string) => {
-      if (!txt) return "";
-      const lines = txt.split("\n");
-      return lines.map((line, lineIdx) => {
-        // Simple markdown parsing of **bold** and `code`
-        const boldParts = line.split(/(\*\*[^*]+\*\*)/g);
-        const formattedLine = boldParts.map((part, i) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return <strong key={i} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
-          }
-          // Parse code blocks/inline code inside line
-          const codeParts = part.split(/(`[^`]+`)/g);
-          return codeParts.map((subPart, j) => {
-            if (subPart.startsWith("`") && subPart.endsWith("`")) {
-              return <code key={j} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "2px 6px", borderRadius: "4px", fontSize: "0.85em", color: "var(--primary)", border: "1px solid rgba(16, 107, 163, 0.15)", fontFamily: "monospace" }}>{subPart.slice(1, -1)}</code>;
-            }
-            return subPart;
-          });
-        });
 
-        return (
-          <p key={lineIdx} style={{ margin: "0 0 0.5rem 0", lineHeight: "1.6" }}>
-            {formattedLine}
-          </p>
-        );
-      });
-    };
 
     const quickReplies = getQuickReplies();
 
@@ -3825,6 +3942,27 @@ export default function Home() {
                           uploadBytes(storageRef, file).then((snapshot) => {
                             getDownloadURL(snapshot.ref).then((downloadURL) => {
                               setOnboardingAvatar(downloadURL);
+                              
+                              // Immediate Firebase avatar download URL sync to /api/user/profile on upload
+                              fetch("/api/user/profile", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  userId: user.uid,
+                                  profile: {
+                                    ...(userProfile || {}),
+                                    avatar: downloadURL
+                                  }
+                                })
+                              }).then((res) => {
+                                if (res.ok) {
+                                  setUserProfile((prev: any) => ({
+                                    ...(prev || {}),
+                                    avatar: downloadURL
+                                  }));
+                                }
+                              }).catch((err) => console.error("Error syncing onboarding avatar to MongoDB:", err));
+
                               setOnboardingLoading(false);
                               setOnboardingStatusText("");
                             }).catch((err) => {
@@ -4423,9 +4561,26 @@ export default function Home() {
                 )}
               </div>
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
-                  {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
+                    {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
+                  </span>
+                  {userProfile?.isWhitelisted && (
+                    <span style={{
+                      fontSize: "0.62rem",
+                      fontWeight: 800,
+                      color: "#b8860b",
+                      background: "linear-gradient(135deg, #ffd700, #ffa500)",
+                      padding: "1px 6px",
+                      borderRadius: "6px",
+                      boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)",
+                      whiteSpace: "nowrap",
+                      textShadow: "0 1px 0 rgba(255,255,255,0.4)"
+                    }}>
+                      ⭐ JUDGE
+                    </span>
+                  )}
+                </div>
                 <span className="sidebar-user-email" title={user.email || ""}>
                   {user.email}
                 </span>
@@ -5842,6 +5997,7 @@ export default function Home() {
                       <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "البريد الإلكتروني" : "Email"}</th>
                       <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "الدور الدراسي" : "User Role"}</th>
                       <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "المدرسة/الجامعة" : "School"}</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "قائمة القبول" : "Whitelist/Judge"}</th>
                       <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "الحالة" : "Status"}</th>
                       <th style={{ padding: "0.75rem 0.5rem", textAlign: "center" }}>{language === "ar" ? "الإجراءات" : "Actions"}</th>
                     </tr>
@@ -5877,6 +6033,31 @@ export default function Home() {
                             </select>
                           </td>
                           <td style={{ padding: "0.75rem 0.5rem", fontSize: "0.8rem", color: "#4f6371", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={u.school}>{u.school || "N/A"}</td>
+                          <td style={{ padding: "0.75rem 0.5rem" }}>
+                            <button
+                              onClick={() => handleAdminUpdateUser(u.userId, { isWhitelisted: !u.isWhitelisted })}
+                                style={{
+                                  padding: "4px 8px",
+                                  borderRadius: "10px",
+                                  cursor: "pointer",
+                                  fontSize: "0.75rem",
+                                  fontWeight: 700,
+                                  background: u.isWhitelisted ? "rgba(212, 175, 55, 0.15)" : "rgba(16, 107, 163, 0.08)",
+                                  color: u.isWhitelisted ? "var(--secondary)" : "#4f6371",
+                                  border: u.isWhitelisted ? "1px solid rgba(212, 175, 55, 0.3)" : "1px solid transparent",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                  transition: "all 0.2s"
+                                }}
+                            >
+                              {u.isWhitelisted ? (
+                                <>⭐ {language === "ar" ? "معتمد (حكم)" : "Whitelisted Judge"}</>
+                              ) : (
+                                <>⚪ {language === "ar" ? "عادي" : "Standard User"}</>
+                              )}
+                            </button>
+                          </td>
                           <td style={{ padding: "0.75rem 0.5rem" }}>
                             {u.banned ? (
                               <span style={{ padding: "2px 6px", borderRadius: "10px", fontSize: "0.7rem", fontWeight: 700, background: "rgba(211, 47, 47, 0.12)", color: "#d32f2f" }}>
@@ -5916,7 +6097,7 @@ export default function Home() {
                       ))}
                     {allUsers.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "#6a7c88" }}>
+                        <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "#6a7c88" }}>
                           {language === "ar" ? "لا يوجد أعضاء مسجلين حالياً." : "No registered members found."}
                         </td>
                       </tr>
@@ -6006,9 +6187,9 @@ export default function Home() {
               </div>
 
               {/* Reader Split Panels */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
+              <div style={{ display: "grid", gridTemplateColumns: isFullScreenCompanion ? "1fr" : "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
                 {/* Left Panel - Textbook Viewer */}
-                {(() => {
+                {!isFullScreenCompanion && (() => {
                   const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || {
                     titleEn: selectedBookReader.titleEn || selectedBookReader.title || "Custom Material",
                     titleAr: selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title || "وثيقة مخصصة",
@@ -6021,11 +6202,11 @@ export default function Home() {
                             pageNum: 1,
                             titleEn: "Section 1: General Core Overview",
                             titleAr: "القسم الأول: نظرة عامة شاملة",
-                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}. Ground your AI study assistant directly in this material by turning on the Magnetize feature.`,
-                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر تشغيل خاصية مغنطة الصفحة.`,
+                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}. Ground your AI study assistant directly in this material by using mentions like @, #, or / in the companion panel.`,
+                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر استخدام الإشارات الذكية مثل @ أو # أو / في لوحة الرفيق المساعد.`,
                             formulas: ["Syllabus Grounding Key: S = G × (1 - E)"],
-                            tipEn: "Toggle 'Magnetize Page' below to pin this specific document's page to all subsequent chatbot queries!",
-                            tipAr: "قم بتفعيل 'مغنطة الصفحة' أدناه لربط هذه الصفحة تحديداً بجميع أسئلتك القادمة لرفيقك الدراسي!"
+                            tipEn: "Type @ to select a subject, # to select a book, or / to invoke specialized companion commands in the chat!",
+                            tipAr: "اكتب @ لاختيار المادة، # لاختيار الكتاب، أو / لتفعيل الأوامر الذكية لرفيق المذاكرة فهم!"
                           }
                         ]
                       }
@@ -6068,7 +6249,7 @@ export default function Home() {
                           paddingBottom: "0.75rem"
                         }}>
                           <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                            📖 {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
+                            |📖 {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
                           </span>
                           
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -6158,41 +6339,23 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* Left Panel Footer - Contextual Magnetization Button */}
-                      <div style={{ marginTop: "1.5rem" }}>
-                        <button
-                          onClick={() => {
-                            setReaderMagnetized(!readerMagnetized);
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "0.9rem 1.5rem",
-                            borderRadius: "14px",
-                            border: "none",
-                            cursor: "pointer",
-                            background: readerMagnetized 
-                              ? "linear-gradient(135deg, var(--primary), #22c55e)" 
-                              : "rgba(16, 107, 163, 0.08)",
-                            color: readerMagnetized ? "#ffffff" : "var(--primary)",
-                            fontWeight: 800,
-                            fontSize: "0.92rem",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "0.5rem",
-                            transition: "all 0.3s ease",
-                            boxShadow: readerMagnetized ? "0 4px 15px rgba(34, 197, 148, 0.35)" : "none"
-                          }}
-                        >
-                          <span style={{ animation: readerMagnetized ? "pulse 1.5s infinite" : "none", display: "inline-block" }}>
-                            {readerMagnetized ? "🧲" : "🔗"}
-                          </span>
-                          <span>
-                            {readerMagnetized 
-                              ? (language === "ar" ? "مغنطة وتثبيت الصفحة نشط" : "🧲 Page Magnetization Grounded") 
-                              : (language === "ar" ? "مغنطة وتثبيت الصفحة الحالية" : "🧲 Magnetize This Page")}
-                          </span>
-                        </button>
+                      {/* Left Panel Footer - Mentions Quick Help Guide */}
+                      <div style={{
+                        marginTop: "1.5rem",
+                        padding: "1.1rem",
+                        borderRadius: "14px",
+                        background: "rgba(16, 107, 163, 0.05)",
+                        border: "1px dashed rgba(16, 107, 163, 0.2)",
+                        textAlign: "start"
+                      }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.4rem" }}>
+                          💬 {language === "ar" ? "تلميحات وإشارات رفيق الدراسة فهم" : "Fahem Companion Mentions"}
+                        </span>
+                        <p style={{ margin: 0, fontSize: "0.78rem", color: "#4f6371", lineHeight: "1.4" }}>
+                          {language === "ar" 
+                            ? "اكتب الرموز الخاصة في محادثة الرفيق الذكي لتخصيص سياق المذاكرة: اكتب @ للمواد، # للمراجع والكتب، أو / للأوامر التعليمية الذكية!" 
+                            : "Type special characters in the companion chat to target your context: use @ for subjects, # for reference books, or / for specialized academic commands!"}
+                        </p>
                       </div>
                     </div>
                   );
@@ -6230,20 +6393,45 @@ export default function Home() {
                         </span>
                       </div>
                     </div>
-                    {readerMagnetized && (
-                      <span style={{
-                        fontSize: "0.7rem", fontWeight: 800, color: "#22c55e",
-                        background: "rgba(34,197,94,0.08)", padding: "4px 8px", borderRadius: "10px"
-                      }}>
-                        📌 {language === "ar" ? "موجّه بالصفحة" : "Page Locked"}
-                      </span>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {isFullScreenCompanion && (
+                        <span style={{
+                          fontSize: "0.7rem", fontWeight: 800, color: "var(--primary)",
+                          background: "rgba(16, 107, 163, 0.08)", padding: "4px 8px", borderRadius: "10px"
+                        }}>
+                          🖥️ {language === "ar" ? "ملء الشاشة" : "Full Screen Active"}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setIsFullScreenCompanion(!isFullScreenCompanion)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "12px",
+                          border: "1px solid var(--card-border)",
+                          background: isFullScreenCompanion ? "rgba(16, 107, 163, 0.12)" : "rgba(255,255,255,0.6)",
+                          color: "var(--primary)",
+                          fontWeight: 700,
+                          fontSize: "0.8rem",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        {isFullScreenCompanion ? (
+                          <>🗜️ {language === "ar" ? "تصغير" : "Minimize"}</>
+                        ) : (
+                          <>🖥️ {language === "ar" ? "ملء الشاشة" : "Full Screen"}</>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Message List Box */}
                   <div style={{
                     flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column",
-                    gap: "0.85rem", padding: "0.5rem", maxHeight: "360px"
+                    gap: "0.85rem", padding: "0.5rem", maxHeight: isFullScreenCompanion ? "520px" : "360px"
                   }} className="custom-scrollbar">
                     {readerMessages.map((msg, mIdx) => {
                       const isStudent = msg.sender === "student";
@@ -6264,9 +6452,13 @@ export default function Home() {
                             border: isStudent ? "none" : "1px solid rgba(16, 107, 163, 0.08)",
                             textAlign: "start", direction: language === "ar" ? "rtl" : "ltr"
                           }}>
-                            <p style={{ margin: 0, fontSize: "0.85rem", lineHeight: "1.5" }}>
-                              {msg.text}
-                            </p>
+                            {isStudent ? (
+                              <p style={{ margin: 0, fontSize: "0.85rem", lineHeight: "1.5" }}>
+                                {msg.text}
+                              </p>
+                            ) : (
+                              formatMessageText(msg.text)
+                            )}
                           </div>
                         </div>
                       );
@@ -6290,9 +6482,76 @@ export default function Home() {
                   {/* Chat Input Area */}
                   <div style={{ marginTop: "1rem" }}>
                     <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+                      {/* Mentions Dropdown Popover */}
+                      {showMentionsDropdown && getMentionOptions().length > 0 && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: "100%",
+                          left: 0,
+                          right: 0,
+                          zIndex: 1000,
+                          background: "rgba(255, 255, 255, 0.95)",
+                          backdropFilter: "blur(20px)",
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                          borderRadius: "16px",
+                          boxShadow: "0 -4px 20px rgba(0,0,0,0.1)",
+                          marginBottom: "0.5rem",
+                          padding: "0.5rem",
+                          maxHeight: "180px",
+                          overflowY: "auto"
+                        }} className="custom-scrollbar">
+                          {getMentionOptions().map((opt) => (
+                            <div
+                              key={opt.id}
+                              onClick={() => handleSelectMention(opt.id)}
+                              style={{
+                                padding: "0.6rem 1rem",
+                                borderRadius: "10px",
+                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                transition: "background 0.2s",
+                                textAlign: "start"
+                              }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
+                              onMouseOut={(e) => { e.currentTarget.style.background = "none"; }}
+                            >
+                              <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>{opt.id}</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>{opt.label}</span>
+                                <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{opt.desc}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <textarea
                         value={readerPrompt}
-                        onChange={(e) => setReaderPrompt(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReaderPrompt(val);
+                          const words = val.split(/\s+/);
+                          const lastWord = words[words.length - 1];
+                          if (lastWord && lastWord.startsWith("@")) {
+                            setMentionType("subject");
+                            setMentionQuery(lastWord.slice(1));
+                            setShowMentionsDropdown(true);
+                          } else if (lastWord && lastWord.startsWith("#")) {
+                            setMentionType("book");
+                            setMentionQuery(lastWord.slice(1));
+                            setShowMentionsDropdown(true);
+                          } else if (lastWord && lastWord.startsWith("/")) {
+                            setMentionType("command");
+                            setMentionQuery(lastWord.slice(1));
+                            setShowMentionsDropdown(true);
+                          } else {
+                            setShowMentionsDropdown(false);
+                            setMentionType(null);
+                            setMentionQuery("");
+                          }
+                        }}
                         onPaste={(e) => {
                           e.preventDefault();
                           alert(language === "ar" 
@@ -6501,20 +6760,36 @@ export default function Home() {
                             e.target.value = "";
                             return;
                           }
-                          const storageRef = ref(storage, "User Uploads/" + user?.uid + "_" + Date.now() + "_" + file.name);
-                          uploadBytes(storageRef, file).then(() => {
-                            // Successfully uploaded securely (sub-path secret)
-                            alert(language === "ar" ? "تم تحميل مستندك الشخصي بنجاح إلى الخزنة الآمنة!" : "Your personal notes have been ingested securely into the vault!");
-                            const newBook = {
-                              titleEn: file.name.replace(/\.[^/.]+$/, ""),
-                              titleAr: file.name.replace(/\.[^/.]+$/, ""),
-                              subject: "Science",
-                              size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-                              format: file.name.split('.').pop()?.toUpperCase() || "PDF",
-                              downloads: "0",
-                              isUserUpload: true
-                            };
-                            setCustomUploadedBooks(prev => [newBook, ...prev]);
+                          const storagePath = "User Uploads/" + user?.uid + "_" + Date.now() + "_" + file.name;
+                          const storageRef = ref(storage, storagePath);
+                          uploadBytes(storageRef, file).then((snapshot) => {
+                            getDownloadURL(snapshot.ref).then((downloadURL) => {
+                              // Trigger async POST to /api/books carrying file metadata for ingestion
+                              fetch("/api/books", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  title: file.name.replace(/\.[^/.]+$/, ""),
+                                  userId: user?.uid,
+                                  storagePath: storagePath,
+                                  downloadUrl: downloadURL,
+                                  sizeBytes: file.size,
+                                  format: file.name.split('.').pop()?.toUpperCase() || "PDF"
+                                })
+                              }).catch((err) => console.error("Error triggering async book ingestion API:", err));
+
+                              alert(language === "ar" ? "تم تحميل مستندك الشخصي بنجاح إلى الخزنة الآمنة وبدأت عملية الفهرسة الفورية!" : "Your personal notes have been ingested securely into the vault and real-time processing has started!");
+                              const newBook = {
+                                titleEn: file.name.replace(/\.[^/.]+$/, ""),
+                                titleAr: file.name.replace(/\.[^/.]+$/, ""),
+                                subject: "Science",
+                                size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
+                                format: file.name.split('.').pop()?.toUpperCase() || "PDF",
+                                downloads: "0",
+                                isUserUpload: true
+                              };
+                              setCustomUploadedBooks(prev => [newBook, ...prev]);
+                            });
                           }).catch((err) => {
                             console.error("Upload error:", err);
                             alert(language === "ar" ? "حدث خطأ أثناء تحميل الملف." : "An error occurred while uploading your document.");
@@ -7883,6 +8158,27 @@ export default function Home() {
                           uploadBytes(storageRef, file).then((snapshot) => {
                             getDownloadURL(snapshot.ref).then((downloadURL) => {
                               setSettingsAvatar(downloadURL);
+                              
+                              // Immediate Firebase avatar download URL sync to /api/user/profile on upload
+                              fetch("/api/user/profile", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  userId: user.uid,
+                                  profile: {
+                                    ...(userProfile || {}),
+                                    avatar: downloadURL
+                                  }
+                                })
+                              }).then((res) => {
+                                if (res.ok) {
+                                  setUserProfile((prev: any) => ({
+                                    ...(prev || {}),
+                                    avatar: downloadURL
+                                  }));
+                                }
+                              }).catch((err) => console.error("Error syncing settings avatar to MongoDB:", err));
+
                               setSettingsLoading(false);
                               setSettingsStatusText("");
                             }).catch((err) => {
@@ -8003,6 +8299,237 @@ export default function Home() {
                 <FiCheckCircle />
                 <span>{language === "ar" ? "حفظ التغييرات" : "Save Settings"}</span>
               </button>
+            </section>
+
+            {/* Gamification & Swarm Telemetry Section */}
+            <section className="panel-card" style={{
+              padding: "2rem",
+              background: "rgba(255, 255, 255, 0.7)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(16, 107, 163, 0.1)",
+              borderRadius: "20px",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.03)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.5rem"
+            }}>
+              <h2 style={{
+                fontSize: "1.4rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                borderBottom: "1px dashed rgba(16, 107, 163, 0.15)",
+                paddingBottom: "1rem",
+                marginBottom: "0.5rem",
+                fontWeight: 800,
+                color: "var(--primary)"
+              }}>
+                <FiActivity style={{ animation: "pulse 2s infinite" }} />
+                <span>{language === "ar" ? "تحليلات السرب والألعاب الأكاديمية" : "Swarm Analytics & Academic Gamification"}</span>
+              </h2>
+
+              <p style={{ fontSize: "0.9rem", color: "#5a6a75", lineHeight: "1.5", margin: 0 }}>
+                {language === "ar"
+                  ? "يستخدم وكيل التحليلات (Insights Agent) تجميعات قواعد بيانات MongoDB Atlas لتتبع الجوانب التعليمية الأربعة ومستويات الفهم لديك. يتم رصد نشاط السرب والتعلم الذاتي تلقائياً هنا."
+                  : "Our specialized Insights Agent utilizes database-side MongoDB Atlas Aggregation Pipelines to monitor your cognitive achievements, active streaks, and misconception risk matrices in real-time."}
+              </p>
+
+              {/* Stats Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
+                {/* Level & Streak Card */}
+                <div style={{
+                  padding: "1.25rem",
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))",
+                  border: "1px solid rgba(16, 107, 163, 0.08)",
+                  textAlign: "start"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                    <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
+                      🏆 {language === "ar" ? "المستوى الدراسي الحالي" : "Active Academic Level"}
+                    </span>
+                    <span style={{
+                      background: "rgba(212, 175, 55, 0.15)",
+                      color: "var(--accent)",
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      padding: "4px 8px",
+                      borderRadius: "8px"
+                    }}>
+                      {language === "ar" ? "التعلم الذاتي المستقل" : "Heutagogic Sage"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
+                    {language === "ar" ? "المستوى 12" : "Level 12"}
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
+                    🔥 {language === "ar" ? "سلسلة المذاكرة: 7 أيام متتالية" : "Current Daily Streak: 7 Days Active"}
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div style={{ width: "100%", height: "8px", background: "rgba(16, 107, 163, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
+                    <div style={{ width: "85%", height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px" }}></div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
+                    <span>8,500 XP</span>
+                    <span>10,000 XP ({language === "ar" ? "المستوى التالي" : "Next Level"})</span>
+                  </div>
+                </div>
+
+                {/* Cognitive Tokens Card */}
+                <div style={{
+                  padding: "1.25rem",
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, rgba(13, 148, 136, 0.05), rgba(16, 107, 163, 0.05))",
+                  border: "1px solid rgba(13, 148, 136, 0.08)",
+                  textAlign: "start"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                    <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
+                      🧠 {language === "ar" ? "رصيد الرموز المعرفية (CLT)" : "Cognitive Token Credit Balance"}
+                    </span>
+                    <span style={{
+                      background: "rgba(13, 148, 136, 0.15)",
+                      color: "var(--accent-green)",
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      padding: "4px 8px",
+                      borderRadius: "8px"
+                    }}>
+                      {language === "ar" ? "متاح" : "Freemium Unlimited"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
+                    14,820 / 25,000 <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#6a7c88" }}>CLT Tokens</span>
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
+                    ⚡ {language === "ar" ? "تم التحسين لحمل الذاكرة العاملة" : "Cognitive Load Optimized System"}
+                  </div>
+
+                  {/* Token progress bar */}
+                  <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
+                    <div style={{ width: "59%", height: "100%", background: "linear-gradient(90deg, var(--accent-green), var(--primary))", borderRadius: "10px" }}></div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
+                    <span>{language === "ar" ? "مستهلك: 59%" : "Allocated: 59%"}</span>
+                    <span>10,180 {language === "ar" ? "رمز متبقي" : "Remaining CLT"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Misconception Risk Matrix */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "start" }}>
+                <span style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--foreground)" }}>
+                  🎯 {language === "ar" ? "مصفوفة فجوات الفهم المعرفي وحالة المواضيع" : "Concept Misconception Risk Matrix (MongoDB Analytics)"}
+                </span>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+                  {/* Topic 1 */}
+                  <div style={{
+                    padding: "1rem",
+                    borderRadius: "14px",
+                    background: "rgba(255,255,255,0.6)",
+                    border: "1px solid rgba(16, 107, 163, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>📊 {language === "ar" ? "الرياضيات والنسب" : "Math: Matrices"}</span>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a", padding: "2px 6px", borderRadius: "6px" }}>
+                        {language === "ar" ? "آمن" : "Low Risk"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                      {language === "ar" ? "مفاهيم محددات المصفوفة ومعكوسها ممتازة." : "Mastered Singular Matrix inverse checks perfectly."}
+                    </span>
+                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 92%</span>
+                      <span>{language === "ar" ? "3 محاولات" : "3 Sessions"}</span>
+                    </div>
+                  </div>
+
+                  {/* Topic 2 */}
+                  <div style={{
+                    padding: "1rem",
+                    borderRadius: "14px",
+                    background: "rgba(255,255,255,0.6)",
+                    border: "1px solid rgba(16, 107, 163, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>🧬 {language === "ar" ? "الأحياء والخلية" : "Science: Chemistry 2e"}</span>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(234, 179, 8, 0.12)", color: "#ca8a04", padding: "2px 6px", borderRadius: "6px" }}>
+                        {language === "ar" ? "متوسط" : "Moderate Risk"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                      {language === "ar" ? "فجوة بسيطة في فهم ثابت الاتزان للتفاعلات." : "Confusion spotted around chemical equilibrium rules."}
+                    </span>
+                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 74%</span>
+                      <span>{language === "ar" ? "5 محاولات" : "5 Sessions"}</span>
+                    </div>
+                  </div>
+
+                  {/* Topic 3 */}
+                  <div style={{
+                    padding: "1rem",
+                    borderRadius: "14px",
+                    background: "rgba(255,255,255,0.6)",
+                    border: "1px solid rgba(16, 107, 163, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>📖 {language === "ar" ? "اللغة العربية وقواعدها" : "Arabic: Grammar"}</span>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "2px 6px", borderRadius: "6px" }}>
+                        {language === "ar" ? "مرتفع" : "High Risk"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                      {language === "ar" ? "صعوبة في تحديد مواضع إعراب جمع المذكر السالم." : "Issues parsed with complex verb modifiers rules."}
+                    </span>
+                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 48%</span>
+                      <span>{language === "ar" ? "4 محاولات" : "4 Sessions"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Swarm Real-Time Telemetry console */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "start" }}>
+                <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span className="pulse-icon" style={{ fontSize: "0.6rem" }}>🟢</span>
+                  {language === "ar" ? "سجل تحليلات ومحاكاة السرب النشط (MongoDB Aggregate Pipe):" : "Active Swarm Network Telemetry Trace (MongoDB Aggregations):"}
+                </span>
+
+                <div style={{
+                  padding: "0.85rem 1.1rem",
+                  borderRadius: "12px",
+                  background: "rgba(15, 23, 42, 0.95)",
+                  border: "1px solid rgba(16, 107, 163, 0.2)",
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                  color: "#38bdf8",
+                  maxHeight: "135px",
+                  overflowY: "auto",
+                  lineHeight: "1.4",
+                  boxShadow: "inset 0 2px 10px rgba(0,0,0,0.5)"
+                }} className="custom-scrollbar">
+                  <div>[SYSTEM] Inicitalizing MongoDB Insights aggregate client...</div>
+                  <div style={{ color: "#a7f3d0" }}>[MONGODB] pipeline: [ {`{ "$match": { "userId": "${user?.uid || "anon"}" } }`}, {`{ "$group": { "_id": "$topic_id", "accuracy": { "$avg": "$score" } } }`} ]</div>
+                  <div style={{ color: "#fef08a" }}>[INSIGHTS_AGENT] Aggregating 12 historical study session attempts from MongoDB.</div>
+                  <div>[PRACTICE_AGENT] Feedback loop grading completed: Score 0.88 over 2 text practice inputs.</div>
+                  <div style={{ color: "#38bdf8" }}>[ZATONA_AGENT] Compressed Chapter 1 'Matrices' formula context into 4 active recall bytes.</div>
+                  <div style={{ color: "#fca5a5" }}>[COMPANION] User typed command '/explain'. Handoff activated in full screen context...</div>
+                  <div>[SYSTEM] Telemetry synchronized. Metrics and Misconception Risk Matrix updated successfully.</div>
+                </div>
+              </div>
             </section>
 
             {/* Danger Zone */}
