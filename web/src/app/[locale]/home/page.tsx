@@ -532,7 +532,7 @@ export default function Home() {
         };
       case "admin-ingestion":
         return {
-          title: language === "ar" ? "أستوديو إدخال المناهج والكتب" : "Curriculum Ingestion Studio",
+          title: language === "ar" ? "أستوديو المناهج" : "Curriculum Studio",
           subtitle: language === "ar" ? "استيراد وتجهيز كتب الوزارة ومناهجها باستخدام قنوات معالجة منفصلة دون إزعاج الوكلاء النشطين." : "Ingest and process official textbooks using isolated Cloud Run Jobs without interrupting active student swarms."
         };
       case "library":
@@ -5166,7 +5166,7 @@ export default function Home() {
                   type="button"
                 >
                   <FiLayers />
-                  <span>{language === "ar" ? "أستوديو إدخال المناهج" : "Curriculum Ingestion Studio"}</span>
+                  <span>{language === "ar" ? "أستوديو المناهج" : "Curriculum Studio"}</span>
                 </button>
               </>
             )}

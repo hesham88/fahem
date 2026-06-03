@@ -159,8 +159,8 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     "[DEBUG] Shared lock system active on MongoDB Atlas primary database."
   ]);
 
-  const terminalEndRef = useRef<HTMLDivElement>(null);
-  const crawlerEndRef = useRef<HTMLDivElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const crawlerContainerRef = useRef<HTMLDivElement>(null);
 
   // Load and fetch initial subjects
   const fetchSubjects = async () => {
@@ -187,16 +187,16 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     fetchSubjects();
   }, []);
 
-  // Auto-scroll terminal log
+  // Auto-scroll terminal log inside container (no viewport glitching/yanking)
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
     }
   }, [terminalLogs]);
 
   useEffect(() => {
-    if (crawlerEndRef.current) {
-      crawlerEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (crawlerContainerRef.current) {
+      crawlerContainerRef.current.scrollTop = crawlerContainerRef.current.scrollHeight;
     }
   }, [crawlLogs]);
 
@@ -555,7 +555,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           </div>
           <div>
             <h2 style={{ fontSize: "1.3rem", margin: 0, fontWeight: 800, color: "var(--primary)" }}>
-              {language === "ar" ? "أستوديو استيراد ومعالجة المناهج الدراسيّة" : "Curriculum & Books Ingestion Studio"}
+              {language === "ar" ? "أستوديو المناهج" : "Curriculum Studio"}
             </h2>
             <p style={{ margin: "0.25rem 0 0 0", color: "#4f6371", fontSize: "0.85rem" }}>
               {language === "ar"
@@ -784,18 +784,21 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           </div>
 
           {/* Cloud Run Terminal Log */}
-          <div style={{
-            background: "#0d1117",
-            border: "1px solid #21262d",
-            borderRadius: "8px",
-            padding: "0.75rem 1rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.25rem",
-            maxHeight: "150px",
-            overflowY: "auto",
-            boxShadow: "inset 0 4px 16px rgba(0,0,0,0.8)"
-          }}>
+          <div 
+            ref={terminalContainerRef}
+            style={{
+              background: "#0d1117",
+              border: "1px solid #21262d",
+              borderRadius: "8px",
+              padding: "0.75rem 1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25rem",
+              maxHeight: "150px",
+              overflowY: "auto",
+              boxShadow: "inset 0 4px 16px rgba(0,0,0,0.8)"
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: "4px", marginBottom: "6px" }}>
               <span style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "#8b949e", display: "flex", alignItems: "center", gap: "4px" }}>
                 <FiTerminal /> GCP_CLOUD_RUN_JOB_LOGGER
@@ -823,7 +826,6 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                 </div>
               );
             })}
-            <div ref={terminalEndRef} />
           </div>
 
           {/* Queue List Table */}
@@ -1004,18 +1006,21 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
             </div>
 
             {/* Crawler Terminal Output */}
-            <div style={{
-              background: "#0c0f13",
-              border: "1px solid #1a202c",
-              borderRadius: "10px",
-              padding: "0.75rem 1rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.25rem",
-              height: "220px",
-              overflowY: "auto",
-              boxShadow: "inset 0 4px 12px rgba(0,0,0,0.6)"
-            }}>
+            <div 
+              ref={crawlerContainerRef}
+              style={{
+                background: "#0c0f13",
+                border: "1px solid #1a202c",
+                borderRadius: "10px",
+                padding: "0.75rem 1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+                height: "220px",
+                overflowY: "auto",
+                boxShadow: "inset 0 4px 12px rgba(0,0,0,0.6)"
+              }}
+            >
               <span style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "#6a7c88", borderBottom: "1px solid #1a202c", paddingBottom: "4px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
                 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
               </span>
@@ -1035,7 +1040,6 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                   </div>
                 ))
               )}
-              <div ref={crawlerEndRef} />
             </div>
           </div>
 
