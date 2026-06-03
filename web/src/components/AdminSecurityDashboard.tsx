@@ -23,7 +23,13 @@ import {
   FiRefreshCw,
   FiTrendingUp,
   FiUsers,
-  FiUser
+  FiUser,
+  FiPlus,
+  FiTrash2,
+  FiBookOpen,
+  FiCheck,
+  FiX,
+  FiList
 } from "react-icons/fi";
 
 interface NodeDetail {
@@ -136,6 +142,235 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [isTokenControlActive, setIsTokenControlActive] = useState<boolean>(true);
   const [isSavingConfigs, setIsSavingConfigs] = useState<boolean>(false);
   const [configSaveSuccess, setConfigSaveSuccess] = useState<string | null>(null);
+
+  // --- Admin Approval & Curriculum Ingestion States ---
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState<boolean>(false);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
+  const [adminActionSuccess, setAdminActionSuccess] = useState<string | null>(null);
+
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState<boolean>(false);
+
+  // Subject Ingestion states
+  const [subjName, setSubjName] = useState("");
+  const [subjNameAr, setSubjNameAr] = useState("");
+  const [subjGrade, setSubjGrade] = useState("Grade 10");
+  const [subjCategory, setSubjCategory] = useState("Science");
+  const [subjEmoji, setSubjEmoji] = useState("📚");
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
+  const [subjectSuccess, setSubjectSuccess] = useState<string | null>(null);
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+
+  // Book Ingestion states
+  const [bookSubjId, setBookSubjId] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [bookTitleAr, setBookTitleAr] = useState("");
+  const [bookGrade, setBookGrade] = useState("Grade 10");
+  const [bookTerm, setBookTerm] = useState("Term 1");
+  const [bookYear, setBookYear] = useState("2026");
+  const [bookLang, setBookLang] = useState("ar");
+  const [bookType, setBookType] = useState("core");
+  const [bookSourceUrl, setBookSourceUrl] = useState("");
+  const [bookStoragePath, setBookStoragePath] = useState("");
+  const [pendingChapters, setPendingChapters] = useState<any[]>([]);
+
+  // Interactive Chapter Builder states
+  const [chTitle, setChTitle] = useState("");
+  const [chTitleAr, setChTitleAr] = useState("");
+  const [chStartPage, setChStartPage] = useState<number>(1);
+  const [chEndPage, setChEndPage] = useState<number>(10);
+  const [chConcepts, setChConcepts] = useState("");
+
+  const [isIngestingBook, setIsIngestingBook] = useState(false);
+  const [bookSuccess, setBookSuccess] = useState<string | null>(null);
+  const [bookError, setBookError] = useState<string | null>(null);
+
+  const fetchAdmins = async () => {
+    if (!email) return;
+    setIsLoadingAdmins(true);
+    try {
+      const response = await fetch(`/api/admin/approve?superadminEmail=${encodeURIComponent(email)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.admins)) {
+          setAdmins(data.admins);
+          setIsSuperadmin(true);
+        }
+      } else {
+        setIsSuperadmin(false);
+      }
+    } catch (err) {
+      console.error("Failed to fetch admin list:", err);
+      setIsSuperadmin(false);
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    setIsLoadingSubjects(true);
+    try {
+      const response = await fetch("/api/subjects");
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.subjects)) {
+          setSubjectsList(data.subjects);
+          if (data.subjects.length > 0 && !bookSubjId) {
+            setBookSubjId(data.subjects[0]._id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch subjects list:", err);
+    } finally {
+      setIsLoadingSubjects(false);
+    }
+  };
+
+  const handleToggleAdminApproval = async (adminEmail: string, currentApproved: boolean) => {
+    if (!email) return;
+    setAdminActionError(null);
+    setAdminActionSuccess(null);
+
+    const action = currentApproved ? "revoke" : "approve";
+
+    try {
+      const res = await fetch("/api/admin/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          superadminEmail: email,
+          adminEmail,
+          action
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminActionSuccess(
+          language === "ar"
+            ? `تمت ${action === "approve" ? "الموافقة على" : "إلغاء موافقة"} المشرف ${adminEmail} بنجاح`
+            : `Successfully ${action === "approve" ? "approved" : "revoked"} admin ${adminEmail}`
+        );
+        fetchAdmins();
+        setTimeout(() => setAdminActionSuccess(null), 4000);
+      } else {
+        setAdminActionError(data.error || "Failed to update administrator status.");
+        setTimeout(() => setAdminActionError(null), 4000);
+      }
+    } catch (err: any) {
+      setAdminActionError(err.message || "An unexpected network error occurred.");
+      setTimeout(() => setAdminActionError(null), 4000);
+    }
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !subjName || !subjNameAr) return;
+    setIsCreatingSubject(true);
+    setSubjectSuccess(null);
+    setSubjectError(null);
+
+    try {
+      const res = await fetch("/api/subjects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: subjName,
+          name_ar: subjNameAr,
+          grade_level: subjGrade,
+          category: subjCategory,
+          icon_emoji: subjEmoji,
+          requesterEmail: email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubjectSuccess(language === "ar" ? "🏆 تم إضافة المادة الدراسية الجديدة بنجاح!" : "🏆 Subject added and propagated successfully!");
+        setSubjName("");
+        setSubjNameAr("");
+        fetchSubjects();
+        setTimeout(() => setSubjectSuccess(null), 4000);
+      } else {
+        setSubjectError(data.error || "Failed to create subject.");
+      }
+    } catch (err: any) {
+      setSubjectError(err.message || "Network error occurred while saving subject.");
+    } finally {
+      setIsCreatingSubject(false);
+    }
+  };
+
+  const handleAddChapter = () => {
+    if (!chTitle || !chTitleAr) return;
+    const newCh = {
+      id: `ch_${pendingChapters.length + 1}`,
+      title: chTitle,
+      title_ar: chTitleAr,
+      page_start: Number(chStartPage),
+      page_end: Number(chEndPage),
+      concepts: chConcepts ? chConcepts.split(",").map(c => c.trim()).filter(Boolean) : []
+    };
+    setPendingChapters([...pendingChapters, newCh]);
+    setChTitle("");
+    setChTitleAr("");
+    setChStartPage(Number(chEndPage) + 1);
+    setChEndPage(Number(chEndPage) + 10);
+    setChConcepts("");
+  };
+
+  const handleRemoveChapter = (index: number) => {
+    setPendingChapters(pendingChapters.filter((_, i) => i !== index));
+  };
+
+  const handleIngestBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !bookSubjId || !bookTitle || !bookTitleAr) return;
+    setIsIngestingBook(true);
+    setBookSuccess(null);
+    setBookError(null);
+
+    try {
+      const res = await fetch("/api/books", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject_id: bookSubjId,
+          title: bookTitle,
+          title_ar: bookTitleAr,
+          grade: bookGrade,
+          term: bookTerm,
+          year: bookYear,
+          language: bookLang,
+          book_type: bookType,
+          source_url: bookSourceUrl,
+          storage_path: bookStoragePath,
+          chapters: pendingChapters,
+          requesterEmail: email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBookSuccess(language === "ar" ? "📚 تم استيراد كتاب المنهج بنجاح!" : "📚 Book ingested, indexed, and linked successfully!");
+        setBookTitle("");
+        setBookTitleAr("");
+        setBookSourceUrl("");
+        setBookStoragePath("");
+        setPendingChapters([]);
+        setTimeout(() => setBookSuccess(null), 4000);
+      } else {
+        setBookError(data.error || "Failed to ingest textbook.");
+      }
+    } catch (err: any) {
+      setBookError(err.message || "Failed to contact database backend.");
+    } finally {
+      setIsIngestingBook(false);
+    }
+  };
 
   const handleSaveConfigs = () => {
     setIsSavingConfigs(true);
@@ -367,11 +602,14 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
     fetchLogs();
     fetchGlobalStats();
+    fetchAdmins();
+    fetchSubjects();
 
     // Refresh logs & stats every 10 seconds automatically
     const interval = setInterval(() => {
       fetchLogs();
       fetchGlobalStats();
+      fetchAdmins();
     }, 10000);
 
     return () => clearInterval(interval);
@@ -649,6 +887,564 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
             </p>
           </div>
 
+        </div>
+      </section>
+
+      {/* A. Superadmin Admin Approval Console */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <FiUsers style={{ color: "var(--primary)" }} />
+          <span>{language === "ar" ? "إدارة واعتماد المشرفين الجدد (خاص بالمسؤول الأكبر)" : "Superadmin Administrator Approval Console"}</span>
+        </h2>
+        <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+          {language === "ar"
+            ? "اعتماد حسابات المشرفين الجدد لتمكينهم من الوصول إلى لوحات التحكم وإدارة المحتوى الدراسي بأمان."
+            : "Review, approve, or revoke access for admin candidates. Only active superadmins can perform modifications on standard admin privileges."}
+        </p>
+
+        {adminActionError && (
+          <div style={{ padding: "0.75rem", background: "rgba(211, 47, 47, 0.1)", border: "1px solid rgba(211, 47, 47, 0.2)", borderRadius: "6px", color: "#f87171", fontSize: "0.85rem", marginBottom: "1rem" }}>
+            {adminActionError}
+          </div>
+        )}
+        {adminActionSuccess && (
+          <div style={{ padding: "0.75rem", background: "rgba(39, 174, 96, 0.1)", border: "1px solid rgba(39, 174, 96, 0.2)", borderRadius: "6px", color: "var(--accent-green)", fontSize: "0.85rem", marginBottom: "1rem" }}>
+            {adminActionSuccess}
+          </div>
+        )}
+
+        {!isSuperadmin ? (
+          <div style={{
+            background: "rgba(255, 193, 7, 0.05)",
+            border: "1px solid rgba(255, 193, 7, 0.2)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            color: "#6b5100"
+          }}>
+            <FiLock style={{ fontSize: "1.25rem", color: "#b28900" }} />
+            <span style={{ fontSize: "0.9rem", fontFamily: "Cairo, var(--font-sans)" }}>
+              {language === "ar"
+                ? "هذا القسم مخصص للمشرفين الكبار (Superadmins) فقط. حسابك الحالي لديه صلاحيات مشرف قياسي."
+                : "This section is restricted to Superadmins. Your active account is authenticated with standard administrator access."}
+            </span>
+          </div>
+        ) : isLoadingAdmins && admins.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem" }}>
+            <FiRefreshCw className="spinning-icon" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
+            <p style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#64748b" }}>
+              {language === "ar" ? "جاري تحميل قائمة المرشحين..." : "Loading administrator candidate list..."}
+            </p>
+          </div>
+        ) : admins.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem", color: "#64748b", fontSize: "0.85rem" }}>
+            {language === "ar" ? "لا يوجد مرشحون حاليون للإشراف." : "No admin candidates currently found."}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto", background: "rgba(255,255,255,0.4)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", textAlign: "start" }}>
+              <thead>
+                <tr style={{ background: "rgba(0,0,0,0.03)", borderBottom: "1px solid var(--card-border)" }}>
+                  <th style={{ padding: "0.75rem 1rem", fontWeight: 700 }}>{language === "ar" ? "المشرف" : "Admin Candidate"}</th>
+                  <th style={{ padding: "0.75rem 1rem", fontWeight: 700 }}>{language === "ar" ? "الحالة" : "Status"}</th>
+                  <th style={{ padding: "0.75rem 1rem", fontWeight: 700 }}>{language === "ar" ? "المصدر" : "Data Source"}</th>
+                  <th style={{ padding: "0.75rem 1rem", fontWeight: 700, textAlign: "center" }}>{language === "ar" ? "العمليات" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {admins.map((adm, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid var(--card-border)", transition: "background 0.2s" }} className="user-breakdown-row">
+                    <td style={{ padding: "0.75rem 1rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: 600, color: "#1e293b" }}>{adm.name}</span>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{adm.email}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "0.75rem 1rem" }}>
+                      {adm.isApprovedAdmin ? (
+                        <span style={{
+                          background: "rgba(39, 174, 96, 0.12)",
+                          color: "var(--accent-green)",
+                          padding: "3px 10px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}>
+                          <FiCheck style={{ fontSize: "0.85rem" }} />
+                          {language === "ar" ? "مقبول" : "Approved"}
+                        </span>
+                      ) : (
+                        <span style={{
+                          background: "rgba(243, 156, 18, 0.12)",
+                          color: "var(--accent-orange)",
+                          padding: "3px 10px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}>
+                          <FiX style={{ fontSize: "0.85rem" }} />
+                          {language === "ar" ? "قيد الانتظار" : "Pending Approval"}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: "0.75rem 1rem", color: "#64748b", fontSize: "0.75rem" }}>
+                      <code>{adm.source}</code>
+                    </td>
+                    <td style={{ padding: "0.75rem 1rem", textAlign: "center" }}>
+                      <button
+                        onClick={() => handleToggleAdminApproval(adm.email, adm.isApprovedAdmin)}
+                        style={{
+                          background: adm.isApprovedAdmin ? "rgba(211, 47, 47, 0.08)" : "rgba(16, 107, 163, 0.08)",
+                          color: adm.isApprovedAdmin ? "#d32f2f" : "var(--primary)",
+                          border: `1px solid ${adm.isApprovedAdmin ? "rgba(211, 47, 47, 0.15)" : "rgba(16, 107, 163, 0.15)"}`,
+                          borderRadius: "6px",
+                          padding: "4px 12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = adm.isApprovedAdmin ? "rgba(211, 47, 47, 0.15)" : "rgba(16, 107, 163, 0.15)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = adm.isApprovedAdmin ? "rgba(211, 47, 47, 0.08)" : "rgba(16, 107, 163, 0.08)";
+                        }}
+                      >
+                        {adm.isApprovedAdmin ? (
+                          <>
+                            <FiX />
+                            {language === "ar" ? "إلغاء الاعتماد" : "Revoke"}
+                          </>
+                        ) : (
+                          <>
+                            <FiCheck />
+                            {language === "ar" ? "اعتماد كمسؤول" : "Approve Admin"}
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* B. Curriculum & Textbook Ingestion Studio */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <FiBookOpen style={{ color: "var(--secondary)" }} />
+          <span>{language === "ar" ? "أستوديو إدخال المواد والكتب الدراسية (تجاوز البيانات التجريبية)" : "Curriculum & Books Ingestion Studio"}</span>
+        </h2>
+        <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+          {language === "ar"
+            ? "أضف مواد دراسية جديدة واستورد كتب الوزارة ومناهجها مباشرة إلى قاعدة البيانات لتجاوز البيانات الثابتة وتوفير مراجع حقيقية للطلبة."
+            : "Add new dynamic subjects and ingest official textbooks. All updates propagate directly to MongoDB, making the tutor companion immediately smart without relying on static sample mocks."}
+        </p>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "1.5rem"
+        }}>
+          {/* Column B1: Add New Subject */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.45)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.25rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem"
+          }}>
+            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem", margin: 0 }}>
+              <FiPlus style={{ color: "var(--primary)" }} />
+              <span>{language === "ar" ? "إضافة مادة دراسية جديدة" : "Add New Subject"}</span>
+            </h3>
+
+            {subjectError && (
+              <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
+                {subjectError}
+              </div>
+            )}
+            {subjectSuccess && (
+              <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
+                {subjectSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateSubject} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (إنجليزي)" : "Subject Name (English)"}</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Pure Mathematics"
+                  value={subjName}
+                  onChange={(e) => setSubjName(e.target.value)}
+                  required
+                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (عربي)" : "Subject Name (Arabic)"}</label>
+                <input
+                  type="text"
+                  placeholder="مثال: الرياضيات البحتة"
+                  value={subjNameAr}
+                  onChange={(e) => setSubjNameAr(e.target.value)}
+                  required
+                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", fontFamily: "Cairo, var(--font-sans)" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "المرحلة الدراسية" : "Grade Level"}</label>
+                  <select
+                    value={subjGrade}
+                    onChange={(e) => setSubjGrade(e.target.value)}
+                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                  >
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "التصنيف" : "Category"}</label>
+                  <select
+                    value={subjCategory}
+                    onChange={(e) => setSubjCategory(e.target.value)}
+                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                  >
+                    <option value="Science">Science</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Languages">Languages</option>
+                    <option value="Social Studies">Social Studies</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "رمز تعبيري (Emoji)" : "Icon Emoji"}</label>
+                <input
+                  type="text"
+                  placeholder="📚"
+                  value={subjEmoji}
+                  onChange={(e) => setSubjEmoji(e.target.value)}
+                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", width: "50px", textAlign: "center" }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isCreatingSubject}
+                style={{
+                  background: "var(--primary)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "0.6rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  cursor: isCreatingSubject ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                  marginTop: "0.5rem"
+                }}
+              >
+                {isCreatingSubject ? (
+                  <FiRefreshCw className="spinning-icon" />
+                ) : (
+                  <>
+                    <FiPlus />
+                    <span>{language === "ar" ? "إنشاء المادة ودفعها للخدمة" : "Create New Subject"}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Column B2: Ingest New Textbook */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.45)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.25rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem"
+          }}>
+            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem", margin: 0 }}>
+              <FiBookOpen style={{ color: "var(--secondary)" }} />
+              <span>{language === "ar" ? "استيراد وتجهيز كتاب جديد" : "Ingest New Book / Library"}</span>
+            </h3>
+
+            {bookError && (
+              <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
+                {bookError}
+              </div>
+            )}
+            {bookSuccess && (
+              <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
+                {bookSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleIngestBook} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اختر المادة المرتبطة" : "Select Target Subject"}</label>
+                <select
+                  value={bookSubjId}
+                  onChange={(e) => setBookSubjId(e.target.value)}
+                  required
+                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                >
+                  {subjectsList.length === 0 ? (
+                    <option value="">{language === "ar" ? "جاري تحميل المواد الدراسية..." : "Loading subjects..."}</option>
+                  ) : (
+                    subjectsList.map((subj) => (
+                      <option key={subj._id} value={subj._id}>
+                        {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (إنجليزي)" : "Book Title (English)"}</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Calculus Volume I"
+                    value={bookTitle}
+                    onChange={(e) => setBookTitle(e.target.value)}
+                    required
+                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (عربي)" : "Book Title (Arabic)"}</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: التفاضل والتكامل ج1"
+                    value={bookTitleAr}
+                    onChange={(e) => setBookTitleAr(e.target.value)}
+                    required
+                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", fontFamily: "Cairo, var(--font-sans)" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.35rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Grade</label>
+                  <select value={bookGrade} onChange={(e) => setBookGrade(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Term</label>
+                  <select value={bookTerm} onChange={(e) => setBookTerm(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                    <option value="Term 1">Term 1</option>
+                    <option value="Term 2">Term 2</option>
+                    <option value="Term 3">Term 3</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Lang</label>
+                  <select value={bookLang} onChange={(e) => setBookLang(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                    <option value="ar">العربية</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Type</label>
+                  <select value={bookType} onChange={(e) => setBookType(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                    <option value="core">Core</option>
+                    <option value="supplementary">Extra</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "رابط المصدر (PDF URL)" : "Source Document URL"}</label>
+                <input
+                  type="url"
+                  placeholder="https://ellibrary.moe.gov.eg/.../calc_g10.pdf"
+                  value={bookSourceUrl}
+                  onChange={(e) => setBookSourceUrl(e.target.value)}
+                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              {/* Interactive Chapters List Section */}
+              <div style={{
+                background: "rgba(0,0,0,0.02)",
+                border: "1px dashed var(--card-border)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem"
+              }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", color: "var(--primary)" }}>
+                  <FiList />
+                  {language === "ar" ? "مخطط فصول وأبواب الكتاب" : "Textbook Chapter Blueprint"}
+                </span>
+
+                {pendingChapters.length === 0 ? (
+                  <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                    {language === "ar" ? "لا توجد فصول مضافة بعد. أضف فصولاً بالأسفل:" : "No chapters added yet. Define textbook segments below:"}
+                  </span>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", maxHeight: "120px", overflowY: "auto", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
+                    {pendingChapters.map((ch, index) => (
+                      <div key={index} style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        background: "rgba(255,255,255,0.9)",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        border: "1px solid var(--card-border)"
+                      }}>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span>{language === "ar" ? ch.title_ar : ch.title}</span>
+                          <span style={{ fontSize: "0.65rem", color: "#64748b" }}>Pages {ch.page_start} - {ch.page_end}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveChapter(index)}
+                          style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.85rem" }}
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Interactive Builder Form Row */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", background: "rgba(255,255,255,0.6)", padding: "0.5rem", borderRadius: "6px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
+                    <input
+                      type="text"
+                      placeholder="Chapter Title"
+                      value={chTitle}
+                      onChange={(e) => setChTitle(e.target.value)}
+                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="عنوان الفصل بالعربي"
+                      value={chTitleAr}
+                      onChange={(e) => setChTitleAr(e.target.value)}
+                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", fontFamily: "Cairo, var(--font-sans)" }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "0.35rem", alignItems: "center" }}>
+                    <input
+                      type="number"
+                      placeholder="Start"
+                      value={chStartPage}
+                      onChange={(e) => setChStartPage(Number(e.target.value))}
+                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="End"
+                      value={chEndPage}
+                      onChange={(e) => setChEndPage(Number(e.target.value))}
+                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Concepts (comma-separated)"
+                      value={chConcepts}
+                      onChange={(e) => setChConcepts(e.target.value)}
+                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddChapter}
+                    disabled={!chTitle || !chTitleAr}
+                    style={{
+                      background: "rgba(27, 163, 156, 0.12)",
+                      color: "var(--secondary)",
+                      border: "1px solid rgba(27, 163, 156, 0.2)",
+                      borderRadius: "4px",
+                      padding: "4px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "2px"
+                    }}
+                  >
+                    <FiPlus />
+                    <span>{language === "ar" ? "إضافة فصل للمسودة" : "Add Chapter Segment"}</span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isIngestingBook || !bookSubjId || !bookTitle || !bookTitleAr}
+                style={{
+                  background: "var(--secondary)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "0.6rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  cursor: (isIngestingBook || !bookSubjId || !bookTitle || !bookTitleAr) ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                  marginTop: "0.5rem"
+                }}
+              >
+                {isIngestingBook ? (
+                  <FiRefreshCw className="spinning-icon" />
+                ) : (
+                  <>
+                    <FiZap />
+                    <span>{language === "ar" ? "دفع الكتاب الجديد للمزامنة والتخزين" : "Ingest Textbook into Catalog"}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 

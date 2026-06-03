@@ -432,6 +432,6 @@ fahem_workflow = Workflow(
 )
 
 # Expose 'app' for compatibility with Next.js frontend calling /run with app_name: "app"
-app = local_mongodb_agent
+app = fahem_workflow
 
 
