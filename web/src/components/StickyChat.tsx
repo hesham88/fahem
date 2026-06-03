@@ -67,6 +67,7 @@ export default function StickyChat() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatLogsEndRef = useRef<HTMLDivElement>(null);
+  const sendMessageRef = useRef<((text?: string) => Promise<void>) | undefined>(undefined);
 
   // Initialize welcome message based on language
   useEffect(() => {
@@ -76,8 +77,8 @@ export default function StickyChat() {
           id: "welcome",
           role: "assistant",
           text: language === "ar" 
-            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب رفيق الدراسة للوزارة، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
-            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the study companion Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
+            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتبك ومصادرك الدراسية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة أو الكتاب الذي تود مذاكرته اليوم؟" 
+            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you study your books and learning resources, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject or book are we studying today?",
           timestamp: new Date()
         }
       ]);
@@ -107,6 +108,17 @@ export default function StickyChat() {
         setBookContext(detail);
         setIsOpen(true);
         setLayoutMode("side"); // Auto-expand to premium side-by-side mode!
+        
+        if (detail.autoExplainText) {
+          const autoExplainPrompt = language === "ar"
+            ? `اشرح لي هذا الجزء بالتفصيل وبأسلوب مبسط: "${detail.autoExplainText}"`
+            : `Please explain this excerpt in detail and in simple terms: "${detail.autoExplainText}"`;
+          setTimeout(() => {
+            if (sendMessageRef.current) {
+              sendMessageRef.current(autoExplainPrompt);
+            }
+          }, 400);
+        }
       } else {
         setBookContext(null);
         setLayoutMode("compact"); // Revert back to compact when leaving reader
@@ -114,7 +126,19 @@ export default function StickyChat() {
     };
     window.addEventListener("fahemBookContext", handleContextChange);
     return () => window.removeEventListener("fahemBookContext", handleContextChange);
-  }, []);
+  }, [language]);
+
+  // Manage layout class on body for side-panel push effect
+  useEffect(() => {
+    if (isOpen && layoutMode === "side") {
+      document.body.classList.add("companion-side-open");
+    } else {
+      document.body.classList.remove("companion-side-open");
+    }
+    return () => {
+      document.body.classList.remove("companion-side-open");
+    };
+  }, [isOpen, layoutMode]);
 
   // Scroll messages to bottom on change
   useEffect(() => {
@@ -217,8 +241,8 @@ export default function StickyChat() {
         id: "welcome",
         role: "assistant",
         text: language === "ar" 
-          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب رفيق الدراسة للوزارة، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
-          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the study companion Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
+          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتبك ومصادرك الدراسية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة أو الكتاب الذي تود مذاكرته اليوم؟" 
+          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you study your books and learning resources, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject or book are we studying today?",
         timestamp: new Date()
       }
     ]);
@@ -336,6 +360,10 @@ export default function StickyChat() {
     });
   };
 
+  useEffect(() => {
+    sendMessageRef.current = handleSendMessage;
+  });
+
   const handleSendMessage = async (textToSend?: string) => {
     const queryText = (textToSend || inputValue).trim();
     if (!queryText || isSending) return;
@@ -408,72 +436,128 @@ User Question: ${queryText}`;
       const decoder = new TextDecoder();
       let done = false;
       let accumulatedText = "";
+      let chunkBuffer = "";
+      let inFinalOutput = false;
 
       while (!done) {
         const { value, done: isDone } = await reader.read();
         done = isDone;
+        let chunk = "";
         if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          chunk = decoder.decode(value, { stream: true });
+        } else if (done) {
+          chunk = decoder.decode();
+        }
+        chunkBuffer += chunk;
 
-          lines.forEach((line) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine) {
-              // Extract metadata details
-              if (trimmedLine.startsWith("[METADATA]")) {
-                const metaContent = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
-                if (metaContent.startsWith("ActiveAgent:")) {
-                  const currentAgent = metaContent.replace("ActiveAgent:", "").trim();
-                  setActiveAgent(currentAgent);
-                  
-                  // Update message status metadata
-                  setMessages((prev) => 
-                    prev.map((msg) => 
-                      msg.id === assistantMsgId ? { ...msg, activeAgent: currentAgent } : msg
-                    )
-                  );
-                } else if (metaContent.startsWith("SessionId:")) {
-                  const activeSessId = metaContent.replace("SessionId:", "").trim();
-                  setCurrentSessionId(activeSessId);
-                } else if (metaContent.startsWith("Duration:")) {
-                  setSessionLogs((prev) => [...prev, `[Telemetry] ${metaContent}`]);
-                } else if (metaContent.startsWith("Credits:")) {
-                  const val = parseInt(metaContent.replace("Credits:", "").trim(), 10);
-                  if (!isNaN(val)) {
-                    setCredits(val);
+        let processed = true;
+        while (processed && chunkBuffer.length > 0) {
+          processed = false;
+
+          if (!inFinalOutput) {
+            const nlIdx = chunkBuffer.indexOf("\n");
+            if (nlIdx !== -1) {
+              const line = chunkBuffer.substring(0, nlIdx);
+              chunkBuffer = chunkBuffer.substring(nlIdx + 1);
+              processed = true;
+
+              const trimmedLine = line.trim();
+              if (trimmedLine) {
+                if (trimmedLine.includes("=== Agent Final Output ===")) {
+                  inFinalOutput = true;
+                } else if (trimmedLine.startsWith("[METADATA]")) {
+                  const metaContent = trimmedLine.replace("[METADATA] ", "").replace("[METADATA]", "").trim();
+                  if (metaContent.startsWith("ActiveAgent:")) {
+                    const currentAgent = metaContent.replace("ActiveAgent:", "").trim();
+                    setActiveAgent(currentAgent);
+                    setMessages((prev) => 
+                      prev.map((msg) => 
+                        msg.id === assistantMsgId ? { ...msg, activeAgent: currentAgent } : msg
+                      )
+                    );
+                  } else if (metaContent.startsWith("SessionId:")) {
+                    const activeSessId = metaContent.replace("SessionId:", "").trim();
+                    setCurrentSessionId(activeSessId);
+                  } else if (metaContent.startsWith("Duration:")) {
+                    setSessionLogs((prev) => [...prev, `[Telemetry] ${metaContent}`]);
+                  } else if (metaContent.startsWith("Credits:")) {
+                    const val = parseInt(metaContent.replace("Credits:", "").trim(), 10);
+                    if (!isNaN(val)) {
+                      setCredits(val);
+                    }
                   }
+                } else if (
+                  trimmedLine.startsWith("[Unknown]") ||
+                  trimmedLine.startsWith("[Fahem Agent]") ||
+                  trimmedLine.startsWith("[Sub-Agent:") ||
+                  trimmedLine.includes("[SYSTEM LOG]")
+                ) {
+                  setSessionLogs((prev) => [...prev, trimmedLine]);
                 }
-                return;
               }
+            }
+          } else {
+            // In final output mode
+            const boundaryIdx = chunkBuffer.indexOf("==========================");
+            if (boundaryIdx !== -1) {
+              const textBefore = chunkBuffer.substring(0, boundaryIdx);
+              chunkBuffer = chunkBuffer.substring(boundaryIdx + "==========================".length);
+              inFinalOutput = false;
+              processed = true;
 
-               // Append system logs
-              if (trimmedLine.startsWith("[Unknown]") || trimmedLine.startsWith("[Fahem Agent]") || trimmedLine.startsWith("[Sub-Agent:") || trimmedLine.includes("[SYSTEM LOG]")) {
-                setSessionLogs((prev) => [...prev, trimmedLine]);
-                return;
-              }
-
-              // Append main text response
-              if (
-                !trimmedLine.includes("[STDERR]") &&
-                !trimmedLine.includes("[CLOSE]") &&
-                !trimmedLine.includes("[Unknown]") &&
-                !trimmedLine.includes("[Fahem Agent]") &&
-                !trimmedLine.startsWith("[Sub-Agent:") &&
-                !trimmedLine.startsWith("Prompt:") &&
-                trimmedLine !== "=== Agent Final Output ===" &&
-                trimmedLine !== "=========================="
-              ) {
-                accumulatedText += line + "\n";
+              if (textBefore) {
+                accumulatedText += textBefore;
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === assistantMsgId
-                      ? { ...msg, text: accumulatedText.trim() }
-                      : msg
+                    msg.id === assistantMsgId ? { ...msg, text: accumulatedText.trim() } : msg
                   )
                 );
               }
+            } else if (chunkBuffer.length > 30) {
+              // Safe to output characters up to length - 30 to prevent leaking prefix of boundary marker
+              const safeLen = chunkBuffer.length - 30;
+              const safeText = chunkBuffer.substring(0, safeLen);
+              chunkBuffer = chunkBuffer.substring(safeLen);
+              processed = true;
+
+              accumulatedText += safeText;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId ? { ...msg, text: accumulatedText.trim() } : msg
+                )
+              );
             }
-          });
+          }
+        }
+
+        if (done && chunkBuffer.length > 0) {
+          if (inFinalOutput) {
+            let cleanText = chunkBuffer;
+            const bIdx = cleanText.indexOf("==========================");
+            if (bIdx !== -1) {
+              cleanText = cleanText.substring(0, bIdx);
+            }
+            if (cleanText) {
+              accumulatedText += cleanText;
+            }
+          } else {
+            const trimmedLine = chunkBuffer.trim();
+            if (trimmedLine && !trimmedLine.includes("==========================") && !trimmedLine.includes("[CLOSE]")) {
+              if (!trimmedLine.startsWith("[METADATA]") &&
+                  !trimmedLine.startsWith("[Unknown]") &&
+                  !trimmedLine.startsWith("[Fahem Agent]") &&
+                  !trimmedLine.startsWith("[Sub-Agent:") &&
+                  !trimmedLine.startsWith("Prompt:")) {
+                accumulatedText += chunkBuffer + "\n";
+              }
+            }
+          }
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId ? { ...msg, text: accumulatedText.trim() } : msg
+            )
+          );
+          chunkBuffer = "";
         }
       }
 
@@ -992,7 +1076,9 @@ User Question: ${queryText}`;
                   boxShadow: msg.role === "user" ? "0 4px 12px rgba(16,107,163,0.15)" : "var(--shadow-sm)",
                   fontSize: "0.9rem",
                   lineHeight: "1.5",
-                  wordBreak: "break-word"
+                  wordBreak: "normal",
+                  overflowWrap: "break-word",
+                  whiteSpace: "pre-wrap"
                 }}
               >
                 {msg.role === "user" ? (
@@ -1157,7 +1243,6 @@ User Question: ${queryText}`;
           </div>
         )}
 
-        {/* Input Form Footer with Mentions popover */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1165,6 +1250,7 @@ User Question: ${queryText}`;
           }}
           style={{
             padding: "1rem",
+            paddingInlineEnd: layoutMode === "fullscreen" ? "1rem" : "5.5rem",
             borderTop: "1px dashed var(--card-border)",
             backgroundColor: "rgba(255,255,255,0.45)",
             display: "flex",

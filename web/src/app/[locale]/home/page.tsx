@@ -8,6 +8,7 @@ import { onAuthStateChanged, signOut, User, linkWithPhoneNumber, RecaptchaVerifi
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
+import CurriculumIngestionStudio from "../../../components/CurriculumIngestionStudio";
 import { 
   FiCpu, 
   FiTerminal, 
@@ -529,6 +530,11 @@ export default function Home() {
           title: language === "ar" ? "إدارة الأعضاء والنشاط" : "Users & Activity Trail",
           subtitle: language === "ar" ? "عرض جميع المستخدمين المسجلين، تعيين الأدوار، حظر الحسابات، ومراقبة النشاط العام." : "View all enrolled users, manage roles, issue account bans, and inspect live user activity trails."
         };
+      case "admin-ingestion":
+        return {
+          title: language === "ar" ? "أستوديو إدخال المناهج والكتب" : "Curriculum Ingestion Studio",
+          subtitle: language === "ar" ? "استيراد وتجهيز كتب الوزارة ومناهجها باستخدام قنوات معالجة منفصلة دون إزعاج الوكلاء النشطين." : "Ingest and process official textbooks using isolated Cloud Run Jobs without interrupting active student swarms."
+        };
       case "library":
         return {
           title: language === "ar" ? "المكتبة التعليمية الرقمية" : "Interactive Knowledge Library",
@@ -671,6 +677,22 @@ export default function Home() {
     }
   ]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
+  const [selectedText, setSelectedText] = useState<string>("");
+  const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
+
+  const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
+
+  useEffect(() => {
+    fetch("/api/admin/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && data.config && data.config.maxUploadSize) {
+          setDynamicMaxUploadSize(Number(data.config.maxUploadSize));
+        }
+      })
+      .catch((err) => console.error("Error loading admin config in home page:", err));
+  }, []);
+
   // Synchronize Book and Page Context from active reader to global StickyChat
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -839,6 +861,774 @@ export default function Home() {
   const [practiceResult, setPracticeResult] = useState<string>("");
   const [practiceLoading, setPracticeLoading] = useState<boolean>(false);
 
+  // --- MULTI-INSTANCE STATE ACADEMIC SPACES ---
+  // Local history audit log for space activities
+  const [spaceHistory, setSpaceHistory] = useState<any[]>([
+    { actionEn: "Initialized Academic Spaces Hub", actionAr: "تم تهيئة مركز مساحات المذاكرة النشطة", timestamp: new Date(Date.now() - 300000) }
+  ]);
+  const addSpaceHistory = (actionEn: string, actionAr: string) => {
+    setSpaceHistory(prev => [
+      { actionEn, actionAr, timestamp: new Date() },
+      ...prev
+    ]);
+  };
+
+  // 1. Practice Spaces State
+  const [activePractices, setActivePractices] = useState<any[]>([
+    {
+      id: "practice_1",
+      nameEn: "Algebra & Inversion Workstation",
+      nameAr: "مساحة ممارسة الجبر ومعكوس المصفوفات",
+      subject: "Math",
+      generatedQuestion: "What is the determinant of a 2x2 matrix [[3, 5], [1, 2]]?",
+      generatedQuestionAr: "ما هي قيمة محدد المصفوفة 2×2 التالية: [[3، 5]، [1، 2]]؟",
+      practiceAnswer: "",
+      practiceResult: ""
+    },
+    {
+      id: "practice_2",
+      nameEn: "Science Active Recall Challenge",
+      nameAr: "مساحة مراجعة العلوم والذرة والكم",
+      subject: "Science",
+      generatedQuestion: "Explain the Pauli Exclusion Principle in your own words.",
+      generatedQuestionAr: "اشرح مبدأ استبعاد باولي بأسلوبك الخاص.",
+      practiceAnswer: "",
+      practiceResult: ""
+    }
+  ]);
+  const [selectedPracticeId, setSelectedPracticeId] = useState<string>("practice_1");
+  const currentPractice = activePractices.find(p => p.id === selectedPracticeId) || activePractices[0];
+
+  // Sync selected Practice space into local inputs
+  useEffect(() => {
+    if (currentPractice) {
+      setPracticeSubject(currentPractice.subject || "Math");
+      setGeneratedQuestion(language === "ar" ? (currentPractice.generatedQuestionAr || currentPractice.generatedQuestion) : currentPractice.generatedQuestion);
+      setPracticeAnswer(currentPractice.practiceAnswer || "");
+      setPracticeResult(currentPractice.practiceResult || "");
+    }
+  }, [selectedPracticeId, language]);
+
+  // Sync back local Practice changes to multi-instance state array
+  useEffect(() => {
+    if (selectedPracticeId) {
+      setActivePractices(prev => prev.map(p => {
+        if (p.id === selectedPracticeId) {
+          return {
+            ...p,
+            practiceAnswer,
+            generatedQuestion,
+            practiceResult,
+            subject: practiceSubject
+          };
+        }
+        return p;
+      }));
+    }
+  }, [practiceAnswer, generatedQuestion, practiceResult, practiceSubject, selectedPracticeId]);
+
+  const saveCurrentPracticeState = (answer: string, result: string) => {
+    setActivePractices(prev => prev.map(p => {
+      if (p.id === selectedPracticeId) {
+        return { ...p, practiceAnswer: answer, practiceResult: result };
+      }
+      return p;
+    }));
+  };
+
+  // 2. Plan Spaces State
+  const [activePlans, setActivePlans] = useState<any[]>([
+    {
+      id: "plan_1",
+      nameEn: "Main School Curriculum Plan",
+      nameAr: "الخطة المدرسية العامة للمنهج",
+      tasks: [
+        { id: "t1", textAr: "دراسة درس المتطابقات المثلثية وحل 10 مسائل", textEn: "Study Trigonometric Functions and solve 10 exercises", checked: true, dayAr: "السبت", dayEn: "Sat" },
+        { id: "t2", textAr: "مراجعة قواعد كتابة الهمزة المتوسطة وحل الكراسة", textEn: "Review Arabic spelling rules and complete exercises", checked: true, dayAr: "الأحد", dayEn: "Sun" },
+        { id: "t3", textAr: "تجربة اختبار معمل الكيمياء عن التفاعلات الطاردة للحرارة", textEn: "Perform chemistry virtual experiment on exothermic reactions", checked: false, dayAr: "الإثنين", dayEn: "Mon" },
+        { id: "t4", textAr: "تلخيص الفصل الرابع من تاريخ الشرق الأوسط عبر الزتونة", textEn: "Summarize Chapter 4 of Middle East History via Zatona AI", checked: false, dayAr: "الثلاثاء", dayEn: "Tue" },
+        { id: "t5", textAr: "التحضير لاختبار مادة العلوم القصير والتدرب على الفلاش كارد", textEn: "Prepare for Science mock assessment and practice flashcards", checked: false, dayAr: "الأربعاء", dayEn: "Wed" }
+      ]
+    },
+    {
+      id: "plan_2",
+      nameEn: "Self-Study Advanced Programming",
+      nameAr: "خطة مهارات البرمجة والذكاء الاصطناعي",
+      tasks: [
+        { id: "t6", textAr: "بناء واجهات تفاعلية مذهلة بالكامل لـ Fahem", textEn: "Build premium interactive interfaces for Fahem", checked: false, dayAr: "الخميس", dayEn: "Thu" },
+        { id: "t7", textAr: "ربط قاعدة البيانات واستعلام السجلات المباشرة للأمان", textEn: "Connect DB and query real-time security logs", checked: true, dayAr: "الجمعة", dayEn: "Fri" }
+      ]
+    }
+  ]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("plan_1");
+  const currentPlan = activePlans.find(p => p.id === selectedPlanId) || activePlans[0];
+  const planTasks = currentPlan?.tasks || [];
+
+  const handleToggleTask = (planId: string, taskId: string) => {
+    setActivePlans(prev => prev.map(p => {
+      if (p.id === planId) {
+        return {
+          ...p,
+          tasks: p.tasks.map((t: any) => t.id === taskId ? { ...t, checked: !t.checked } : t)
+        };
+      }
+      return p;
+    }));
+    addSpaceHistory("Toggled task checkbox in plan", "تم تغيير حالة المهمة في خطة المذاكرة");
+  };
+
+  // 3. Timetables Spaces State (Replaces simple timetableEvents)
+  const [activeTimetables, setActiveTimetables] = useState<any[]>([
+    {
+      id: "timetable_1",
+      nameEn: "Spring Term Weekly Schedule",
+      nameAr: "جدول الحصص للفصل الدراسي الثاني",
+      events: [
+        { id: 1, subject: "Mathematics", subjectAr: "الرياضيات", day: "Monday", dayAr: "الإثنين", time: "09:00 - 10:30", room: "Room 102" },
+        { id: 2, subject: "Physics", subjectAr: "الفيزياء", day: "Monday", dayAr: "الإثنين", time: "11:00 - 12:30", room: "Lab A" },
+        { id: 3, subject: "Arabic Language", subjectAr: "اللغة العربية", day: "Tuesday", dayAr: "الثلاثاء", time: "09:00 - 10:30", room: "Room 105" },
+        { id: 4, subject: "Biology", subjectAr: "الأحياء", day: "Wednesday", dayAr: "الأربعاء", time: "10:00 - 11:30", room: "Lab B" },
+        { id: 5, subject: "Computer Science", subjectAr: "علوم الحاسب", day: "Thursday", dayAr: "الخميس", time: "12:00 - 13:30", room: "Room 201" }
+      ]
+    },
+    {
+      id: "timetable_2",
+      nameEn: "Summer Academy Class Timetable",
+      nameAr: "جدول دورات الأكاديمية الصيفية المكثفة",
+      events: [
+        { id: 6, subject: "Machine Learning Introduction", subjectAr: "مقدمة في تعلم الآلة والذكاء الاصطناعي", day: "Sunday", dayAr: "الأحد", time: "15:00 - 17:00", room: "AI Lab" }
+      ]
+    }
+  ]);
+  const [selectedTimetableId, setSelectedTimetableId] = useState<string>("timetable_1");
+  const currentTimetable = activeTimetables.find(t => t.id === selectedTimetableId) || activeTimetables[0];
+  const timetableEvents = currentTimetable?.events || [];
+
+  const setTimetableEvents = (newEventsOrFunc: any) => {
+    setActiveTimetables(prev => prev.map(t => {
+      if (t.id === selectedTimetableId) {
+        const updatedEvents = typeof newEventsOrFunc === "function" ? newEventsOrFunc(t.events) : newEventsOrFunc;
+        return { ...t, events: updatedEvents };
+      }
+      return t;
+    }));
+    addSpaceHistory("Updated timetable events", "تم تعديل جدول المواعيد والحصص");
+  };
+
+  // 4. Quizzes Spaces State
+  const [activeQuizzes, setActiveQuizzes] = useState<any[]>([
+    {
+      id: "quiz_1",
+      nameEn: "General Knowledge Assessment",
+      nameAr: "نموذج اختبار التقييم التحصيلي الشامل",
+      quizQuestionIndex: 0,
+      quizAnswers: {},
+      quizFinished: false
+    },
+    {
+      id: "quiz_2",
+      nameEn: "Alternative Science Trial Quiz",
+      nameAr: "الاختبار التدريبي البديل للعلوم والفيزياء",
+      quizQuestionIndex: 0,
+      quizAnswers: {},
+      quizFinished: false
+    }
+  ]);
+  const [selectedQuizId, setSelectedQuizId] = useState<string>("quiz_1");
+  const currentQuiz = activeQuizzes.find(q => q.id === selectedQuizId) || activeQuizzes[0];
+  const quizQuestionIndex = currentQuiz?.quizQuestionIndex || 0;
+  const quizAnswers = currentQuiz?.quizAnswers || {};
+  const quizFinished = currentQuiz?.quizFinished || false;
+
+  const setQuizQuestionIndex = (valOrFunc: any) => {
+    setActiveQuizzes(prev => prev.map(q => {
+      if (q.id === selectedQuizId) {
+        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizQuestionIndex) : valOrFunc;
+        return { ...q, quizQuestionIndex: nextVal };
+      }
+      return q;
+    }));
+  };
+
+  const setQuizAnswers = (valOrFunc: any) => {
+    setActiveQuizzes(prev => prev.map(q => {
+      if (q.id === selectedQuizId) {
+        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizAnswers) : valOrFunc;
+        return { ...q, quizAnswers: nextVal };
+      }
+      return q;
+    }));
+  };
+
+  const setQuizFinished = (valOrFunc: any) => {
+    setActiveQuizzes(prev => prev.map(q => {
+      if (q.id === selectedQuizId) {
+        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizFinished) : valOrFunc;
+        return { ...q, quizFinished: nextVal };
+      }
+      return q;
+    }));
+    addSpaceHistory("Updated quiz answers/finished status", "تم تحديث إجابات أو حالة اكتمال الاختبار");
+  };
+
+  // 5. Zatonas Spaces State
+  const [activeZatonas, setActiveZatonas] = useState<any[]>([
+    {
+      id: "zatona_1",
+      nameEn: "Newtonian Motion Digest",
+      nameAr: "زتونة قوانين الحركة والميكانيكا الكلاسيكية",
+      zatonaPrompt: "Newton's laws of motion",
+      zatonaResult: `High-Yield AI Digest for [ Newton's laws of motion ]\n\n📌 Core Concept 1:\nNewton's laws formulate the baseline relation between mass and forces.\n\n📌 Core Concept 2 (Inertia):\nAn object remains at rest or in uniform motion unless acted upon by an external force.\n\n📌 Core Concept 3:\nForce equals mass times acceleration (F = ma), and action equals reaction.`,
+      zatonaResultAr: `ملخص مخصص للـ [ قوانين نيوتن للحركة ]\n\n📌 الخلاصة الأولى:\nتصف قوانين نيوتن الثلاثة العلاقة بين حركة الجسم والقوى المؤثرة عليه.\n\n📌 الخلاصة الثانية (قانون القصور الذاتي):\nالجسم الساكن يظل ساكناً والجسم المتحرك يظل متحركاً ما لم تؤثر عليه قوة خارجية.\n\n📌 الخلاصة الثالثة:\nالقوة تساوي الكتلة ضرب التسارع (F = ma)، ولكل فعل رد فعل مساوٍ له في المقدار ومضاد له في الاتجاه.`
+    },
+    {
+      id: "zatona_2",
+      nameEn: "Arabic Grammar Syntax Summary",
+      nameAr: "زتونة قواعد اللغة العربية وأقسام الكلام",
+      zatonaPrompt: "Arabic parts of speech",
+      zatonaResult: `High-Yield AI Digest for [ Arabic parts of speech ]\n\n📌 Core Concept 1:\nWords are classified into nouns, verbs, or particles. Nouns are independent of time, verbs are time-bound, particles have context-only meaning.`,
+      zatonaResultAr: `ملخص مخصص للـ [ أقسام الكلام في العربية ]\n\n📌 الخلاصة الأولى:\nتنقسم الكلمة لاسم وفعل وحرف. الاسم مستقل عن الزمن، والفعل مرتبط بزمن، والحرف لا يظهر معناه إلا مع غيره.`
+    }
+  ]);
+  const [selectedZatonaId, setSelectedZatonaId] = useState<string>("zatona_1");
+  const currentZatona = activeZatonas.find(z => z.id === selectedZatonaId) || activeZatonas[0];
+  const [zatonaLoading, setZatonaLoading] = useState(false);
+
+  const zatonaPrompt = currentZatona?.zatonaPrompt || "";
+  const zatonaResult = language === "ar" 
+    ? (currentZatona?.zatonaResultAr || currentZatona?.zatonaResult || "")
+    : (currentZatona?.zatonaResult || currentZatona?.zatonaResultAr || "");
+
+  const setZatonaPrompt = (valOrFunc: any) => {
+    setActiveZatonas(prev => prev.map(z => {
+      if (z.id === selectedZatonaId) {
+        const nextVal = typeof valOrFunc === "function" ? valOrFunc(z.zatonaPrompt) : valOrFunc;
+        return { ...z, zatonaPrompt: nextVal };
+      }
+      return z;
+    }));
+  };
+
+  const setZatonaResult = (valOrFunc: any) => {
+    setActiveZatonas(prev => prev.map(z => {
+      if (z.id === selectedZatonaId) {
+        const nextVal = typeof valOrFunc === "function" ? valOrFunc(z.zatonaResult) : valOrFunc;
+        if (language === "ar") {
+          return { ...z, zatonaResultAr: nextVal };
+        } else {
+          return { ...z, zatonaResult: nextVal };
+        }
+      }
+      return z;
+    }));
+    addSpaceHistory("Updated Zatona AI summary result", "تم تحديث ملخص الزتونة المستخرج");
+  };
+
+  // State controls for Space Editing / Creation modals
+  const [spaceModalConfig, setSpaceModalConfig] = useState<{
+    isOpen: boolean;
+    type: "new" | "edit";
+    tab: "practice" | "plan" | "timetable" | "quiz" | "zatona";
+    spaceId?: string;
+    nameEn: string;
+    nameAr: string;
+    extraSubject?: string;
+  }>({
+    isOpen: false,
+    type: "new",
+    tab: "practice",
+    nameEn: "",
+    nameAr: ""
+  });
+
+  // --- ACADEMIC SPACES CRUD & UI HELPERS ---
+  const renderSpaceSelectorBar = (tab: "practice" | "plan" | "timetable" | "quiz" | "zatona") => {
+    let list: any[] = [];
+    let selectedId = "";
+    let setSelectedId: (id: string) => void = () => {};
+    let tabTitleEn = "";
+    let tabTitleAr = "";
+
+    if (tab === "practice") {
+      list = activePractices;
+      selectedId = selectedPracticeId;
+      setSelectedId = setSelectedPracticeId;
+      tabTitleEn = "Active Recall Practice Workstations";
+      tabTitleAr = "مساحات المذاكرة والممارسة النشطة";
+    } else if (tab === "plan") {
+      list = activePlans;
+      selectedId = selectedPlanId;
+      setSelectedId = setSelectedPlanId;
+      tabTitleEn = "Active Planner Blueprints";
+      tabTitleAr = "مساحات خطط المذاكرة النشطة";
+    } else if (tab === "timetable") {
+      list = activeTimetables;
+      selectedId = selectedTimetableId;
+      setSelectedId = setSelectedTimetableId;
+      tabTitleEn = "Class Schedule Planners";
+      tabTitleAr = "جداول الحصص الدراسية";
+    } else if (tab === "quiz") {
+      list = activeQuizzes;
+      selectedId = selectedQuizId;
+      setSelectedId = setSelectedQuizId;
+      tabTitleEn = "Knowledge Assessment Arenas";
+      tabTitleAr = "مساحات الاختبارات والتقييم الذاتي";
+    } else if (tab === "zatona") {
+      list = activeZatonas;
+      selectedId = selectedZatonaId;
+      setSelectedId = setSelectedZatonaId;
+      tabTitleEn = "Zatona AI Summary Spaces";
+      tabTitleAr = "مساحات عصر ملخصات الزتونة";
+    }
+
+    const activeSpace = list.find(item => item.id === selectedId) || list[0];
+
+    const handleCreateNew = () => {
+      setSpaceModalConfig({
+        isOpen: true,
+        type: "new",
+        tab,
+        nameEn: "",
+        nameAr: "",
+        extraSubject: "Math"
+      });
+    };
+
+    const handleEditSelected = () => {
+      if (!activeSpace) return;
+      setSpaceModalConfig({
+        isOpen: true,
+        type: "edit",
+        tab,
+        spaceId: activeSpace.id,
+        nameEn: activeSpace.nameEn || "",
+        nameAr: activeSpace.nameAr || "",
+        extraSubject: activeSpace.subject || "Math"
+      });
+    };
+
+    const handleDeleteSelected = () => {
+      if (!activeSpace) return;
+      if (list.length <= 1) {
+        alert(language === "ar" 
+          ? "تنبيه: يجب أن تظل هناك مساحة نشطة واحدة على الأقل!" 
+          : "Notice: You must keep at least one active workspace!");
+        return;
+      }
+      const confirmDelete = window.confirm(language === "ar"
+        ? `هل أنت متأكد من رغبتك في حذف مساحة "${activeSpace.nameAr || activeSpace.nameEn}"؟`
+        : `Are you sure you want to delete workspace "${activeSpace.nameEn || activeSpace.nameAr}"?`);
+      if (!confirmDelete) return;
+
+      const updatedList = list.filter(item => item.id !== activeSpace.id);
+      
+      if (tab === "practice") {
+        setActivePractices(updatedList);
+        setSelectedPracticeId(updatedList[0].id);
+      } else if (tab === "plan") {
+        setActivePlans(updatedList);
+        setSelectedPlanId(updatedList[0].id);
+      } else if (tab === "timetable") {
+        setActiveTimetables(updatedList);
+        setSelectedTimetableId(updatedList[0].id);
+      } else if (tab === "quiz") {
+        setActiveQuizzes(updatedList);
+        setSelectedQuizId(updatedList[0].id);
+      } else if (tab === "zatona") {
+        setActiveZatonas(updatedList);
+        setSelectedZatonaId(updatedList[0].id);
+      }
+
+      addSpaceHistory(
+        `Deleted active workspace: ${activeSpace.nameEn}`,
+        `تم حذف مساحة العمل النشطة: ${activeSpace.nameAr || activeSpace.nameEn}`
+      );
+    };
+
+    return (
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "1rem 1.5rem", borderRadius: "16px",
+        background: "rgba(255, 255, 255, 0.55)", backdropFilter: "blur(12px)",
+        border: "1px solid rgba(16, 107, 163, 0.1)",
+        boxShadow: "var(--shadow-sm)",
+        flexWrap: "wrap", gap: "1rem", marginBottom: "1rem"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", textTransform: "uppercase" }}>
+              {language === "ar" ? "المساحة الأكاديمية النشطة" : "Active Academic Space"}
+            </span>
+            <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--foreground)" }}>
+              {language === "ar" ? tabTitleAr : tabTitleEn}
+            </span>
+          </div>
+
+          <select
+            value={selectedId}
+            onChange={(e) => {
+              setSelectedId(e.target.value);
+              addSpaceHistory(
+                `Swapped workspace to: ${list.find(item => item.id === e.target.value)?.nameEn}`,
+                `تم تبديل مساحة العمل إلى: ${list.find(item => item.id === e.target.value)?.nameAr || list.find(item => item.id === e.target.value)?.nameEn}`
+              );
+            }}
+            style={{
+              padding: "0.5rem 2rem 0.5rem 1rem", borderRadius: "12px",
+              border: "1px solid rgba(16, 107, 163, 0.15)",
+              background: "#ffffff", color: "var(--foreground)",
+              fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+              outline: "none", transition: "all 0.2s"
+            }}
+          >
+            {list.map(item => (
+              <option key={item.id} value={item.id}>
+                {language === "ar" ? (item.nameAr || item.nameEn) : (item.nameEn || item.nameAr)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button
+            onClick={handleCreateNew}
+            type="button"
+            style={{
+              padding: "8px 14px", borderRadius: "10px", border: "none",
+              background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+              color: "#ffffff", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "0.3rem", transition: "all 0.2s",
+              boxShadow: "0 2px 8px rgba(16, 107, 163, 0.15)"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
+            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <span>➕</span>
+            <span>{language === "ar" ? "مساحة جديدة" : "New Space"}</span>
+          </button>
+
+          <button
+            onClick={handleEditSelected}
+            type="button"
+            style={{
+              padding: "8px 14px", borderRadius: "10px", border: "1px solid rgba(16, 107, 163, 0.2)",
+              background: "#ffffff", color: "var(--primary)", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "0.3rem", transition: "all 0.2s"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "#ffffff"}
+          >
+            <span>✏️</span>
+            <span>{language === "ar" ? "تعديل" : "Edit"}</span>
+          </button>
+
+          <button
+            onClick={handleDeleteSelected}
+            type="button"
+            style={{
+              padding: "8px 14px", borderRadius: "10px", border: "1px solid rgba(211, 47, 47, 0.2)",
+              background: "#ffffff", color: "#d32f2f", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "0.3rem", transition: "all 0.2s"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(211, 47, 47, 0.05)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "#ffffff"}
+          >
+            <span>🗑️</span>
+            <span>{language === "ar" ? "حذف" : "Delete"}</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSpaceModal = () => {
+    if (!spaceModalConfig.isOpen) return null;
+
+    const { type, tab, nameEn, nameAr, extraSubject, spaceId } = spaceModalConfig;
+
+    const handleSave = (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (!nameEn.trim() || !nameAr.trim()) {
+        alert(language === "ar" ? "يرجى تعبئة جميع الحقول المطلوبة!" : "Please fill in all required fields!");
+        return;
+      }
+
+      if (type === "new") {
+        const newId = `${tab}_${Date.now()}`;
+        let newItem: any = {
+          id: newId,
+          nameEn: nameEn.trim(),
+          nameAr: nameAr.trim(),
+        };
+
+        if (tab === "practice") {
+          newItem = {
+            ...newItem,
+            subject: extraSubject || "Math",
+            generatedQuestion: "Welcome to your new practice space! Explain your first concept here.",
+            generatedQuestionAr: "مرحباً بك في مساحة التدريب الجديدة! اشرح أول مفهوم رياضي أو علمي هنا.",
+            practiceAnswer: "",
+            practiceResult: ""
+          };
+          setActivePractices(prev => [...prev, newItem]);
+          setSelectedPracticeId(newId);
+        } else if (tab === "plan") {
+          newItem = {
+            ...newItem,
+            tasks: [
+              { id: `t_${Date.now()}_1`, textAr: "أول مهمة في مساحة الخطة الجديدة", textEn: "First task in your new planning space", checked: false, dayAr: "السبت", dayEn: "Sat" }
+            ]
+          };
+          setActivePlans(prev => [...prev, newItem]);
+          setSelectedPlanId(newId);
+        } else if (tab === "timetable") {
+          newItem = {
+            ...newItem,
+            events: []
+          };
+          setActiveTimetables(prev => [...prev, newItem]);
+          setSelectedTimetableId(newId);
+        } else if (tab === "quiz") {
+          newItem = {
+            ...newItem,
+            quizQuestionIndex: 0,
+            quizAnswers: {},
+            quizFinished: false
+          };
+          setActiveQuizzes(prev => [...prev, newItem]);
+          setSelectedQuizId(newId);
+        } else if (tab === "zatona") {
+          newItem = {
+            ...newItem,
+            zatonaPrompt: "",
+            zatonaResult: "",
+            zatonaResultAr: ""
+          };
+          setActiveZatonas(prev => [...prev, newItem]);
+          setSelectedZatonaId(newId);
+        }
+
+        addSpaceHistory(
+          `Created new academic space: ${nameEn}`,
+          `تم إنشاء مساحة أكاديمية جديدة: ${nameAr}`
+        );
+      } else {
+        const updateItem = (item: any) => ({
+          ...item,
+          nameEn: nameEn.trim(),
+          nameAr: nameAr.trim(),
+          subject: tab === "practice" ? (extraSubject || item.subject) : item.subject
+        });
+
+        if (tab === "practice") {
+          setActivePractices(prev => prev.map(p => p.id === spaceId ? updateItem(p) : p));
+        } else if (tab === "plan") {
+          setActivePlans(prev => prev.map(p => p.id === spaceId ? updateItem(p) : p));
+        } else if (tab === "timetable") {
+          setActiveTimetables(prev => prev.map(t => t.id === spaceId ? updateItem(t) : t));
+        } else if (tab === "quiz") {
+          setActiveQuizzes(prev => prev.map(q => q.id === spaceId ? updateItem(q) : q));
+        } else if (tab === "zatona") {
+          setActiveZatonas(prev => prev.map(z => z.id === spaceId ? updateItem(z) : z));
+        }
+
+        addSpaceHistory(
+          `Edited academic space: ${nameEn}`,
+          `تم تعديل المساحة الأكاديمية: ${nameAr}`
+        );
+      }
+
+      setSpaceModalConfig(prev => ({ ...prev, isOpen: false }));
+    };
+
+    return (
+      <div style={{
+        position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+        background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(12px)",
+        display: "flex", justifyContent: "center", alignItems: "center",
+        zIndex: 10000
+      }}>
+        <div className="panel-card" style={{
+          width: "100%", maxWidth: "480px", padding: "2rem",
+          background: "rgba(255, 255, 255, 0.95)", border: "1px solid rgba(16, 107, 163, 0.15)",
+          boxShadow: "0 20px 40px rgba(15, 23, 42, 0.15)", borderRadius: "24px"
+        }}>
+          <h3 style={{ margin: "0 0 1.5rem 0", fontWeight: 800, color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>{type === "new" ? "➕" : "✏️"}</span>
+            <span>
+              {type === "new"
+                ? (language === "ar" ? "إنشاء مساحة دراسية نشطة جديدة" : "Create New Academic Space")
+                : (language === "ar" ? "تعديل تفاصيل المساحة الدراسية" : "Edit Academic Space Details")}
+            </span>
+          </h3>
+
+          <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text)" }}>
+                {language === "ar" ? "اسم المساحة (بالإنكليزية) *" : "Space Name (English) *"}
+              </label>
+              <input
+                type="text"
+                required
+                value={nameEn}
+                onChange={(e) => setSpaceModalConfig(prev => ({ ...prev, nameEn: e.target.value }))}
+                placeholder="e.g. Physics Quantum Workstation"
+                style={{
+                  padding: "0.75rem", borderRadius: "12px", border: "1px solid var(--card-border)",
+                  outline: "none", fontSize: "0.9rem", width: "100%", background: "#ffffff"
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text)" }}>
+                {language === "ar" ? "اسم المساحة (بالعربية) *" : "Space Name (Arabic) *"}
+              </label>
+              <input
+                type="text"
+                required
+                value={nameAr}
+                onChange={(e) => setSpaceModalConfig(prev => ({ ...prev, nameAr: e.target.value }))}
+                placeholder="مثال: مساحة ميكانيكا الكم والفيزياء"
+                style={{
+                  padding: "0.75rem", borderRadius: "12px", border: "1px solid var(--card-border)",
+                  outline: "none", fontSize: "0.9rem", width: "100%", background: "#ffffff"
+                }}
+              />
+            </div>
+
+            {tab === "practice" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text)" }}>
+                  {language === "ar" ? "المادة الدراسية" : "Workstation Subject"}
+                </label>
+                <select
+                  value={extraSubject}
+                  onChange={(e) => setSpaceModalConfig(prev => ({ ...prev, extraSubject: e.target.value }))}
+                  style={{
+                    padding: "0.75rem", borderRadius: "12px", border: "1px solid var(--card-border)",
+                    outline: "none", fontSize: "0.9rem", width: "100%", background: "#ffffff"
+                  }}
+                >
+                  <option value="Math">{language === "ar" ? "الرياضيات" : "Math"}</option>
+                  <option value="Science">{language === "ar" ? "العلوم" : "Science"}</option>
+                  <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic"}</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+              <button
+                type="button"
+                onClick={() => setSpaceModalConfig(prev => ({ ...prev, isOpen: false }))}
+                style={{
+                  padding: "0.75rem 1.25rem", borderRadius: "12px", border: "1px solid var(--card-border)",
+                  background: "#ffffff", color: "var(--foreground)", fontWeight: 700, fontSize: "0.85rem",
+                  cursor: "pointer"
+                }}
+              >
+                {language === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+
+              <button
+                type="submit"
+                style={{
+                  padding: "0.75rem 1.5rem", borderRadius: "12px", border: "none",
+                  background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                  color: "#ffffff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(16, 107, 163, 0.25)"
+                }}
+              >
+                {language === "ar" ? "حفظ المساحة" : "Save Workspace"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSpaceHistory = () => {
+    return (
+      <div className="panel-card" style={{
+        padding: "1.5rem", marginTop: "2rem",
+        background: "rgba(255, 255, 255, 0.6)", backdropFilter: "blur(12px)",
+        border: "1px solid rgba(16, 107, 163, 0.08)", borderRadius: "var(--border-radius-lg)"
+      }}>
+        <h4 style={{
+          fontSize: "1rem", fontWeight: 800, color: "var(--primary)",
+          display: "flex", alignItems: "center", gap: "0.5rem",
+          margin: "0 0 1rem 0", borderBottom: "1px dashed rgba(16, 107, 163, 0.15)",
+          paddingBottom: "0.5rem"
+        }}>
+          ⏱️
+          <span>{language === "ar" ? "سجل الأنشطة والتدقيق لمساحات المذاكرة" : "Academic Spaces Activity & Audit Log"}</span>
+        </h4>
+        <div style={{
+          maxHeight: "150px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.6rem"
+        }} className="custom-scrollbar">
+          {spaceHistory.length === 0 ? (
+            <span style={{ fontSize: "0.85rem", color: "#6a7c88" }}>
+              {language === "ar" ? "لا توجد أنشطة مسجلة بعد." : "No actions logged yet."}
+            </span>
+          ) : (
+            spaceHistory.map((log, idx) => (
+              <div key={idx} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                fontSize: "0.8rem", padding: "0.4rem 0.75rem", borderRadius: "8px",
+                background: "rgba(255, 255, 255, 0.4)", border: "1px solid rgba(0, 0, 0, 0.02)"
+              }}>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
+                  {language === "ar" ? log.actionAr : log.actionEn}
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "#8fa0ac" }}>
+                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Social & Messenger states
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loadingAllUsers, setLoadingAllUsers] = useState(false);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [chatRecipient, setChatRecipient] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<any[]>([]);
+
+  // Silent polling DM synchronization effect
+  useEffect(() => {
+    if (activeTab !== "social" || !chatRecipient || !user) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const fetchedMsgs = data.messages || [];
+          
+          setChatMessages(prev => {
+            if (prev.length !== fetchedMsgs.length || JSON.stringify(prev) !== JSON.stringify(fetchedMsgs)) {
+              return fetchedMsgs;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error("Error silently syncing chat messages:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [activeTab, chatRecipient, user]);
+
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const activeEl = document.activeElement;
@@ -854,30 +1644,6 @@ export default function Home() {
       document.removeEventListener("paste", handlePaste);
     };
   }, [language]);
-
-  const [timetableEvents, setTimetableEvents] = useState<any[]>([
-    { id: 1, subject: "Mathematics", subjectAr: "الرياضيات", day: "Monday", dayAr: "الإثنين", time: "09:00 - 10:30", room: "Room 102" },
-    { id: 2, subject: "Physics", subjectAr: "الفيزياء", day: "Monday", dayAr: "الإثنين", time: "11:00 - 12:30", room: "Lab A" },
-    { id: 3, subject: "Arabic Language", subjectAr: "اللغة العربية", day: "Tuesday", dayAr: "الثلاثاء", time: "09:00 - 10:30", room: "Room 105" },
-    { id: 4, subject: "Biology", subjectAr: "الأحياء", day: "Wednesday", dayAr: "الأربعاء", time: "10:00 - 11:30", room: "Lab B" },
-    { id: 5, subject: "Computer Science", subjectAr: "علوم الحاسب", day: "Thursday", dayAr: "الخميس", time: "12:00 - 13:30", room: "Room 201" }
-  ]);
-  const [quizQuestionIndex, setQuizQuestionIndex] = useState(0);
-  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
-  const [quizFinished, setQuizFinished] = useState(false);
-  const [zatonaPrompt, setZatonaPrompt] = useState("");
-  const [zatonaResult, setZatonaResult] = useState("");
-  const [zatonaLoading, setZatonaLoading] = useState(false);
-
-  // Social & Messenger states
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [loadingAllUsers, setLoadingAllUsers] = useState(false);
-  const [directorySearch, setDirectorySearch] = useState("");
-  const [chatRecipient, setChatRecipient] = useState<any>(null);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user || !chatRecipient) {
@@ -4394,6 +5160,14 @@ export default function Home() {
                   <FiUserCheck />
                   <span>{language === "ar" ? "إدارة الأعضاء والنشاط" : "Users & Activity Trail"}</span>
                 </button>
+                <button
+                  onClick={() => setActiveTab("admin-ingestion")}
+                  className={`sidebar-nav-btn ${activeTab === "admin-ingestion" ? "active" : ""}`}
+                  type="button"
+                >
+                  <FiLayers />
+                  <span>{language === "ar" ? "أستوديو إدخال المناهج" : "Curriculum Ingestion Studio"}</span>
+                </button>
               </>
             )}
 
@@ -4634,750 +5408,11 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
             <AdminSecurityDashboard language={language} email={user?.email || undefined} />
-
-            {/* MOE Ingestion Harvester / وحدة حصاد المناهج الكبرى */}
-            <section className="panel-card" style={{
-              background: "rgba(255, 255, 255, 0.45)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(16, 107, 163, 0.08)",
-              borderRadius: "var(--border-radius-lg)",
-              padding: "2rem",
-              boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.04)"
-            }}>
-              <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--foreground)", borderBottom: "1px dashed rgba(16, 107, 163, 0.1)", paddingBottom: "0.75rem", marginBottom: "1rem" }}>
-                <FiBookOpen className="pulse-icon" style={{ color: "var(--primary)" }} />
-                <span>{language === "ar" ? "وحدة حصاد المناهج الكبرى" : "MOE Ingestion Harvester"}</span>
-              </h2>
-              
-              <p style={{ color: "#4f6371", fontSize: "0.95rem", lineHeight: "1.5rem", marginBottom: "1.5rem" }}>
-                {language === "ar" 
-                  ? "تتيح هذه المنصة لمدراء النظام ووزارة التربية والتعليم رفع المناهج المدرسية الرسمية مباشرة إلى المسار المشفر والمحمي في السحابة لخدمة وكلاء الذكاء الاصطناعي."
-                  : "Secure, encrypted administrative ingestion terminal. Direct curriculum stream to protected cloud sub-path /MOE Library. Maximum file size allowed: 50MB."}
-              </p>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleMoeUpload();
-              }} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {language === "ar" ? "المادة الدراسية" : "Curriculum Subject"}
-                    </label>
-                    <select
-                      value={moeSubject}
-                      onChange={(e) => setMoeSubject(e.target.value)}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    >
-                      <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
-                      <option value="Science">{language === "ar" ? "العلوم" : "Science"}</option>
-                      <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Language"}</option>
-                      <option value="History">{language === "ar" ? "التاريخ والجغرافيا" : "History & Social Studies"}</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {language === "ar" ? "الصف الدراسي" : "Academic Grade"}
-                    </label>
-                    <select
-                      value={moeGrade}
-                      onChange={(e) => setMoeGrade(e.target.value)}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    >
-                      <option value="Grade 7">{language === "ar" ? "الصف السابع (المتوسط)" : "Grade 7"}</option>
-                      <option value="Grade 8">{language === "ar" ? "الصف الثامن" : "Grade 8"}</option>
-                      <option value="Grade 9">{language === "ar" ? "الصف التاسع" : "Grade 9"}</option>
-                      <option value="Grade 10">{language === "ar" ? "الصف العاشر (الثانوي)" : "Grade 10"}</option>
-                      <option value="Grade 11">{language === "ar" ? "الصف الحادي عشر" : "Grade 11"}</option>
-                      <option value="Grade 12">{language === "ar" ? "الصف الثاني عشر (التوجيهي)" : "Grade 12"}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {language === "ar" ? "لغة الكتاب" : "Document Language"}
-                    </label>
-                    <select
-                      value={moeLang}
-                      onChange={(e) => setMoeLang(e.target.value)}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    >
-                      <option value="Arabic">{language === "ar" ? "العربية" : "Arabic"}</option>
-                      <option value="English">{language === "ar" ? "الإنجليزية" : "English"}</option>
-                      <option value="French">{language === "ar" ? "الفرنسية" : "French"}</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {language === "ar" ? "العام الدراسي المعتمد" : "Curriculum Academic Year"}
-                    </label>
-                    <input
-                      type="text"
-                      value={moeYear}
-                      onChange={(e) => setMoeYear(e.target.value)}
-                      placeholder="e.g. 2025/2026"
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Elegant Drag-and-Drop Area / File Selection Widget */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                    {language === "ar" ? "مستند المنهج (PDF)" : "Curriculum PDF Textbook"}
-                  </label>
-                  <div 
-                    style={{
-                      border: "2px dashed rgba(16, 107, 163, 0.25)",
-                      borderRadius: "var(--border-radius-md)",
-                      padding: "1.5rem",
-                      textAlign: "center",
-                      background: "rgba(255, 255, 255, 0.3)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "0.5rem"
-                    }}
-                    onClick={() => document.getElementById("moe-file-picker")?.click()}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.style.borderColor = "var(--primary)";
-                      e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)";
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.25)";
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.25)";
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) {
-                        handleMoeFileSelected(file);
-                      }
-                    }}
-                  >
-                    <FiFileText style={{ fontSize: "2rem", color: moeFile ? "var(--primary)" : "#8a9ca8" }} />
-                    {moeFile ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                        <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--primary)" }}>
-                          {moeFile.name}
-                        </span>
-                        <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                          {(moeFile.size / (1024 * 1024)).toFixed(2)} MB / 50 MB
-                        </span>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                        <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--foreground)" }}>
-                          {language === "ar" ? "اسحب وأفلت الملف هنا أو انقر للتصفح" : "Drag & drop PDF here, or click to browse"}
-                        </span>
-                        <span style={{ fontSize: "0.75rem", color: "#8a9ca8" }}>
-                          {language === "ar" ? "الملفات المدعومة: PDF فقط، بحد أقصى 50 ميجابايت" : "Supported: PDF only, max 50MB limit"}
-                        </span>
-                      </div>
-                    )}
-                    <input
-                      id="moe-file-picker"
-                      type="file"
-                      accept=".pdf"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleMoeFileSelected(file);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Inline error or warning message */}
-                {moeError && (
-                  <div style={{
-                    padding: "0.75rem",
-                    borderRadius: "var(--border-radius-sm)",
-                    background: "rgba(211, 47, 47, 0.08)",
-                    border: "1px solid rgba(211, 47, 47, 0.15)",
-                    color: "#d32f2f",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.4rem"
-                  }}>
-                    <FiAlertTriangle />
-                    <span>{moeError}</span>
-                  </div>
-                )}
-
-                {/* Progress Bar & Status messages */}
-                {moeUploading && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 600, color: "var(--primary)" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                        <FiRefreshCw className="spinning-icon" />
-                        <span>{moeStatusText}</span>
-                      </span>
-                      <span>{moeProgress}%</span>
-                    </div>
-                    <div style={{ width: "100%", height: "8px", background: "rgba(0,0,0,0.05)", borderRadius: "10px", overflow: "hidden" }}>
-                      <div style={{ width: `${moeProgress}%`, height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px", transition: "width 0.15s ease-out" }} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Ingestion success banner */}
-                {moeSuccess && !moeUploading && (
-                  <div style={{
-                    padding: "1rem",
-                    borderRadius: "var(--border-radius-md)",
-                    background: "rgba(46, 125, 50, 0.08)",
-                    border: "1px solid rgba(46, 125, 50, 0.2)",
-                    color: "var(--accent-green)",
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.35rem"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <FiCheckCircle style={{ fontSize: "1.1rem" }} />
-                      <span>{language === "ar" ? "تم حصاد المنهج بنجاح!" : "Curriculum Ingested Successfully!"}</span>
-                    </div>
-                    <span style={{ fontSize: "0.75rem", color: "#4b6f4c", fontWeight: 400, marginLeft: "1.5rem" }}>
-                      {language === "ar" 
-                        ? `تم تشفير وحفظ مستند المنهج في مسار وزارة التربية والتعليم الموثق تحت فئة [${moeSubject}].`
-                        : `The document has been securely indexed and stored under the [${moeSubject}] pipeline.`}
-                    </span>
-                  </div>
-                )}
-
-                {/* Buttons */}
-                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={moeUploading || !moeFile}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      cursor: (moeUploading || !moeFile) ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    <FiPlus />
-                    <span>
-                      {moeUploading 
-                        ? (language === "ar" ? "جاري الحصاد..." : "Ingesting...") 
-                        : (language === "ar" ? "بدء الحصاد والدراسة" : "Execute Ingestion")}
-                    </span>
-                  </button>
-                  
-                  {moeFile && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => {
-                        setMoeFile(null);
-                        setMoeError(null);
-                        setMoeSuccess(false);
-                      }}
-                      disabled={moeUploading}
-                      style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
-                    >
-                      <FiX />
-                      <span>{language === "ar" ? "إلغاء" : "Clear"}</span>
-                    </button>
-                  )}
-                </div>
-              </form>
-            </section>
-
-            {/* Admin Sourcing Engine Tab View */}
-            <div className="grid-cols-2">
-            {/* Left Side: Create/Configure Source Feed */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-              <section className="panel-card" id="sourcing-pipeline-config">
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <FiCpu className="pulse-icon" style={{ color: "var(--primary)" }} />
-                  <span>{t("sourcing_engine_title")}</span>
-                </h2>
-                <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
-                  {t("sourcing_engine_subtitle")}
-                </p>
-
-                <form onSubmit={(e) => e.preventDefault()} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t("lbl_pipeline_name")}</label>
-                    <input 
-                      type="text" 
-                      placeholder={t("pipeline_name_placeholder")}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t("lbl_ingestion_url")}</label>
-                    <input 
-                      type="text" 
-                      placeholder={t("ingestion_url_placeholder")}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff"
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                      <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t("lbl_target_collection")}</label>
-                      <select
-                        style={{
-                          padding: "0.75rem",
-                          borderRadius: "var(--border-radius-md)",
-                          border: "1px solid var(--card-border)",
-                          outline: "none",
-                          fontFamily: "var(--font-sans)",
-                          background: "#ffffff"
-                        }}
-                      >
-                        <option value="users">users</option>
-                        <option value="sourcing_logs">sourcing_logs</option>
-                        <option value="new">{t("create_new_collection")}</option>
-                      </select>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                      <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t("lbl_pipeline_schedule")}</label>
-                      <select
-                        style={{
-                          padding: "0.75rem",
-                          borderRadius: "var(--border-radius-md)",
-                          border: "1px solid var(--card-border)",
-                          outline: "none",
-                          fontFamily: "var(--font-sans)",
-                          background: "#ffffff"
-                        }}
-                      >
-                        <option value="realtime">{t("schedule_realtime")}</option>
-                        <option value="hourly">{t("schedule_hourly")}</option>
-                        <option value="daily">{t("schedule_daily")}</option>
-                        <option value="manual">{t("schedule_manual")}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
-                    <button type="button" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <FiPlus />
-                      <span>{t("btn_create_pipeline")}</span>
-                    </button>
-                    <button type="button" className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <FiLink />
-                      <span>{t("btn_test_connection")}</span>
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              {/* Grounded Multi-Agent Test Bench Card */}
-              <section className="panel-card" style={{ marginTop: "2rem" }}>
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <FiGlobe className={groundedLoading ? "pulse-icon" : ""} style={{ color: "var(--primary)" }} />
-                  <span>{language === "ar" ? "منصة اختبار البحث الموثق" : "Grounded Multi-Agent Test Bench"}</span>
-                </h2>
-                <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
-                  {language === "ar" 
-                    ? "تفاعل مع عملاء البحث الموثق والتنسيق المتقدم للحصول على نتائج دقيقة ومنسقة في الوقت الفعلي."
-                    : "Test dynamic handoffs between the Grounded Search agent (with web search grounding) and the Stylizer agent."}
-                </p>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <label style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {language === "ar" ? "استعلام البحث الموثق" : "Grounded Prompt Query"}
-                    </label>
-                    <textarea 
-                      value={groundedInput}
-                      onChange={(e) => setGroundedInput(e.target.value)}
-                      placeholder={language === "ar" ? "مثال: ما هو سعر سهم أبل اليوم وأهم الأخبار؟" : "e.g., What is the current price of Bitcoin today and latest news?"}
-                      rows={3}
-                      style={{
-                        padding: "0.75rem",
-                        borderRadius: "var(--border-radius-md)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff",
-                        resize: "vertical"
-                      }}
-                    />
-                  </div>
-
-                  {/* Preset Queries for Grounded Search */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                    {[
-                      { en: "Bitcoin Price Today", ar: "سعر البيتكوين اليوم" },
-                      { en: "Google Stock Valuation", ar: "سهم جوجل والتقييم المالي" },
-                      { en: "Weather in Paris & Tokyo", ar: "حالة الطقس في باريس وطوكيو" }
-                    ].map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setGroundedInput(language === "ar" ? preset.ar : preset.en)}
-                        style={{
-                          padding: "0.35rem 0.75rem",
-                          fontSize: "0.8rem",
-                          borderRadius: "20px",
-                          border: "1px solid var(--card-border)",
-                          background: "var(--cream-bg)",
-                          color: "var(--text-color)",
-                          cursor: "pointer",
-                          transition: "all 0.2s ease"
-                        }}
-                      >
-                        {language === "ar" ? preset.ar : preset.en}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button 
-                    type="button" 
-                    className="btn btn-primary"
-                    disabled={groundedLoading}
-                    onClick={() => runGroundedWorkflow(groundedInput)}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", alignSelf: "flex-start" }}
-                  >
-                    {groundedLoading ? <FiRefreshCw className="pulse-icon" /> : <FiLayers />}
-                    <span>
-                      {groundedLoading 
-                        ? (language === "ar" ? "جاري تشغيل الوكلاء..." : "Running Agents...") 
-                        : (language === "ar" ? "تشغيل دورة الوكلاء الموثقة" : "Run Grounded Workflow")}
-                    </span>
-                  </button>
-                </div>
-              </section>
-            </div>
-
-            {/* Right Side: Active pipelines & health metrics */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-              <section className="panel-card" id="sourcing-pipeline-list">
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <FiDatabase style={{ color: "var(--primary)" }} />
-                  <span>{t("active_feeds_title")}</span>
-                </h2>
-                
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", textAlign: "start" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "2px solid var(--card-border)" }}>
-                        <th style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{t("tbl_feed_name")}</th>
-                        <th style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{t("tbl_target_col")}</th>
-                        <th style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{t("tbl_schedule")}</th>
-                        <th style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{t("tbl_status")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
-                        <td style={{ padding: "0.75rem 0.5rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                          <FiLink style={{ color: "var(--primary)" }} />
-                          {t("feed_user_activity")}
-                        </td>
-                        <td style={{ padding: "0.75rem 0.5rem" }}><code style={{ background: "rgba(255,255,255,0.7)", padding: "2px 6px", borderRadius: "4px" }}>users</code></td>
-                        <td style={{ padding: "0.75rem 0.5rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <FiClock />
-                          {t("schedule_realtime")}
-                        </td>
-                        <td style={{ padding: "0.75rem 0.5rem" }}>
-                          <span style={{ padding: "2px 8px", borderRadius: "10px", fontSize: "0.75rem", background: "rgba(46, 125, 50, 0.1)", color: "var(--accent-green)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                            <FiCheckCircle />
-                            {t("status_active")}
-                          </span>
-                        </td>
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
-                        <td style={{ padding: "0.75rem 0.5rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                          <FiLink style={{ color: "var(--primary)" }} />
-                          {t("feed_partner_sync")}
-                        </td>
-                        <td style={{ padding: "0.75rem 0.5rem" }}><code style={{ background: "rgba(255,255,255,0.7)", padding: "2px 6px", borderRadius: "4px" }}>fahem</code></td>
-                        <td style={{ padding: "0.75rem 0.5rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <FiClock />
-                          {t("schedule_hourly")}
-                        </td>
-                        <td style={{ padding: "0.75rem 0.5rem" }}>
-                          <span style={{ padding: "2px 8px", borderRadius: "10px", fontSize: "0.75rem", background: "rgba(212, 175, 55, 0.1)", color: "var(--secondary-hover)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                            <FiAlertTriangle />
-                            {t("status_idle")}
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              {/* Grounded Execution Console & Stylized Output Card */}
-              <section className="panel-card" id="grounded-terminal-panel">
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <FiTerminal style={{ color: "var(--secondary)" }} />
-                  <span>{language === "ar" ? "منصة تشغيل ومخرجات البحث الموثق" : "Grounded Execution Console & Output"}</span>
-                </h2>
-                
-                <div className="logs-console" id="grounded-logs-console" style={{ maxHeight: "250px", marginBottom: "1.5rem" }}>
-                  {groundedLogs.length === 0 ? (
-                    <span style={{ color: "#6a7c88" }}>
-                      {language === "ar" ? "بانتظار تشغيل استعلام البحث الموثق..." : "Waiting for grounded search query..."}
-                    </span>
-                  ) : (
-                    groundedLogs.map((log, idx) => {
-                      let styleClass = "log-info";
-                      if (log.startsWith("[System]")) styleClass = "log-success";
-                      else if (log.startsWith("[Sub-Agent: Grounded Search]")) styleClass = "log-tool";
-                      else if (log.startsWith("[Sub-Agent: Stylizer]")) styleClass = "log-success";
-                      else if (log.startsWith("[ERROR]")) styleClass = "log-error";
-                      
-                      return (
-                        <div key={idx} className={`log-entry ${styleClass}`}>
-                          {log}
-                        </div>
-                      );
-                    })
-                  )}
-                  <div ref={groundedLogsEndRef} />
-                </div>
-
-                {/* Grounded Search Multi-Agent Telemetry Grid */}
-                {(activeGroundedAgent !== "idle" || groundedSearchTime || stylizerTime) && (
-                  <div style={{
-                    marginTop: "1.25rem",
-                    marginBottom: "1.25rem",
-                    padding: "1.25rem",
-                    background: "rgba(255, 255, 255, 0.5)",
-                    borderRadius: "var(--border-radius-md)",
-                    border: "1px solid var(--card-border)",
-                    boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.4)",
-                    backdropFilter: "blur(10px)",
-                    transition: "all 0.3s ease"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                      <h3 style={{ fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0, color: "var(--foreground)" }}>
-                        <FiCpu style={{ color: "var(--primary)", animation: activeGroundedAgent !== "idle" ? "spin 4s linear infinite" : "none" }} />
-                        <span>{getTelemetryT("groundedTitle")}</span>
-                      </h3>
-                      {activeGroundedAgent !== "idle" && (
-                        <span style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.4rem",
-                          padding: "0.3rem 0.75rem",
-                          borderRadius: "50px",
-                          background: "rgba(16, 107, 163, 0.08)",
-                          color: "var(--primary)",
-                          fontSize: "0.8rem",
-                          fontWeight: 600,
-                          border: "1px solid rgba(16, 107, 163, 0.15)",
-                        }}>
-                          <span style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            background: "var(--primary)",
-                            display: "inline-block",
-                            animation: "pulse 2s infinite"
-                          }} />
-                          <span>{getTelemetryT("activeAgent")} {
-                            activeGroundedAgent === "Grounded Search" ? getTelemetryT("groundedSearchName") :
-                            activeGroundedAgent === "Stylizer" ? getTelemetryT("stylizerName") :
-                            activeGroundedAgent
-                          }</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                      gap: "0.75rem"
-                    }}>
-                      {/* Grounded Search Sub-Agent */}
-                      <div style={{
-                        padding: "1rem",
-                        borderRadius: "var(--border-radius-sm)",
-                        background: activeGroundedAgent === "Grounded Search" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
-                        border: activeGroundedAgent === "Grounded Search" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
-                        boxShadow: activeGroundedAgent === "Grounded Search" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
-                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.35rem"
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
-                            {getTelemetryT("groundedSearchName")}
-                          </span>
-                          <FiGlobe style={{ fontSize: "0.95rem", color: activeGroundedAgent === "Grounded Search" ? "var(--primary)" : "#8a9ca8" }} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
-                          {groundedSearchTime ? (
-                            <>
-                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
-                                {groundedSearchTime.replace("ms", "").replace("s", "").trim()}
-                              </span>
-                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
-                                {groundedSearchTime.includes("s") && !groundedSearchTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeGroundedAgent === "Grounded Search" ? "var(--primary)" : "#b0c0cb" }}>
-                              {activeGroundedAgent === "Grounded Search" ? "..." : "-"}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
-                          {activeGroundedAgent === "Grounded Search" ? (
-                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
-                              {getTelemetryT("statusSearching")}
-                            </span>
-                          ) : groundedSearchTime ? (
-                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
-                              {getTelemetryT("statusFound")}
-                            </span>
-                          ) : (
-                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stylizer Sub-Agent */}
-                      <div style={{
-                        padding: "1rem",
-                        borderRadius: "var(--border-radius-sm)",
-                        background: activeGroundedAgent === "Stylizer" ? "rgba(16, 107, 163, 0.06)" : "rgba(255, 255, 255, 0.3)",
-                        border: activeGroundedAgent === "Stylizer" ? "1px solid var(--primary)" : "1px solid var(--card-border)",
-                        boxShadow: activeGroundedAgent === "Stylizer" ? "0 4px 12px rgba(16, 107, 163, 0.08)" : "none",
-                        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.35rem"
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 600 }}>
-                            {getTelemetryT("stylizerName")}
-                          </span>
-                          <FiLayers style={{ fontSize: "0.95rem", color: activeGroundedAgent === "Stylizer" ? "var(--primary)" : "#8a9ca8" }} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", marginTop: "0.25rem" }}>
-                          {stylizerTime ? (
-                            <>
-                              <span style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
-                                {stylizerTime.replace("ms", "").replace("s", "").trim()}
-                              </span>
-                              <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 500 }}>
-                                {stylizerTime.includes("s") && !stylizerTime.includes("ms") ? getTelemetryT("unitSec") : getTelemetryT("unitMs")}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ fontSize: "1.3rem", fontWeight: 700, color: activeGroundedAgent === "Stylizer" ? "var(--primary)" : "#b0c0cb" }}>
-                              {activeGroundedAgent === "Stylizer" ? "..." : "-"}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", marginTop: "0.5rem" }}>
-                          {activeGroundedAgent === "Stylizer" ? (
-                            <span style={{ color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                              <FiRefreshCw className="spinning-icon" style={{ fontSize: "0.75rem" }} />
-                              {getTelemetryT("statusStylizing")}
-                            </span>
-                          ) : stylizerTime ? (
-                            <span style={{ color: "var(--accent-green)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.2rem" }}>
-                              <FiCheckCircle style={{ fontSize: "0.8rem" }} />
-                              {getTelemetryT("statusStylized")}
-                            </span>
-                          ) : (
-                            <span style={{ color: "#8a9ca8" }}>{getTelemetryT("statusIdle")}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {groundedResult && (
-                  <div className="agent-response-box" id="grounded-final-response" style={{ borderRadius: "var(--border-radius-md)", borderLeftWidth: "4px", borderLeftColor: "var(--primary)", background: "var(--background)", padding: "1.5rem", marginTop: "1rem", border: "1px solid var(--card-border)" }}>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", color: "var(--primary)" }}>
-                      <FiCheckCircle style={{ color: "var(--primary)" }} />
-                      <span>{language === "ar" ? "المخرجات المنسقة للوكيل" : "Stylized Agent Presentation"}</span>
-                    </h3>
-                    <div style={{ color: "var(--foreground)", fontSize: "0.95rem", lineHeight: "1.7" }}>
-                      {renderPremiumContent(groundedResult)}
-                    </div>
-                  </div>
-                )}
-
-                {(groundedLogs.length > 0 || groundedResult) && (
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    onClick={handleClearGrounded}
-                    disabled={groundedLoading}
-                    style={{ marginTop: "1rem" }}
-                  >
-                    <FiTrash2 />
-                    <span>{language === "ar" ? "مسح السجلات" : "Clear Console"}</span>
-                  </button>
-                )}
-              </section>
-            </div>
           </div>
+        ) : activeTab === "admin-ingestion" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            {/* Premium Curriculum Ingestion Studio Panel */}
+            <CurriculumIngestionStudio language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "super-admin-users" ? (
           /* Tabular Super-Admin User Manager Panel */
@@ -5655,12 +5690,33 @@ export default function Home() {
                   };
 
                   return (
-                    <div className="panel-card" style={{
-                      padding: "1.75rem", display: "flex", flexDirection: "column",
-                      justifyContent: "space-between", minHeight: "550px", position: "relative",
-                      background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(14px)",
-                      border: "1px solid rgba(16, 107, 163, 0.1)"
-                    }}>
+                    <div 
+                      className="panel-card" 
+                      onMouseUp={() => {
+                        const selection = window.getSelection();
+                        if (!selection) return;
+                        const text = selection.toString().trim();
+                        if (text.length > 5) {
+                          const range = selection.getRangeAt(0);
+                          const rect = range.getBoundingClientRect();
+                          setBubbleCoords({
+                            x: rect.left + rect.width / 2 + window.scrollX,
+                            y: rect.top - 48 + window.scrollY
+                          });
+                          setSelectedText(text);
+                        } else {
+                          setBubbleCoords(null);
+                          setSelectedText("");
+                        }
+                      }}
+                      style={{
+                        padding: "1.75rem", display: "flex", flexDirection: "column",
+                        justifyContent: "space-between", minHeight: "550px", position: "relative",
+                        background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(14px)",
+                        border: "1px solid rgba(16, 107, 163, 0.1)",
+                        userSelect: "text"
+                      }}
+                    >
                       <div>
                         {/* Page Navigation & Chapters */}
                         <div style={{
@@ -5703,17 +5759,63 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Page Title & Body */}
+                        {/* Page Title & Body in Beautiful Custom Cards */}
                         <div style={{ direction: language === "ar" ? "rtl" : "ltr", textAlign: "start" }}>
-                          <h3 style={{ fontSize: "1.2rem", fontWeight: 800, margin: "0 0 1rem 0", color: "var(--primary)" }}>
-                            {language === "ar" ? activePage.titleAr : activePage.titleEn}
-                          </h3>
-                          <p style={{
-                            fontSize: "0.95rem", lineHeight: "1.65", color: "var(--foreground)",
-                            margin: "0 0 1.5rem 0", whiteSpace: "pre-wrap"
+                          {/* Unit Card Banner */}
+                          <div style={{
+                            alignItems: "center", gap: "0.5rem",
+                            padding: "6px 12px", borderRadius: "10px", background: "rgba(16, 107, 163, 0.05)",
+                            border: "1px solid rgba(16, 107, 163, 0.08)", marginBottom: "1rem", display: "inline-flex"
                           }}>
-                            {language === "ar" ? (activePage.contentAr || activePage.contentEn) : (activePage.contentEn || activePage.contentAr)}
-                          </p>
+                            <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>
+                              🏛️ {language === "ar" ? "الوحدة الدراسية" : "Unit / Course Section"}: {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
+                            </span>
+                          </div>
+
+                          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, margin: "0 0 1.25rem 0", color: "var(--primary)" }}>
+                            📖 {language === "ar" ? activePage.titleAr : activePage.titleEn}
+                          </h3>
+
+                          {/* Concept card */}
+                          <div style={{
+                            padding: "1.25rem", borderRadius: "16px",
+                            background: "rgba(255, 255, 255, 0.5)",
+                            border: "1px solid rgba(16, 107, 163, 0.12)",
+                            boxShadow: "0 8px 32px rgba(31, 38, 135, 0.03)",
+                            backdropFilter: "blur(4px)",
+                            marginBottom: "1.5rem"
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.75rem" }}>
+                              <span style={{ fontSize: "0.75rem", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent)" }}>
+                                💡 {language === "ar" ? "المفهوم الأساسي والشرح" : "Core Educational Concept"}
+                              </span>
+                            </div>
+                            <p style={{
+                              fontSize: "0.95rem", lineHeight: "1.7", color: "var(--foreground)",
+                              margin: 0, whiteSpace: "pre-wrap"
+                            }}>
+                              {language === "ar" ? (activePage.contentAr || activePage.contentEn) : (activePage.contentEn || activePage.contentAr)}
+                            </p>
+                          </div>
+
+                          {/* Highlights taker */}
+                          <div style={{
+                            borderLeft: language === "ar" ? "none" : "4px solid var(--accent)",
+                            borderRight: language === "ar" ? "4px solid var(--accent)" : "none",
+                            padding: "0.75rem 1rem",
+                            background: "rgba(212, 175, 55, 0.05)",
+                            borderRadius: "8px",
+                            marginBottom: "1.5rem"
+                          }}>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--accent)", display: "block", marginBottom: "0.25rem" }}>
+                              🎯 {language === "ar" ? "إضاءة سريعة للفهم" : "Interactive Study Highlight"}
+                            </span>
+                            <p style={{ margin: 0, fontSize: "0.85rem", color: "#4f6371", fontStyle: "italic", lineHeight: "1.4" }}>
+                              {language === "ar" 
+                                ? "حدد أي نص أو عبارة داخل الصفحة لتشغيل ميزة \"الشرّاح الذكي\" لرفيق فهم للتبسيط الفوري!"
+                                : "Select or highlight any paragraph above to immediately query your AI Study Companion for a simplified breakdown!"}
+                            </p>
+                          </div>
                         </div>
 
                         {/* Custom Formatted Math/Chemistry Formulas */}
@@ -5822,31 +5924,38 @@ export default function Home() {
 
               {/* Textbooks List */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
-                {([
-                  ...(moeIngestedBooks && moeIngestedBooks.length > 0 ? moeIngestedBooks.map((b: any) => ({
-                    titleEn: b.titleEn,
-                    titleAr: b.titleAr,
-                    subject: b.subject,
-                    size: b.size,
-                    format: b.format,
-                    downloads: b.downloads,
-                    isMoeIngested: true
-                  })) : []),
-                  ...(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
-                    titleEn: b.title,
-                    titleAr: b.title_ar || b.title,
-                    subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
-                    size: "15.0 MB",
-                    format: "PDF",
-                    downloads: "1,450"
-                  })) : []),
-                  { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
-                  { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
-                  { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
-                  { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
-                  { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
-                  { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
-                ] as any[])
+                {((() => {
+                  const dynamicList = [
+                    ...(moeIngestedBooks && moeIngestedBooks.length > 0 ? moeIngestedBooks.map((b: any) => ({
+                      titleEn: b.titleEn,
+                      titleAr: b.titleAr,
+                      subject: b.subject,
+                      size: b.size,
+                      format: b.format,
+                      downloads: b.downloads,
+                      isMoeIngested: true
+                    })) : []),
+                    ...(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
+                      titleEn: b.title,
+                      titleAr: b.title_ar || b.title,
+                      subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
+                      size: "15.0 MB",
+                      format: "PDF",
+                      downloads: "1,450"
+                    })) : [])
+                  ];
+                  if (dynamicList.length > 0) {
+                    return dynamicList;
+                  }
+                  return [
+                    { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
+                    { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
+                    { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
+                    { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
+                    { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
+                    { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
+                  ];
+                })() as any[])
                   .filter(item => {
                     const s = librarySearch.toLowerCase();
                     const matchesSearch = item.titleEn.toLowerCase().includes(s) || item.titleAr.includes(s);
@@ -5918,8 +6027,8 @@ export default function Home() {
                     </h3>
                     <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "#6a7c88" }}>
                       {language === "ar" 
-                        ? "قم بتحميل وثائقك وأبحاثك الشخصية لدراستها ومذاكرتها بشكل تفاعلي مع رفيق فهم (بحد أقصى 2 ميجابايت)."
-                        : "Upload personal notes or guides to study interactively with your companion (strict 2MB limit)."}
+                        ? `قم بتحميل وثائقك وأبحاثك الشخصية لدراستها ومذاكرتها بشكل تفاعلي مع رفيق فهم (بحد أقصى ${dynamicMaxUploadSize} ميجابايت).`
+                        : `Upload personal notes or guides to study interactively with your companion (strict ${dynamicMaxUploadSize}MB limit).`}
                     </p>
                   </div>
 
@@ -5936,8 +6045,10 @@ export default function Home() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          if (file.size > 2 * 1024 * 1024) {
-                            alert(language === "ar" ? "خطأ: حجم الملف يتجاوز الحد الأقصى (2 ميجابايت) للمستندات الخاصة." : "Error: Study document exceeds the strict 2MB upload limit.");
+                          if (file.size > dynamicMaxUploadSize * 1024 * 1024) {
+                            alert(language === "ar" 
+                              ? `خطأ: حجم الملف يتجاوز الحد الأقصى (${dynamicMaxUploadSize} ميجابايت) للمستندات الخاصة.` 
+                              : `Error: Study document exceeds the strict ${dynamicMaxUploadSize}MB upload limit.`);
                             e.target.value = "";
                             return;
                           }
@@ -6162,6 +6273,7 @@ export default function Home() {
         ) : activeTab === "practice" ? (
           /* Practice Workstation Panel */
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {renderSpaceSelectorBar("practice")}
             <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
               {/* Flashcard Player Widget with flip animation */}
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -6366,6 +6478,7 @@ export default function Home() {
                 )}
               </div>
             </div>
+            {renderSpaceHistory()}
           </div>
         ) : activeTab === "plan" ? (
           /* Study Planner Panel */
@@ -6428,6 +6541,7 @@ export default function Home() {
         ) : activeTab === "timetable" ? (
           /* Weekly Schedule Panel */
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {renderSpaceSelectorBar("timetable")}
             <section className="panel-card" style={{ padding: "2rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
                 <h3 style={{ fontSize: "1.2rem", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -6440,7 +6554,7 @@ export default function Home() {
                     const newDay = window.prompt(language === "ar" ? "اليوم (مثال: Monday):" : "Day of week (e.g., Monday):");
                     const newTime = window.prompt(language === "ar" ? "الوقت (مثال: 09:00 - 10:30):" : "Time range (e.g., 09:00 - 10:30):");
                     if (newSub && newDay && newTime) {
-                      setTimetableEvents(prev => [
+                      setTimetableEvents((prev: any[]) => [
                         ...prev,
                         { id: Date.now(), subject: newSub, subjectAr: newSub, day: newDay, dayAr: newDay, time: newTime, room: "Virtual Room" }
                       ]);
@@ -6455,7 +6569,7 @@ export default function Home() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
-                {timetableEvents.map((evt) => (
+                {timetableEvents.map((evt: any) => (
                   <div key={evt.id} style={{ padding: "1rem", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-md)", background: "#ffffff", display: "flex", flexDirection: "column", gap: "0.5rem", position: "relative" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", background: "rgba(16, 107, 163, 0.06)", padding: "2px 8px", borderRadius: "10px" }}>
@@ -6463,7 +6577,7 @@ export default function Home() {
                       </span>
                       <button
                         onClick={() => {
-                          setTimetableEvents(prev => prev.filter(e => e.id !== evt.id));
+                          setTimetableEvents((prev: any[]) => prev.filter((e: any) => e.id !== evt.id));
                         }}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "#d32f2f", fontSize: "0.8rem" }}
                         title={language === "ar" ? "حذف الحصة" : "Delete class"}
@@ -6479,6 +6593,7 @@ export default function Home() {
                 ))}
               </div>
             </section>
+            {renderSpaceHistory()}
           </div>
         ) : activeTab === "quiz" ? (
           /* Quiz Arena Panel */
@@ -6534,7 +6649,7 @@ export default function Home() {
                       return (
                         <button
                           key={optIdx}
-                          onClick={() => setQuizAnswers(prev => ({ ...prev, [quizQuestionIndex]: optIdx }))}
+                          onClick={() => setQuizAnswers((prev: any) => ({ ...prev, [quizQuestionIndex]: optIdx }))}
                           style={{
                             padding: "0.85rem 1.25rem", borderRadius: "var(--border-radius-sm)", border: "1px solid",
                             textAlign: language === "ar" ? "right" : "left", cursor: "pointer",
@@ -6558,7 +6673,7 @@ export default function Home() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <button
                       disabled={quizQuestionIndex === 0}
-                      onClick={() => setQuizQuestionIndex(prev => prev - 1)}
+                      onClick={() => setQuizQuestionIndex((prev: number) => prev - 1)}
                       style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#ffffff", cursor: quizQuestionIndex === 0 ? "not-allowed" : "pointer", opacity: quizQuestionIndex === 0 ? 0.5 : 1, fontWeight: 700 }}
                     >
                       {language === "ar" ? "السابق" : "Back"}
@@ -6574,7 +6689,7 @@ export default function Home() {
                     ) : (
                       <button
                         disabled={quizAnswers[quizQuestionIndex] === undefined}
-                        onClick={() => setQuizQuestionIndex(prev => prev + 1)}
+                        onClick={() => setQuizQuestionIndex((prev: number) => prev + 1)}
                         style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--primary)", background: "var(--primary)", color: "#ffffff", cursor: quizAnswers[quizQuestionIndex] === undefined ? "not-allowed" : "pointer", opacity: quizAnswers[quizQuestionIndex] === undefined ? 0.5 : 1, fontWeight: 700 }}
                       >
                         {language === "ar" ? "التالي" : "Next Question"}
@@ -6628,6 +6743,7 @@ export default function Home() {
         ) : activeTab === "zatona" ? (
           /* Zatona AI Research Panel */
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {renderSpaceSelectorBar("zatona")}
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
               {/* Left Side: Summary prompt generator */}
               <div className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -6697,6 +6813,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
+            {renderSpaceHistory()}
           </div>
         ) : activeTab === "social" ? (
           /* Social Hub & Messenger Pane */
@@ -7788,6 +7905,115 @@ export default function Home() {
             {t("footer_dashboard_line2")}
           </p>
         </footer>
+
+        {renderSpaceModal()}
+
+        {bubbleCoords && selectedText && (
+          <>
+            <style>{`
+              @keyframes bubbleFadeIn {
+                0% { opacity: 0; transform: translate(-50%, 10px) scale(0.85); }
+                100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+              }
+            `}</style>
+            <button
+              onClick={() => {
+                let chapterTitleEn = "";
+                let chapterTitleAr = "";
+                let titleEn = "";
+                let titleAr = "";
+                let contentEn = "";
+                let contentAr = "";
+                let totalPages = 1;
+
+                if (selectedBookReader) {
+                  const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || {
+                    titleEn: selectedBookReader.titleEn || selectedBookReader.title || "Custom Material",
+                    titleAr: selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title || "وثيقة مخصصة",
+                    chapters: [
+                      {
+                        titleEn: "Chapter 1: Study Content",
+                        titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
+                        pages: [
+                          {
+                            pageNum: 1,
+                            titleEn: "Section 1: General Core Overview",
+                            titleAr: "القسم الأول: نظرة عامة شاملة",
+                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}.`,
+                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}".`,
+                          }
+                        ]
+                      }
+                    ]
+                  };
+
+                  const allPages: any[] = [];
+                  bookData.chapters?.forEach((ch: any, chIdx: number) => {
+                    ch.pages?.forEach((p: any) => {
+                      allPages.push({
+                        ...p,
+                        chapterTitleEn: ch.titleEn,
+                        chapterTitleAr: ch.titleAr,
+                        chapterIndex: chIdx
+                      });
+                    });
+                  });
+
+                  totalPages = allPages.length || 1;
+                  const activePage = allPages[readerCurrentPage - 1] || allPages[0] || null;
+                  if (activePage) {
+                    chapterTitleEn = activePage.chapterTitleEn || "";
+                    chapterTitleAr = activePage.chapterTitleAr || "";
+                    titleEn = activePage.titleEn || "";
+                    titleAr = activePage.titleAr || "";
+                    contentEn = activePage.contentEn || "";
+                    contentAr = activePage.contentAr || "";
+                  }
+                }
+
+                window.dispatchEvent(new CustomEvent("fahemBookContext", {
+                  detail: {
+                    book: selectedBookReader,
+                    currentPage: readerCurrentPage,
+                    autoExplainText: selectedText,
+                    totalPages,
+                    chapterTitleEn,
+                    chapterTitleAr,
+                    titleEn,
+                    titleAr,
+                    contentEn,
+                    contentAr
+                  }
+                }));
+                setSelectedText("");
+                setBubbleCoords(null);
+              }}
+              style={{
+                position: "absolute",
+                left: `${bubbleCoords.x}px`,
+                top: `${bubbleCoords.y}px`,
+                transform: "translateX(-50%)",
+                zIndex: 9999,
+                background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                color: "#ffffff",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: "24px",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                boxShadow: "0 4px 15px rgba(16, 107, 163, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                animation: "bubbleFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                userSelect: "none"
+              }}
+            >
+              ✨ {language === "ar" ? "اشرح لي مع فاهم" : "Explain with Fahem"}
+            </button>
+          </>
+        )}
       </main>
     </div>
   );

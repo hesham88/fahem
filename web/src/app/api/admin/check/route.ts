@@ -18,8 +18,11 @@ export async function GET(req: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // 1. Superadmin check (Gated purely via environment secrets)
-    const envSuperadmins = process.env.SUPERADMIN_USER
-      ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
+    let raw = process.env.SUPERADMIN_USER || "";
+    // Strip outer quotes if any (common in Secret Manager values)
+    raw = raw.trim().replace(/^['"]|['"]$/g, "");
+    const envSuperadmins = raw
+      ? raw.split(",").map((addr) => addr.trim().toLowerCase().replace(/^['"]|['"]$/g, ""))
       : [];
     const isSuperadmin = envSuperadmins.includes(normalizedEmail);
 

@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
-import { MongoClient } from "mongodb";
+import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
 function getSuperadmins(): string[] {
-  const envSuperadmins = process.env.SUPERADMIN_USER
-    ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
+  let raw = process.env.SUPERADMIN_USER || "";
+  // Strip outer quotes if any (common in Secret Manager values)
+  raw = raw.trim().replace(/^['"]|['"]$/g, "");
+  const envSuperadmins = raw
+    ? raw.split(",").map((addr) => addr.trim().toLowerCase().replace(/^['"]|['"]$/g, ""))
     : [];
   return envSuperadmins;
 }
@@ -31,58 +35,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
-      return new Response(JSON.stringify({ error: "MONGODB_URI is not set" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const client = new MongoClient(uri);
-    await client.connect();
-    const db = client.db("fahem");
-
-    // Fetch users with role admin, as well as anyone already in the admins collection
-    const users = await db.collection("users").find({ role: "admin" }).toArray();
-    const admins = await db.collection("admins").find({}).toArray();
-
-    await client.close();
-
-    // Map and merge results
-    const adminMap = new Map<string, any>();
-
-    // Seed with database admins collection
-    admins.forEach((adm) => {
-      adminMap.set(adm.email.toLowerCase().trim(), {
+    // 1. Local environment check
+    if (isLocalEnv()) {
+      const db = getLocalDb();
+      // Ensure all admins have role admin
+      const localAdmins = db.admins.map(adm => ({
         email: adm.email,
         name: adm.name || "Approved Admin",
         role: "admin",
         isApprovedAdmin: adm.isApprovedAdmin === true,
-        source: "admins_collection"
+        source: "local_db"
+      }));
+      return new Response(JSON.stringify({ success: true, admins: localAdmins }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
       });
-    });
+    }
 
-    // Merge/override with users collection data
-    users.forEach((usr) => {
-      const emailKey = usr.email.toLowerCase().trim();
-      const existing = adminMap.get(emailKey);
-      adminMap.set(emailKey, {
-        email: usr.email,
-        name: usr.name || usr.username || "Admin Candidate",
-        role: "admin",
-        isApprovedAdmin: usr.isApprovedAdmin === true || existing?.isApprovedAdmin === true,
-        source: "users_collection",
-        userId: usr.userId
-      });
-    });
-
-    const mergedList = Array.from(adminMap.values());
-
-    return new Response(JSON.stringify({ success: true, admins: mergedList }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    // 2. Production: Proxy to GCP Agent
+    const proxyRes = await proxyRequest("/admin/approve", "GET");
+    return proxyRes;
 
   } catch (err: any) {
     console.error("[admin-approve-api] GET failed:", err);
@@ -124,39 +96,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
-      return new Response(JSON.stringify({ error: "MONGODB_URI is not set" }), {
-        status: 500,
+    // 1. Local environment check
+    if (isLocalEnv()) {
+      const db = getLocalDb();
+      const isApproved = action === "approve";
+      
+      const existingIndex = db.admins.findIndex(adm => adm.email.toLowerCase().trim() === cleanAdmin);
+      if (existingIndex >= 0) {
+        db.admins[existingIndex].isApprovedAdmin = isApproved;
+      } else {
+        db.admins.push({
+          email: adminEmail,
+          name: adminEmail.split("@")[0],
+          isApprovedAdmin: isApproved
+        });
+      }
+      saveLocalDb(db);
+      return new Response(JSON.stringify({ success: true, message: `Successfully ${isApproved ? "approved" : "revoked"} admin ${cleanAdmin} (Local DB)` }), {
+        status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const client = new MongoClient(uri);
-    await client.connect();
-    const db = client.db("fahem");
-
-    const isApproved = action === "approve";
-
-    // 1. Update users collection if they exist
-    await db.collection("users").updateOne(
-      { email: cleanAdmin },
-      { $set: { isApprovedAdmin: isApproved } }
-    );
-
-    // 2. Update or upsert admins collection
-    await db.collection("admins").updateOne(
-      { email: cleanAdmin },
-      { $set: { email: cleanAdmin, isApprovedAdmin: isApproved, name: adminEmail.split("@")[0] } },
-      { upsert: true }
-    );
-
-    await client.close();
-
-    return new Response(JSON.stringify({ success: true, message: `Successfully ${isApproved ? "approved" : "revoked"} admin ${cleanAdmin}` }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    // 2. Production: Proxy to GCP Agent
+    const proxyRes = await proxyRequest("/admin/approve", "POST", { adminEmail, action });
+    return proxyRes;
 
   } catch (err: any) {
     console.error("[admin-approve-api] POST failed:", err);

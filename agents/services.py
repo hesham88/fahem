@@ -696,6 +696,239 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to get subjects: {err}", exc_info=True)
             return {"subjects": [], "error": str(err)}
 
+    @app.get("/admin/check")
+    async def admin_check_endpoint(email: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            normalized_email = email.lower().strip()
+            
+            # Check users collection
+            user_doc = db["users"].find_one({"email": normalized_email, "isApprovedAdmin": True})
+            if user_doc:
+                client.close()
+                return {"isAdmin": True}
+                
+            # Check admins collection
+            admin_doc = db["admins"].find_one({"email": normalized_email, "isApprovedAdmin": True})
+            client.close()
+            return {"isAdmin": bool(admin_doc)}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to check admin: {err}", exc_info=True)
+            return {"isAdmin": False, "error": str(err)}
+
+    @app.get("/admin/approve")
+    async def admin_approve_get_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            # Fetch users with role admin and all admins
+            users = list(db["users"].find({"role": "admin"}))
+            admins = list(db["admins"].find({}))
+            client.close()
+            
+            admin_map = {}
+            for adm in admins:
+                email_key = adm.get("email", "").lower().strip()
+                if email_key:
+                    admin_map[email_key] = {
+                        "email": adm.get("email"),
+                        "name": adm.get("name") or "Approved Admin",
+                        "role": "admin",
+                        "isApprovedAdmin": adm.get("isApprovedAdmin") == True,
+                        "source": "admins_collection"
+                    }
+                    
+            for usr in users:
+                email_key = usr.get("email", "").lower().strip()
+                if email_key:
+                    existing = admin_map.get(email_key)
+                    admin_map[email_key] = {
+                        "email": usr.get("email"),
+                        "name": usr.get("name") or usr.get("username") or "Admin Candidate",
+                        "role": "admin",
+                        "isApprovedAdmin": usr.get("isApprovedAdmin") == True or (existing and existing.get("isApprovedAdmin") == True),
+                        "source": "users_collection",
+                        "userId": usr.get("userId")
+                    }
+            
+            return {"success": True, "admins": list(admin_map.values())}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to list admins: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/admin/approve")
+    async def admin_approve_post_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            data = await request.json()
+            admin_email = data.get("adminEmail", "").lower().strip()
+            action = data.get("action", "")
+            
+            if not admin_email or not action:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            is_approved = (action == "approve")
+            
+            # Update users
+            db["users"].update_one(
+                {"email": admin_email},
+                {"$set": {"isApprovedAdmin": is_approved}}
+            )
+            
+            # Update or upsert admins
+            db["admins"].update_one(
+                {"email": admin_email},
+                {"$set": {
+                    "email": admin_email,
+                    "isApprovedAdmin": is_approved,
+                    "name": admin_email.split("@")[0]
+                }},
+                upsert=True
+            )
+            
+            client.close()
+            return {"success": True, "message": f"Successfully {action}d admin {admin_email}"}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to update admin: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/user/subjects")
+    async def post_subjects_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            import re
+            
+            data = await request.json()
+            name = data.get("name", "")
+            name_ar = data.get("name_ar", "")
+            grade_level = data.get("grade_level", "General")
+            category = data.get("category", "Science")
+            icon_emoji = data.get("icon_emoji", "📚")
+            
+            if not name or not name_ar:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            clean_name = re.sub(r'[^a-z0-9]', '_', name.lower())
+            subject_id = f"sub_{clean_name}_{int(time.time() * 1000)}"
+            
+            new_subject = {
+                "_id": subject_id,
+                "name": name,
+                "name_ar": name_ar,
+                "grade_level": grade_level,
+                "category": category,
+                "icon_emoji": icon_emoji,
+                "books_count": 0
+            }
+            
+            db["subjects"].insert_one(new_subject)
+            client.close()
+            return {"success": True, "subject": new_subject}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to create subject: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/user/books")
+    async def post_books_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            import re
+            
+            data = await request.json()
+            subject_id = data.get("subject_id", "")
+            title = data.get("title", "")
+            title_ar = data.get("title_ar", "")
+            grade = data.get("grade", "General")
+            term = data.get("term", "Term 1")
+            year = data.get("year", "2026")
+            language = data.get("language", "ar")
+            book_type = data.get("book_type", "core")
+            source_url = data.get("source_url", "")
+            storage_path = data.get("storage_path", "")
+            chapters = data.get("chapters", [])
+            
+            if not subject_id or not title or not title_ar:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            clean_title = re.sub(r'[^a-z0-9]', '_', title.lower())
+            book_id = f"book_{clean_title}_{int(time.time() * 1000)}"
+            
+            new_book = {
+                "_id": book_id,
+                "subject_id": subject_id,
+                "title": title,
+                "title_ar": title_ar,
+                "grade": grade,
+                "term": term,
+                "year": year,
+                "language": language,
+                "book_type": book_type,
+                "source_url": source_url,
+                "storage_path": storage_path,
+                "chapters": chapters
+            }
+            
+            db["books"].insert_one(new_book)
+            
+            # Increment books_count in subject
+            db["subjects"].update_one(
+                {"_id": subject_id},
+                {"$inc": {"books_count": 1}}
+            )
+            
+            client.close()
+            return {"success": True, "book": new_book}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to create book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
     @app.get("/user/profile")
     async def get_profile_endpoint(userId: str = None, username: str = None, email: str = None):
         try:
