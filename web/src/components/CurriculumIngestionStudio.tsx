@@ -100,7 +100,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const [bookError, setBookError] = useState<string | null>(null);
 
   // Web Crawler / Exploration Studio States
-  const [crawlUrl, setBookCrawlUrl] = useState("https://ellibrary.moe.gov.eg");
+  const [crawlUrl, setBookCrawlUrl] = useState("https://openstax.org");
   const [crawlMaxDepth, setCrawlDepth] = useState<number>(2);
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlLogs, setCrawlLogs] = useState<string[]>([]);
@@ -438,13 +438,13 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       "Enforcing strict compliance with robots.txt policy... Allowed",
       "Scanning target server HTML anchors & metadata tags...",
       `Crawling level 1: Resolving page references up to max_depth: ${crawlMaxDepth}`,
-      "Discovered index: /downloads/education/curriculums",
+      "Discovered index: /downloads/education/textbooks/creative_commons",
       "Parsing educational node list for direct PDF textbook repositories...",
-      "Found potential textbook: Physics_Grade12_Electricity_and_Magnetism_v2.pdf",
-      "Found potential textbook: High_School_Arabic_Grammar_and_Poetry_Grade11.pdf",
-      "Found potential textbook: Advanced_Biology_Cells_and_Heredity_G12.pdf",
+      "Found potential textbook: Introduction_to_Python_Programming-WEB.pdf",
+      "Found potential textbook: Calculus-Volume1-OP.pdf",
+      "Found potential textbook: CollegePhysics-OP.pdf",
       "Resolving download URLs & page segment counts...",
-      "Spider crawled successfully. Consolidated 3 high-quality textbooks ready for direct ingestion."
+      "Spider crawled successfully. Consolidated 3 high-quality Creative Commons textbooks ready for direct ingestion."
     ];
 
     let currentMsgIdx = 0;
@@ -458,43 +458,46 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
         setIsCrawling(false);
         setDiscoveredResources([
           {
-            title: "Physics Grade 12 - Electricity & Magnetism",
-            titleAr: "الفيزياء للصف الثاني عشر - الكهرباء والمغناطيسية",
-            subject: "Physics",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("physic"))?._id || "",
-            fileName: "Physics_Grade12_Electricity_and_Magnetism_v2.pdf",
-            url: "https://ellibrary.moe.gov.eg/downloads/Physics_Grade12_Electricity_and_Magnetism_v2.pdf",
+            title: "Introduction to Python Programming",
+            titleAr: "مقدمة في البرمجة بلغة بايثون",
+            subject: "Computer Science",
+            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("science") || s.name.toLowerCase().includes("comput"))?._id || "",
+            fileName: "Introduction_to_Python_Programming-WEB.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf",
+            totalPages: 240,
+            chapters: [
+              { title: "Introduction to Programming", title_ar: "مقدمة في البرمجة", page_start: 1, page_end: 45, concepts: ["variables", "expressions", "types"] },
+              { title: "Control Structures & Loops", title_ar: "جمل التحكم والتكرار", page_start: 46, page_end: 110, concepts: ["conditionals", "while loops", "for loops"] },
+              { title: "Functions & Scope", title_ar: "الدوال ونطاق المتغيرات", page_start: 111, page_end: 175, concepts: ["def", "parameters", "return", "local scope"] },
+              { title: "Data Structures & Objects", title_ar: "بنيات البيانات والكائنات", page_start: 176, page_end: 240, concepts: ["lists", "dicts", "classes", "methods"] }
+            ]
+          },
+          {
+            title: "Calculus Volume 1",
+            titleAr: "حساب التفاضل والتكامل - الجزء الأول",
+            subject: "Mathematics",
+            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("math"))?._id || "",
+            fileName: "Calculus-Volume1-OP.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus-Volume1-OP.pdf",
             totalPages: 184,
             chapters: [
-              { title: "Static Electricity", title_ar: "الكهرباء الساكنة", page_start: 1, page_end: 45, concepts: ["charge", "coulomb", "electric field"] },
-              { title: "Electric Currents", title_ar: "التيار الكهربائي", page_start: 46, page_end: 110, concepts: ["ohm law", "resistors", "kirchhoff"] },
-              { title: "Magnetic Fields", title_ar: "المجالات المغناطيسية", page_start: 111, page_end: 184, concepts: ["magnetic flux", "ampere law", "faraday"] }
+              { title: "Functions and Graphs", title_ar: "الدوال والتمثيلات البيانية", page_start: 1, page_end: 60, concepts: ["domains", "ranges", "linear models"] },
+              { title: "Limits & Continuity", title_ar: "النهايات والاتصال", page_start: 61, page_end: 130, concepts: ["limit laws", "asymptotes", "continuity"] },
+              { title: "Derivatives", title_ar: "المشتقات", page_start: 131, page_end: 184, concepts: ["power rule", "product rule", "chain rule"] }
             ]
           },
           {
-            title: "High School Arabic Grammar",
-            titleAr: "قواعد النحو العربي - المرحلة الثانوية",
-            subject: "Languages",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("lang"))?._id || "",
-            fileName: "High_School_Arabic_Grammar_and_Poetry_Grade11.pdf",
-            url: "https://ellibrary.moe.gov.eg/downloads/High_School_Arabic_Grammar_and_Poetry_Grade11.pdf",
-            totalPages: 96,
+            title: "College Physics",
+            titleAr: "الفيزياء الكلاسيكية والجامعية",
+            subject: "Physics",
+            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("physic"))?._id || "",
+            fileName: "CollegePhysics-OP.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/CollegePhysics-OP.pdf",
+            totalPages: 175,
             chapters: [
-              { title: "The Nominative Cases", title_ar: "المرفوعات من الأسماء", page_start: 1, page_end: 30, concepts: ["المبتدأ والخبر", "فاعل", "اسم كان"] },
-              { title: "The Accusative Cases", title_ar: "المنصوبات من الأسماء", page_start: 31, page_end: 70, concepts: ["المفاعيل الخمسة", "خبر كان", "حال"] }
-            ]
-          },
-          {
-            title: "Advanced Biology G12 - Cells & Heredity",
-            titleAr: "الأحياء المتقدمة - الخلايا والوراثة",
-            subject: "Science",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("science"))?._id || "",
-            fileName: "Advanced_Biology_Cells_and_Heredity_G12.pdf",
-            url: "https://ellibrary.moe.gov.eg/downloads/Advanced_Biology_Cells_and_Heredity_G12.pdf",
-            totalPages: 210,
-            chapters: [
-              { title: "Cellular Structure", title_ar: "تركيب الخلية ووظيفتها", page_start: 1, page_end: 65, concepts: ["organelles", "mitochondria", "membrane"] },
-              { title: "Molecular Genetics", title_ar: "علم الوراثة الجزيئي", page_start: 66, page_end: 140, concepts: ["DNA replication", "transcription", "translation"] }
+              { title: "Kinematics", title_ar: "علم الحركة المجردة", page_start: 1, page_end: 50, concepts: ["velocity", "acceleration", "displacement"] },
+              { title: "Dynamics and Force", title_ar: "القوى وقوانين الحركة", page_start: 51, page_end: 110, concepts: ["newtons laws", "friction", "drag forces"] },
+              { title: "Work & Kinetic Energy", title_ar: "الشغل والطاقة الحركية", page_start: 111, page_end: 175, concepts: ["kinetic energy", "potential energy", "conservation of energy"] }
             ]
           }
         ]);
