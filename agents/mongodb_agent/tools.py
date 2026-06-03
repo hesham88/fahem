@@ -1,5 +1,8 @@
 import os
 import json
+from pymongo import MongoClient
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 
 def resolve_srv_to_mongodb_uri(uri: str) -> str:
     """Converts a mongodb+srv:// connection string to a standard mongodb:// string by resolving SRV records."""
@@ -133,3 +136,87 @@ def get_mongodb_uri(read_only: bool = False) -> str:
         
     return "mongodb://localhost:27017"
 
+# Initialize MongoDB Connection safely using our robust URI resolver
+MONGO_URI = get_mongodb_uri()
+if not MONGO_URI:
+    raise RuntimeError("CRITICAL_DB_UNAVAILABLE: System authorization keys missing. Operational lifecycle blocked.")
+
+client = MongoClient(MONGO_URI)
+db = client.get_default_database() or client.fahem_academic
+
+# Input Contracts matching our master specifications
+class ExtractPersistenceInput(BaseModel):
+    extracted_book_profile: Dict[str, Any] = Field(description="Complete structural JSON output from extraction workflows.")
+
+class StudentPerformanceQuery(BaseModel):
+    grade_tier: str = Field(description="Target student grade level filter constraint pattern.")
+    subject_filter: str = Field(description="Target academic subject taxonomy tracking identity marker.")
+
+class HybridVectorQuery(BaseModel):
+    dense_vector: List[float] = Field(description="768-dimension float32 array tracking semantic intent from user prompts.")
+    subject_id: str = Field(description="Target discipline scope limitation index value.")
+    grade: str = Field(description="Target cohort boundary metric mapping index.")
+
+# -------------------------------------------------------------
+# SPECIFIED DECLARATIVE DATABASE MCP TOOLS
+# -------------------------------------------------------------
+
+def persist_extracted_textbook_catalog(payload: ExtractPersistenceInput) -> str:
+    """Stores high-fidelity structural data configurations straight into active collections."""
+    try:
+        collection = db.curriculum_directory
+        result = collection.insert_one(payload.extracted_book_profile)
+        return f"SUCCESS: Academic schema committed and indexed under reference identity object: {result.inserted_id}"
+    except Exception as error:
+        return f"FAILURE: Data persistence aborted due to execution error: {str(error)}"
+
+def execute_student_insight_aggregation(query: StudentPerformanceQuery) -> List[Dict[str, Any]]:
+    """Analyzes student metrics using high-performance database aggregation components."""
+    try:
+        pipeline = [
+            {"$match": {"grade": query.grade_tier, "subject_id": query.subject_filter}},
+            {"$group": {
+                "_id": "$concept_id",
+                "average_proficiency": {"$avg": "$checkpoint_score"},
+                "total_evaluation_attempts": {"$sum": 1},
+                "tracked_misconceptions": {"$push": "$primary_error_tag"}
+            }},
+            {"$sort": {"average_proficiency": 1}}, # Highlights weakest topics first to adjust training plans
+            {"$limit": 5}
+        ]
+        return list(db.student_performance_tracking.aggregate(pipeline))
+    except Exception as error:
+        return [{"error": f"Aggregation loop aborted due to critical error trace: {str(error)}"}]
+
+def execute_atlas_hybrid_vector_search(spec: HybridVectorQuery) -> List[Dict[str, Any]]:
+    """Runs a semantic lookup against question collections using dense Atlas indexes."""
+    try:
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "academic_vector_search_index",
+                    "path": "embedding",
+                    "queryVector": spec.dense_vector,
+                    "numCandidates": 40,
+                    "limit": 5,
+                    "filter": {
+                        "$and": [
+                            {"subject_id": {"$eq": spec.subject_id}},
+                            {"grade": {"$eq": spec.grade}}
+                        ]
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "_id": 1,
+                    "question_text": 1,
+                    "correct_answer": 1,
+                    "target_page": 1,
+                    "search_relevance_score": {"$meta": "vectorSearchScore"}
+                }
+            }
+        ]
+        return list(db.question_bank.aggregate(pipeline))
+    except Exception as error:
+        return [{"error": f"Atlas Vector search worker failed on execution path: {str(error)}"}]

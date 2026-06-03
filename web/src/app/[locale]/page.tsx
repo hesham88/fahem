@@ -550,6 +550,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Platform Capabilities Augmentation Showcase */}
+      <PlatformCapabilitiesAugmentation />
+
       {/* Styled Interactive Footer with Asdaa.co Attribution */}
       <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
         <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
@@ -586,6 +589,87 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function PlatformCapabilitiesAugmentation() {
+  return (
+    <div className="fahem-capabilities-section py-16 px-8 bg-[#FDFBF7] text-[#1A1A1A]">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Framework Architecture Brief */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+          <div className="capability-card p-8 bg-white/60 backdrop-blur-md border border-neutral-200 rounded-2xl shadow-sm">
+            <h3 className="text-2xl font-bold font-cairo mb-4">🧠 Cognitive Load Management (CLT & CTL Balance)</h3>
+            <p className="text-md text-neutral-600 leading-relaxed">
+              Fahem utilizes a structured, balanced presentation layout to avoid interface clutter. By carefully managing
+              working memory loads based on Cognitive Load Theory (CLT) and Cognitive Tuning/Load (CTL) balance, our interfaces
+              present information using clean progressive disclosure mechanisms. This minimizes distractions, converting dense
+              textbooks into intuitive structural concept blocks that help information move smoothly from active attention
+              into long-term memory.
+            </p>
+          </div>
+
+          <div className="capability-card p-8 bg-white/60 backdrop-blur-md border border-neutral-200 rounded-2xl shadow-sm">
+            <h3 className="text-2xl font-bold font-cairo mb-4">🌱 Bounded Autodidactism via Heutagogical Paths</h3>
+            <p className="text-md text-neutral-600 leading-relaxed">
+              Our advanced multi-agent swarm supports authentic student autonomy through the Orientation, Exploration,
+              Pathfinding, and Arrival (OEPA) mobile learning model. Students set independent learning paces—navigating
+              flexible chapter directories, interacting with visual mindmaps, and selectively exploring knowledge targets
+              directly with their AI companion for customized, self-guided study acceleration.
+            </p>
+          </div>
+        </div>
+
+        {/* Swarm Specialist Matrix */}
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold font-cairo mb-2">🤖 Decoupled Specialist Swarm Capabilities Matrix</h2>
+          <p className="text-sm text-neutral-500 mb-8 font-mono">Powered Programmatically by Google ADK 2.0 & gemini-3.1-flash-lite</p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+            <div className="matrix-pill p-5 bg-white border border-neutral-100 rounded-xl shadow-2xs">
+              <span className="text-xl mb-2 block">👤</span>
+              <h4 className="font-bold text-base mb-1">Coordinator Engine</h4>
+              <p className="text-xs text-neutral-500 leading-relaxed">Dynamic graph routing node tracking session metrics and allocating sub-agent execution pathways cleanly.</p>
+            </div>
+            
+            <div className="matrix-pill p-5 bg-white border border-neutral-100 rounded-xl shadow-2xs">
+              <span className="text-xl mb-2 block">📝</span>
+              <h4 className="font-bold text-base mb-1">Text Practice Expert</h4>
+              <p className="text-xs text-neutral-500 leading-relaxed">Administers open-ended Socratic check questions. Disables client-side copy-paste actions to enforce authentic writing layout drills.</p>
+            </div>
+
+            <div className="matrix-pill p-5 bg-white border border-neutral-100 rounded-xl shadow-2xs">
+              <span className="text-xl mb-2 block">🎤</span>
+              <h4 className="font-bold text-base mb-1">Live Oral Streamer</h4>
+              <p className="text-xs text-neutral-500 leading-relaxed">Deploys non-blocking WebSocket streams to support interactive voice-driven training loops and pronunciation tracking.</p>
+            </div>
+
+            <div className="matrix-pill p-5 bg-white border border-neutral-100 rounded-xl shadow-2xs">
+              <span className="text-xl mb-2 block">🧪</span>
+              <h4 className="font-bold text-base mb-1">Zatona Synthesizer</h4>
+              <p className="text-xs text-neutral-500 leading-relaxed">Generates hyper-dense text summaries, rule sheets, and core equation directories instantly from catalog collections.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Security & Access Panel */}
+        <div className="admin-glimpse-box bg-neutral-900 text-white rounded-2xl p-8 text-center shadow-lg">
+          <h3 className="text-lg font-mono font-bold tracking-widest text-emerald-400 mb-3">🛡️ ZERO-TRUST ADMINISTRATIVE SHIELDS ENABLED</h3>
+          <p className="text-sm text-neutral-300 max-w-3xl mx-auto mb-6 leading-relaxed">
+            Fahem runs private multi-agent execution loops safely isolated from internet-facing gateways. For platform testing,
+            hackathon judges gain friction-free access to the dashboard via secure bypass lookup files that skip verification steps
+            while keeping full logging records across our non-blocking asynchronous telemetry systems.
+          </p>
+          <div className="flex flex-wrap justify-center gap-6 text-xs font-mono text-neutral-400 border-t border-neutral-800 pt-6">
+            <span>• Googlebot-Enterprise Managed Ingestion Control</span>
+            <span>• Quota-Gated Tiered Token Allocation Hooks</span>
+            <span>• Multi-Stage Admin Document Queue Isolation</span>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

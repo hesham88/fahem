@@ -1664,3 +1664,121 @@ th, td {
   pointer-events: none !important;
 }
 
+/* Bidirectional Logical UI Layout Adjustments */
+.fahem-navbar-root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  
+  /* Logical properties automatically mirror padding adjustments based on direction flags */
+  padding-inline-start: max(1.5rem, 4vw);
+  padding-inline-end: max(1.5rem, 4vw);
+  padding-block: 1.25rem;
+}
+
+body[dir="rtl"] .fahem-nav-links-wrapper {
+  flex-direction: row-reverse;
+  font-family: var(--font-cairo), sans-serif;
+}
+
+body[dir="rtl"] .fahem-nav-link-item {
+  /* Clears left-margin spacing bugs, shifting cleanly to directional inline variables */
+  margin-inline-start: 0;
+  margin-inline-end: 2.25rem;
+  letter-spacing: 0rem; /* Resolves character tracking compression on Arabic text runs */
+}
+
+/* Premium Showcase Panel & Platform Capabilities Layout */
+.fahem-capabilities-section {
+  padding: 5rem 2rem;
+  background-color: #FDFBF7;
+  color: #1a1a1a;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+  border-top: 1px solid rgba(235, 220, 185, 0.4);
+}
+
+.fahem-capabilities-section .max-w-7xl {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.fahem-capabilities-section .grid {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.fahem-capabilities-section .grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1024px) {
+  .fahem-capabilities-section .lg\:grid-cols-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 640px) {
+  .fahem-capabilities-section .sm\:grid-cols-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fahem-capabilities-section .lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.capability-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(235, 220, 185, 0.35);
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.capability-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--secondary);
+  box-shadow: 0 12px 30px rgba(249, 115, 22, 0.06);
+}
+
+.matrix-pill {
+  background: #ffffff;
+  border: 1px solid rgba(235, 220, 185, 0.3);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.01);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.matrix-pill:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.05);
+}
+
+.admin-glimpse-box {
+  background-color: #171717;
+  color: #ffffff;
+  border-radius: 24px;
+  padding: 3rem 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  margin-top: 4rem;
+}
+
+.admin-glimpse-box h3 {
+  color: #10b981 !important;
+}
+
+.fahem-capabilities-section h3, 
+.fahem-capabilities-section h2, 
+.fahem-capabilities-section h4 {
+  color: #1a1a1a;
+}
+

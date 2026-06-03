@@ -26,7 +26,12 @@ except Exception:
 from mcp import StdioServerParameters
 from google.adk.tools.mcp_tool import StdioConnectionParams, McpToolset
 from google.adk import Agent
-from .tools import get_mongodb_uri
+from .tools import (
+    get_mongodb_uri,
+    persist_extracted_textbook_catalog,
+    execute_student_insight_aggregation,
+    execute_atlas_hybrid_vector_search
+)
 
 # Import Secure Parameterized Tools and Callbacks
 try:
@@ -133,7 +138,10 @@ root_agent = Agent(
         search_users_by_email,
         insert_user_report,
         inspect_collection_schema,
-        get_whitelisted_db_stats
+        get_whitelisted_db_stats,
+        persist_extracted_textbook_catalog,
+        execute_student_insight_aggregation,
+        execute_atlas_hybrid_vector_search
     ],
     before_agent_callback=before_agent_callback,
     before_model_callback=before_model_callback,

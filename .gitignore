@@ -28,7 +28,9 @@ Thumbs.db
 
 # Executables and large binaries
 agy.exe
+agy.exe*
 *.exe
+*.old
 
 # Debug logs
 *.log
