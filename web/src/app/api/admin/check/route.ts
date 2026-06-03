@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { checkIsAdmin } from "../helper";
 
 export const dynamic = "force-dynamic";
 
@@ -14,19 +15,24 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const HARDCODED_ADMINS = ["hesham1988@gmail.com", "contact@asdaa.co"];
-    const envAdmins = process.env.SUPERADMIN_USER
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Superadmin check (Gated purely via environment secrets)
+    const envSuperadmins = process.env.SUPERADMIN_USER
       ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
       : [];
-    const admins = Array.from(new Set([...HARDCODED_ADMINS, ...envAdmins]));
-    const isAdmin = admins.includes(email.toLowerCase().trim());
+    const isSuperadmin = envSuperadmins.includes(normalizedEmail);
 
-    return new Response(JSON.stringify({ isAdmin }), {
+    // 2. Comprehensive Admin Check (Superadmin OR MongoDB approved standard admin)
+    const isAdmin = await checkIsAdmin(normalizedEmail);
+
+    return new Response(JSON.stringify({ isAdmin, isSuperadmin }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
 
   } catch (e: any) {
+    console.error("[admin-check] Error validating admin status:", e);
     return new Response(JSON.stringify({ isAdmin: false, error: e.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" }

@@ -142,7 +142,12 @@ if not MONGO_URI:
     raise RuntimeError("CRITICAL_DB_UNAVAILABLE: System authorization keys missing. Operational lifecycle blocked.")
 
 client = MongoClient(MONGO_URI)
-db = client.get_default_database() or client.fahem_academic
+try:
+    db = client.get_default_database()
+    if db is None:
+        db = client["fahem"]
+except Exception:
+    db = client["fahem"]
 
 # Input Contracts matching our master specifications
 class ExtractPersistenceInput(BaseModel):

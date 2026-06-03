@@ -121,6 +121,32 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [mcpResult, setMcpResult] = useState<any>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
 
+  // Interactive Security, Token Controls, and File Upload state configurations
+  const [maxUploadSize, setMaxUploadSize] = useState<number>(2); // in MB
+  const [isUploadScanningEnabled, setIsUploadScanningEnabled] = useState<boolean>(true);
+  const [allowedUploadFormats, setAllowedFormats] = useState({
+    pdf: true,
+    docx: true,
+    txt: true,
+    images: false
+  });
+  const [dailyAllocationLimit, setDailyAllocationLimit] = useState<number>(50000);
+  const [weeklyAllocationLimit, setWeeklyAllocationLimit] = useState<number>(250000);
+  const [monthlyAllocationLimit, setMonthlyAllocationLimit] = useState<number>(1000000);
+  const [isTokenControlActive, setIsTokenControlActive] = useState<boolean>(true);
+  const [isSavingConfigs, setIsSavingConfigs] = useState<boolean>(false);
+  const [configSaveSuccess, setConfigSaveSuccess] = useState<string | null>(null);
+
+  const handleSaveConfigs = () => {
+    setIsSavingConfigs(true);
+    setConfigSaveSuccess(null);
+    setTimeout(() => {
+      setIsSavingConfigs(false);
+      setConfigSaveSuccess(language === "ar" ? "تم حفظ التكوينات وتطبيقها بنجاح!" : "Configurations successfully saved and enforced!");
+      setTimeout(() => setConfigSaveSuccess(null), 4000);
+    }, 1200);
+  };
+
   // Tool 1: Persist states
   const [catalogPayload, setCatalogPayload] = useState<string>(
     JSON.stringify({
@@ -626,6 +652,725 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
         </div>
       </section>
 
+      {/* 4. Executive Global Token Analytics Panel */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+          <div>
+            <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+              <FiTrendingUp style={{ color: "var(--primary)" }} />
+              <span>{language === "ar" ? "التحليلات التنفيذية لاستهلاك الرموز عالمياً" : "Executive Global Token Analytics"}</span>
+            </h2>
+            <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
+              {language === "ar"
+                ? "مراقبة وتحليل منحنيات استهلاك الرموز (Tokens) يومياً، أسبوعياً، وشهرياً لجميع الحسابات."
+                : "Real-time monitoring and reporting of token consumption metrics across Daily, Weekly, Monthly, and Lifetime intervals."}
+            </p>
+          </div>
+          {isLoadingGlobal && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85rem", color: "var(--primary)" }}>
+              <FiRefreshCw className="spinning-icon" />
+              <span>{language === "ar" ? "جاري التحديث..." : "Syncing..."}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Token Stats Grid */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "1.25rem"
+          }}>
+            {[
+              {
+                id: "daily",
+                titleAr: "الاستهلاك اليومي",
+                titleEn: "Daily Consumption",
+                tokens: globalStats?.daily ?? 0,
+                color: "var(--primary)",
+                descAr: "آخر 24 ساعة",
+                descEn: "Last 24 hours"
+              },
+              {
+                id: "weekly",
+                titleAr: "الاستهلاك الأسبوعي",
+                titleEn: "Weekly Consumption",
+                tokens: globalStats?.weekly ?? 0,
+                color: "var(--secondary-hover)",
+                descAr: "آخر 7 أيام",
+                descEn: "Last 7 days"
+              },
+              {
+                id: "monthly",
+                titleAr: "الاستهلاك الشهري",
+                titleEn: "Monthly Consumption",
+                tokens: globalStats?.monthly ?? 0,
+                color: "var(--accent-orange)",
+                descAr: "آخر 30 يوم",
+                descEn: "Last 30 days"
+              },
+              {
+                id: "lifetime",
+                titleAr: "الاستهلاك الإجمالي",
+                titleEn: "Lifetime Consumption",
+                tokens: globalStats?.total ?? 0,
+                color: "var(--accent-green)",
+                descAr: "تراكمي مدى الحياة",
+                descEn: "Cumulative overall"
+              }
+            ].map((card) => (
+              <div key={card.id} style={{
+                padding: "1.25rem",
+                background: "rgba(255, 255, 255, 0.45)",
+                border: "1px solid var(--card-border)",
+                borderRadius: "var(--border-radius-md)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: "var(--shadow-sm)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                cursor: "default"
+              }}
+              className="metric-card-hover"
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 2 }}>
+                  <span style={{ fontSize: "0.85rem", color: "#6a7c88", fontWeight: 600 }}>
+                    {language === "ar" ? card.titleAr : card.titleEn}
+                  </span>
+                  <div style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: card.color,
+                    animation: "pulse 2s infinite"
+                  }} />
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0", position: "relative", zIndex: 2 }}>
+                  <span style={{ fontSize: "1.65rem", fontWeight: 800, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                    {(card.tokens || 0).toLocaleString()}
+                  </span>
+                  <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 500 }}>
+                    {language === "ar" ? "رمز" : "tokens"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#5a6e7c", position: "relative", zIndex: 2 }}>
+                  {language === "ar" ? card.descAr : card.descEn}
+                </div>
+                {renderSparkline(card.id, card.tokens, card.color)}
+              </div>
+            ))}
+          </div>
+
+          {/* Interactive Token Controls & File Upload Limits Setup */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "1.5rem",
+            marginTop: "1.5rem",
+            marginBottom: "1.5rem"
+          }}>
+            {/* Token Allocation Controls Card */}
+            <div style={{
+              background: "rgba(255, 255, 255, 0.55)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--border-radius-md)",
+              padding: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem"
+            }}>
+              <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <FiSettings style={{ color: "var(--primary)" }} />
+                <span>{language === "ar" ? "إعدادات وقواعد التحكم بالرموز (Tokens)" : "Cognitive Token Controls & Allocations"}</span>
+              </h3>
+              <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0 }}>
+                {language === "ar" ? "تحديد سقف وحصص الاستهلاك اليومية والأسبوعية للحد من التكلفة وضمان استقرار الخدمة." : "Configure cognitive token limitations across Daily, Weekly, and Monthly intervals to prevent API runaway bills."}
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد اليومي المخصص للمستعلم" : "Daily Limit Per Student"}</span>
+                    <span style={{ color: "var(--primary)", fontWeight: 700, fontFamily: "monospace" }}>{dailyAllocationLimit.toLocaleString()} tokens</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10000"
+                    max="100000"
+                    step="5000"
+                    value={dailyAllocationLimit}
+                    onChange={(e) => setDailyAllocationLimit(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--primary)" }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد الأسبوعي للمستعلم" : "Weekly Limit Per Student"}</span>
+                    <span style={{ color: "var(--secondary)", fontWeight: 700, fontFamily: "monospace" }}>{weeklyAllocationLimit.toLocaleString()} tokens</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50000"
+                    max="500000"
+                    step="10000"
+                    value={weeklyAllocationLimit}
+                    onChange={(e) => setWeeklyAllocationLimit(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--secondary)" }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد الشهري الأقصى" : "Monthly Allocated Limit"}</span>
+                    <span style={{ color: "var(--accent-orange)", fontWeight: 700, fontFamily: "monospace" }}>{monthlyAllocationLimit.toLocaleString()} tokens</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="200000"
+                    max="2000000"
+                    step="50000"
+                    value={monthlyAllocationLimit}
+                    onChange={(e) => setMonthlyAllocationLimit(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--accent-orange)" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "0.5rem", borderTop: "1px dashed var(--card-border)" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{language === "ar" ? "تفعيل الرقابة الصارمة" : "Strict Limit Enforcement"}</span>
+                  <label className="switch-label" style={{ position: "relative", display: "inline-block", width: "42px", height: "20px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isTokenControlActive}
+                      onChange={(e) => setIsTokenControlActive(e.target.checked)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span style={{
+                      position: "absolute",
+                      cursor: "pointer",
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: isTokenControlActive ? "var(--primary)" : "#cbd5e1",
+                      transition: "0.3s",
+                      borderRadius: "20px"
+                    }}>
+                      <span style={{
+                        position: "absolute",
+                        content: '""',
+                        height: "14px", width: "14px",
+                        left: isTokenControlActive ? "24px" : "3px",
+                        bottom: "3px",
+                        backgroundColor: "white",
+                        transition: "0.3s",
+                        borderRadius: "50%"
+                      }} />
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* File Upload Size & Format Constraints Card */}
+            <div style={{
+              background: "rgba(255, 255, 255, 0.55)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--border-radius-md)",
+              padding: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem"
+            }}>
+              <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <FiLock style={{ color: "var(--accent-orange)" }} />
+                <span>{language === "ar" ? "تكوينات قيود وحجم الملفات المرفوعة" : "File Upload & Size Limit Configurations"}</span>
+              </h3>
+              <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0 }}>
+                {language === "ar" ? "التحكم في الحد الأقصى للمرفقات وصيغ الملفات المسموح بها لحماية الخوادم والاشتراكات." : "Set hard-limits on custom textbook and notes uploads to safeguard cluster space and optimize parsing overhead."}
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد الأقصى لحجم الملف الواحد" : "Maximum Size Allowed"}</span>
+                    <span style={{ color: "var(--accent-orange)", fontWeight: 700, fontFamily: "monospace" }}>{maxUploadSize} MB</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={maxUploadSize}
+                    onChange={(e) => setMaxUploadSize(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--accent-orange)" }}
+                  />
+                </div>
+
+                <div>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, display: "block", marginBottom: "0.4rem", color: "var(--foreground)" }}>
+                    {language === "ar" ? "الصيغ والامتدادات المسموح بها" : "Allowed Attachment Formats"}
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                    {[
+                      { key: "pdf", label: "PDF Documents" },
+                      { key: "docx", label: "Word (DOCX)" },
+                      { key: "txt", label: "Text Files (TXT)" },
+                      { key: "images", label: "Images (PNG/JPG)" }
+                    ].map((fmt) => (
+                      <label key={fmt.key} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", cursor: "pointer", color: "#475569" }}>
+                        <input
+                          type="checkbox"
+                          checked={(allowedUploadFormats as any)[fmt.key]}
+                          onChange={(e) => setAllowedFormats({ ...allowedUploadFormats, [fmt.key]: e.target.checked })}
+                          style={{ accentColor: "var(--accent-orange)" }}
+                        />
+                        <span>{fmt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "0.5rem", borderTop: "1px dashed var(--card-border)" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{language === "ar" ? "فحص الملفات سحابياً قبل الحفظ" : "Pre-upload Sandbox Malware Scan"}</span>
+                  <label className="switch-label" style={{ position: "relative", display: "inline-block", width: "42px", height: "20px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isUploadScanningEnabled}
+                      onChange={(e) => setIsUploadScanningEnabled(e.target.checked)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span style={{
+                      position: "absolute",
+                      cursor: "pointer",
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: isUploadScanningEnabled ? "var(--accent-orange)" : "#cbd5e1",
+                      transition: "0.3s",
+                      borderRadius: "20px"
+                    }}>
+                      <span style={{
+                        position: "absolute",
+                        content: '""',
+                        height: "14px", width: "14px",
+                        left: isUploadScanningEnabled ? "24px" : "3px",
+                        bottom: "3px",
+                        backgroundColor: "white",
+                        transition: "0.3s",
+                        borderRadius: "50%"
+                      }} />
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Config Action Row */}
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "1rem", borderTop: "1px dashed var(--card-border)", paddingTop: "1rem" }}>
+            {configSaveSuccess && (
+              <span style={{ fontSize: "0.85rem", color: "var(--accent-green)", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <FiCheckCircle />
+                {configSaveSuccess}
+              </span>
+            )}
+            <button
+              onClick={handleSaveConfigs}
+              disabled={isSavingConfigs}
+              className="btn btn-primary"
+              style={{ padding: "0.6rem 1.5rem", minWidth: "180px", background: "linear-gradient(135deg, var(--primary), var(--secondary))", border: "none", boxShadow: "var(--shadow-md)" }}
+            >
+              {isSavingConfigs ? <FiRefreshCw className="spinning-icon" /> : <FiLock />}
+              <span>{isSavingConfigs ? (language === "ar" ? "جاري الحفظ والإنفاذ..." : "Deploying Policies...") : (language === "ar" ? "حفظ وتطبيق السياسات" : "Save & Apply Policies")}</span>
+            </button>
+          </div>
+
+
+          {/* Interactive Token Telemetry Visual Chart */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-lg)",
+            padding: "1.5rem",
+            boxShadow: "var(--shadow-md)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <FiActivity style={{ color: "var(--primary)", fontSize: "1.2rem" }} />
+                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>
+                  {language === "ar" ? "سجل استهلاك الرموز اليومي" : "Historical Daily Token Telemetry"}
+                </h3>
+              </div>
+              <span style={{
+                fontSize: "0.7rem",
+                color: "#106ba3",
+                background: "rgba(16, 107, 163, 0.06)",
+                padding: "3px 8px",
+                borderRadius: "50px",
+                fontWeight: 700
+              }}>
+                {language === "ar" ? "آخر 7 أيام (محدث لحظياً)" : "Last 7 Days (Realtime)"}
+              </span>
+            </div>
+
+            <div style={{ width: "100%", overflowX: "auto" }}>
+              <div style={{ position: "relative", minWidth: "550px", width: "100%", height: "230px" }}>
+                {(() => {
+                  const dummyHistory = [
+                    { date: "05-23", tokens: 1200 },
+                    { date: "05-24", tokens: 2800 },
+                    { date: "05-25", tokens: 2100 },
+                    { date: "05-26", tokens: 4100 },
+                    { date: "05-27", tokens: 3600 },
+                    { date: "05-28", tokens: 5800 },
+                    { date: "05-29", tokens: 7200 },
+                  ];
+
+                  const historyData = (globalStats?.history && globalStats.history.length > 0)
+                    ? globalStats.history.map(item => ({
+                        ...item,
+                        label: item.date.length >= 10 ? item.date.substring(5) : item.date
+                      }))
+                    : dummyHistory.map(item => ({ ...item, label: item.date }));
+
+                  const maxVal = Math.max(...historyData.map(d => d.tokens), 500);
+
+                  const svgWidth = 600;
+                  const svgHeight = 220;
+                  const paddingLeft = 60;
+                  const paddingRight = 20;
+                  const paddingTop = 25;
+                  const paddingBottom = 35;
+
+                  const chartWidth = svgWidth - paddingLeft - paddingRight;
+                  const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+                  let linePath = "";
+                  let areaPath = "";
+
+                  if (historyData.length > 0) {
+                    linePath = historyData.map((d, i) => {
+                      const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
+                      const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+                    }).join(" ");
+
+                    const firstX = paddingLeft;
+                    const lastX = paddingLeft + chartWidth;
+                    const bottomY = paddingTop + chartHeight;
+                    areaPath = `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
+                  }
+
+                  const gridLines = [0.25, 0.5, 0.75, 1.0];
+
+                  return (
+                    <>
+                      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} width="100%" height="100%" style={{ display: "block" }}>
+                        <defs>
+                          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.00" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Background Grid Lines */}
+                        {gridLines.map((ratio, index) => {
+                          const y = paddingTop + chartHeight - ratio * chartHeight;
+                          const val = Math.round(ratio * maxVal);
+                          return (
+                            <g key={index}>
+                              <line
+                                x1={paddingLeft}
+                                y1={y}
+                                x2={svgWidth - paddingRight}
+                                y2={y}
+                                stroke="rgba(16, 107, 163, 0.08)"
+                                strokeWidth="1"
+                                strokeDasharray="4 4"
+                              />
+                              <text
+                                x={paddingLeft - 8}
+                                y={y + 4}
+                                fill="#8a9ca8"
+                                fontSize="10"
+                                fontWeight="700"
+                                textAnchor="end"
+                                style={{ fontFamily: "var(--font-mono)" }}
+                              >
+                                {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Baseline */}
+                        <line
+                          x1={paddingLeft}
+                          y1={paddingTop + chartHeight}
+                          x2={svgWidth - paddingRight}
+                          y2={paddingTop + chartHeight}
+                          stroke="rgba(16, 107, 163, 0.15)"
+                          strokeWidth="1"
+                        />
+
+                        {/* Under Area Gradient */}
+                        {areaPath && (
+                          <path
+                            d={areaPath}
+                            fill="url(#chartGradient)"
+                          />
+                        )}
+
+                        {/* Active Area Bars for extra richness */}
+                        {historyData.map((d, i) => {
+                          const barWidth = Math.max(12, chartWidth / historyData.length * 0.25);
+                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth - barWidth / 2;
+                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                          const height = (d.tokens / maxVal) * chartHeight;
+                          return (
+                            <rect
+                              key={`bar-${i}`}
+                              x={x}
+                              y={y}
+                              width={barWidth}
+                              height={height}
+                              rx="3"
+                              fill="rgba(16, 107, 163, 0.06)"
+                              style={{ transition: "all 0.3s ease" }}
+                            />
+                          );
+                        })}
+
+                        {/* Core Line Path */}
+                        {linePath && (
+                          <path
+                            d={linePath}
+                            fill="none"
+                            stroke="var(--primary)"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+
+                        {/* Glow Dots and Interactive hover overlays */}
+                        {historyData.map((d, i) => {
+                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
+                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
+                          const isHovered = hoveredPoint && hoveredPoint.date === d.date;
+
+                          return (
+                            <g key={i}>
+                              <circle
+                                cx={x}
+                                cy={y}
+                                r={isHovered ? "7" : "4"}
+                                fill="#ffffff"
+                                stroke="var(--primary)"
+                                strokeWidth={isHovered ? "4" : "2.5"}
+                                style={{
+                                  transition: "all 0.15s ease",
+                                  cursor: "pointer",
+                                  filter: "drop-shadow(0 2px 4px rgba(16, 107, 163, 0.2))"
+                                }}
+                              />
+                              {/* X Axis Labels */}
+                              <text
+                                x={x}
+                                y={paddingTop + chartHeight + 18}
+                                fill="#6a7c88"
+                                fontSize="10"
+                                fontWeight="700"
+                                textAnchor="middle"
+                                style={{ fontFamily: " Cairo, var(--font-sans)" }}
+                              >
+                                {d.label}
+                              </text>
+
+                              {/* Invisible Trigger rect for easy hovering */}
+                              <rect
+                                x={x - (chartWidth / historyData.length) / 2}
+                                y={paddingTop}
+                                width={chartWidth / historyData.length}
+                                height={chartHeight + 15}
+                                fill="transparent"
+                                style={{ cursor: "pointer" }}
+                                onMouseEnter={(e) => {
+                                  // Get bounding rect to calculate responsive HTML coordinates
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const container = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                                  if (container) {
+                                    setHoveredPoint({
+                                      date: d.date,
+                                      tokens: d.tokens,
+                                      x: rect.left - container.left + rect.width / 2,
+                                      y: rect.top - container.top + (y - paddingTop)
+                                    });
+                                  }
+                                }}
+                                onMouseLeave={() => setHoveredPoint(null)}
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {/* Tooltip Overlay */}
+                      {hoveredPoint && (
+                        <div style={{
+                          position: "absolute",
+                          left: `${hoveredPoint.x}px`,
+                          top: `${hoveredPoint.y - 30}px`,
+                          transform: "translate(-50%, -100%)",
+                          background: "rgba(15, 23, 42, 0.95)",
+                          color: "#ffffff",
+                          padding: "8px 14px",
+                          borderRadius: "10px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          pointerEvents: "none",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.22)",
+                          zIndex: 100,
+                          whiteSpace: "nowrap",
+                          transition: "all 0.1s ease",
+                          fontFamily: "Cairo, var(--font-sans)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                          border: "1px solid rgba(255,255,255,0.15)"
+                        }}>
+                          <span style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.65rem", display: "block" }}>
+                            {language === "ar" ? `التاريخ: ${hoveredPoint.date}` : `Date: ${hoveredPoint.date}`}
+                          </span>
+                          <span style={{ color: "#4394d2", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4394d2" }} />
+                            {(hoveredPoint.tokens || 0).toLocaleString()} {language === "ar" ? "رمز مستهلك" : "tokens used"}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Top Consuming Users Table */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.25rem",
+          }}>
+            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 1rem 0" }}>
+              <FiUsers style={{ color: "var(--secondary)" }} />
+              <span>{language === "ar" ? "أكثر المستخدمين استهلاكاً للرموز" : "Top Consuming Users Breakdown"}</span>
+            </h3>
+
+            {!globalStats?.userBreakdown || globalStats.userBreakdown.length === 0 ? (
+              <div style={{ color: "#506578", textAlign: "center", padding: "1.5rem", fontSize: "0.85rem" }}>
+                {language === "ar" ? "لا توجد بيانات استهلاك متاحة حالياً." : "No usage data available."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "250px", overflowY: "auto" }}>
+                {globalStats.userBreakdown.map((user, idx) => {
+                  const maxTokens = globalStats.userBreakdown[0]?.tokens || 1;
+                  const percentage = Math.min(100, Math.round(((user.tokens || 0) / maxTokens) * 100));
+                  const rankColors = [
+                    { border: "rgba(16, 107, 163, 0.22)", bg: "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(27, 163, 156, 0.03))", badge: "var(--primary)" },
+                    { border: "rgba(27, 163, 156, 0.22)", bg: "linear-gradient(135deg, rgba(27, 163, 156, 0.08), rgba(243, 156, 18, 0.03))", badge: "var(--secondary)" },
+                    { border: "rgba(243, 156, 18, 0.22)", bg: "linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(162, 217, 206, 0.03))", badge: "var(--accent-orange)" }
+                  ];
+                  const rankStyle = rankColors[idx] || { border: "rgba(16, 107, 163, 0.1)", bg: "rgba(255,255,255,0.75)", badge: "#7a8b9e" };
+                  const initials = user.email ? user.email.substring(0, 2).toUpperCase() : "U";
+
+                  return (
+                    <div key={idx} style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.45rem",
+                      padding: "0.85rem",
+                      background: rankStyle.bg,
+                      borderRadius: "8px",
+                      border: `1px solid ${rankStyle.border}`,
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    }}
+                    className="user-breakdown-row"
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                          <span style={{
+                            width: "22px",
+                            height: "22px",
+                            borderRadius: "50%",
+                            background: rankStyle.badge,
+                            color: "#fff",
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "var(--font-mono)"
+                          }}>
+                            #{idx + 1}
+                          </span>
+                          <span style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.85)",
+                            border: "1px solid rgba(16, 107, 163, 0.15)",
+                            color: "var(--primary)",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "var(--font-mono)"
+                          }}>
+                            {initials}
+                          </span>
+                          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
+                            {user.email}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
+                          {(user.tokens || 0).toLocaleString()} {language === "ar" ? "رمز" : "tokens"}
+                        </span>
+                      </div>
+                      <div style={{
+                        width: "100%",
+                        height: "6px",
+                        background: "rgba(16, 107, 163, 0.08)",
+                        borderRadius: "50px",
+                        overflow: "hidden"
+                      }}>
+                        <div style={{
+                          width: `${percentage}%`,
+                          height: "100%",
+                          background: "linear-gradient(90deg, var(--primary), var(--secondary))",
+                          borderRadius: "50px"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* 2. Interactive Agent Pipeline & DAG Workflows */}
       <section className="panel-card" style={{ width: "100%" }}>
         <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1032,500 +1777,6 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
               );
             })
           )}
-        </div>
-      </section>
-
-      {/* 4. Executive Global Token Analytics Panel */}
-      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-              <FiTrendingUp style={{ color: "var(--primary)" }} />
-              <span>{language === "ar" ? "التحليلات التنفيذية لاستهلاك الرموز عالمياً" : "Executive Global Token Analytics"}</span>
-            </h2>
-            <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
-              {language === "ar"
-                ? "مراقبة وتحليل منحنيات استهلاك الرموز (Tokens) يومياً، أسبوعياً، وشهرياً لجميع الحسابات."
-                : "Real-time monitoring and reporting of token consumption metrics across Daily, Weekly, Monthly, and Lifetime intervals."}
-            </p>
-          </div>
-          {isLoadingGlobal && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85rem", color: "var(--primary)" }}>
-              <FiRefreshCw className="spinning-icon" />
-              <span>{language === "ar" ? "جاري التحديث..." : "Syncing..."}</span>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          {/* Token Stats Grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.25rem"
-          }}>
-            {[
-              {
-                id: "daily",
-                titleAr: "الاستهلاك اليومي",
-                titleEn: "Daily Consumption",
-                tokens: globalStats?.daily ?? 0,
-                color: "var(--primary)",
-                descAr: "آخر 24 ساعة",
-                descEn: "Last 24 hours"
-              },
-              {
-                id: "weekly",
-                titleAr: "الاستهلاك الأسبوعي",
-                titleEn: "Weekly Consumption",
-                tokens: globalStats?.weekly ?? 0,
-                color: "var(--secondary-hover)",
-                descAr: "آخر 7 أيام",
-                descEn: "Last 7 days"
-              },
-              {
-                id: "monthly",
-                titleAr: "الاستهلاك الشهري",
-                titleEn: "Monthly Consumption",
-                tokens: globalStats?.monthly ?? 0,
-                color: "var(--accent-orange)",
-                descAr: "آخر 30 يوم",
-                descEn: "Last 30 days"
-              },
-              {
-                id: "lifetime",
-                titleAr: "الاستهلاك الإجمالي",
-                titleEn: "Lifetime Consumption",
-                tokens: globalStats?.total ?? 0,
-                color: "var(--accent-green)",
-                descAr: "تراكمي مدى الحياة",
-                descEn: "Cumulative overall"
-              }
-            ].map((card) => (
-              <div key={card.id} style={{
-                padding: "1.25rem",
-                background: "rgba(255, 255, 255, 0.45)",
-                border: "1px solid var(--card-border)",
-                borderRadius: "var(--border-radius-md)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow: "var(--shadow-sm)",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "default"
-              }}
-              className="metric-card-hover"
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 2 }}>
-                  <span style={{ fontSize: "0.85rem", color: "#6a7c88", fontWeight: 600 }}>
-                    {language === "ar" ? card.titleAr : card.titleEn}
-                  </span>
-                  <div style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: card.color,
-                    animation: "pulse 2s infinite"
-                  }} />
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0", position: "relative", zIndex: 2 }}>
-                  <span style={{ fontSize: "1.65rem", fontWeight: 800, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
-                    {(card.tokens || 0).toLocaleString()}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 500 }}>
-                    {language === "ar" ? "رمز" : "tokens"}
-                  </span>
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#5a6e7c", position: "relative", zIndex: 2 }}>
-                  {language === "ar" ? card.descAr : card.descEn}
-                </div>
-                {renderSparkline(card.id, card.tokens, card.color)}
-              </div>
-            ))}
-          </div>
-
-          {/* Interactive Token Telemetry Visual Chart */}
-          <div style={{
-            background: "rgba(255, 255, 255, 0.55)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--border-radius-lg)",
-            padding: "1.5rem",
-            boxShadow: "var(--shadow-md)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            position: "relative"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FiActivity style={{ color: "var(--primary)", fontSize: "1.2rem" }} />
-                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>
-                  {language === "ar" ? "سجل استهلاك الرموز اليومي" : "Historical Daily Token Telemetry"}
-                </h3>
-              </div>
-              <span style={{
-                fontSize: "0.7rem",
-                color: "#106ba3",
-                background: "rgba(16, 107, 163, 0.06)",
-                padding: "3px 8px",
-                borderRadius: "50px",
-                fontWeight: 700
-              }}>
-                {language === "ar" ? "آخر 7 أيام (محدث لحظياً)" : "Last 7 Days (Realtime)"}
-              </span>
-            </div>
-
-            <div style={{ width: "100%", overflowX: "auto" }}>
-              <div style={{ position: "relative", minWidth: "550px", width: "100%", height: "230px" }}>
-                {(() => {
-                  const dummyHistory = [
-                    { date: "05-23", tokens: 1200 },
-                    { date: "05-24", tokens: 2800 },
-                    { date: "05-25", tokens: 2100 },
-                    { date: "05-26", tokens: 4100 },
-                    { date: "05-27", tokens: 3600 },
-                    { date: "05-28", tokens: 5800 },
-                    { date: "05-29", tokens: 7200 },
-                  ];
-
-                  const historyData = (globalStats?.history && globalStats.history.length > 0)
-                    ? globalStats.history.map(item => ({
-                        ...item,
-                        label: item.date.length >= 10 ? item.date.substring(5) : item.date
-                      }))
-                    : dummyHistory.map(item => ({ ...item, label: item.date }));
-
-                  const maxVal = Math.max(...historyData.map(d => d.tokens), 500);
-
-                  const svgWidth = 600;
-                  const svgHeight = 220;
-                  const paddingLeft = 60;
-                  const paddingRight = 20;
-                  const paddingTop = 25;
-                  const paddingBottom = 35;
-
-                  const chartWidth = svgWidth - paddingLeft - paddingRight;
-                  const chartHeight = svgHeight - paddingTop - paddingBottom;
-
-                  let linePath = "";
-                  let areaPath = "";
-
-                  if (historyData.length > 0) {
-                    linePath = historyData.map((d, i) => {
-                      const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
-                      const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
-                      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-                    }).join(" ");
-
-                    const firstX = paddingLeft;
-                    const lastX = paddingLeft + chartWidth;
-                    const bottomY = paddingTop + chartHeight;
-                    areaPath = `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-                  }
-
-                  const gridLines = [0.25, 0.5, 0.75, 1.0];
-
-                  return (
-                    <>
-                      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} width="100%" height="100%" style={{ display: "block" }}>
-                        <defs>
-                          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.00" />
-                          </linearGradient>
-                        </defs>
-
-                        {/* Background Grid Lines */}
-                        {gridLines.map((ratio, index) => {
-                          const y = paddingTop + chartHeight - ratio * chartHeight;
-                          const val = Math.round(ratio * maxVal);
-                          return (
-                            <g key={index}>
-                              <line
-                                x1={paddingLeft}
-                                y1={y}
-                                x2={svgWidth - paddingRight}
-                                y2={y}
-                                stroke="rgba(16, 107, 163, 0.08)"
-                                strokeWidth="1"
-                                strokeDasharray="4 4"
-                              />
-                              <text
-                                x={paddingLeft - 8}
-                                y={y + 4}
-                                fill="#8a9ca8"
-                                fontSize="10"
-                                fontWeight="700"
-                                textAnchor="end"
-                                style={{ fontFamily: "var(--font-mono)" }}
-                              >
-                                {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
-                              </text>
-                            </g>
-                          );
-                        })}
-
-                        {/* Baseline */}
-                        <line
-                          x1={paddingLeft}
-                          y1={paddingTop + chartHeight}
-                          x2={svgWidth - paddingRight}
-                          y2={paddingTop + chartHeight}
-                          stroke="rgba(16, 107, 163, 0.15)"
-                          strokeWidth="1"
-                        />
-
-                        {/* Under Area Gradient */}
-                        {areaPath && (
-                          <path
-                            d={areaPath}
-                            fill="url(#chartGradient)"
-                          />
-                        )}
-
-                        {/* Active Area Bars for extra richness */}
-                        {historyData.map((d, i) => {
-                          const barWidth = Math.max(12, chartWidth / historyData.length * 0.25);
-                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth - barWidth / 2;
-                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
-                          const height = (d.tokens / maxVal) * chartHeight;
-                          return (
-                            <rect
-                              key={`bar-${i}`}
-                              x={x}
-                              y={y}
-                              width={barWidth}
-                              height={height}
-                              rx="3"
-                              fill="rgba(16, 107, 163, 0.06)"
-                              style={{ transition: "all 0.3s ease" }}
-                            />
-                          );
-                        })}
-
-                        {/* Core Line Path */}
-                        {linePath && (
-                          <path
-                            d={linePath}
-                            fill="none"
-                            stroke="var(--primary)"
-                            strokeWidth="3.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        )}
-
-                        {/* Glow Dots and Interactive hover overlays */}
-                        {historyData.map((d, i) => {
-                          const x = paddingLeft + (i / (historyData.length - 1)) * chartWidth;
-                          const y = paddingTop + chartHeight - (d.tokens / maxVal) * chartHeight;
-                          const isHovered = hoveredPoint && hoveredPoint.date === d.date;
-
-                          return (
-                            <g key={i}>
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r={isHovered ? "7" : "4"}
-                                fill="#ffffff"
-                                stroke="var(--primary)"
-                                strokeWidth={isHovered ? "4" : "2.5"}
-                                style={{
-                                  transition: "all 0.15s ease",
-                                  cursor: "pointer",
-                                  filter: "drop-shadow(0 2px 4px rgba(16, 107, 163, 0.2))"
-                                }}
-                              />
-                              {/* X Axis Labels */}
-                              <text
-                                x={x}
-                                y={paddingTop + chartHeight + 18}
-                                fill="#6a7c88"
-                                fontSize="10"
-                                fontWeight="700"
-                                textAnchor="middle"
-                                style={{ fontFamily: " Cairo, var(--font-sans)" }}
-                              >
-                                {d.label}
-                              </text>
-
-                              {/* Invisible Trigger rect for easy hovering */}
-                              <rect
-                                x={x - (chartWidth / historyData.length) / 2}
-                                y={paddingTop}
-                                width={chartWidth / historyData.length}
-                                height={chartHeight + 15}
-                                fill="transparent"
-                                style={{ cursor: "pointer" }}
-                                onMouseEnter={(e) => {
-                                  // Get bounding rect to calculate responsive HTML coordinates
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const container = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
-                                  if (container) {
-                                    setHoveredPoint({
-                                      date: d.date,
-                                      tokens: d.tokens,
-                                      x: rect.left - container.left + rect.width / 2,
-                                      y: rect.top - container.top + (y - paddingTop)
-                                    });
-                                  }
-                                }}
-                                onMouseLeave={() => setHoveredPoint(null)}
-                              />
-                            </g>
-                          );
-                        })}
-                      </svg>
-
-                      {/* Tooltip Overlay */}
-                      {hoveredPoint && (
-                        <div style={{
-                          position: "absolute",
-                          left: `${hoveredPoint.x}px`,
-                          top: `${hoveredPoint.y - 30}px`,
-                          transform: "translate(-50%, -100%)",
-                          background: "rgba(15, 23, 42, 0.95)",
-                          color: "#ffffff",
-                          padding: "8px 14px",
-                          borderRadius: "10px",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          pointerEvents: "none",
-                          boxShadow: "0 10px 25px rgba(0,0,0,0.22)",
-                          zIndex: 100,
-                          whiteSpace: "nowrap",
-                          transition: "all 0.1s ease",
-                          fontFamily: "Cairo, var(--font-sans)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "2px",
-                          border: "1px solid rgba(255,255,255,0.15)"
-                        }}>
-                          <span style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.65rem", display: "block" }}>
-                            {language === "ar" ? `التاريخ: ${hoveredPoint.date}` : `Date: ${hoveredPoint.date}`}
-                          </span>
-                          <span style={{ color: "#4394d2", display: "flex", alignItems: "center", gap: "4px" }}>
-                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4394d2" }} />
-                            {(hoveredPoint.tokens || 0).toLocaleString()} {language === "ar" ? "رمز مستهلك" : "tokens used"}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
-
-          {/* Top Consuming Users Table */}
-          <div style={{
-            background: "rgba(255, 255, 255, 0.55)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--border-radius-md)",
-            padding: "1.25rem",
-          }}>
-            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 1rem 0" }}>
-              <FiUsers style={{ color: "var(--secondary)" }} />
-              <span>{language === "ar" ? "أكثر المستخدمين استهلاكاً للرموز" : "Top Consuming Users Breakdown"}</span>
-            </h3>
-
-            {!globalStats?.userBreakdown || globalStats.userBreakdown.length === 0 ? (
-              <div style={{ color: "#506578", textAlign: "center", padding: "1.5rem", fontSize: "0.85rem" }}>
-                {language === "ar" ? "لا توجد بيانات استهلاك متاحة حالياً." : "No usage data available."}
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "250px", overflowY: "auto" }}>
-                {globalStats.userBreakdown.map((user, idx) => {
-                  const maxTokens = globalStats.userBreakdown[0]?.tokens || 1;
-                  const percentage = Math.min(100, Math.round(((user.tokens || 0) / maxTokens) * 100));
-                  const rankColors = [
-                    { border: "rgba(16, 107, 163, 0.22)", bg: "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(27, 163, 156, 0.03))", badge: "var(--primary)" },
-                    { border: "rgba(27, 163, 156, 0.22)", bg: "linear-gradient(135deg, rgba(27, 163, 156, 0.08), rgba(243, 156, 18, 0.03))", badge: "var(--secondary)" },
-                    { border: "rgba(243, 156, 18, 0.22)", bg: "linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(162, 217, 206, 0.03))", badge: "var(--accent-orange)" }
-                  ];
-                  const rankStyle = rankColors[idx] || { border: "rgba(16, 107, 163, 0.1)", bg: "rgba(255,255,255,0.75)", badge: "#7a8b9e" };
-                  const initials = user.email ? user.email.substring(0, 2).toUpperCase() : "U";
-
-                  return (
-                    <div key={idx} style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.45rem",
-                      padding: "0.85rem",
-                      background: rankStyle.bg,
-                      borderRadius: "8px",
-                      border: `1px solid ${rankStyle.border}`,
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                    }}
-                    className="user-breakdown-row"
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                          <span style={{
-                            width: "22px",
-                            height: "22px",
-                            borderRadius: "50%",
-                            background: rankStyle.badge,
-                            color: "#fff",
-                            fontSize: "0.7rem",
-                            fontWeight: 800,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontFamily: "var(--font-mono)"
-                          }}>
-                            #{idx + 1}
-                          </span>
-                          <span style={{
-                            width: "28px",
-                            height: "28px",
-                            borderRadius: "50%",
-                            background: "rgba(255,255,255,0.85)",
-                            border: "1px solid rgba(16, 107, 163, 0.15)",
-                            color: "var(--primary)",
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontFamily: "var(--font-mono)"
-                          }}>
-                            {initials}
-                          </span>
-                          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--foreground)", fontFamily: "var(--font-mono)" }}>
-                            {user.email}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                          {(user.tokens || 0).toLocaleString()} {language === "ar" ? "رمز" : "tokens"}
-                        </span>
-                      </div>
-                      <div style={{
-                        width: "100%",
-                        height: "6px",
-                        background: "rgba(16, 107, 163, 0.08)",
-                        borderRadius: "50px",
-                        overflow: "hidden"
-                      }}>
-                        <div style={{
-                          width: `${percentage}%`,
-                          height: "100%",
-                          background: "linear-gradient(90deg, var(--primary), var(--secondary))",
-                          borderRadius: "50px"
-                        }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </section>
 

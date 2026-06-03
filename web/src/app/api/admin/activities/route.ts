@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
+import { checkIsAdmin } from "../helper";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +16,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Role-based Access Control Check
-    const HARDCODED_ADMINS = ["hesham1988@gmail.com", "contact@asdaa.co"];
-    const envAdmins = process.env.SUPERADMIN_USER
-      ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
-      : [];
-    const admins = Array.from(new Set([...HARDCODED_ADMINS, ...envAdmins]));
+    // Role-based Access Control Check using centralized helper
+    const isAdmin = await checkIsAdmin(email);
     
-    if (!admins.includes(email.toLowerCase().trim())) {
+    if (!isAdmin) {
       return new Response(
-        JSON.stringify({ error: "Forbidden: Superadmin access required." }),
+        JSON.stringify({ error: "Forbidden: Admin access required." }),
         { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }

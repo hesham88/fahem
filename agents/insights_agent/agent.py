@@ -32,7 +32,12 @@ async def generate_student_insight_report_tool(user_id: str, subject_id: str) ->
         from pymongo import MongoClient
         uri = get_mongodb_uri(read_only=True)
         client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-        db = client.get_default_database() or client.fahem
+        try:
+            db = client.get_default_database()
+            if db is None:
+                db = client["fahem"]
+        except Exception:
+            db = client["fahem"]
         
         # Aggregate pipeline
         pipeline = [

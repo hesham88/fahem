@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { getOidcToken } from "../../proxy";
+import { checkIsAdmin } from "../helper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
 
-  // 1. Super Admin Validation Guardrail Engine
+  // 1. Super Admin Validation Guardrail Engine via centralized helper
   const { searchParams } = new URL(req.url);
   const email = searchParams.get("email");
 
@@ -22,15 +23,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const HARDCODED_ADMINS = ["hesham1988@gmail.com", "contact@asdaa.co"];
-  const envAdmins = process.env.SUPERADMIN_USER
-    ? process.env.SUPERADMIN_USER.split(",").map((addr) => addr.trim().toLowerCase())
-    : [];
-  const admins = Array.from(new Set([...HARDCODED_ADMINS, ...envAdmins]));
-  if (!admins.includes(email.toLowerCase().trim())) {
+  const isAdmin = await checkIsAdmin(email);
+  if (!isAdmin) {
     return new Response(
       JSON.stringify({
-        error: "Forbidden: Only designated Super Admins are allowed to inspect operational logs."
+        error: "Forbidden: Only designated Admins are allowed to inspect operational logs."
       }),
       {
         status: 403,

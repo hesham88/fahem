@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { auth } from "../lib/firebase";
+import { auth, storage } from "../lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useTranslation } from "../context/LanguageContext";
 import { 
   FiMessageSquare, 
@@ -21,7 +22,10 @@ import {
   FiPlus,
   FiTrash2,
   FiRefreshCw,
-  FiFileText
+  FiFileText,
+  FiMaximize2,
+  FiSidebar,
+  FiMinimize2
 } from "react-icons/fi";
 
 interface Message {
@@ -43,6 +47,15 @@ export default function StickyChat() {
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+
+  // Layout & Context States
+  const [layoutMode, setLayoutMode] = useState<"compact" | "side" | "fullscreen">("compact");
+  const [bookContext, setBookContext] = useState<any>(null);
+
+  // Mentions Dropdown States
+  const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
+  const [mentionSearch, setMentionQuery] = useState<string>("");
+  const [showMentionsDropdown, setShowMentionsDropdown] = useState<boolean>(false);
 
   // Saved Chats States
   const [sessions, setSessions] = useState<any[]>([]);
@@ -85,6 +98,23 @@ export default function StickyChat() {
       fetchSessions(user.uid);
     }
   }, [user, isOpen]);
+
+  // Listen to custom textbook context changes from page.tsx
+  useEffect(() => {
+    const handleContextChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setBookContext(detail);
+        setIsOpen(true);
+        setLayoutMode("side"); // Auto-expand to premium side-by-side mode!
+      } else {
+        setBookContext(null);
+        setLayoutMode("compact"); // Revert back to compact when leaving reader
+      }
+    };
+    window.addEventListener("fahemBookContext", handleContextChange);
+    return () => window.removeEventListener("fahemBookContext", handleContextChange);
+  }, []);
 
   // Scroll messages to bottom on change
   useEffect(() => {
@@ -196,6 +226,116 @@ export default function StickyChat() {
     setShowHistory(false);
   };
 
+  const getMentionOptions = () => {
+    if (mentionType === "subject") {
+      const opts = [
+        { id: "@math", label: language === "ar" ? "➕ الرياضيات" : "📊 Math", desc: language === "ar" ? "مواضيع الجبر والإحصاء" : "Algebra & Statistics" },
+        { id: "@science", label: language === "ar" ? "🧪 العلوم" : "🧬 Science", desc: language === "ar" ? "الأحياء والفيزياء والكيمياء" : "Biology, Physics, Chem" },
+        { id: "@arabic", label: language === "ar" ? "📖 اللغة العربية" : "✍️ Arabic", desc: language === "ar" ? "قواعد النحو واللغة" : "Arabic Linguistics & Grammar" },
+        { id: "@history", label: language === "ar" ? "🌍 التاريخ" : "🏛️ History", desc: language === "ar" ? "الدراسات الاجتماعية والتاريخية" : "Modern History & Social Studies" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    if (mentionType === "book") {
+      const opts = [
+        { id: "#college-algebra", label: "📚 College Algebra 2e", desc: language === "ar" ? "مرجع الجبر من OpenStax" : "OpenStax Algebra Textbook" },
+        { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: language === "ar" ? "مرجع الكيمياء العامة" : "OpenStax Chemistry Volume" },
+        { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: language === "ar" ? "كتاب شرح قواعد اللغة" : "Simplified Arabic Grammar Rules" },
+        { id: "#middleeast-history", label: "🌍 Middle East History", desc: language === "ar" ? "مرجع التاريخ الحديث والمعاصر" : "Modern Middle East History Guide" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    if (mentionType === "command") {
+      const opts = [
+        { id: "/explain", label: "💡 Explain Step-by-Step", desc: language === "ar" ? "شرح وافٍ ومفصل خطوة بخطوة" : "Detailed pedagogical explanation" },
+        { id: "/summary", label: "📝 Generate Summary", desc: language === "ar" ? "تخليص عالي الكثافة (الخلاصة والزتونة)" : "High-density concepts & formulas sheet" },
+        { id: "/practice", label: "✍️ Active Recall Challenge", desc: language === "ar" ? "سؤال تفاعلي يشجع المذاكرة النشطة" : "Generate interactive question to solve" },
+        { id: "/quiz", label: "⚡ Quick Mastery Quiz", desc: language === "ar" ? "اختبار قصير من 3 أسئلة مفاهيمية" : "Generate 3-question conceptual quiz" }
+      ];
+      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+    }
+    return [];
+  };
+
+  const handleSelectMention = (optionId: string) => {
+    const words = inputValue.split(/\s+/);
+    words[words.length - 1] = optionId;
+    setInputValue(words.join(" ") + " ");
+    setShowMentionsDropdown(false);
+    setMentionType(null);
+    setMentionQuery("");
+  };
+
+  const parseInlineMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
+  };
+
+  const formatMessageText = (txt: string) => {
+    if (!txt) return "";
+    
+    const lines = txt.split("\n");
+    return lines.map((line, lineIdx) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return <div key={lineIdx} style={{ height: "0.5rem" }} />;
+      }
+
+      if (trimmed.startsWith("###")) {
+        return <h4 key={lineIdx} style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.5rem", marginBottom: "0.25rem", textAlign: "start" }}>{trimmed.slice(3).trim()}</h4>;
+      }
+      if (trimmed.startsWith("##")) {
+        return <h3 key={lineIdx} style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.75rem", marginBottom: "0.35rem", textAlign: "start" }}>{trimmed.slice(2).trim()}</h3>;
+      }
+
+      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+        const rest = trimmed.substring(2);
+        return (
+          <ul key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "disc", textAlign: "start" }}>
+            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+              {parseInlineMarkdown(rest)}
+            </li>
+          </ul>
+        );
+      }
+
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+      if (numMatch) {
+        const rest = numMatch[2];
+        return (
+          <ol key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "decimal", textAlign: "start" }}>
+            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+              {parseInlineMarkdown(rest)}
+            </li>
+          </ol>
+        );
+      }
+
+      if (trimmed.startsWith("`") && trimmed.endsWith("`")) {
+        const rest = trimmed.slice(1, -1);
+        return (
+          <div key={lineIdx} style={{ margin: "0.4rem 0", padding: "0.4rem 0.6rem", borderRadius: "8px", background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.05)", fontFamily: "monospace", fontSize: "0.8rem", color: "var(--primary)", overflowX: "auto", textAlign: "start" }}>
+            {rest}
+          </div>
+        );
+      }
+
+      return (
+        <p key={lineIdx} style={{ margin: "0.25rem 0", fontSize: "0.85rem", lineHeight: "1.5", textAlign: "start" }}>
+          {parseInlineMarkdown(trimmed)}
+        </p>
+      );
+    });
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const queryText = (textToSend || inputValue).trim();
     if (!queryText || isSending) return;
@@ -223,6 +363,27 @@ export default function StickyChat() {
       { id: assistantMsgId, role: "assistant", text: "", timestamp: new Date(), activeAgent: "Guardrail Audit" }
     ]);
 
+    // Construct Context-Enriched Prompt Payload for RAG Grounding
+    let promptPayload = queryText;
+    if (bookContext) {
+      const isArabic = language === "ar";
+      const title = isArabic ? (bookContext.book?.titleAr || bookContext.book?.title) : (bookContext.book?.titleEn || bookContext.book?.title);
+      const chapter = isArabic ? bookContext.chapterTitleAr : bookContext.chapterTitleEn;
+      const pageTitle = isArabic ? bookContext.titleAr : bookContext.titleEn;
+      const content = isArabic ? (bookContext.contentAr || bookContext.contentEn) : (bookContext.contentEn || bookContext.contentAr);
+      
+      promptPayload = `[Context Reference: Textbook: "${title}", Chapter: "${chapter}", Section: "${pageTitle}", Page: ${bookContext.currentPage}] 
+
+Page Content:
+"""
+${content}
+"""
+
+User Question: ${queryText}`;
+      
+      setSessionLogs((prev) => [...prev, `[RAG Grounding] Grounded directly in textbook: "${title}" - Page ${bookContext.currentPage}`]);
+    }
+
     try {
       const endpoint = useGrounded ? "/api/agent/grounded" : "/api/agent";
       const response = await fetch(endpoint, {
@@ -231,7 +392,7 @@ export default function StickyChat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: queryText,
+          prompt: promptPayload,
           language,
           userEmail: user.email || "",
           userId: user.uid || "",
@@ -411,20 +572,24 @@ export default function StickyChat() {
       <div
         style={{
           position: "fixed",
-          top: "1.5rem",
-          bottom: "1.5rem",
-          [dir === "rtl" ? "left" : "right"]: isOpen ? "1.5rem" : "-460px",
-          width: "400px",
-          maxWidth: "calc(100vw - 3rem)",
-          height: "calc(100vh - 3rem)",
-          backgroundColor: "rgba(253, 251, 247, 0.85)",
+          top: layoutMode === "compact" ? "1.5rem" : "0",
+          bottom: layoutMode === "compact" ? "1.5rem" : "0",
+          [dir === "rtl" ? "left" : "right"]: isOpen 
+            ? (layoutMode === "compact" ? "1.5rem" : "0") 
+            : (layoutMode === "fullscreen" ? "-100vw" : layoutMode === "side" ? "-540px" : "-460px"),
+          width: layoutMode === "fullscreen" ? "100vw" : layoutMode === "side" ? "480px" : "400px",
+          maxWidth: layoutMode === "fullscreen" ? "100%" : "calc(100vw - 1rem)",
+          height: layoutMode === "compact" ? "calc(100vh - 3rem)" : "100vh",
+          backgroundColor: "rgba(253, 251, 247, 0.95)",
           backdropFilter: "blur(24px) saturate(190%)",
           WebkitBackdropFilter: "blur(24px) saturate(190%)",
-          border: "1px solid rgba(212, 175, 55, 0.35)",
-          borderRadius: "var(--border-radius-lg)",
-          boxShadow: dir === "rtl" 
+          border: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderLeft: (layoutMode === "side" && dir !== "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderRight: (layoutMode === "side" && dir === "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderRadius: layoutMode === "compact" ? "var(--border-radius-lg)" : "0",
+          boxShadow: layoutMode === "fullscreen" ? "none" : (dir === "rtl" 
             ? "10px 15px 50px rgba(16, 107, 163, 0.15), -2px 0px 10px rgba(255, 255, 255, 0.5)" 
-            : "-10px 15px 50px rgba(16, 107, 163, 0.15), 2px 0px 10px rgba(255, 255, 255, 0.5)",
+            : "-10px 15px 50px rgba(16, 107, 163, 0.15), 2px 0px 10px rgba(255, 255, 255, 0.5)"),
           zIndex: 9998,
           display: "flex",
           flexDirection: "column",
@@ -470,6 +635,62 @@ export default function StickyChat() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            
+            {/* Interactive Layout Mode Selectors */}
+            <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", padding: "2px", borderRadius: "10px", marginRight: "0.25rem" }}>
+              <button
+                onClick={() => setLayoutMode("compact")}
+                style={{
+                  background: layoutMode === "compact" ? "#ffffff" : "transparent",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                  color: layoutMode === "compact" ? "var(--primary)" : "#5a6e7c",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+                title={language === "ar" ? "عائم مصغر" : "Compact Overlay"}
+              >
+                <FiMinimize2 />
+              </button>
+              <button
+                onClick={() => setLayoutMode("side")}
+                style={{
+                  background: layoutMode === "side" ? "#ffffff" : "transparent",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                  color: layoutMode === "side" ? "var(--primary)" : "#5a6e7c",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+                title={language === "ar" ? "لوحة جانبية" : "Side Panel"}
+              >
+                <FiSidebar />
+              </button>
+              <button
+                onClick={() => setLayoutMode("fullscreen")}
+                style={{
+                  background: layoutMode === "fullscreen" ? "#ffffff" : "transparent",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                  color: layoutMode === "fullscreen" ? "var(--primary)" : "#5a6e7c",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+                title={language === "ar" ? "ملء الشاشة" : "Full Screen"}
+              >
+                <FiMaximize2 />
+              </button>
+            </div>
+
             <button
               onClick={() => setShowHistory(!showHistory)}
               style={{
@@ -703,6 +924,33 @@ export default function StickyChat() {
           </div>
         </div>
 
+        {/* Active Context Bar */}
+        {bookContext && (
+          <div style={{
+            background: "rgba(16, 107, 163, 0.08)",
+            padding: "0.5rem 1rem",
+            fontSize: "0.75rem",
+            color: "var(--primary)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px dashed rgba(16, 107, 163, 0.15)",
+            animation: "pulse-kf 2s infinite"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span>📖</span>
+              <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "220px" }}>
+                {language === "ar" 
+                  ? (bookContext.book?.titleAr || bookContext.book?.title) 
+                  : (bookContext.book?.titleEn || bookContext.book?.title)}
+              </strong>
+            </div>
+            <span>
+              {language === "ar" ? `الصفحة ${bookContext.currentPage}` : `Page ${bookContext.currentPage}`}
+            </span>
+          </div>
+        )}
+
         {/* Messages Body */}
         <div
           style={{
@@ -711,8 +959,14 @@ export default function StickyChat() {
             padding: "1.25rem",
             display: "flex",
             flexDirection: "column",
-            gap: "1.25rem"
+            gap: "1.25rem",
+            maxHeight: layoutMode === "fullscreen" 
+              ? "calc(100vh - 12rem)" 
+              : layoutMode === "side" 
+                ? "calc(100vh - 10rem)" 
+                : "calc(100vh - 15rem)"
           }}
+          className="custom-scrollbar"
         >
           {messages.map((msg) => (
             <div
@@ -732,23 +986,26 @@ export default function StickyChat() {
                   borderRadius: msg.role === "user" 
                     ? (dir === "rtl" ? "16px 16px 16px 0" : "16px 16px 0 16px") 
                     : (dir === "rtl" ? "16px 16px 0 16px" : "16px 16px 16px 0"),
-                  backgroundColor: msg.role === "user" ? "var(--primary)" : "rgba(255, 255, 255, 0.8)",
+                  backgroundColor: msg.role === "user" ? "var(--primary)" : "rgba(255, 255, 255, 0.85)",
                   color: msg.role === "user" ? "#ffffff" : "var(--foreground)",
                   border: msg.role === "user" ? "none" : "1px solid var(--card-border)",
                   boxShadow: msg.role === "user" ? "0 4px 12px rgba(16,107,163,0.15)" : "var(--shadow-sm)",
                   fontSize: "0.9rem",
                   lineHeight: "1.5",
-                  whiteSpace: "pre-line",
                   wordBreak: "break-word"
                 }}
               >
-                {msg.text || (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span className="dot-typing"></span>
-                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
-                      {language === "ar" ? "جاري التفكير..." : "Thinking..."}
-                    </span>
-                  </div>
+                {msg.role === "user" ? (
+                  <p style={{ margin: 0 }}>{msg.text}</p>
+                ) : (
+                  msg.text ? formatMessageText(msg.text) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span className="dot-typing"></span>
+                      <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                        {language === "ar" ? "جاري التفكير وسحب المعرفة..." : "Thinking & fetching knowledge..."}
+                      </span>
+                    </div>
+                  )
                 )}
               </div>
 
@@ -900,7 +1157,7 @@ export default function StickyChat() {
           </div>
         )}
 
-        {/* Input Form Footer */}
+        {/* Input Form Footer with Mentions popover */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -911,15 +1168,83 @@ export default function StickyChat() {
             borderTop: "1px dashed var(--card-border)",
             backgroundColor: "rgba(255,255,255,0.45)",
             display: "flex",
-            gap: "0.5rem"
+            gap: "0.5rem",
+            position: "relative"
           }}
         >
+          {/* Mentions Dropdown Popover */}
+          {showMentionsDropdown && getMentionOptions().length > 0 && (
+            <div style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "1rem",
+              right: "1rem",
+              zIndex: 10000,
+              background: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(24px)",
+              border: "1px solid rgba(16, 107, 163, 0.15)",
+              borderRadius: "16px",
+              boxShadow: "0 -4px 20px rgba(0,0,0,0.1)",
+              marginBottom: "0.5rem",
+              padding: "0.5rem",
+              maxHeight: "180px",
+              overflowY: "auto"
+            }} className="custom-scrollbar">
+              {getMentionOptions().map((opt) => (
+                <div
+                  key={opt.id}
+                  onClick={() => handleSelectMention(opt.id)}
+                  style={{
+                    padding: "0.6rem 1rem",
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    transition: "background 0.2s",
+                    textAlign: "start"
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = "none"; }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>{opt.id}</span>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>{opt.label}</span>
+                    <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{opt.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <input
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setInputValue(val);
+              const words = val.split(/\s+/);
+              const lastWord = words[words.length - 1];
+              if (lastWord && lastWord.startsWith("@")) {
+                setMentionType("subject");
+                setMentionQuery(lastWord.slice(1));
+                setShowMentionsDropdown(true);
+              } else if (lastWord && lastWord.startsWith("#")) {
+                setMentionType("book");
+                setMentionQuery(lastWord.slice(1));
+                setShowMentionsDropdown(true);
+              } else if (lastWord && lastWord.startsWith("/")) {
+                setMentionType("command");
+                setMentionQuery(lastWord.slice(1));
+                setShowMentionsDropdown(true);
+              } else {
+                setShowMentionsDropdown(false);
+                setMentionType(null);
+                setMentionQuery("");
+              }
+            }}
             disabled={isSending}
-            placeholder={language === "ar" ? "اكتب استفسارك أو فحص الأمان هنا..." : "Type your security check or query..."}
+            placeholder={language === "ar" ? "اسأل رفيقك الدراسي الذكي عن محتوى الصفحة (اكتب @ أو # أو /)..." : "Ask your AI tutor companion (type @, #, or /)..."}
             style={{
               flex: 1,
               padding: "0.75rem 1rem",
