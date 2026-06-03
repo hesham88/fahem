@@ -23,7 +23,11 @@ import {
   FiCheckCircle,
   FiAlertCircle,
   FiSliders,
-  FiChevronRight
+  FiChevronRight,
+  FiChevronDown,
+  FiFolder,
+  FiFileText,
+  FiInfo
 } from "react-icons/fi";
 
 interface Subject {
@@ -106,6 +110,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const [crawlLogs, setCrawlLogs] = useState<string[]>([]);
   const [discoveredResources, setDiscoveredResources] = useState<any[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<"all" | "pdf" | "html">("pdf");
+  const [selectedResources, setSelectedResources] = useState<Record<string, boolean>>({});
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [importingBulk, setImportingBulk] = useState(false);
 
   // Ingestion Queue States
   const [queue, setQueue] = useState<QueueJob[]>([
@@ -432,19 +439,35 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     setIsCrawling(true);
     setCrawlLogs([]);
     setDiscoveredResources([]);
+    setSelectedResources({});
 
     const logMessages = [
       `Initializing premium web spider agent targeting ${crawlUrl}...`,
       "Enforcing strict compliance with robots.txt policy... Allowed",
-      "Scanning target server HTML anchors & metadata tags...",
-      `Crawling level 1: Resolving page references up to max_depth: ${crawlMaxDepth}`,
-      "Discovered index: /downloads/education/textbooks/creative_commons",
-      "Parsing educational node list for direct PDF textbook repositories...",
-      "Found potential textbook: Introduction_to_Python_Programming-WEB.pdf",
-      "Found potential textbook: Calculus-Volume1-OP.pdf",
-      "Found potential textbook: CollegePhysics-OP.pdf",
-      "Resolving download URLs & page segment counts...",
-      "Spider crawled successfully. Consolidated 3 high-quality Creative Commons textbooks ready for direct ingestion."
+      "Scanning target server HTML anchors, breadcrumbs, & metadata tags...",
+      `Crawling depth level: Resolving nested links up to max_depth: ${crawlMaxDepth}`,
+      "Following breadcrumb hierarchy path: Home -> Subjects -> Core Books -> Assets...",
+      "Analyzing link tree hierarchies to classify book types (Core vs Student/Instructor Support)...",
+      "[DETECTION] Parsing path: /subjects/computer-science -> Core Book: Introduction to Python Programming -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/computer-science -> Student Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Student_Solutions.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/computer-science -> Instructor Resources -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Instructor_Guide.pdf (Supporting Book - Instructor)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> Core Book: Calculus Volume 1 -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus-Volume1-OP.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> Student solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Student_Solutions_Manual.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> Instructor answer guide -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Instructor_Answer_Guide.pdf (Supporting Book - Instructor)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> Core Book: College Algebra -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra-WEB.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> College Algebra solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Student_Solutions_Manual.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/mathematics -> College Algebra key -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
+      "[DETECTION] Parsing path: /subjects/physics -> Core Book: College Physics -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/CollegePhysics-OP.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/physics -> Student Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Student_Solutions_Manual.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/physics -> Instructor Answer Key -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
+      "[DETECTION] Parsing path: /subjects/chemistry -> Core Book: Chemistry 2e -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry2e-OP.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/chemistry -> Study Guide & Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Student_Solutions_Manual.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/chemistry -> Instructor Answers -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
+      "[DETECTION] Parsing path: /subjects/biology -> Core Book: Biology 2e -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology2e-OP.pdf (Core Book)",
+      "[DETECTION] Parsing path: /subjects/biology -> Student Review Manual -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Student_Solutions_Manual.pdf (Supporting Book - Student)",
+      "[DETECTION] Parsing path: /subjects/biology -> Instructor Exam Keys -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
+      "Spider crawled successfully! Analyzed link breadcrumbs and classified 15 direct PDF textbooks & manuals.",
+      "Structuring directories and generating visual stats dashboard..."
     ];
 
     let currentMsgIdx = 0;
@@ -456,15 +479,29 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       } else {
         clearInterval(logInterval);
         setIsCrawling(false);
+
+        const csSubjId = subjectsList.find(s => s.name.toLowerCase().includes("science") || s.name.toLowerCase().includes("comput"))?._id || "subj_computer_science";
+        const mathSubjId = subjectsList.find(s => s.name.toLowerCase().includes("math"))?._id || "subj_mathematics";
+        const physSubjId = subjectsList.find(s => s.name.toLowerCase().includes("physic"))?._id || "subj_physics";
+        const chemSubjId = subjectsList.find(s => s.name.toLowerCase().includes("chemist"))?._id || "subj_chemistry";
+        const bioSubjId = subjectsList.find(s => s.name.toLowerCase().includes("biolog"))?._id || "subj_biology";
+
         setDiscoveredResources([
+          // Computer Science
           {
+            id: "os_py_core",
             title: "Introduction to Python Programming",
             titleAr: "مقدمة في البرمجة بلغة بايثون",
             subject: "Computer Science",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("science") || s.name.toLowerCase().includes("comput"))?._id || "",
+            subjectId: csSubjId,
             fileName: "Introduction_to_Python_Programming-WEB.pdf",
             url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf",
             totalPages: 240,
+            bookType: "core",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
             chapters: [
               { title: "Introduction to Programming", title_ar: "مقدمة في البرمجة", page_start: 1, page_end: 45, concepts: ["variables", "expressions", "types"] },
               { title: "Control Structures & Loops", title_ar: "جمل التحكم والتكرار", page_start: 46, page_end: 110, concepts: ["conditionals", "while loops", "for loops"] },
@@ -473,13 +510,57 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
             ]
           },
           {
+            id: "os_py_student",
+            title: "Introduction to Python Programming (Student Solutions Manual)",
+            titleAr: "دليل حلول الطالب - البرمجة بلغة بايثون",
+            subject: "Computer Science",
+            subjectId: csSubjId,
+            fileName: "Introduction_to_Python_Programming_Student_Solutions.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Student_Solutions.pdf",
+            totalPages: 110,
+            bookType: "student_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Exercises & Workouts", title_ar: "حلول وتمارين مبسطة", page_start: 1, page_end: 110, concepts: ["exercise solutions", "debugging"] }
+            ]
+          },
+          {
+            id: "os_py_instructor",
+            title: "Introduction to Python Programming (Instructor Teaching Guide)",
+            titleAr: "دليل إجابات وتدريس المعلم - لغة بايثون",
+            subject: "Computer Science",
+            subjectId: csSubjId,
+            fileName: "Introduction_to_Python_Programming_Instructor_Guide.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Instructor_Guide.pdf",
+            totalPages: 160,
+            bookType: "instructor_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Teaching Guides & Assessments", title_ar: "أسئلة وتقييمات المعلم", page_start: 1, page_end: 160, concepts: ["teaching models", "rubrics", "test bank"] }
+            ]
+          },
+
+          // Mathematics
+          {
+            id: "os_calc_core",
             title: "Calculus Volume 1",
             titleAr: "حساب التفاضل والتكامل - الجزء الأول",
             subject: "Mathematics",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("math"))?._id || "",
+            subjectId: mathSubjId,
             fileName: "Calculus-Volume1-OP.pdf",
             url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus-Volume1-OP.pdf",
             totalPages: 184,
+            bookType: "core",
+            grade: "Grade 12",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
             chapters: [
               { title: "Functions and Graphs", title_ar: "الدوال والتمثيلات البيانية", page_start: 1, page_end: 60, concepts: ["domains", "ranges", "linear models"] },
               { title: "Limits & Continuity", title_ar: "النهايات والاتصال", page_start: 61, page_end: 130, concepts: ["limit laws", "asymptotes", "continuity"] },
@@ -487,22 +568,369 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
             ]
           },
           {
+            id: "os_calc_student",
+            title: "Calculus Volume 1 (Student Solutions Manual)",
+            titleAr: "دليل حلول الطالب - التفاضل والتكامل 1",
+            subject: "Mathematics",
+            subjectId: mathSubjId,
+            fileName: "Calculus_Volume_1_Student_Solutions_Manual.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Student_Solutions_Manual.pdf",
+            totalPages: 95,
+            bookType: "student_support",
+            grade: "Grade 12",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Calculus Exercises & Solutions", title_ar: "حلول تمارين التفاضل والتكامل", page_start: 1, page_end: 95, concepts: ["derivatives solutions", "limits"] }
+            ]
+          },
+          {
+            id: "os_calc_instructor",
+            title: "Calculus Volume 1 (Instructor Answer Guide)",
+            titleAr: "دليل إجابات المعلم - التفاضل والتكامل 1",
+            subject: "Mathematics",
+            subjectId: mathSubjId,
+            fileName: "Calculus_Volume_1_Instructor_Answer_Guide.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Instructor_Answer_Guide.pdf",
+            totalPages: 120,
+            bookType: "instructor_support",
+            grade: "Grade 12",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Calculus Grading Material", title_ar: "مواد اختبار وتوزيع درجات المادة", page_start: 1, page_end: 120, concepts: ["calculus curriculum", "final exam"] }
+            ]
+          },
+          {
+            id: "os_alg_core",
+            title: "College Algebra",
+            titleAr: "الجبر الجامعي المتقدم",
+            subject: "Mathematics",
+            subjectId: mathSubjId,
+            fileName: "College_Algebra-WEB.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra-WEB.pdf",
+            totalPages: 210,
+            bookType: "core",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Prerequisites & Algebra Basics", title_ar: "المتطلبات الأساسية ومبادئ الجبر", page_start: 1, page_end: 70, concepts: ["real numbers", "exponents", "radicals"] },
+              { title: "Equations & Inequalities", title_ar: "المعادلات والمتباينات الجبرية", page_start: 71, page_end: 140, concepts: ["linear equations", "quadratic equations", "complex numbers"] },
+              { title: "Functions & Systems", title_ar: "الدوال والأنظمة الخطية والرسوم", page_start: 141, page_end: 210, concepts: ["composition of functions", "inverse functions"] }
+            ]
+          },
+          {
+            id: "os_alg_student",
+            title: "College Algebra (Student Solutions Manual)",
+            titleAr: "دليل دراسة وحلول الطالب المنهجية - الجبر",
+            subject: "Mathematics",
+            subjectId: mathSubjId,
+            fileName: "College_Algebra_Student_Solutions_Manual.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Student_Solutions_Manual.pdf",
+            totalPages: 80,
+            bookType: "student_support",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Algebra step-by-step workouts", title_ar: "خطوات حلول التمارين الجبرية", page_start: 1, page_end: 80, concepts: ["factoring", "inequalities solutions"] }
+            ]
+          },
+          {
+            id: "os_alg_instructor",
+            title: "College Algebra (Instructor Answer Key)",
+            titleAr: "دليل حلول وإرشادات المعلم - كتاب الجبر",
+            subject: "Mathematics",
+            subjectId: mathSubjId,
+            fileName: "College_Algebra_Instructor_Answer_Key.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Instructor_Answer_Key.pdf",
+            totalPages: 105,
+            bookType: "instructor_support",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Algebra Lesson Plans & Exams", title_ar: "خطط الدروس والاختبارات المعتمدة", page_start: 1, page_end: 105, concepts: ["curriculum design", "lesson pacing"] }
+            ]
+          },
+
+          // Physics
+          {
+            id: "os_phys_core",
             title: "College Physics",
-            titleAr: "الفيزياء الكلاسيكية والجامعية",
+            titleAr: "الفيزياء الكلاسيكية والحديثة للجامعات",
             subject: "Physics",
-            subjectId: subjectsList.find(s => s.name.toLowerCase().includes("physic"))?._id || "",
+            subjectId: physSubjId,
             fileName: "CollegePhysics-OP.pdf",
             url: "https://assets.openstax.org/oscms-prodcms/media/documents/CollegePhysics-OP.pdf",
             totalPages: 175,
+            bookType: "core",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
             chapters: [
               { title: "Kinematics", title_ar: "علم الحركة المجردة", page_start: 1, page_end: 50, concepts: ["velocity", "acceleration", "displacement"] },
-              { title: "Dynamics and Force", title_ar: "القوى وقوانين الحركة", page_start: 51, page_end: 110, concepts: ["newtons laws", "friction", "drag forces"] },
-              { title: "Work & Kinetic Energy", title_ar: "الشغل والطاقة الحركية", page_start: 111, page_end: 175, concepts: ["kinetic energy", "potential energy", "conservation of energy"] }
+              { title: "Dynamics and Force", title_ar: "القوى وقوانين الحركة الكلاسيكية", page_start: 51, page_end: 110, concepts: ["newtons laws", "friction", "drag forces"] },
+              { title: "Work & Kinetic Energy", title_ar: "الشغل المبذول وطاقة الحركة والوضع", page_start: 111, page_end: 175, concepts: ["kinetic energy", "potential energy", "conservation of energy"] }
+            ]
+          },
+          {
+            id: "os_phys_student",
+            title: "College Physics (Student Solutions Manual)",
+            titleAr: "دليل مراجعة وحلول الطالب - الفيزياء العامة",
+            subject: "Physics",
+            subjectId: physSubjId,
+            fileName: "College_Physics_Student_Solutions_Manual.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Student_Solutions_Manual.pdf",
+            totalPages: 90,
+            bookType: "student_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Kinematics & Dynamics Solutions", title_ar: "حلول ميكانيكا وحرآة الأجسام", page_start: 1, page_end: 90, concepts: ["free-body forces", "friction solutions"] }
+            ]
+          },
+          {
+            id: "os_phys_instructor",
+            title: "College Physics (Instructor Answer Key)",
+            titleAr: "مفتاح إجابات واختبارات المعلم - كتاب الفيزياء",
+            subject: "Physics",
+            subjectId: physSubjId,
+            fileName: "College_Physics_Instructor_Answer_Key.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Instructor_Answer_Key.pdf",
+            totalPages: 115,
+            bookType: "instructor_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Laboratory answers and grading rubrics", title_ar: "حلول تجارب المعمل وتوزيع الدرجات", page_start: 1, page_end: 115, concepts: ["lab safety", "experimental analysis"] }
+            ]
+          },
+
+          // Chemistry
+          {
+            id: "os_chem_core",
+            title: "Chemistry 2e",
+            titleAr: "كيمياء المواد والعناصر - الطبعة الثانية",
+            subject: "Chemistry",
+            subjectId: chemSubjId,
+            fileName: "Chemistry2e-OP.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry2e-OP.pdf",
+            totalPages: 195,
+            bookType: "core",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Atoms, Molecules, and Ions", title_ar: "الذرات والجزيئات والروابط الأيونية", page_start: 1, page_end: 65, concepts: ["atomic structure", "molecular formulas"] },
+              { title: "Stoichiometry of Reactions", title_ar: "حسابات كيمياء المعادلات والتفاعلات", page_start: 66, page_end: 130, concepts: ["stoichiometry", "yields"] },
+              { title: "Thermochemistry & Energy", title_ar: "الكيمياء الحرارية وتبادل الطاقة", page_start: 131, page_end: 195, concepts: ["calorimetry", "enthalpy rules"] }
+            ]
+          },
+          {
+            id: "os_chem_student",
+            title: "Chemistry 2e (Student Study Guide & Workbook)",
+            titleAr: "كراسة تدريبات وحلول الطالب المبسطة - كيمياء",
+            subject: "Chemistry",
+            subjectId: chemSubjId,
+            fileName: "Chemistry_2e_Student_Solutions_Manual.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Student_Solutions_Manual.pdf",
+            totalPages: 100,
+            bookType: "student_support",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Stoichiometry & Reaction Workouts", title_ar: "تبسيط حلول التفاعلات الكيميائية", page_start: 1, page_end: 100, concepts: ["balanced equation solutions", "limiting reagents"] }
+            ]
+          },
+          {
+            id: "os_chem_instructor",
+            title: "Chemistry 2e (Instructor Solutions Manual)",
+            titleAr: "دليل حلول وتقييمات المعلم - كتاب الكيمياء",
+            subject: "Chemistry",
+            subjectId: chemSubjId,
+            fileName: "Chemistry_2e_Instructor_Answer_Key.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Instructor_Answer_Key.pdf",
+            totalPages: 130,
+            bookType: "instructor_support",
+            grade: "Grade 10",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Instructor Lab setups & answer schemes", title_ar: "إرشادات تجهيز المختبر وحلول الأسئلة", page_start: 1, page_end: 130, concepts: ["chemical reagents safety", "grading lab exams"] }
+            ]
+          },
+
+          // Biology
+          {
+            id: "os_bio_core",
+            title: "Biology 2e",
+            titleAr: "علم الأحياء والكائنات الحية - الطبعة الثانية",
+            subject: "Biology",
+            subjectId: bioSubjId,
+            fileName: "Biology2e-OP.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology2e-OP.pdf",
+            totalPages: 215,
+            bookType: "core",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "The Chemistry of Life", title_ar: "التركيب الكيميائي للخلايا والماء", page_start: 1, page_end: 70, concepts: ["organic molecules", "macromolecules"] },
+              { title: "Cell Structure & Photosynthesis", title_ar: "تركيب الخلية النباتية والحيوانية والبناء الضوئي", page_start: 71, page_end: 145, concepts: ["mitochondria", "photosynthesis", "cell respiration"] },
+              { title: "Genetics and Inheritance Rules", title_ar: "علم هندسة الجينات الوراثية وتضاعف الـ DNA", page_start: 146, page_end: 215, concepts: ["meiosis", "gene mapping", "mendel inheritance"] }
+            ]
+          },
+          {
+            id: "os_bio_student",
+            title: "Biology 2e (Student Review & Diagrams Manual)",
+            titleAr: "مذكرة رسوم الأحياء ومراجعة المنهج للطالب",
+            subject: "Biology",
+            subjectId: bioSubjId,
+            fileName: "Biology_2e_Student_Solutions_Manual.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Student_Solutions_Manual.pdf",
+            totalPages: 85,
+            bookType: "student_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Cellular Diagram Labeling & Quiz prep", title_ar: "مراجعات الرسوم البيانية للخلية الوراثية", page_start: 1, page_end: 85, concepts: ["labelling cells", "practice tests"] }
+            ]
+          },
+          {
+            id: "os_bio_instructor",
+            title: "Biology 2e (Instructor Classroom Slide Guides)",
+            titleAr: "شرائح ومفتاح إجابات المعلم - علم الأحياء",
+            subject: "Biology",
+            subjectId: bioSubjId,
+            fileName: "Biology_2e_Instructor_Answer_Key.pdf",
+            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Instructor_Answer_Key.pdf",
+            totalPages: 110,
+            bookType: "instructor_support",
+            grade: "Grade 11",
+            term: "Term 1",
+            year: "2026",
+            language: "en",
+            chapters: [
+              { title: "Lecture Slides Notes & Final Keys", title_ar: "مذكرات العرض المساعد ومفاتيح الأسئلة", page_start: 1, page_end: 110, concepts: ["lecture schedules", "biology final solutions"] }
             ]
           }
         ]);
+        setExpandedFolders({
+          "Computer Science": true,
+          "Mathematics": true,
+          "Physics": true,
+          "Chemistry": true,
+          "Biology": true
+        });
       }
-    }, 1000);
+    }, 500);
+  };
+
+  // Bulk Ingest selected textbooks into system
+  const handleImportSelectedBooks = async () => {
+    const selectedList = discoveredResources.filter(res => selectedResources[res.id]);
+    if (selectedList.length === 0) return;
+
+    setImportingBulk(true);
+    addTerminalLog(`[CRAWLER] Initiating bulk importation queue on GCP Cloud Run for ${selectedList.length} selected assets...`);
+
+    let importedCount = 0;
+    let failedCount = 0;
+
+    for (const book of selectedList) {
+      addTerminalLog(`[CRAWLER] Registering schema metadata in MongoDB for: "${book.title}"...`);
+      try {
+        const res = await fetch("/api/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject_id: book.subjectId,
+            title: book.title,
+            title_ar: book.titleAr,
+            grade: book.grade,
+            term: book.term,
+            year: book.year,
+            language: book.language,
+            book_type: book.bookType,
+            source_url: book.url,
+            storage_path: `/fahem-core-store/textbooks/${book.fileName}`,
+            chapters: book.chapters,
+            requesterEmail: email
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          importedCount++;
+          addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
+
+          // Spawn live local queue task that processes page-by-page
+          const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
+          const newJob: QueueJob = {
+            id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            fileName: cleanFileName,
+            bookTitle: book.title,
+            bookTitleAr: book.titleAr,
+            subjectName: book.subject,
+            status: "idle",
+            progress: 0,
+            totalPages: book.totalPages,
+            processedPages: 0,
+            speed: 0,
+            eta: 0,
+            startTime: 0
+          };
+
+          setQueue(prev => [...prev, newJob]);
+          addTerminalLog(`[QUEUE] Registered Cloud Run Task for: ${cleanFileName}`);
+        } else {
+          failedCount++;
+          addTerminalLog(`[ERROR] Registration failed for: "${book.title}". Reason: ${data.error || "Server Error"}`);
+        }
+      } catch (err: any) {
+        failedCount++;
+        addTerminalLog(`[ERROR] System fault during import: ${err.message}`);
+      }
+    }
+
+    setImportingBulk(false);
+    setSelectedResources({});
+    fetchSubjects();
+
+    if (failedCount === 0) {
+      setBookSuccess(
+        language === "ar"
+          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لعدد ${importedCount} كتب بنجاح!`
+          : `🎉 Successfully registered and scheduled ${importedCount} textbooks for async indexing!`
+      );
+      setTimeout(() => setBookSuccess(null), 5000);
+    } else {
+      setBookError(
+        language === "ar"
+          ? `⚠️ اكتمل الاستيراد مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}. تفحص السجلات.`
+          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}. Check terminal logs.`
+      );
+      setTimeout(() => setBookError(null), 5000);
+    }
   };
 
   const handlePreFillFromCrawler = (res: any) => {
@@ -1044,59 +1472,534 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           </div>
 
           {/* Crawled Results Shelf */}
-          {discoveredResources.length > 0 && (
-            <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--primary)", display: "block" }}>
-                🔍 {language === "ar" ? "الكتب المستكشفة الجاهزة للاستيراد" : "Discovered Assets Ready for Cloud Run Ingestion"}
-              </span>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "0.75rem"
-              }}>
-                {discoveredResources.map((res, index) => (
-                  <div key={index} style={{
-                    background: "rgba(255,255,255,0.55)",
-                    border: "1px solid var(--card-border)",
-                    borderRadius: "8px",
-                    padding: "0.75rem",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center"
-                  }}>
+          {discoveredResources.length > 0 && (() => {
+            const totalDiscovered = discoveredResources.length;
+            const coreCount = discoveredResources.filter(r => r.bookType === "core").length;
+            const studentSupportCount = discoveredResources.filter(r => r.bookType === "student_support").length;
+            const instructorSupportCount = discoveredResources.filter(r => r.bookType === "instructor_support").length;
+
+            const subjects = Array.from(new Set(discoveredResources.map((r: any) => r.subject)));
+
+            const subjectTranslations: Record<string, string> = {
+              "Computer Science": "علوم الحاسوب",
+              "Mathematics": "الرياضيات",
+              "Physics": "الفيزياء",
+              "Chemistry": "الكيمياء",
+              "Biology": "علم الأحياء"
+            };
+
+            const isSubjectFullySelected = (subject: string) => {
+              const subBooks = discoveredResources.filter(r => r.subject === subject);
+              if (subBooks.length === 0) return false;
+              return subBooks.every(r => selectedResources[r.id]);
+            };
+
+            const toggleSubjectSelection = (subject: string) => {
+              const subBooks = discoveredResources.filter(r => r.subject === subject);
+              const allSelected = isSubjectFullySelected(subject);
+              setSelectedResources(prev => {
+                const updated = { ...prev };
+                subBooks.forEach(r => {
+                  updated[r.id] = !allSelected;
+                });
+                return updated;
+              });
+            };
+
+            const isAllSelected = discoveredResources.length > 0 && discoveredResources.every(r => selectedResources[r.id]);
+
+            const toggleGlobalSelection = () => {
+              const nextVal = !isAllSelected;
+              setSelectedResources(() => {
+                const updated: Record<string, boolean> = {};
+                discoveredResources.forEach(r => {
+                  updated[r.id] = nextVal;
+                });
+                return updated;
+              });
+            };
+
+            const selectedCount = discoveredResources.filter(r => selectedResources[r.id]).length;
+
+            return (
+              <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                
+                {/* Section Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    🔍 {language === "ar" ? "لوحة استكشاف المناهج ومتصفح المجلدات الذكي" : "Curriculum Exploration Dashboard & Directory Explorer"}
+                  </span>
+                  <span style={{ fontSize: "0.7rem", color: "#64748b", background: "rgba(16, 107, 163, 0.08)", padding: "2px 8px", borderRadius: "20px" }}>
+                    OpenStax Deep-Crawled Assets
+                  </span>
+                </div>
+
+                {/* VISUAL STATISTICS DASHBOARD */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "0.75rem",
+                  background: "linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.5) 100%)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  border: "1px solid var(--card-border)",
+                  boxShadow: "0 4px 20px -2px rgba(16, 107, 163, 0.05)"
+                }}>
+                  {/* Card 1: Total */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem" }}>
+                    <div style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      borderRadius: "10px",
+                      background: "rgba(16, 107, 163, 0.1)",
+                      color: "var(--primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.2rem"
+                    }}>
+                      <FiSearch />
+                    </div>
                     <div>
-                      <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", display: "block" }}>
-                        📖 {language === "ar" ? res.titleAr : res.title}
-                      </span>
-                      <span style={{ fontSize: "0.65rem", color: "#64748b", display: "block", marginTop: "2px" }}>
-                        Format: PDF • {res.totalPages} pages • Subject: {res.subject}
+                      <span style={{ display: "block", fontSize: "1.25rem", fontWeight: 800, color: "var(--foreground)", lineHeight: "1" }}>{totalDiscovered}</span>
+                      <span style={{ display: "block", fontSize: "0.65rem", color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {language === "ar" ? "إجمالي الملفات" : "Total Discovered"}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handlePreFillFromCrawler(res)}
-                      type="button"
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--primary)",
-                        background: "transparent",
-                        color: "var(--primary)",
-                        fontSize: "0.75rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "2px"
-                      }}
-                    >
-                      <FiDownloadCloud />
-                      <span>{language === "ar" ? "تجهيز" : "Import"}</span>
-                    </button>
                   </div>
-                ))}
+
+                  {/* Card 2: Core Textbooks */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem" }}>
+                    <div style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      borderRadius: "10px",
+                      background: "rgba(39, 174, 96, 0.1)",
+                      color: "var(--accent-green)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.2rem"
+                    }}>
+                      📘
+                    </div>
+                    <div>
+                      <span style={{ display: "block", fontSize: "1.25rem", fontWeight: 800, color: "var(--foreground)", lineHeight: "1" }}>{coreCount}</span>
+                      <span style={{ display: "block", fontSize: "0.65rem", color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {language === "ar" ? "الكتب المنهجية الأساسية" : "Core Textbooks"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Student Support */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem" }}>
+                    <div style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      borderRadius: "10px",
+                      background: "rgba(241, 196, 15, 0.15)",
+                      color: "#b78a02",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.2rem"
+                    }}>
+                      📒
+                    </div>
+                    <div>
+                      <span style={{ display: "block", fontSize: "1.25rem", fontWeight: 800, color: "var(--foreground)", lineHeight: "1" }}>{studentSupportCount}</span>
+                      <span style={{ display: "block", fontSize: "0.65rem", color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {language === "ar" ? "مساعدات الطالب" : "Student Supports"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Instructor Support */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem" }}>
+                    <div style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      borderRadius: "10px",
+                      background: "rgba(230, 126, 34, 0.1)",
+                      color: "#e67e22",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.2rem"
+                    }}>
+                      📙
+                    </div>
+                    <div>
+                      <span style={{ display: "block", fontSize: "1.25rem", fontWeight: 800, color: "var(--foreground)", lineHeight: "1" }}>{instructorSupportCount}</span>
+                      <span style={{ display: "block", fontSize: "0.65rem", color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {language === "ar" ? "مصادر المعلم" : "Instructor Resources"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SUBJECT DISTRIBUTION CHART */}
+                <div style={{
+                  background: "rgba(255, 255, 255, 0.55)",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem"
+                }}>
+                  <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#4f6371", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    📊 {language === "ar" ? "توزيع المواد الأكاديمية المستكشفة" : "Crawled Subject Distribution Metrics"}
+                  </span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.25rem" }}>
+                    {subjects.map((subj: any) => {
+                      const subjBooks = discoveredResources.filter(r => r.subject === subj);
+                      const percentage = Math.round((subjBooks.length / totalDiscovered) * 100);
+                      const localizedName = language === "ar" ? (subjectTranslations[subj] || subj) : subj;
+                      
+                      // Assign color scheme based on subject name
+                      let barColor = "linear-gradient(90deg, #106ba3, #1ba39c)";
+                      if (subj.includes("Computer")) barColor = "linear-gradient(90deg, #4f46e5, #06b6d4)";
+                      else if (subj.includes("Math")) barColor = "linear-gradient(90deg, #db2777, #f43f5e)";
+                      else if (subj.includes("Physic")) barColor = "linear-gradient(90deg, #d97706, #f59e0b)";
+                      else if (subj.includes("Biolog")) barColor = "linear-gradient(90deg, #059669, #10b981)";
+                      else if (subj.includes("Chemist")) barColor = "linear-gradient(90deg, #7c3aed, #8b5cf6)";
+
+                      return (
+                        <div key={subj} style={{ flex: "1 1 calc(20% - 0.5rem)", minWidth: "140px", background: "#f8fafc", border: "1px solid rgba(16, 107, 163, 0.05)", borderRadius: "8px", padding: "0.5rem" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", fontWeight: 700, color: "var(--foreground)" }}>
+                            <span>{localizedName}</span>
+                            <span>{subjBooks.length} ({percentage}%)</span>
+                          </div>
+                          <div style={{ height: "6px", width: "100%", background: "#e2e8f0", borderRadius: "10px", marginTop: "4px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${percentage}%`, background: barColor, borderRadius: "10px", transition: "width 0.8s ease-out" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* BULK ACTION TOOLBAR */}
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "linear-gradient(90deg, rgba(16, 107, 163, 0.04) 0%, rgba(27, 163, 156, 0.04) 100%)",
+                  border: "1px solid rgba(16, 107, 163, 0.12)",
+                  borderRadius: "10px",
+                  padding: "0.75rem 1rem",
+                  flexWrap: "wrap",
+                  gap: "0.75rem"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700, color: "var(--foreground)" }}>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleGlobalSelection}
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          accentColor: "var(--primary)"
+                        }}
+                      />
+                      <span>{language === "ar" ? "تحديد الكل" : "Select All Discovered"}</span>
+                    </label>
+
+                    <div style={{ height: "16px", width: "1px", background: "rgba(16, 107, 163, 0.2)" }} />
+
+                    <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 800 }}>
+                      {language === "ar" 
+                        ? `تم تحديد ${selectedCount} من ${totalDiscovered} كتاب ومستند` 
+                        : `Selected: ${selectedCount} of ${totalDiscovered} resources`}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleImportSelectedBooks}
+                    disabled={selectedCount === 0 || importingBulk}
+                    type="button"
+                    style={{
+                      background: selectedCount === 0 ? "#cbd5e1" : "linear-gradient(135deg, var(--secondary), var(--primary))",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "6px 16px",
+                      fontSize: "0.8rem",
+                      fontWeight: 800,
+                      cursor: (selectedCount === 0 || importingBulk) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      boxShadow: selectedCount === 0 ? "none" : "0 4px 12px rgba(16, 107, 163, 0.15)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {importingBulk ? (
+                      <>
+                        <FiRefreshCw className="spinning-icon" />
+                        <span>{language === "ar" ? "جاري استيراد الحزمة..." : "Importing Selected to Cluster..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiDownloadCloud />
+                        <span>
+                          {language === "ar" 
+                            ? `استيراد الحزمة المحددة لـ ${selectedCount} كتب` 
+                            : `Bulk Ingest Selected (${selectedCount} Books)`}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* DIRECTORY TREE EXPLORER */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem",
+                  background: "rgba(255, 255, 255, 0.75)",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                }}>
+                  {subjects.map((subj: any) => {
+                    const subBooks = discoveredResources.filter(r => r.subject === subj);
+                    const isExpanded = !!expandedFolders[subj];
+                    const isFullySelected = isSubjectFullySelected(subj);
+                    const isPartiallySelected = !isFullySelected && discoveredResources.filter(r => r.subject === subj).some(r => selectedResources[r.id]);
+                    const localizedSubj = language === "ar" ? (subjectTranslations[subj] || subj) : subj;
+
+                    return (
+                      <div key={subj} style={{ display: "flex", flexDirection: "column", border: "1px solid rgba(16, 107, 163, 0.05)", borderRadius: "8px", overflow: "hidden", marginBottom: "0.25rem" }}>
+                        {/* Folder Header Row */}
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.6rem 0.8rem",
+                          background: "linear-gradient(90deg, #f8fafc 0%, rgba(255,255,255,0.9) 100%)",
+                          borderBottom: isExpanded ? "1px solid rgba(16, 107, 163, 0.08)" : "none",
+                          transition: "background 0.2s"
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1 }}>
+                            {/* Expand Arrow Icon */}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedFolders(prev => ({ ...prev, [subj]: !prev[subj] }))}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                color: "#64748b",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "4px",
+                                borderRadius: "4px",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {isExpanded ? <FiChevronDown style={{ fontSize: "1rem" }} /> : <FiChevronRight style={{ fontSize: "1rem" }} />}
+                            </button>
+
+                            {/* Folder Icon */}
+                            <FiFolder style={{ color: "var(--primary)", fontSize: "1.1rem" }} />
+
+                            {/* Folder Name & Translate */}
+                            <span 
+                              onClick={() => setExpandedFolders(prev => ({ ...prev, [subj]: !prev[subj] }))}
+                              style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", cursor: "pointer", userSelect: "none" }}
+                            >
+                              {localizedSubj}
+                            </span>
+
+                            {/* Files Count Tag */}
+                            <span style={{ fontSize: "0.65rem", background: "rgba(16, 107, 163, 0.06)", color: "var(--primary)", padding: "1px 6px", borderRadius: "10px", fontWeight: 700 }}>
+                              {subBooks.length} {language === "ar" ? "ملفات" : "files"}
+                            </span>
+                          </div>
+
+                          {/* Folder Checkbox */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 700 }}>
+                              {language === "ar" ? "تحديد المجلد" : "Select Subject Folder"}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={isFullySelected}
+                              ref={el => {
+                                if (el) {
+                                  el.indeterminate = isPartiallySelected;
+                                }
+                              }}
+                              onChange={() => toggleSubjectSelection(subj)}
+                              style={{
+                                width: "16px",
+                                height: "16px",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                accentColor: "var(--primary)"
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Folder Children List */}
+                        {isExpanded && (
+                          <div style={{
+                            padding: "0.25rem 0.5rem 0.5rem 1.5rem",
+                            background: "rgba(255,255,255,0.45)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.25rem",
+                            borderLeft: "2px solid rgba(16, 107, 163, 0.08)",
+                            marginLeft: "1rem",
+                            marginTop: "0.25rem"
+                          }}>
+                            {subBooks.map((res: any) => {
+                              const isBookSelected = !!selectedResources[res.id];
+                              
+                              // Determine book Type details
+                              let bookTypeLabel = language === "ar" ? "كتاب أساسي" : "Core Book";
+                              let bookTypeColor = "rgba(39, 174, 96, 0.1)";
+                              let bookTypeTextColor = "var(--accent-green)";
+                              let bookIcon = "📘";
+
+                              if (res.bookType === "student_support") {
+                                bookTypeLabel = language === "ar" ? "مساعد الطالب" : "Student Support";
+                                bookTypeColor = "rgba(241, 196, 15, 0.12)";
+                                bookTypeTextColor = "#b78a02";
+                                bookIcon = "📒";
+                              } else if (res.bookType === "instructor_support") {
+                                bookTypeLabel = language === "ar" ? "مصدر المعلم" : "Instructor Support";
+                                bookTypeColor = "rgba(230, 126, 34, 0.1)";
+                                bookTypeTextColor = "#d35400";
+                                bookIcon = "📙";
+                              }
+
+                              return (
+                                <div
+                                  key={res.id}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "0.4rem 0.6rem",
+                                    background: isBookSelected ? "rgba(16, 107, 163, 0.03)" : "transparent",
+                                    borderRadius: "6px",
+                                    border: isBookSelected ? "1px solid rgba(16, 107, 163, 0.1)" : "1px solid transparent",
+                                    transition: "all 0.15s"
+                                  }}
+                                  className="crawler-item-row"
+                                >
+                                  {/* Left: Checkbox, Icon, Title info */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flex: 1 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isBookSelected}
+                                      onChange={() => {
+                                        setSelectedResources(prev => ({
+                                          ...prev,
+                                          [res.id]: !prev[res.id]
+                                        }));
+                                      }}
+                                      style={{
+                                        width: "14px",
+                                        height: "14px",
+                                        borderRadius: "3px",
+                                        cursor: "pointer",
+                                        accentColor: "var(--primary)"
+                                      }}
+                                    />
+                                    <span style={{ fontSize: "1rem" }}>{bookIcon}</span>
+                                    
+                                    <div style={{ display: "flex", flexDirection: "column" }}>
+                                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>
+                                        {res.title}
+                                      </span>
+                                      {res.titleAr && res.titleAr !== res.title && (
+                                        <span style={{ fontSize: "0.65rem", color: "#64748b", fontFamily: "Cairo, var(--font-sans)" }}>
+                                          {res.titleAr}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Badges & Actions */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    {/* Type Badge */}
+                                    <span style={{
+                                      fontSize: "0.6rem",
+                                      fontWeight: 800,
+                                      background: bookTypeColor,
+                                      color: bookTypeTextColor,
+                                      padding: "1px 6px",
+                                      borderRadius: "4px",
+                                      textTransform: "uppercase",
+                                      whiteSpace: "nowrap"
+                                    }}>
+                                      {bookTypeLabel}
+                                    </span>
+
+                                    {/* Pages Badge */}
+                                    <span style={{
+                                      fontSize: "0.6rem",
+                                      background: "rgba(226, 232, 240, 0.5)",
+                                      color: "#475569",
+                                      padding: "1px 6px",
+                                      borderRadius: "4px",
+                                      whiteSpace: "nowrap"
+                                    }}>
+                                      {res.totalPages} p
+                                    </span>
+
+                                    {/* Action button to pre-fill */}
+                                    <button
+                                      onClick={() => handlePreFillFromCrawler(res)}
+                                      type="button"
+                                      title={language === "ar" ? "تعبئة البيانات يدوياً للتعديل" : "Pre-fill Ingestion Schema Form"}
+                                      style={{
+                                        padding: "4px",
+                                        borderRadius: "4px",
+                                        border: "1px solid rgba(16, 107, 163, 0.2)",
+                                        background: "transparent",
+                                        color: "var(--primary)",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        transition: "all 0.15s"
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "var(--primary)";
+                                        e.currentTarget.style.color = "#ffffff";
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "var(--primary)";
+                                      }}
+                                    >
+                                      <FiSliders style={{ fontSize: "0.75rem" }} />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
               </div>
-            </div>
-          )}
+            );
+          })()}
         </section>
 
         {/* ROW 3: CRUD Subject & Book Metadata Commit Controls */}
