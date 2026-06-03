@@ -154,8 +154,6 @@ export default function StickyChat() {
     }
   }, [sessionLogs]);
 
-  if (!user) return null; // Only show after successful sign-in
-
   const fetchSessions = async (userIdVal?: string) => {
     const activeUserId = userIdVal || user?.uid;
     if (!activeUserId) return;
@@ -363,6 +361,8 @@ export default function StickyChat() {
   useEffect(() => {
     sendMessageRef.current = handleSendMessage;
   });
+
+  if (!user) return null; // Only show after successful sign-in
 
   const handleSendMessage = async (textToSend?: string) => {
     const queryText = (textToSend || inputValue).trim();
