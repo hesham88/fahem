@@ -115,6 +115,103 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
   const [hoveredPoint, setHoveredPoint] = useState<{ date: string; tokens: number; x: number; y: number } | null>(null);
 
+  // Custom Database MCP Tools test states
+  const [activeMcpTab, setActiveMcpTab] = useState<"persist" | "insight" | "search">("persist");
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpResult, setMcpResult] = useState<any>(null);
+  const [mcpError, setMcpError] = useState<string | null>(null);
+
+  // Tool 1: Persist states
+  const [catalogPayload, setCatalogPayload] = useState<string>(
+    JSON.stringify({
+      subject_id: "subj_biology",
+      grade: "Grade 10",
+      book_title: "High School Biology - Introductory Genetics",
+      total_pages: 142,
+      concepts_catalog: [
+        {
+          concept_id: "concept_mendel_laws",
+          title: "Mendelian Inheritance Principles",
+          start_page: 34,
+          end_page: 55
+        }
+      ]
+    }, null, 2)
+  );
+
+  // Tool 2: Insight states
+  const [gradeTier, setGradeTier] = useState("Grade 10");
+  const [subjectFilter, setSubjectFilter] = useState("subj_biology");
+
+  // Tool 3: Vector search states
+  const [searchSubject, setSearchSubject] = useState("subj_biology");
+  const [searchGrade, setSearchGrade] = useState("Grade 10");
+  const [searchQueryVectorText, setSearchQueryVectorText] = useState("How does DNA replication process start?");
+
+  const handleExecuteMcpTool = async () => {
+    setMcpLoading(true);
+    setMcpResult(null);
+    setMcpError(null);
+    
+    let argumentsPayload: any = {};
+    let toolName = "";
+
+    try {
+      if (activeMcpTab === "persist") {
+        toolName = "persist_extracted_textbook_catalog";
+        let parsedJson;
+        try {
+          parsedJson = JSON.parse(catalogPayload);
+        } catch (e) {
+          throw new Error(language === "ar" ? "خطأ في تنسيق JSON. يرجى التأكد من كتابة JSON بشكل صحيح." : "Invalid JSON format. Please verify the JSON syntax.");
+        }
+        argumentsPayload = { extracted_book_profile: parsedJson };
+      } else if (activeMcpTab === "insight") {
+        toolName = "execute_student_insight_aggregation";
+        argumentsPayload = {
+          grade_tier: gradeTier,
+          subject_filter: subjectFilter
+        };
+      } else if (activeMcpTab === "search") {
+        toolName = "execute_atlas_hybrid_vector_search";
+        // Mock a 768-dim float vector dynamically
+        const denseVector = Array.from({ length: 768 }, () => parseFloat((Math.random() * 0.2 - 0.1).toFixed(6)));
+        argumentsPayload = {
+          dense_vector: denseVector,
+          subject_id: searchSubject,
+          grade: searchGrade
+        };
+      }
+
+      const response = await fetch(`/api/admin/mcp-tool?email=${encodeURIComponent(email || "")}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          tool_name: toolName,
+          arguments: argumentsPayload
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.status === "success") {
+        setMcpResult(data.result);
+      } else {
+        setMcpError(data.error || "Execution failed");
+      }
+    } catch (err: any) {
+      setMcpError(err.message || "An unexpected error occurred during execution.");
+    } finally {
+      setMcpLoading(false);
+    }
+  };
+
   // Generates sleek vector sparkline SVG overlays for metrics panels
   const renderSparkline = (cardId: string, tokens: number, strokeColor: string) => {
     const historyData = globalStats?.history || [];
@@ -1545,6 +1642,292 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* 6. Superadmin Database MCP Specialist Toolset Control Panel */}
+      <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+        <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <FiTerminal style={{ color: "var(--primary)" }} />
+          <span>{language === "ar" ? "لوحة التحكم واختبار أدوات MCP المخصصة" : "Superadmin Database MCP Specialist Toolset"}</span>
+        </h2>
+        <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+          {language === "ar"
+            ? "تشغيل واختبار أدوات قاعدة البيانات المتقدمة لفاهم للتأكد من سلامة المزامنة والعمليات البينية."
+            : "Execute, test, and inspect high-fidelity custom database MCP functions programmatically integrated into our multi-agent swarm."}
+        </p>
+
+        {/* MCP Tab Controls */}
+        <div style={{
+          display: "flex",
+          borderBottom: "1px solid var(--card-border)",
+          marginBottom: "1.5rem",
+          gap: "1rem"
+        }}>
+          {[
+            { id: "persist", nameAr: "حفظ كتالوج الكتب", nameEn: "Persist Textbook Catalog" },
+            { id: "insight", nameAr: "تحليلات أداء الطلاب", nameEn: "Student Performance Analytics" },
+            { id: "search", nameAr: "البحث المتجهي الهجين", nameEn: "Atlas Hybrid Vector Search" }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveMcpTab(tab.id as any);
+                setMcpResult(null);
+                setMcpError(null);
+              }}
+              style={{
+                padding: "0.75rem 1rem",
+                background: "transparent",
+                border: "none",
+                borderBottom: activeMcpTab === tab.id ? "3px solid var(--primary)" : "3px solid transparent",
+                color: activeMcpTab === tab.id ? "var(--primary)" : "#64748b",
+                fontWeight: activeMcpTab === tab.id ? "700" : "500",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                fontSize: "0.9rem"
+              }}
+            >
+              {language === "ar" ? tab.nameAr : tab.nameEn}
+            </button>
+          ))}
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr",
+          gap: "1.5rem"
+        }}>
+          {/* Tool Parameters Form */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.45)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem"
+          }}>
+            <h3 style={{ fontSize: "1.05rem", margin: 0, fontWeight: 700 }}>
+              {language === "ar" ? "معاملات الأداة النشطة" : "Active Tool Parameters"}
+            </h3>
+
+            {activeMcpTab === "persist" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                  {language === "ar" ? "ملف كتالوج الكتاب (صيغة JSON):" : "Extracted Book Catalog Payload (JSON format):"}
+                </label>
+                <textarea
+                  value={catalogPayload}
+                  onChange={(e) => setCatalogPayload(e.target.value)}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.85rem",
+                    padding: "0.75rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--card-border)",
+                    minHeight: "180px",
+                    background: "#fdfbf7",
+                    color: "var(--foreground)",
+                    width: "100%",
+                    outline: "none"
+                  }}
+                />
+              </div>
+            )}
+
+            {activeMcpTab === "insight" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                    {language === "ar" ? "المرحلة الدراسية:" : "Target Grade Level:"}
+                  </label>
+                  <select
+                    value={gradeTier}
+                    onChange={(e) => setGradeTier(e.target.value)}
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--card-border)",
+                      background: "#fff",
+                      fontSize: "0.85rem",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="Grade 10">{language === "ar" ? "الصف العاشر (أولى ثانوي)" : "Grade 10"}</option>
+                    <option value="Grade 11">{language === "ar" ? "الصف الحادي عشر (ثانية ثانوي)" : "Grade 11"}</option>
+                    <option value="Grade 12">{language === "ar" ? "الصف الثاني عشر (ثالثة ثانوي)" : "Grade 12"}</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                    {language === "ar" ? "رمز المادة الدراسية:" : "Subject Taxonomy ID:"}
+                  </label>
+                  <input
+                    type="text"
+                    value={subjectFilter}
+                    onChange={(e) => setSubjectFilter(e.target.value)}
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--card-border)",
+                      fontSize: "0.85rem",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeMcpTab === "search" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                      {language === "ar" ? "المرحلة الدراسية:" : "Cohort / Grade:"}
+                    </label>
+                    <select
+                      value={searchGrade}
+                      onChange={(e) => setSearchGrade(e.target.value)}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--card-border)",
+                        background: "#fff",
+                        fontSize: "0.85rem",
+                        outline: "none"
+                      }}
+                    >
+                      <option value="Grade 10">Grade 10</option>
+                      <option value="Grade 11">Grade 11</option>
+                      <option value="Grade 12">Grade 12</option>
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                      {language === "ar" ? "رمز المادة الدراسية:" : "Subject Taxonomy ID:"}
+                    </label>
+                    <input
+                      type="text"
+                      value={searchSubject}
+                      onChange={(e) => setSearchSubject(e.target.value)}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--card-border)",
+                        fontSize: "0.85rem",
+                        outline: "none"
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                    {language === "ar" ? "نص استعلام البحث المتجهي (سيتم تحويله تلقائياً لمتجه 768-D):" : "Semantic Search query (simulates 768-D vector embedding conversion):"}
+                  </label>
+                  <input
+                    type="text"
+                    value={searchQueryVectorText}
+                    onChange={(e) => setSearchQueryVectorText(e.target.value)}
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--card-border)",
+                      fontSize: "0.85rem",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleExecuteMcpTool}
+              disabled={mcpLoading}
+              style={{
+                background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                padding: "0.75rem 1.5rem",
+                fontSize: "0.9rem",
+                fontWeight: 700,
+                cursor: mcpLoading ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                transition: "all 0.2s ease",
+                boxShadow: "0 4px 12px rgba(16, 107, 163, 0.15)",
+                alignSelf: "flex-start",
+                marginTop: "0.5rem"
+              }}
+            >
+              {mcpLoading ? (
+                <>
+                  <FiRefreshCw className="spinning-icon" />
+                  <span>{language === "ar" ? "جاري تشغيل الأداة..." : "Running Tool..."}</span>
+                </>
+              ) : (
+                <>
+                  <FiZap />
+                  <span>{language === "ar" ? "تشغيل أداة قاعدة البيانات" : "Execute Database Tool"}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Results Audit Output */}
+          <div style={{
+            background: "#0f172a",
+            color: "#38bdf8",
+            border: "1px solid #1e293b",
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            minHeight: "220px",
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.85rem",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "0.5rem" }}>
+              <span style={{ color: "#94a3b8", fontWeight: 700 }}>
+                {language === "ar" ? "💻 مخرجات التدقيق وتفاصيل التشغيل" : "💻 Execution Audit Log Output"}
+              </span>
+              <span style={{
+                color: mcpLoading ? "var(--accent-orange)" : mcpResult ? "var(--accent-green)" : mcpError ? "#f87171" : "#64748b",
+                fontSize: "0.75rem",
+                fontWeight: "bold"
+              }}>
+                {mcpLoading ? "RUNNING" : mcpResult ? "SUCCESS" : mcpError ? "FAILED" : "IDLE"}
+              </span>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", maxHeight: "300px" }}>
+              {mcpLoading && (
+                <div style={{ color: "var(--accent-orange)" }}>
+                  {language === "ar" ? "> جاري إرسال حزمة تشغيل الأداة عبر خادم الوكيل الآمن..." : "> Securing GCP OIDC Bearer Token verification and invoking Cloud Run Agent execution pathway..."}
+                </div>
+              )}
+              {mcpError && (
+                <div style={{ color: "#f87171" }}>
+                  {language === "ar" ? `❌ خطأ في التشغيل: ${mcpError}` : `❌ Execution Error: ${mcpError}`}
+                </div>
+              )}
+              {mcpResult && (
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: "#e2e8f0" }}>
+                  {typeof mcpResult === "string" ? mcpResult : JSON.stringify(mcpResult, null, 2)}
+                </pre>
+              )}
+              {!mcpLoading && !mcpResult && !mcpError && (
+                <div style={{ color: "#64748b" }}>
+                  {language === "ar" ? "> بانتظار تشغيل الأداة لتلقي مخرجات فحص قاعدة البيانات..." : "> Standing by. Select a tool, customize arguments, and trigger execution to inspect live data metrics..."}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

@@ -63,8 +63,8 @@ export default function StickyChat() {
           id: "welcome",
           role: "assistant",
           text: language === "ar" 
-            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب الوزارة المصرية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
-            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the Egyptian Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
+            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب رفيق الدراسة للوزارة، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
+            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the study companion Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
           timestamp: new Date()
         }
       ]);
@@ -187,8 +187,8 @@ export default function StickyChat() {
         id: "welcome",
         role: "assistant",
         text: language === "ar" 
-          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب الوزارة المصرية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
-          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the Egyptian Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
+          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتب رفيق الدراسة للوزارة، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة التي تود مذاكرتها اليوم؟" 
+          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you master the study companion Ministry textbooks, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject are we studying today?",
         timestamp: new Date()
       }
     ]);

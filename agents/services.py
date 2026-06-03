@@ -19,7 +19,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
             "/db-metadata", "/audit-logs", "/user/activity", "/user/chat-session",
             "/user/token-usage", "/user/token-stats", "/admin/global-stats",
             "/user/profile", "/user/account", "/user/list", "/user/friend",
-            "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db"
+            "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db",
+            "/admin/mcp-tool"
         ]
         
         path = request.url.path
@@ -596,6 +597,68 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to get global stats: {err}", exc_info=True)
             return {"activities": [], "tokenStats": {}, "error": str(err)}
+
+    @app.post("/admin/mcp-tool")
+    async def run_mcp_tool_by_name(request: fastapi.Request):
+        try:
+            body = await request.json()
+            tool_name = body.get("tool_name")
+            arguments = body.get("arguments", {})
+            
+            logger.info(f"[services.py] Admin executing custom MCP tool {tool_name} with arguments: {arguments}")
+            
+            # Add agents_dir to sys.path to resolve module imports
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+                
+            from mongodb_agent.tools import (
+                persist_extracted_textbook_catalog,
+                execute_student_insight_aggregation,
+                execute_atlas_hybrid_vector_search,
+                ExtractPersistenceInput,
+                StudentPerformanceQuery,
+                HybridVectorQuery
+            )
+            
+            if tool_name == "persist_extracted_textbook_catalog":
+                input_payload = ExtractPersistenceInput(extracted_book_profile=arguments.get("extracted_book_profile", {}))
+                res = persist_extracted_textbook_catalog(input_payload)
+                return {"status": "success", "result": res}
+                
+            elif tool_name == "execute_student_insight_aggregation":
+                query_payload = StudentPerformanceQuery(
+                    grade_tier=arguments.get("grade_tier", ""),
+                    subject_filter=arguments.get("subject_filter", "")
+                )
+                res = execute_student_insight_aggregation(query_payload)
+                return {"status": "success", "result": res}
+                
+            elif tool_name == "execute_atlas_hybrid_vector_search":
+                dense_vector = arguments.get("dense_vector", [])
+                if isinstance(dense_vector, str):
+                    try:
+                        dense_vector = json.loads(dense_vector)
+                    except Exception:
+                        pass
+                if not dense_vector or not isinstance(dense_vector, list):
+                    import random
+                    dense_vector = [random.uniform(-0.1, 0.1) for _ in range(768)]
+                    
+                spec_payload = HybridVectorQuery(
+                    dense_vector=dense_vector,
+                    subject_id=arguments.get("subject_id", ""),
+                    grade=arguments.get("grade", "")
+                )
+                res = execute_atlas_hybrid_vector_search(spec_payload)
+                return {"status": "success", "result": res}
+                
+            else:
+                return {"status": "error", "error": f"Unknown custom database tool: {tool_name}"}
+                
+        except Exception as err:
+            logger.error(f"[services.py] Failed to execute custom database tool: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
 
     @app.get("/user/books")
     async def get_books_endpoint(subject_id: str = None):
