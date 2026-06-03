@@ -131,12 +131,14 @@ try:
     from quiz_agent.agent import quiz_agent
     from planner_agent.agent import planner_agent
     from insights_agent.agent import insights_agent
+    from academic_agent.agent import academic_agent
 except ImportError:
     try:
         from agents.zatona_agent.agent import zatona_agent
         from agents.quiz_agent.agent import quiz_agent
         from agents.planner_agent.agent import planner_agent
         from agents.insights_agent.agent import insights_agent
+        from agents.academic_agent.agent import academic_agent
     except ImportError:
         pass
 
@@ -280,7 +282,24 @@ async def presenter_node_func(ctx, node_input: Any) -> str:
     """Orchestrator finalizes and presents output nicely to the user."""
     lang = ctx.state.get("language", "en")
     
-    if ctx.state.get("guardrail_passed"):
+    if not ctx.state.get("guardrail_passed"):
+        presentation_prompt = f"""
+        Present a polite security denial message in {lang} to the user explaining why their request was blocked.
+        Highlight that security guardrails are active and administrative/unauthorized operations are blocked.
+        
+        Reason for denial:
+        {ctx.state.get("guardrail_reason", "")}
+        """
+        final_output = await ctx.run_node(orchestrator_agent, presentation_prompt)
+        ctx.state["final_output"] = final_output
+        return final_output
+
+    prompt = ctx.state.get("original_prompt", "").lower()
+    admin_keywords = ["database", "collection", "schema", "mongodb", "stats", "audit", "user profile", "retrieve user", "trend analysis", "diagnostics", "diagnostic report", "mcp"]
+    ar_admin_keywords = ["قاعدة بيانات", "مجموعات", "مجموعة", "مخطط", "احصائيات", "تقرير تشخيصي", "سجلات", "تشخيص"]
+    is_admin_query = any(w in prompt for w in admin_keywords) or any(w in prompt for w in ar_admin_keywords)
+
+    if is_admin_query:
         presentation_prompt = f"""
         Format and present the following database results nicely in {lang} for the user dashboard.
         Use clean Markdown tables, lists, or structured highlights.
@@ -289,18 +308,13 @@ async def presenter_node_func(ctx, node_input: Any) -> str:
         Raw Database Results:
         {ctx.state.get("database_results", "")}
         """
+        final_output = await ctx.run_node(orchestrator_agent, presentation_prompt)
+        ctx.state["final_output"] = final_output
+        return final_output
     else:
-        presentation_prompt = f"""
-        Present a polite security denial message in {lang} to the user explaining why their request was blocked.
-        Highlight that security guardrails are active and administrative/unauthorized operations are blocked.
-        
-        Reason for denial:
-        {ctx.state.get("guardrail_reason", "")}
-        """
-        
-    final_output = await ctx.run_node(orchestrator_agent, presentation_prompt)
-    ctx.state["final_output"] = final_output
-    return final_output
+        res_text = ctx.state.get("database_results", "")
+        ctx.state["final_output"] = res_text
+        return res_text
 
 async def onboarding_node_func(ctx, node_input: Any) -> str:
     """Conversational Onboarding Agent Node."""
@@ -378,9 +392,20 @@ async def swarm_execution_node_func(ctx, node_input: Any) -> str:
         ctx.state["execution_success"] = True
         return res
         
-    # 5. Default: MongoDB query retrieval fallback
-    print("[Swarm Router] Routing standard request to MongoDB Core Agent Node")
-    return await mongodb_node_func(ctx, node_input)
+    # 5. Default: If query contains administrative or DB keywords, route to MongoDB Agent; otherwise route to Academic Tutor!
+    admin_keywords = ["database", "collection", "schema", "mongodb", "stats", "audit", "user profile", "retrieve user", "trend analysis", "diagnostics", "diagnostic report", "mcp"]
+    ar_admin_keywords = ["قاعدة بيانات", "مجموعات", "مجموعة", "مخطط", "احصائيات", "تقرير تشخيصي", "سجلات", "تشخيص"]
+    is_admin_query = any(w in prompt for w in admin_keywords) or any(w in prompt for w in ar_admin_keywords)
+    
+    if is_admin_query:
+        print("[Swarm Router] Routing administrative request to MongoDB Core Agent Node")
+        return await mongodb_node_func(ctx, node_input)
+    else:
+        print("[Swarm Router] Routing standard request to Academic Companion/Tutor Agent")
+        res = await ctx.run_node(academic_agent, ctx.state.get("original_prompt", ""))
+        ctx.state["database_results"] = res
+        ctx.state["execution_success"] = True
+        return res
 
 # -------------------------------------------------------------
 # 4. Compile the Workflow Graph DAG

@@ -731,24 +731,41 @@ ${guardText || "Access unauthorized"}
 `;
           }
 
+          const normalizedPrompt = prompt.toLowerCase();
+          const adminKeywords = ["database", "collection", "schema", "mongodb", "stats", "audit", "user profile", "retrieve user", "trend analysis", "diagnostics", "diagnostic report", "mcp"];
+          const arAdminKeywords = ["قاعدة بيانات", "مجموعات", "مجموعة", "مخطط", "احصائيات", "تقرير تشخيصي", "سجلات", "تشخيص"];
+          const isAdminQuery = adminKeywords.some(w => normalizedPrompt.includes(w)) || arAdminKeywords.some(w => normalizedPrompt.includes(w));
+
           const orchStart = performance.now();
+          let finalResponseText = "";
 
           // Signal start of final output to the frontend parser
           controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
 
-          const responseStream = await ai.models.generateContentStream({
-            model: modelName,
-            contents: presentationPrompt,
-            config: {
-              systemInstruction: orchestratorSystemInstruction
+          if (isConfirmed && executionSuccess && !isAdminQuery) {
+            // Stream the academic tutor output directly to preserve natural human warmth and format
+            const chunkSize = 25;
+            for (let i = 0; i < databaseResults.length; i += chunkSize) {
+              const chunk = databaseResults.substring(i, i + chunkSize);
+              finalResponseText += chunk;
+              controller.enqueue(encoder.encode(chunk));
+              await new Promise(resolve => setTimeout(resolve, 8)); // dynamic streaming feel
             }
-          });
+          } else {
+            // For admin queries or security denials, format via Orchestrator as usual
+            const responseStream = await ai.models.generateContentStream({
+              model: modelName,
+              contents: presentationPrompt,
+              config: {
+                systemInstruction: orchestratorSystemInstruction
+              }
+            });
 
-          let finalResponseText = "";
-          for await (const chunk of responseStream) {
-            if (chunk.text) {
-              finalResponseText += chunk.text;
-              controller.enqueue(encoder.encode(chunk.text));
+            for await (const chunk of responseStream) {
+              if (chunk.text) {
+                finalResponseText += chunk.text;
+                controller.enqueue(encoder.encode(chunk.text));
+              }
             }
           }
 
