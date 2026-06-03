@@ -154,7 +154,7 @@ export default function StickyChat() {
     }
   }, [sessionLogs]);
 
-  const fetchSessions = async (userIdVal?: string) => {
+  async function fetchSessions(userIdVal?: string) {
     const activeUserId = userIdVal || user?.uid;
     if (!activeUserId) return;
     setIsSessionsLoading(true);
@@ -169,9 +169,9 @@ export default function StickyChat() {
     } finally {
       setIsSessionsLoading(false);
     }
-  };
+  }
 
-  const loadSession = async (sessionIdVal: string) => {
+  async function loadSession(sessionIdVal: string) {
     if (!sessionIdVal) return;
     setIsSessionsLoading(true);
     try {
@@ -206,9 +206,9 @@ export default function StickyChat() {
     } finally {
       setIsSessionsLoading(false);
     }
-  };
+  }
 
-  const deleteSession = async (sessionIdVal: string, e: React.MouseEvent) => {
+  async function deleteSession(sessionIdVal: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!sessionIdVal) return;
     const confirmMsg = language === "ar" 
@@ -230,7 +230,7 @@ export default function StickyChat() {
     } catch (err) {
       console.error("Error deleting session in companion:", err);
     }
-  };
+  }
 
   const startNewChat = () => {
     setCurrentSessionId("");
@@ -364,7 +364,9 @@ export default function StickyChat() {
 
   if (!user) return null; // Only show after successful sign-in
 
-  const handleSendMessage = async (textToSend?: string) => {
+  async function handleSendMessage(textToSend?: string) {
+    const activeUser = user;
+    if (!activeUser) return;
     const queryText = (textToSend || inputValue).trim();
     if (!queryText || isSending) return;
 
@@ -422,8 +424,8 @@ User Question: ${queryText}`;
         body: JSON.stringify({
           prompt: promptPayload,
           language,
-          userEmail: user.email || "",
-          userId: user.uid || "",
+          userEmail: activeUser.email || "",
+          userId: activeUser.uid || "",
           sessionId: currentSessionId || undefined
         }),
       });
