@@ -1252,7 +1252,7 @@ User Question: ${queryText}`;
           }}
           style={{
             padding: "1rem",
-            paddingInlineEnd: layoutMode === "fullscreen" ? "1rem" : "5.5rem",
+            paddingInlineEnd: layoutMode === "fullscreen" ? "6.5rem" : "5.5rem",
             borderTop: "1px dashed var(--card-border)",
             backgroundColor: "rgba(255,255,255,0.45)",
             display: "flex",
