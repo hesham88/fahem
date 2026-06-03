@@ -203,8 +203,8 @@ async function runStagingSmokeTest() {
 
   // 1. Verify db-metadata endpoint
   try {
-    log(`Verifying metadata at: ${STAGING_URL}/api/db-metadata...`);
-    const metadata = await fetchHttpsJson(`${STAGING_URL}/api/db-metadata`);
+    log(`Verifying metadata at: ${STAGING_URL}/api/db-metadata?email=hesham1988@gmail.com...`);
+    const metadata = await fetchHttpsJson(`${STAGING_URL}/api/db-metadata?email=hesham1988@gmail.com`);
     if (metadata && metadata.status === "Connected") {
       results.details.push(`[PASS] GET /api/db-metadata: MongoDB Atlas status is "${metadata.status}" (Database: "${metadata.databaseName}", Collections: ${metadata.collectionsCount})`);
     } else {
