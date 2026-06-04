@@ -75,10 +75,10 @@ You MUST respond with a JSON object strictly matching this schema:
     }
 
     const isOral = resolvedMode === "oral";
-    const modelName = isOral ? "gemini-3.1-flash-live-preview" : (process.env.GEMINI_MODEL || "gemini-3.1-flash-lite");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+    let modelName = isOral ? "gemini-3.1-flash-live-preview" : (process.env.GEMINI_MODEL || "gemini-3.1-flash-lite");
+    let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -88,6 +88,22 @@ You MUST respond with a JSON object strictly matching this schema:
         }
       })
     });
+
+    if (!response.ok && isOral && modelName === "gemini-3.1-flash-live-preview") {
+      console.warn(`[api-practice-evaluate] gemini-3.1-flash-live-preview failed with status ${response.status}. Falling back to gemini-3.1-flash-lite.`);
+      modelName = "gemini-3.1-flash-lite";
+      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+      response = await fetch(fallbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

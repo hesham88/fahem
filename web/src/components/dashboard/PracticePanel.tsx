@@ -1,7 +1,47 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { FiCpu, FiClock, FiRefreshCw } from "react-icons/fi";
+
+const SUBTOPIC_REGISTRY: { [subject: string]: string[] } = {
+  Math: ["Matrices", "Determinants", "Cramer's Rule", "Probability", "Statistics", "Linear Algebra"],
+  Science: ["Ideal Gas Law", "Boyle's Law", "Charles's Law", "Kinetic Theory", "Thermodynamics", "Internal Energy"],
+  Arabic: ["Sentence Parsing", "Arabic Grammar", "Poetry Meters", "Verb States"],
+  General: ["Ancient Civilizations", "Modern Era", "General Knowledge"]
+};
+
+const determineSubtopic = (questionText: string, subject: string): string => {
+  const text = (questionText || "").toLowerCase();
+  const sub = (subject || "").toLowerCase();
+
+  if (sub.includes("math")) {
+    if (text.includes("matrix") || text.includes("matrices")) return "Matrices";
+    if (text.includes("determinant")) return "Determinants";
+    if (text.includes("cramer")) return "Cramer's Rule";
+    if (text.includes("probabilit")) return "Probability";
+    if (text.includes("statistic")) return "Statistics";
+    return "Linear Algebra";
+  }
+  if (sub.includes("science")) {
+    if (text.includes("ideal gas") || text.includes("pv = nrt")) return "Ideal Gas Law";
+    if (text.includes("boyle")) return "Boyle's Law";
+    if (text.includes("charles")) return "Charles's Law";
+    if (text.includes("kinetic")) return "Kinetic Theory";
+    if (text.includes("thermodynamic")) return "Thermodynamics";
+    if (text.includes("internal energy") || text.includes("heat") || text.includes("work")) return "Internal Energy";
+    return "Thermodynamics";
+  }
+  if (sub.includes("arabic") || sub.includes("عربي")) {
+    if (text.includes("إعراب") || text.includes("اعراب") || text.includes("parse") || text.includes("parsing")) return "Sentence Parsing";
+    if (text.includes("شعر") || text.includes("poetry") || text.includes("بحور")) return "Poetry Meters";
+    if (text.includes("فعل") || text.includes("فاعل") || text.includes("verb")) return "Verb States";
+    return "Arabic Grammar";
+  }
+  // Default/General
+  if (text.includes("ancient") || text.includes("history") || text.includes("pharaoh") || text.includes("romans")) return "Ancient Civilizations";
+  if (text.includes("modern") || text.includes("war") || text.includes("century")) return "Modern Era";
+  return "General Knowledge";
+};
 
 interface Book {
   _id?: string;
@@ -11,6 +51,7 @@ interface Book {
   titleEn?: string;
   titleAr?: string;
   subject?: string;
+  chapters?: any[];
 }
 
 interface PracticePanelProps {
@@ -18,8 +59,11 @@ interface PracticePanelProps {
   dynamicBooks: Book[];
   renderSpaceSelectorBar: (tab: "practice" | "plan" | "timetable" | "zatona") => React.ReactNode;
   renderSpaceHistory: () => React.ReactNode;
+  addSpaceHistory: (actionEn: string, actionAr: string) => void;
   renderPremiumContent: (markdownText: string) => React.ReactNode;
   t: (key: string) => string;
+  user: any;
+  userProfile: any;
 }
 
 /**
@@ -31,13 +75,18 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   dynamicBooks,
   renderSpaceSelectorBar,
   renderSpaceHistory,
+  addSpaceHistory,
   renderPremiumContent,
   t,
+  user,
+  userProfile,
 }) => {
   // Practice Specific States (fully encapsulated)
   const [practiceGameState, setPracticeGameState] = useState<"setup" | "active" | "victory">("setup");
   const [practiceScopeType, setPracticeScopeType] = useState<"subject" | "book">("subject");
   const [practiceSelectedBookId, setPracticeSelectedBookId] = useState<string>("");
+  const [practiceSelectedChapters, setPracticeSelectedChapters] = useState<string[]>([]);
+  const [practiceCustomConcepts, setPracticeCustomConcepts] = useState<string>("");
   const [practiceSubject, setPracticeSubject] = useState<string>("Math");
   const [practiceMode, setPracticeMode] = useState<"mcq" | "text" | "oral">("mcq");
   const [practiceSessionType, setPracticeSessionType] = useState<"infinite" | "quiz">("infinite");
@@ -49,6 +98,108 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceLevel, setPracticeLevel] = useState<number>(3);
   const [practiceStreak, setPracticeStreak] = useState<number>(4);
 
+  // Practice History List & Fetching States
+  const [practiceHistoryList, setPracticeHistoryList] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+
+  // Heatmap filtering and activities states
+  const [allActivities, setAllActivities] = useState<any[]>([]);
+  const [heatmapSubjectFilter, setHeatmapSubjectFilter] = useState<string>("All");
+
+  const fetchPracticeHistory = async () => {
+    if (!user?.uid) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/activity?userId=${encodeURIComponent(user.uid)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const activities = data.activities || [];
+        setAllActivities(activities);
+        // Filter only practice_session actions
+        const practiceRuns = activities.filter((act: any) => act.action === "practice_session");
+        setPracticeHistoryList(practiceRuns);
+      }
+    } catch (err) {
+      console.error("Failed to fetch practice history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPracticeHistory();
+  }, [user]);
+
+  // Aggregate user practice achievements dynamically into the mastery heatmap list
+  const subtopicMastery = useMemo(() => {
+    const registry: { [subtopic: string]: { correct: number; total: number; subject: string } } = {};
+    
+    // Add all registered subtopics as unattempted initially
+    Object.entries(SUBTOPIC_REGISTRY).forEach(([subject, subtopics]) => {
+      subtopics.forEach((subtopic) => {
+        registry[subtopic] = { correct: 0, total: 0, subject };
+      });
+    });
+
+    // Loop through all activities to aggregate
+    allActivities.forEach((act: any) => {
+      if (act.action === "practice_session" || act.action === "practice_attempt") {
+        const question = act.details?.question || "";
+        const givenSubject = act.details?.subject || "General";
+        const isCorrect = !!(act.details?.isCorrect || act.status === "correct");
+        
+        // Find subtopic - if details has subtopic, use it. Otherwise determine on client
+        let subtopic = act.details?.subtopic;
+        if (!subtopic) {
+          subtopic = determineSubtopic(question, givenSubject);
+        }
+
+        // Aggregate!
+        if (registry[subtopic]) {
+          registry[subtopic].total += 1;
+          if (isCorrect) {
+            registry[subtopic].correct += 1;
+          }
+        } else {
+          // If we got some other custom subtopic, dynamic registration
+          registry[subtopic] = {
+            correct: isCorrect ? 1 : 0,
+            total: 1,
+            subject: givenSubject
+          };
+        }
+      }
+    });
+
+    // Convert registry back into an array for easy rendering
+    return Object.entries(registry).map(([subtopic, data]) => {
+      const ratio = data.total > 0 ? data.correct / data.total : null;
+      let status: "green" | "yellow" | "red" | "neutral" = "neutral";
+      if (data.total > 0) {
+        if (ratio !== null) {
+          if (ratio >= 0.70) status = "green";
+          else if (ratio >= 0.40) status = "yellow";
+          else status = "red";
+        }
+      }
+      return {
+        subtopic,
+        subject: data.subject,
+        correct: data.correct,
+        total: data.total,
+        ratio,
+        status
+      };
+    });
+  }, [allActivities]);
+
+  const filteredHeatmapData = useMemo(() => {
+    if (heatmapSubjectFilter === "All") {
+      return subtopicMastery;
+    }
+    return subtopicMastery.filter(item => item.subject.toLowerCase() === heatmapSubjectFilter.toLowerCase());
+  }, [subtopicMastery, heatmapSubjectFilter]);
+
   const [practiceLoading, setPracticeLoading] = useState<boolean>(false);
   const [practiceCurrentQuestion, setPracticeCurrentQuestion] = useState<any>(null);
   const [practiceAnswer, setPracticeAnswer] = useState<string>("");
@@ -57,18 +208,82 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceFeedback, setPracticeFeedback] = useState<any>(null);
   const [practiceShowHint, setPracticeShowHint] = useState<boolean>(false);
 
-  // Multimodal TTS states & helpers
-  const [speakingType, setSpeakingElement] = useState<"question" | "feedback" | null>(null);
+  // Web Speech API / Oral specific states
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const isListeningRef = useRef<boolean>(false);
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
 
-  const speakPracticeText = (text: string, type: "question" | "feedback") => {
+  const [interimSpeechText, setInterimSpeechText] = useState<string>("");
+
+  const [micError, setMicError] = useState<string>("");
+  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
+
+  // Multimodal TTS states & helpers
+  const [speakingType, setSpeakingElement] = useState<string | null>(null);
+  const speakingTypeRef = useRef<string | null>(null);
+
+  const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fahem_auto_play_voice") !== "false";
+    }
+    return true;
+  });
+
+  const handleAutoPlayVoiceChange = (val: boolean) => {
+    setAutoPlayVoice(val);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fahem_auto_play_voice", String(val));
+    }
+  };
+
+  const practiceModeRef = useRef<string>("mcq");
+  useEffect(() => {
+    practiceModeRef.current = practiceMode;
+  }, [practiceMode]);
+
+  const autoPlayVoiceRef = useRef<boolean>(true);
+  useEffect(() => {
+    autoPlayVoiceRef.current = autoPlayVoice;
+  }, [autoPlayVoice]);
+
+  const [selectedVoice, setSelectedVoice] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fahem_tts_voice") || "Aoede";
+    }
+    return "Aoede";
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = localStorage.getItem("fahem_tts_voice");
+      if (stored && stored !== selectedVoice) {
+        setSelectedVoice(stored);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [selectedVoice]);
+
+  const speakPracticeText = async (text: string, type: string) => {
     if (speakingType === type) {
+      if ((window as any)._activeAudioPractice) {
+        (window as any)._activeAudioPractice.pause();
+        (window as any)._activeAudioPractice = null;
+      }
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
       setSpeakingElement(null);
+      speakingTypeRef.current = null;
       return;
     }
 
+    if ((window as any)._activeAudioPractice) {
+      (window as any)._activeAudioPractice.pause();
+      (window as any)._activeAudioPractice = null;
+    }
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -79,52 +294,165 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
       .replace(/`.*?`/g, "")
       .trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    (window as any)._activeUtterance = utterance;
-    const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
-    const localeMap: Record<string, string> = {
-      en: "en-US",
-      ar: "ar-EG",
-      es: "es-ES",
-      fr: "fr-FR",
-      de: "de-DE",
-      zh: "zh-CN",
-      it: "it-IT"
-    };
-    const activeLocale = hasArabicChars ? "ar-EG" : (localeMap[language] || "en-US");
-    utterance.lang = activeLocale;
-
-    const voices = window.speechSynthesis.getVoices();
-    const selectedVoice = voices.find(v => v.lang.toLowerCase() === activeLocale.toLowerCase()) || 
-                          voices.find(v => v.lang.toLowerCase().startsWith(activeLocale.split("-")[0].toLowerCase()));
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-
-    utterance.onend = () => {
-      setSpeakingElement(null);
-    };
-
-    utterance.onerror = (err) => {
-      console.error("Practice Speech Synthesis Error:", err);
-      setSpeakingElement(null);
-    };
+    if (!cleanText) return;
 
     setSpeakingElement(type);
-    window.speechSynthesis.speak(utterance);
+    speakingTypeRef.current = type;
+
+    const runWebSpeechFallback = (txt: string) => {
+      if (speakingTypeRef.current !== type) {
+        return; // Stopped or switched type
+      }
+
+      const utterance = new SpeechSynthesisUtterance(txt);
+      (window as any)._activeUtterance = utterance;
+      const hasArabicChars = /[\u0600-\u06FF]/.test(txt);
+      const localeMap: Record<string, string> = {
+        en: "en-US",
+        ar: "ar-EG",
+        es: "es-ES",
+        fr: "fr-FR",
+        de: "de-DE",
+        zh: "zh-CN",
+        it: "it-IT"
+      };
+      const activeLocale = hasArabicChars ? "ar-EG" : (localeMap[language] || "en-US");
+      utterance.lang = activeLocale;
+
+      const voices = window.speechSynthesis.getVoices();
+      const selectedVoice = voices.find(v => v.lang.toLowerCase() === activeLocale.toLowerCase()) || 
+                            voices.find(v => v.lang.toLowerCase().startsWith(activeLocale.split("-")[0].toLowerCase()));
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+
+      utterance.onend = () => {
+        if (speakingTypeRef.current === type) {
+          setSpeakingElement(null);
+          speakingTypeRef.current = null;
+        }
+        if (type === "question" && practiceModeRef.current === "oral" && autoPlayVoiceRef.current) {
+          startSpeechRecognition();
+        }
+      };
+
+      utterance.onerror = (err) => {
+        console.error("Practice Speech Synthesis Error:", err);
+        if (speakingTypeRef.current === type) {
+          setSpeakingElement(null);
+          speakingTypeRef.current = null;
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    try {
+      const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
+      const reqLang = hasArabicChars ? "ar" : (language || "en");
+
+      const res = await fetch("/api/audio/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: cleanText,
+          language: reqLang,
+          voice: selectedVoice, // use user's selected voice dynamically!
+          userId: user?.uid || "anonymous",
+          userEmail: user?.email || "anonymous@fahem.ai"
+        })
+      });
+
+      if (speakingTypeRef.current !== type) {
+        return; // Stale fetch response
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (speakingTypeRef.current !== type) {
+          return; // Stale data response
+        }
+
+        if (data.success && data.audioContent) {
+          const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
+          const audio = new Audio(audioUrl);
+          (window as any)._activeAudioPractice = audio;
+
+          audio.onended = () => {
+            if (speakingTypeRef.current === type) {
+              setSpeakingElement(null);
+              speakingTypeRef.current = null;
+            }
+            if ((window as any)._activeAudioPractice === audio) {
+              (window as any)._activeAudioPractice = null;
+            }
+            if (type === "question" && practiceModeRef.current === "oral" && autoPlayVoiceRef.current) {
+              startSpeechRecognition();
+            }
+          };
+
+          audio.onerror = (e) => {
+            if (speakingTypeRef.current !== type) {
+              return;
+            }
+            console.error("Premium audio error, falling back to Web Speech:", e);
+            runWebSpeechFallback(cleanText);
+          };
+
+          await audio.play();
+          return;
+        }
+      }
+
+      if (speakingTypeRef.current === type) {
+        console.warn("Premium TTS unsuccessful, falling back to Web Speech");
+        runWebSpeechFallback(cleanText);
+      }
+
+    } catch (err) {
+      if (speakingTypeRef.current === type) {
+        console.error("Failed premium TTS in practice:", err);
+        runWebSpeechFallback(cleanText);
+      }
+    }
   };
 
   useEffect(() => {
+    if ((window as any)._activeAudioPractice) {
+      (window as any)._activeAudioPractice.pause();
+      (window as any)._activeAudioPractice = null;
+    }
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
     setSpeakingElement(null);
-  }, [practiceCurrentQuestion, practiceFeedback]);
+    if (speechRecognition) {
+      try {
+        speechRecognition.stop();
+      } catch (e) {}
+    }
+    setIsListening(false);
+  }, [practiceCurrentQuestion, practiceFeedback, speechRecognition]);
 
-  // Web Speech API / Oral specific states
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [micError, setMicError] = useState<string>("");
-  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
+  // Auto-play question TTS in oral mode
+  useEffect(() => {
+    if (
+      practiceGameState === "active" &&
+      practiceMode === "oral" &&
+      practiceCurrentQuestion &&
+      practiceCurrentQuestion.question &&
+      !practiceFeedback &&
+      autoPlayVoice
+    ) {
+      const timer = setTimeout(() => {
+        speakPracticeText(practiceCurrentQuestion.question, "question");
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [practiceCurrentQuestion, practiceGameState, practiceMode, practiceFeedback, autoPlayVoice]);
+
+
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -156,6 +484,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           }
           if (finalTranscript) {
             setPracticeAnswer((prev) => (prev ? prev + " " + finalTranscript : finalTranscript));
+            setInterimSpeechText("");
+          } else {
+            setInterimSpeechText(interimText);
           }
         };
 
@@ -167,10 +498,12 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             setMicError(event.error);
           }
           setIsListening(false);
+          setInterimSpeechText("");
         };
 
         rec.onend = () => {
           setIsListening(false);
+          setInterimSpeechText("");
         };
 
         setSpeechRecognition(rec);
@@ -178,16 +511,49 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     }
   }, [language]);
 
+  const startSpeechRecognition = () => {
+    if (!speechRecognition) return;
+    if (isListeningRef.current) return;
+    setMicError("");
+    setInterimSpeechText("");
+    try {
+      speechRecognition.start();
+      setIsListening(true);
+    } catch (err) {
+      console.warn("Speech recognition auto-start warning:", err);
+    }
+  };
+
   const toggleListening = () => {
     if (!speechRecognition) {
       alert(language === "ar" ? "التعرف على الصوت غير مدعوم في متصفحك" : "Web Speech recognition is not supported in this browser");
       return;
     }
+
+    // Interrupt any active question/feedback TTS reading if mic is clicked to dictate
+    if (speakingType) {
+      if ((window as any)._activeAudioPractice) {
+        try {
+          (window as any)._activeAudioPractice.pause();
+        } catch (e) {}
+          (window as any)._activeAudioPractice = null;
+      }
+      if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (e) {}
+      }
+      setSpeakingElement(null);
+      speakingTypeRef.current = null;
+    }
+
     if (isListening) {
       speechRecognition.stop();
       setIsListening(false);
+      setInterimSpeechText("");
     } else {
       setMicError("");
+      setInterimSpeechText("");
       try {
         speechRecognition.start();
         setIsListening(true);
@@ -311,21 +677,101 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                   <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
                 </select>
               ) : (
-                <select
-                  value={practiceSelectedBookId}
-                  onChange={(e) => setPracticeSelectedBookId(e.target.value)}
-                  style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700 }}
-                >
-                  {dynamicBooks.length > 0 ? (
-                    dynamicBooks.map((b: any) => (
-                      <option key={b._id || b.id} value={b._id || b.id}>
-                        {language === "ar" ? b.titleAr || b.title : b.titleEn || b.title}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">{language === "ar" ? "لا توجد كتب مضافة بعد" : "No textbooks ingested yet"}</option>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <select
+                    value={practiceSelectedBookId}
+                    onChange={(e) => {
+                      setPracticeSelectedBookId(e.target.value);
+                      setPracticeSelectedChapters([]);
+                    }}
+                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700 }}
+                  >
+                    {dynamicBooks.length > 0 ? (
+                      dynamicBooks.map((b: any) => (
+                        <option key={b._id || b.id} value={b._id || b.id}>
+                          {language === "ar" ? b.titleAr || b.title : b.titleEn || b.title}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">{language === "ar" ? "لا توجد كتب مضافة بعد" : "No textbooks ingested yet"}</option>
+                    )}
+                  </select>
+
+                  {/* 📚 Multiple Chapter Selection list */}
+                  {practiceSelectedBookId && (
+                    (() => {
+                      const activeBook = dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId);
+                      const chapters = activeBook?.chapters || [];
+                      return (
+                        <div style={{
+                          marginTop: "0.5rem",
+                          padding: "1rem",
+                          borderRadius: "8px",
+                          background: "rgba(16, 107, 163, 0.03)",
+                          border: "1px solid rgba(16, 107, 163, 0.08)"
+                        }}>
+                          <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", display: "block", marginBottom: "0.5rem" }}>
+                            {language === "ar" ? "📍 حدد فصول الكتاب المستهدفة (خيارات متعددة):" : "📍 Select Target Chapters (Multiple Selection):"}
+                          </label>
+                          {chapters.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "150px", overflowY: "auto", paddingRight: "4px" }}>
+                              {chapters.map((ch: any, idx: number) => {
+                                const chTitle = language === "ar" ? (ch.title_ar || ch.title) : (ch.title || ch.title_ar);
+                                const isChecked = practiceSelectedChapters.includes(ch.title);
+                                return (
+                                  <label key={idx} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setPracticeSelectedChapters(practiceSelectedChapters.filter(t => t !== ch.title));
+                                        } else {
+                                          setPracticeSelectedChapters([...practiceSelectedChapters, ch.title]);
+                                        }
+                                      }}
+                                      style={{ cursor: "pointer" }}
+                                    />
+                                    <span>{chTitle}</span>
+                                    <span style={{ fontSize: "0.7rem", color: "rgba(0,0,0,0.4)" }}>
+                                      ({language === "ar" ? `الصفحات: ${ch.start_page}-${ch.end_page}` : `Pages: ${ch.start_page}-${ch.end_page}`})
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.5)" }}>
+                              {language === "ar" ? "لا توجد فصول مسجلة لهذا الكتاب، سيتم التدريب على الكتاب كاملاً." : "No structured chapters recorded. Full textbook will be targeted."}
+                            </div>
+                          )}
+
+                          {/* 🏷️ Target Titles / Concepts input */}
+                          <div style={{ marginTop: "0.8rem", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "0.8rem" }}>
+                            <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", display: "block", marginBottom: "0.3rem" }}>
+                              {language === "ar" ? "🏷️ أدخل مفاهيم أو مواضيع معينة لتركيز التدريب عليها (مثال: الخلايا، الجبر):" : "🏷️ Focus on specific concepts, titles, or tags (e.g. matrix, cell division):"}
+                            </label>
+                            <input
+                              type="text"
+                              value={practiceCustomConcepts}
+                              onChange={(e) => setPracticeCustomConcepts(e.target.value)}
+                              placeholder={language === "ar" ? "اكتب المواضيع هنا تفصلها فواصل..." : "Type custom concepts separated by commas..."}
+                              style={{
+                                width: "100%",
+                                padding: "6px 10px",
+                                borderRadius: "6px",
+                                border: "1px solid var(--card-border)",
+                                fontSize: "0.8rem",
+                                outline: "none",
+                                background: "#ffffff"
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()
                   )}
-                </select>
+                </div>
               )}
             </div>
 
@@ -528,12 +974,19 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
                       : practiceSubject;
 
+                  addSpaceHistory(
+                    `Launched ${practiceMode.toUpperCase()} Active Recall Quest for subject: ${targetSubject}`,
+                    `تم إطلاق غارة المراجعة النشطة (${practiceMode.toUpperCase()}) لمادة: ${targetSubject}`
+                  );
+
                   const res = await fetch("/api/practice/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       subject: targetSubject,
                       bookId: practiceScopeType === "book" ? practiceSelectedBookId : "",
+                      selectedChapters: practiceSelectedChapters,
+                      customConcepts: practiceCustomConcepts,
                       mode: practiceMode,
                       language: language,
                     }),
@@ -658,6 +1111,200 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Student Vulnerability Heatmap */}
+            <div className="panel-card" style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span>🎯</span>
+                  <span>{language === "ar" ? "خريطة تحصيل وثغرات الطالب" : "Student Vulnerability Heatmap"}</span>
+                </h4>
+                {/* Dynamic Status Indicator */}
+                <div style={{ display: "flex", gap: "0.3rem" }}>
+                  <span className="pulsing-dot-green" title="Mastered (>=70%)" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4caf50" }} />
+                  <span className="pulsing-dot-yellow" title="Warning (40%-69%)" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ff9800" }} />
+                  <span className="pulsing-dot-red" title="Vulnerable (<40%)" style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f44336" }} />
+                </div>
+              </div>
+
+              {/* Subject Category Selectors */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                {["All", "Math", "Science", "Arabic", "General"].map((sub) => {
+                  const isActive = heatmapSubjectFilter === sub;
+                  return (
+                    <button
+                      key={sub}
+                      onClick={() => setHeatmapSubjectFilter(sub)}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: "0.75rem",
+                        fontWeight: 800,
+                        border: "1px solid " + (isActive ? "var(--primary)" : "var(--card-border)"),
+                        borderRadius: "20px",
+                        background: isActive ? "var(--primary)" : "#ffffff",
+                        color: isActive ? "#ffffff" : "var(--foreground)",
+                        cursor: "pointer",
+                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                      }}
+                    >
+                      {sub === "All" && (language === "ar" ? "الكل" : "All")}
+                      {sub === "Math" && (language === "ar" ? "رياضيات" : "Math")}
+                      {sub === "Science" && (language === "ar" ? "علوم" : "Science")}
+                      {sub === "Arabic" && (language === "ar" ? "عربي" : "Arabic")}
+                      {sub === "General" && (language === "ar" ? "عام" : "General")}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Heatmap Grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                  gap: "0.6rem",
+                  maxHeight: "260px",
+                  overflowY: "auto",
+                  paddingRight: "4px",
+                }}
+              >
+                {filteredHeatmapData.map((item) => {
+                  let statusBg = "rgba(106, 124, 136, 0.05)";
+                  let statusColor = "#6a7c88";
+                  let statusTextEn = "Unattempted";
+                  let statusTextAr = "غير مجرب";
+                  let pulseColor = "transparent";
+
+                  if (item.status === "green") {
+                    statusBg = "rgba(76, 175, 80, 0.1)";
+                    statusColor = "#2e7d32";
+                    statusTextEn = "Mastered";
+                    statusTextAr = "متقن";
+                    pulseColor = "#4caf50";
+                  } else if (item.status === "yellow") {
+                    statusBg = "rgba(255, 152, 0, 0.1)";
+                    statusColor = "#e65100";
+                    statusTextEn = "Warning";
+                    statusTextAr = "تحذير";
+                    pulseColor = "#ff9800";
+                  } else if (item.status === "red") {
+                    statusBg = "rgba(244, 67, 54, 0.1)";
+                    statusColor = "#c62828";
+                    statusTextEn = "Vulnerable";
+                    statusTextAr = "ثغرة حرجة";
+                    pulseColor = "#f44336";
+                  }
+
+                  return (
+                    <div
+                      key={item.subtopic}
+                      className="heatmap-cell"
+                      style={{
+                        padding: "0.6rem",
+                        borderRadius: "8px",
+                        background: statusBg,
+                        border: `1px solid ${statusColor}1c`,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.3rem",
+                        position: "relative",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        cursor: "pointer",
+                      }}
+                      title={`${item.subtopic}: ${item.correct}/${item.total} Correct (${item.ratio !== null ? Math.round(item.ratio * 100) : 0}%)`}
+                    >
+                      {/* Pulse Indicator */}
+                      {item.status !== "neutral" && (
+                        <div
+                          className="pulse-indicator"
+                          style={{
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            background: pulseColor,
+                            position: "absolute",
+                            top: "6px",
+                            right: "6px",
+                            boxShadow: `0 0 0 0 ${pulseColor}`,
+                          }}
+                        />
+                      )}
+
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          color: "var(--foreground)",
+                          lineHeight: 1.2,
+                          paddingRight: item.status !== "neutral" ? "8px" : "0",
+                        }}
+                      >
+                        {item.subtopic}
+                      </span>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem" }}>
+                        <span style={{ fontSize: "0.6rem", color: statusColor, fontWeight: 700 }}>
+                          {language === "ar" ? statusTextAr : statusTextEn}
+                        </span>
+                        {item.total > 0 && (
+                          <span style={{ fontSize: "0.55rem", color: "#6a7c88" }}>
+                            {item.correct}/{item.total} {language === "ar" ? "صحيحة" : "Correct"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Small Progress Bar */}
+                      {item.total > 0 && (
+                        <div style={{ width: "100%", height: "3px", background: "rgba(0,0,0,0.05)", borderRadius: "2px", overflow: "hidden" }}>
+                          <div
+                            style={{
+                              width: `${(item.ratio || 0) * 100}%`,
+                              height: "100%",
+                              background: statusColor,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <style>{`
+              .heatmap-cell:hover {
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                border-color: rgba(16, 107, 163, 0.2) !important;
+              }
+              @keyframes cellPulseGreen {
+                0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+                70% { box-shadow: 0 0 0 6px rgba(76, 175, 80, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+              }
+              @keyframes cellPulseYellow {
+                0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+                70% { box-shadow: 0 0 0 6px rgba(255, 152, 0, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+              }
+              @keyframes cellPulseRed {
+                0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+                70% { box-shadow: 0 0 0 6px rgba(244, 67, 54, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+              }
+              .pulsing-dot-green {
+                animation: cellPulseGreen 2s infinite;
+              }
+              .pulsing-dot-yellow {
+                animation: cellPulseYellow 2s infinite;
+              }
+              .pulsing-dot-red {
+                animation: cellPulseRed 2s infinite;
+              }
+              .pulse-indicator {
+                animation: cellPulseGreen 2s infinite;
+              }
+            `}</style>
           </div>
         </div>
       ) : practiceGameState === "active" && practiceCurrentQuestion ? (
@@ -865,13 +1512,33 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                   >
                     <div style={{ textAlign: "center" }}>
                       <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)" }}>
-                        {language === "ar" ? "🎙️ استوديو التسميع الشفوي الذكي" : "🎙️ AI Oral Recitation Console"}
+                        {language === "ar" ? "🎙️ منصة التسميع الشفوي والكتابة بالصوت" : "🎙️ AI Oral Recitation & Voice Dictation"}
                       </h4>
                       <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.75rem", color: "#6a7c88" }}>
                         {language === "ar"
-                          ? "تحدث بلغة فصيحة أو بلهجة مصرية، معيار التقييم يدمج التعرف التلقائي"
-                          : "Speak clearly. System auto-normalizes Egyptian Arabic accents."}
+                          ? "تحدث لإملاء إجابتك مباشرة، حيث يقوم النظام بتحويل صوتك لنص مكتوب في الحال."
+                          : "Speak to dictate your answer. System transcribes your Egyptian Arabic or English speech to text live."}
                       </p>
+                    </div>
+
+                    {/* Auto-Play & Auto-Dictation Toggle */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "-0.5rem" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", userSelect: "none" }}>
+                        <input
+                          type="checkbox"
+                          checked={autoPlayVoice}
+                          onChange={(e) => handleAutoPlayVoiceChange(e.target.checked)}
+                          style={{
+                            accentColor: "var(--primary)",
+                            width: "14px",
+                            height: "14px",
+                            cursor: "pointer"
+                          }}
+                        />
+                        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>
+                          {language === "ar" ? "تشغيل التسميع الشفوي وفتح الميكروفون للإملاء تلقائياً" : "Auto-read question & open dictation mic"}
+                        </span>
+                      </label>
                     </div>
 
                     {/* Microphone Action Button */}
@@ -914,11 +1581,11 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       >
                         {isListening
                           ? language === "ar"
-                            ? "🔴 جاري الاستماع لتسميعك..."
-                            : "🔴 Recording recitation live..."
+                            ? "✍️ جاري تحويل صوتك إلى نص مكتوب..."
+                            : "✍️ Transcribing your speech to text live..."
                           : language === "ar"
-                          ? "اضغط على الميكروفون لبدء التسجيل"
-                          : "Click microphone to start reciting"}
+                          ? "اضغط على الميكروفون لبدء الإملاء بالصوت"
+                          : "Click microphone to start voice dictation"}
                       </span>
 
                       {/* Sound wave visualizer bars */}
@@ -967,8 +1634,13 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                         </span>
                       </div>
                       <textarea
-                        value={practiceAnswer}
-                        onChange={(e) => setPracticeAnswer(e.target.value)}
+                        value={isListening && interimSpeechText ? (practiceAnswer ? practiceAnswer + " " + interimSpeechText : interimSpeechText) : practiceAnswer}
+                        onChange={(e) => {
+                          setPracticeAnswer(e.target.value);
+                          if (interimSpeechText) {
+                            setInterimSpeechText("");
+                          }
+                        }}
                         disabled={practiceHasAnswered}
                         placeholder={
                           language === "ar"
@@ -1114,8 +1786,16 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                           if (data.isCorrect) {
                             setPracticeStreak((prev) => prev + 1);
                             setPracticeSessionCorrectAnswers((prev) => prev + 1);
+                            addSpaceHistory(
+                              `Answered Quest Challenge: Correct (+${computedXp} XP)`,
+                              `أجاب على تحدي الممارسة بشكل صحيح (+${computedXp} XP)`
+                            );
                           } else {
                             setPracticeStreak(0);
+                            addSpaceHistory(
+                              `Answered Quest Challenge: Incorrect`,
+                              `أجاب على تحدي الممارسة بشكل خاطئ`
+                            );
                           }
 
                           // Update level/XP
@@ -1127,6 +1807,59 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             }
                             return newXP;
                           });
+
+                          // Save to persistent database
+                          if (user) {
+                            const targetSubject = practiceScopeType === "book"
+                              ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
+                              : practiceSubject;
+                            const subtopic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
+
+                            // Log standard session
+                            fetch("/api/activity", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                userId: user.uid,
+                                userEmail: user.email || "student@fahem.edu",
+                                action: "practice_session",
+                                status: data.isCorrect ? "correct" : "incorrect",
+                                details: {
+                                  question: practiceCurrentQuestion.question,
+                                  mode: practiceMode,
+                                  userAnswer: answerStr,
+                                  isCorrect: data.isCorrect,
+                                  xpGained: computedXp,
+                                  feedback: data.feedback,
+                                  explanation: data.correctExplanation || "",
+                                  rubric: data.rubric || null
+                                }
+                              })
+                            }).catch(err => console.error("Failed to save practice session activity:", err));
+
+                            // Log specialized practice attempt for heatmap metrics
+                            fetch("/api/activity", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                userId: user.uid,
+                                userEmail: user.email || "student@fahem.edu",
+                                action: "practice_attempt",
+                                status: data.isCorrect ? "correct" : "incorrect",
+                                details: {
+                                  question: practiceCurrentQuestion.question,
+                                  subject: targetSubject,
+                                  subtopic,
+                                  isCorrect: data.isCorrect,
+                                  xpGained: computedXp,
+                                  rubric: data.rubric || null
+                                }
+                              })
+                            }).then(() => {
+                              // Reload history
+                              fetchPracticeHistory();
+                            }).catch(err => console.error("Failed to save practice attempt activity:", err));
+                          }
                         } else {
                           alert(language === "ar" ? "حدث خطأ أثناء تقييم الإجابة." : "Failed to evaluate answer.");
                         }
@@ -1188,6 +1921,8 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                         body: JSON.stringify({
                           subject: targetSubject,
                           bookId: practiceScopeType === "book" ? practiceSelectedBookId : "",
+                          selectedChapters: practiceSelectedChapters,
+                          customConcepts: practiceCustomConcepts,
                           mode: practiceMode,
                           language: language,
                         }),
@@ -1528,6 +2263,8 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     body: JSON.stringify({
                       subject: targetSubject,
                       bookId: practiceScopeType === "book" ? practiceSelectedBookId : "",
+                      selectedChapters: practiceSelectedChapters,
+                      customConcepts: practiceCustomConcepts,
                       mode: practiceMode,
                       language: language,
                     }),
@@ -1587,6 +2324,278 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* 📜 Practice Sessions History & Audit Trail */}
+      <div style={{
+        marginTop: "2.5rem",
+        background: "rgba(255, 255, 255, 0.45)",
+        backdropFilter: "blur(12px)",
+        borderRadius: "16px",
+        padding: "2rem",
+        border: "1px solid var(--card-border)",
+        boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.05)",
+      }}>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1.5rem",
+          borderBottom: "2px solid rgba(0, 0, 0, 0.05)",
+          paddingBottom: "1rem"
+        }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 800, color: "var(--foreground)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              📜 {language === "ar" ? "سجل غارات الممارسة وتحديات الأسئلة" : "Practice Sessions History & Challenges"}
+            </h3>
+            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "rgba(0,0,0,0.5)" }}>
+              {language === "ar" ? "شاهد أسئلتك وإجاباتك والتقييمات التفصيلية لكل تحدٍ قمت به" : "View your past questions, answers, and full evaluations with tutor-provided explanations"}
+            </p>
+          </div>
+          <button
+            onClick={fetchPracticeHistory}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "20px",
+              background: "rgba(16, 107, 163, 0.08)",
+              color: "var(--primary)",
+              border: "1px solid rgba(16, 107, 163, 0.15)",
+              fontWeight: 700,
+              fontSize: "0.75rem",
+              cursor: "pointer"
+            }}
+          >
+            {historyLoading ? "🔄..." : (language === "ar" ? "تحديث" : "Refresh")}
+          </button>
+        </div>
+
+        {historyLoading && practiceHistoryList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem" }}>
+            <div className="animate-spin" style={{ display: "inline-block", width: "2rem", height: "2rem", border: "4px solid rgba(0,0,0,0.1)", borderLeftColor: "var(--primary)", borderRadius: "50%" }}></div>
+            <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "var(--foreground)" }}>
+              {language === "ar" ? "جاري تحميل السجل..." : "Loading practice history..."}
+            </p>
+          </div>
+        ) : practiceHistoryList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "3rem 1rem", background: "rgba(0,0,0,0.02)", borderRadius: "12px", border: "1px dashed rgba(0,0,0,0.1)" }}>
+            <span style={{ fontSize: "2.5rem" }}>🎯</span>
+            <h4 style={{ margin: "1rem 0 0.25rem 0", fontWeight: 700 }}>
+              {language === "ar" ? "لا توجد غارات مسجلة بعد" : "No practice history recorded yet"}
+            </h4>
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "rgba(0,0,0,0.5)" }}>
+              {language === "ar" ? "ابدأ غارة مراجعة نشطة في الأعلى وسجل إجابتك ليتم حفظ تقدمك هنا!" : "Launch an Active Recall Quest above and evaluate your response to start recording achievements here."}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {practiceHistoryList.map((run: any, idx: number) => {
+              const details = run.details || {};
+              const isCorrect = details.isCorrect === true || run.status === "correct";
+              const keyId = run._id || `run-${idx}`;
+              return (
+                <div key={keyId} style={{
+                  background: "#ffffff",
+                  borderRadius: "12px",
+                  border: "1px solid " + (isCorrect ? "rgba(76, 175, 80, 0.15)" : "rgba(244, 67, 54, 0.15)"),
+                  padding: "1.25rem",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+                  transition: "all 0.2s"
+                }}>
+                  {/* Card Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem", borderBottom: "1px solid rgba(0,0,0,0.03)", paddingBottom: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{
+                        padding: "3px 8px",
+                        borderRadius: "12px",
+                        fontSize: "0.7rem",
+                        fontWeight: 800,
+                        background: isCorrect ? "rgba(76, 175, 80, 0.1)" : "rgba(244, 67, 54, 0.1)",
+                        color: isCorrect ? "#2e7d32" : "#d32f2f"
+                      }}>
+                        {isCorrect ? (language === "ar" ? "صحيح" : "Correct") : (language === "ar" ? "يحتاج مراجعة" : "Incorrect")}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.4)" }}>
+                        {details.mode ? `• Mode: ${details.mode.toUpperCase()}` : ""}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.4)" }}>
+                        • {new Date(run.createdAt || Date.now()).toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {details.xpGained > 0 && (
+                        <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#e65100", background: "rgba(255, 152, 0, 0.1)", padding: "2px 8px", borderRadius: "10px" }}>
+                          🔥 +{details.xpGained} XP
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Question */}
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)", marginBottom: "0.5rem" }}>
+                    Q: {details.question}
+                  </div>
+
+                  {/* User's Answer */}
+                  <div style={{
+                    fontSize: "0.85rem",
+                    padding: "8px 12px",
+                    background: "rgba(0,0,0,0.02)",
+                    borderRadius: "6px",
+                    color: "rgba(0,0,0,0.7)",
+                    borderLeft: "3px solid " + (isCorrect ? "#4caf50" : "#f44336"),
+                    marginBottom: "0.75rem"
+                  }}>
+                    <strong>{language === "ar" ? "إجابتك:" : "Your Answer:"}</strong> {details.userAnswer || "N/A"}
+                  </div>
+
+                  {/* Oral Practice Assessment Rubric (Saved in History) */}
+                  {details.mode === "oral" && details.rubric && (
+                    <div style={{
+                      padding: "1rem",
+                      background: "linear-gradient(135deg, rgba(212, 175, 55, 0.03), rgba(16, 107, 163, 0.03))",
+                      border: "1px solid #d4af37",
+                      borderRadius: "10px",
+                      marginBottom: "0.75rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.75rem"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                          <span style={{ fontSize: "1.1rem" }}>📊</span>
+                          <strong style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>
+                            {language === "ar" ? "تقييم الأداء النطقي" : "Oral Rubric Evaluation"}
+                          </strong>
+                        </div>
+                        {details.rubric.accentNormalizationApplied && (
+                          <span style={{
+                            background: "rgba(39, 174, 96, 0.08)",
+                            color: "#27ae60",
+                            fontSize: "0.65rem",
+                            fontWeight: 800,
+                            padding: "2px 6px",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(39,174,96,0.15)"
+                          }}>
+                            ✨ {language === "ar" ? "تسامح لهجي مصري" : "Egyptian Accent Normalization"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1rem", alignItems: "center" }} className="grid-cols-1">
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0.5rem", background: "rgba(0,0,0,0.015)", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.03)" }}>
+                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#6a7c88" }}>
+                            {language === "ar" ? "الدرجة الكلية" : "Overall"}
+                          </span>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#d4af37" }}>
+                            {details.rubric.overall}%
+                          </div>
+                          <span style={{ fontSize: "0.6rem", fontWeight: 700, color: details.rubric.overall >= 60 ? "#27ae60" : "#d32f2f" }}>
+                            {details.rubric.overall >= 60 
+                              ? (language === "ar" ? "اجتياز 🛡️" : "PASS 🛡️") 
+                              : (language === "ar" ? "مراجعة ⚠️" : "REVIEW ⚠️")}
+                          </span>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                          {[
+                            { key: "pronunciation", labelAr: "النطق", labelEn: "Pronunciation", val: details.rubric.pronunciation, icon: "🗣️", color: "#106ba3" },
+                            { key: "confidence", labelAr: "الطلاقة", labelEn: "Fluency", val: details.rubric.confidence, icon: "⚡", color: "#f39c12" },
+                            { key: "accuracy", labelAr: "الدقة", labelEn: "Accuracy", val: details.rubric.accuracy, icon: "🎯", color: "#27ae60" },
+                            { key: "structure", labelAr: "الصياغة", labelEn: "Structure", val: details.rubric.structure, icon: "🧱", color: "#9b59b6" },
+                          ].map((metric) => (
+                            <div key={metric.key} style={{ padding: "0.4rem 0.5rem", background: "#ffffff", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.05)" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.15rem" }}>
+                                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>
+                                  {metric.icon} {language === "ar" ? metric.labelAr : metric.labelEn}
+                                </span>
+                                <strong style={{ fontSize: "0.75rem", color: metric.color }}>{metric.val}%</strong>
+                              </div>
+                              <div style={{ width: "100%", height: "4px", background: "rgba(0,0,0,0.04)", borderRadius: "2px", overflow: "hidden" }}>
+                                <div style={{ width: `${metric.val}%`, height: "100%", background: metric.color, borderRadius: "2px" }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {details.rubric.feedbackDetails && (
+                        <div style={{ fontSize: "0.7rem", padding: "0.5rem", background: "rgba(0,0,0,0.015)", borderRadius: "6px", color: "var(--foreground)" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }} className="grid-cols-1">
+                            {details.rubric.feedbackDetails.pronunciationFeedback && (
+                              <div>
+                                <strong>🗣️ {language === "ar" ? "مخارج الحروف:" : "Pronunciation:"}</strong> {details.rubric.feedbackDetails.pronunciationFeedback}
+                              </div>
+                            )}
+                            {details.rubric.feedbackDetails.confidenceFeedback && (
+                              <div>
+                                <strong>⚡ {language === "ar" ? "الطلاقة والثقة:" : "Fluency:"}</strong> {details.rubric.feedbackDetails.confidenceFeedback}
+                              </div>
+                            )}
+                            {details.rubric.feedbackDetails.accuracyFeedback && (
+                              <div>
+                                <strong>🎯 {language === "ar" ? "الدقة العلمية:" : "Accuracy:"}</strong> {details.rubric.feedbackDetails.accuracyFeedback}
+                              </div>
+                            )}
+                            {details.rubric.feedbackDetails.structureFeedback && (
+                              <div>
+                                <strong>🧱 {language === "ar" ? "الصياغة والترتيب:" : "Structure:"}</strong> {details.rubric.feedbackDetails.structureFeedback}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tutor Explanation & Feedback */}
+                  {details.explanation && (
+                    <div style={{
+                      background: "rgba(16, 107, 163, 0.03)",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      border: "1px dashed rgba(16, 107, 163, 0.15)",
+                      fontSize: "0.85rem",
+                      color: "var(--foreground)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                        <strong style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px" }}>
+                          💡 {language === "ar" ? "شرح وتوضيح المعلم:" : "Tutor Explanation:"}
+                        </strong>
+                        <button
+                          onClick={() => speakPracticeText(details.explanation, keyId)}
+                          style={{
+                            padding: "3px 8px",
+                            borderRadius: "12px",
+                            background: speakingType === keyId ? "rgba(244, 67, 54, 0.1)" : "rgba(16, 107, 163, 0.1)",
+                            color: speakingType === keyId ? "#f44336" : "var(--primary)",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "3px"
+                          }}
+                        >
+                          {speakingType === keyId ? "🛑 Stop" : "🔊 Listen"}
+                        </button>
+                      </div>
+                      <div style={{ lineHeight: 1.5 }}>
+                        {details.explanation}
+                      </div>
+                      {details.feedback && (
+                        <div style={{ marginTop: "0.5rem", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "0.5rem", fontSize: "0.8rem", color: "rgba(0,0,0,0.6)" }}>
+                          💬 {details.feedback}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {renderSpaceHistory()}
     </div>

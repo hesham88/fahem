@@ -712,42 +712,109 @@ export default function Home() {
 
   const getAllPages = (book: any, pagesState: any[]) => {
     if (!book) return [];
-    const bookData = TEXTBOOK_PAGES[book.subject] || {
-      titleEn: book.titleEn || book.title || "Custom Material",
-      titleAr: book.titleAr || book.title_ar || book.title || "وثيقة مخصصة",
-      chapters: [
-        {
-          titleEn: "Chapter 1: Study Content",
-          titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
-          pages: [
-            {
-              pageNum: 1,
-              titleEn: "Section 1: General Core Overview",
-              titleAr: "القسم الأول: نظرة عامة شاملة",
-              contentEn: `This personal study note contains curated context for ${book.titleEn || book.title}. Ground your AI study assistant directly in this material by using mentions like @, #, or / in the companion panel.`,
-              contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${book.titleAr || book.title_ar || book.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر استخدام الإشارات الذكية مثل @ أو # أو / في لوحة الرفيق المساعد.`,
-              formulas: ["Syllabus Grounding Key: S = G × (1 - E)"],
-              tipEn: "Type @ to select a subject, # to select a book, or / to invoke specialized companion commands in the chat!",
-              tipAr: "اكتب @ لاختيار المادة، # لاختيار الكتاب، أو / لتفعيل الأوامر الذكية لرفيق المذاكرة فهم!"
-            }
-          ]
-        }
-      ]
-    };
+    
+    // 1. If we have real pages loaded in pagesState for this book, map them!
+    const targetBookId = book._id || book.id;
+    const realPages = (pagesState || []).filter((p: any) => p.book_id === targetBookId || p.bookId === targetBookId);
+    
+    if (realPages.length > 0) {
+      return realPages.map((p: any) => {
+        const pageNum = p.page_number || p.pageNum || 1;
+        
+        // Detect language of the content, or use book's language
+        const isAr = book.language === "ar" || /[\u0600-\u06FF]/.test(p.content || "");
+        
+        // Map fields to match what the viewer expects
+        return {
+          pageNum: pageNum,
+          page_number: pageNum,
+          titleEn: p.titleEn || `Page ${pageNum}`,
+          titleAr: p.titleAr || `الصفحة ${pageNum}`,
+          contentEn: p.contentEn || (isAr ? "" : p.content) || p.content || "",
+          contentAr: p.contentAr || (isAr ? p.content : "") || p.content || "",
+          formulas: p.formulas || [],
+          tipEn: p.tipEn || p.tips || "Use the companion chat on the right side to ask questions!",
+          tipAr: p.tipAr || p.tips || "اسأل رفيق المذاكرة فهم في لوحة الدردشة الجانبية للتعمق في هذه الصفحة!",
+          chapterTitleEn: p.chapterTitleEn || p.chapter_title_en || `Section ${pageNum}`,
+          chapterTitleAr: p.chapterTitleAr || p.chapter_title_ar || `القسم ${pageNum}`,
+          chapterIndex: p.chapterIndex || 0,
+          originalPage: p
+        };
+      });
+    }
 
-    const allPages: any[] = [];
-    bookData.chapters.forEach((ch: any, chIdx: number) => {
-      ch.pages.forEach((p: any) => {
-        allPages.push({
-          ...p,
-          chapterTitleEn: ch.titleEn,
-          chapterTitleAr: ch.titleAr,
-          chapterIndex: chIdx
+    // 2. Fallback to TEXTBOOK_PAGES if available for the specific subject,
+    // but ONLY if the book is one of the standard static ones (like Math, Science, Arabic)
+    const bookSubject = book.subject;
+    if (bookSubject && TEXTBOOK_PAGES[bookSubject] && !book.isUserUpload && !book.isMoeIngested) {
+      const bookData = TEXTBOOK_PAGES[bookSubject];
+      const allPages: any[] = [];
+      bookData.chapters?.forEach((ch: any, chIdx: number) => {
+        ch.pages?.forEach((p: any) => {
+          allPages.push({
+            ...p,
+            chapterTitleEn: ch.titleEn,
+            chapterTitleAr: ch.titleAr,
+            chapterIndex: chIdx
+          });
         });
       });
-    });
-    return allPages;
+      return allPages;
+    }
+
+    // 3. Dynamic synthesis loading placeholder
+    return [
+      {
+        pageNum: 1,
+        titleEn: "Retrieving pages...",
+        titleAr: "جاري استرجاع الصفحات...",
+        contentEn: "Connecting to the secure ingestion vault and retrieving book pages. Please wait...",
+        contentAr: "جاري الاتصال بقاعدة البيانات الآمنة واسترجاع صفحات الكتاب دراسياً... يرجى الانتظار ثوانٍ معدودة.",
+        formulas: [],
+        tipEn: "Loading...",
+        tipAr: "جاري التحميل...",
+        chapterTitleEn: "Retrieving book pages...",
+        chapterTitleAr: "جاري استرجاع الصفحات...",
+        chapterIndex: 0
+      }
+    ];
   };
+
+  // Fetch book pages from database/API when a book is selected
+  useEffect(() => {
+    if (!selectedBookReader) {
+      setLoadedBookPages([]);
+      return;
+    }
+    
+    const bookId = selectedBookReader._id || selectedBookReader.id;
+    if (!bookId) return;
+
+    setLoadingBookPages(true);
+    console.log(`[Library-Reader] Fetching book pages for book ID: ${bookId}...`);
+    
+    fetch(`/api/books/pages?bookId=${bookId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch pages");
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.success && data.pages) {
+          console.log(`[Library-Reader] Loaded ${data.pages.length} pages for book ID: ${bookId}`);
+          setLoadedBookPages(data.pages);
+        } else {
+          console.warn("[Library-Reader] API returned success false or no pages.");
+          setLoadedBookPages([]);
+        }
+      })
+      .catch((err) => {
+        console.error("[Library-Reader] Error loading pages from API:", err);
+        setLoadedBookPages([]);
+      })
+      .finally(() => {
+        setLoadingBookPages(false);
+      });
+  }, [selectedBookReader]);
 
   const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
 
@@ -766,18 +833,7 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (selectedBookReader) {
-        const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || { chapters: [] };
-        const allPages: any[] = [];
-        bookData.chapters?.forEach((ch: any, chIdx: number) => {
-          ch.pages?.forEach((p: any) => {
-            allPages.push({
-              ...p,
-              chapterTitleEn: ch.titleEn,
-              chapterTitleAr: ch.titleAr,
-              chapterIndex: chIdx
-            });
-          });
-        });
+        const allPages = getAllPages(selectedBookReader, loadedBookPages);
         const activePage = allPages[readerCurrentPage - 1] || allPages[0] || null;
         
         window.dispatchEvent(new CustomEvent("fahemBookContext", {
@@ -797,7 +853,89 @@ export default function Home() {
         window.dispatchEvent(new CustomEvent("fahemBookContext", { detail: null }));
       }
     }
-  }, [selectedBookReader, readerCurrentPage, language]);
+  }, [selectedBookReader, readerCurrentPage, loadedBookPages, language]);
+
+  // Deep-linking: listener for the custom navigate event
+  useEffect(() => {
+    const handleNavigateBook = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { bookId, page } = customEvent.detail;
+      if (!bookId) return;
+
+      console.log(`[Deep-Linking] Received fahemNavigateBook event for bookId: "${bookId}", page: ${page}`);
+
+      // 1. Search in dynamicBooks
+      const matchedBook = (dynamicBooks || []).find(b => b._id === bookId || b.id === bookId || b.subject === bookId);
+      if (matchedBook) {
+        setSelectedBookReader(matchedBook);
+        setReaderCurrentPage(page || 1);
+        setActiveTab("library");
+      } else {
+        // 2. Fallback check for static books
+        const staticBooks: Record<string, any> = {
+          "Math": { _id: "Math", id: "Math", title: "Advanced Mathematics Grade 9", titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math" },
+          "Science": { _id: "Science", id: "Science", title: "Comprehensive Chemistry Handbook", titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science" },
+          "Arabic": { _id: "Arabic", id: "Arabic", title: "Grammar & Arabic Linguistics Keys", titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic" }
+        };
+        const staticBook = staticBooks[bookId];
+        if (staticBook) {
+          setSelectedBookReader(staticBook);
+          setReaderCurrentPage(page || 1);
+          setActiveTab("library");
+        }
+      }
+    };
+
+    window.addEventListener("fahemNavigateBook", handleNavigateBook);
+    return () => {
+      window.removeEventListener("fahemNavigateBook", handleNavigateBook);
+    };
+  }, [dynamicBooks]);
+
+  // Deep-linking: initial URL query load on app startup
+  useEffect(() => {
+    if (typeof window !== "undefined" && dynamicBooks.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const bookId = params.get("bookId") || params.get("book_id");
+      const pageParam = params.get("page");
+      if (bookId) {
+        const page = parseInt(pageParam || "1", 10) || 1;
+        console.log(`[Deep-Linking] Initial load parsed parameter bookId: ${bookId}, page: ${page}`);
+        setTimeout(() => {
+          const event = new CustomEvent("fahemNavigateBook", {
+            detail: { bookId, page }
+          });
+          window.dispatchEvent(event);
+        }, 1500); // Small buffer to ensure library panels are mounted and ready
+      }
+    }
+  }, [dynamicBooks]);
+
+  // Deep-linking: sync current viewer state back to browser URL string
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (selectedBookReader) {
+        const bookId = selectedBookReader._id || selectedBookReader.id;
+        if (bookId) {
+          params.set("bookId", bookId);
+          params.set("page", readerCurrentPage.toString());
+          const newSearch = params.toString();
+          const newUrl = `${window.location.pathname}?${newSearch}`;
+          window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+        }
+      } else {
+        if (params.has("bookId") || params.has("page")) {
+          params.delete("bookId");
+          params.delete("page");
+          const newSearch = params.toString();
+          const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
+          window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+        }
+      }
+    }
+  }, [selectedBookReader, readerCurrentPage]);
+
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
   const [mentionSearch, setMentionQuery] = useState<string>("");
   const [showMentionsDropdown, setShowMentionsDropdown] = useState<boolean>(false);
@@ -940,6 +1078,55 @@ export default function Home() {
       { actionEn, actionAr, timestamp: new Date() },
       ...prev
     ]);
+    if (user) {
+      fetch("/api/activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          userEmail: user.email || "student@fahem.edu",
+          action: "space_history",
+          status: "success",
+          details: { actionEn, actionAr }
+        })
+      }).catch(err => console.error("Error saving space history activity:", err));
+    }
+  };
+
+  const fetchSpaceHistory = async (userId: string) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`/api/activity?userId=${encodeURIComponent(userId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const activities = data.activities || [];
+        const loadedHistory = activities
+          .filter((act: any) => act.action === "space_history" || act.action === "practice_session")
+          .map((act: any) => {
+            if (act.action === "space_history") {
+              return {
+                actionEn: act.details?.actionEn || act.details || "",
+                actionAr: act.details?.actionAr || act.details || "",
+                timestamp: new Date(act.timestamp)
+              };
+            } else { // practice_session
+              const details = act.details || {};
+              const isCorrect = act.status === "correct" || details.isCorrect === true;
+              const xp = details.xpGained || 0;
+              return {
+                actionEn: `Answered Quest Challenge: ${isCorrect ? "Correct (+" + xp + " XP)" : "Incorrect"}`,
+                actionAr: `أجاب على تحدي الممارسة بشكل ${isCorrect ? "صحيح (+" + xp + " XP)" : "خاطئ"}`,
+                timestamp: new Date(act.timestamp)
+              };
+            }
+          });
+        if (loadedHistory.length > 0) {
+          setSpaceHistory(loadedHistory);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch space history:", err);
+    }
   };
 
   // 1. Practice Spaces State
@@ -3224,6 +3411,7 @@ export default function Home() {
         fetchUserSessions(currentUser.uid); // Fetch user sessions
         fetchUserTokenStats(currentUser.uid); // Fetch user token usage stats
         fetchBooksAndSubjects(); // Fetch dynamic books and subjects from database
+        fetchSpaceHistory(currentUser.uid); // Fetch active recall and space audit history
         
         // Fetch User Profile over MongoDB Agent Proxies
         setLoadingProfile(true);
@@ -3884,7 +4072,7 @@ export default function Home() {
     }, intervalTime);
 
     // Actual Firebase Storage upload
-    const path = "MOE Library/" + Date.now() + "_" + moeFile.name;
+    const path = "ellibrary_moe_gov_eg/" + Date.now() + "_" + moeFile.name;
     const storageRef = ref(storage, path);
     uploadBytes(storageRef, moeFile)
       .then((snapshot) => {
@@ -3963,20 +4151,8 @@ export default function Home() {
     setReaderMessages((prev) => [...prev, userMsg]);
     setReaderPrompt("");
 
-    const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || TEXTBOOK_PAGES["Math"];
-    const allPages: any[] = [];
-    bookData.chapters.forEach((ch, chIdx) => {
-      ch.pages.forEach((p) => {
-        allPages.push({
-          ...p,
-          chapterTitleEn: ch.titleEn,
-          chapterTitleAr: ch.titleAr,
-          chapterIndex: chIdx
-        });
-      });
-    });
-
-    const activePage = allPages[readerCurrentPage - 1];
+    const allPages = getAllPages(selectedBookReader, loadedBookPages);
+    const activePage = allPages[readerCurrentPage - 1] || allPages[0] || null;
     let promptPayload = queryText;
     const lowerText = queryText.toLowerCase();
 
@@ -3994,9 +4170,9 @@ export default function Home() {
 
     let subjectGrounding = "";
     if (lowerText.includes("@math") || lowerText.includes("#advancedmath")) {
-      subjectGrounding = "\n[Subject Grounding: Mathematics Grade 9 - Matrices & Algebra]";
+      subjectGrounding = "\n[Subject Grounding: Mathematics - Formulas & Analytical Concepts]";
     } else if (lowerText.includes("@science") || lowerText.includes("#chemistryhandbook") || lowerText.includes("#biologynotes")) {
-      subjectGrounding = "\n[Subject Grounding: Science & Biology - Cell structure, transport systems & nutrition]";
+      subjectGrounding = "\n[Subject Grounding: Science & Engineering - Experimental & Empirical Concepts]";
     } else if (lowerText.includes("@arabic") || lowerText.includes("#arabicgrammar")) {
       subjectGrounding = "\n[Subject Grounding: Arabic Linguistics & Grammar Basics]";
     } else if (lowerText.includes("@history") || lowerText.includes("#middleeasthistory")) {
@@ -4004,7 +4180,10 @@ export default function Home() {
     }
 
     if (activePage) {
-      promptPayload = `[Context Reference: Textbook: "${selectedBookReader.titleEn}", Page: ${readerCurrentPage}, Chapter: "${activePage.chapterTitleEn}"] ${subjectGrounding} ${directive} \n\nUser Question: ${queryText}`;
+      const pageText = language === "ar" 
+        ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
+        : (activePage.contentEn || activePage.contentAr || activePage.content || "");
+      promptPayload = `[Context Reference: Textbook: "${selectedBookReader.titleEn || selectedBookReader.title}", Page: ${readerCurrentPage}, Chapter: "${activePage.chapterTitleEn || activePage.chapterTitleAr || "General"}"]\n[Page Content:\n${pageText}\n]\n${subjectGrounding} ${directive} \n\nUser Question: ${queryText}`;
     } else {
       promptPayload = `${subjectGrounding} ${directive} \n\nUser Question: ${queryText}`;
     }
@@ -5671,6 +5850,7 @@ export default function Home() {
           <LibraryPanel
             language={language}
             user={user}
+            isAdmin={isAdmin}
             selectedBookReader={selectedBookReader}
             setSelectedBookReader={setSelectedBookReader}
             loadedBookPages={loadedBookPages}
@@ -5710,8 +5890,11 @@ export default function Home() {
             dynamicBooks={dynamicBooks}
             renderSpaceSelectorBar={renderSpaceSelectorBar}
             renderSpaceHistory={renderSpaceHistory}
+            addSpaceHistory={addSpaceHistory}
             renderPremiumContent={renderPremiumContent}
             t={t}
+            user={user}
+            userProfile={userProfile}
           />
         ) : activeTab === "plan" ? (
           <StudyPlanPanel
@@ -5862,38 +6045,7 @@ export default function Home() {
                 let totalPages = 1;
 
                 if (selectedBookReader) {
-                  const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || {
-                    titleEn: selectedBookReader.titleEn || selectedBookReader.title || "Custom Material",
-                    titleAr: selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title || "وثيقة مخصصة",
-                    chapters: [
-                      {
-                        titleEn: "Chapter 1: Study Content",
-                        titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
-                        pages: [
-                          {
-                            pageNum: 1,
-                            titleEn: "Section 1: General Core Overview",
-                            titleAr: "القسم الأول: نظرة عامة شاملة",
-                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}.`,
-                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}".`,
-                          }
-                        ]
-                      }
-                    ]
-                  };
-
-                  const allPages: any[] = [];
-                  bookData.chapters?.forEach((ch: any, chIdx: number) => {
-                    ch.pages?.forEach((p: any) => {
-                      allPages.push({
-                        ...p,
-                        chapterTitleEn: ch.titleEn,
-                        chapterTitleAr: ch.titleAr,
-                        chapterIndex: chIdx
-                      });
-                    });
-                  });
-
+                  const allPages = getAllPages(selectedBookReader, loadedBookPages);
                   totalPages = allPages.length || 1;
                   const activePage = allPages[readerCurrentPage - 1] || allPages[0] || null;
                   if (activePage) {

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
 import { proxyRequest, getOidcToken } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../localDbHelper";
 import { checkIsSuperadmin, checkIsAdmin } from "../admin/helper";
 import { spawn } from "child_process";
 import path from "path";
@@ -429,7 +429,7 @@ export async function POST(req: NextRequest) {
             // Spawn Process
             try {
               const pythonPath = "python";
-              const scriptPath = path.join(process.cwd(), "scripts", "ingestion", "job_fetch.py");
+              const scriptPath = resolveScriptPath(path.join("ingestion", "job_fetch.py"));
 
               const payload = {
                 book_id: bookId,
@@ -561,11 +561,19 @@ export async function POST(req: NextRequest) {
             let existingMessages: any[] = [];
             try {
               console.log(`[Onboarding API] Fetching existing session history for: ${activeSessionId}`);
-              const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
-              if (res.ok) {
-                const data = await res.json();
-                if (data?.session?.messages) {
-                  existingMessages = data.session.messages;
+              if (isLocalEnv()) {
+                const db = getLocalDb();
+                const session = (db.chat_sessions || []).find((s: any) => s.sessionId === activeSessionId);
+                if (session?.messages) {
+                  existingMessages = session.messages;
+                }
+              } else {
+                const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data?.session?.messages) {
+                    existingMessages = data.session.messages;
+                  }
                 }
               }
               console.log(`[Onboarding API] Session history load complete. Found ${existingMessages.length} existing messages.`);
@@ -839,13 +847,40 @@ Examples:
             ];
 
             try {
-              await proxyRequest("/user/chat-session", "POST", {
-                sessionId: activeSessionId,
-                userId,
-                userEmail,
-                title: "Onboarding Chat Session",
-                messages: newMessages
-              });
+              if (isLocalEnv()) {
+                const db = getLocalDb();
+                if (!db.chat_sessions) {
+                  db.chat_sessions = [];
+                }
+                const idx = db.chat_sessions.findIndex((s: any) => s.sessionId === activeSessionId);
+                const now = new Date().toISOString();
+                if (idx > -1) {
+                  db.chat_sessions[idx] = {
+                    ...db.chat_sessions[idx],
+                    messages: newMessages,
+                    updatedAt: now
+                  };
+                } else {
+                  db.chat_sessions.push({
+                    sessionId: activeSessionId,
+                    userId,
+                    userEmail,
+                    title: "Onboarding Chat Session",
+                    messages: newMessages,
+                    createdAt: now,
+                    updatedAt: now
+                  });
+                }
+                saveLocalDb(db);
+              } else {
+                await proxyRequest("/user/chat-session", "POST", {
+                  sessionId: activeSessionId,
+                  userId,
+                  userEmail,
+                  title: "Onboarding Chat Session",
+                  messages: newMessages
+                });
+              }
             } catch (err) {
               console.warn("Failed to save onboarding session history:", err);
             }
@@ -1130,11 +1165,19 @@ ${guardText || "Access unauthorized"}
             // A. Fetch existing session messages
             let existingMessages: any[] = [];
             try {
-              const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
-              if (res.ok) {
-                const data = await res.json();
-                if (data?.session?.messages) {
-                  existingMessages = data.session.messages;
+              if (isLocalEnv()) {
+                const db = getLocalDb();
+                const session = (db.chat_sessions || []).find((s: any) => s.sessionId === activeSessionId);
+                if (session?.messages) {
+                  existingMessages = session.messages;
+                }
+              } else {
+                const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data?.session?.messages) {
+                    existingMessages = data.session.messages;
+                  }
                 }
               }
             } catch (err) {
@@ -1155,13 +1198,41 @@ ${guardText || "Access unauthorized"}
 
             // C. Save Chat Session
             try {
-              await proxyRequest("/user/chat-session", "POST", {
-                sessionId: activeSessionId,
-                userId,
-                userEmail,
-                title,
-                messages: newMessages
-              });
+              if (isLocalEnv()) {
+                const db = getLocalDb();
+                if (!db.chat_sessions) {
+                  db.chat_sessions = [];
+                }
+                const idx = db.chat_sessions.findIndex((s: any) => s.sessionId === activeSessionId);
+                const now = new Date().toISOString();
+                if (idx > -1) {
+                  db.chat_sessions[idx] = {
+                    ...db.chat_sessions[idx],
+                    title: title || db.chat_sessions[idx].title || "Untitled Chat",
+                    messages: newMessages,
+                    updatedAt: now
+                  };
+                } else {
+                  db.chat_sessions.push({
+                    sessionId: activeSessionId,
+                    userId,
+                    userEmail,
+                    title: title || "Untitled Chat",
+                    messages: newMessages,
+                    createdAt: now,
+                    updatedAt: now
+                  });
+                }
+                saveLocalDb(db);
+              } else {
+                await proxyRequest("/user/chat-session", "POST", {
+                  sessionId: activeSessionId,
+                  userId,
+                  userEmail,
+                  title,
+                  messages: newMessages
+                });
+              }
             } catch (err) {
               console.warn("Failed to save session history:", err);
             }

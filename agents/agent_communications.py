@@ -578,6 +578,37 @@ async def save_chat_session(session_id: str, user_id: str, user_email: str, titl
         logger.warning(f"Failed to save chat session: {err}")
         return False
 
+async def rename_chat_session(session_id: str, new_title: str) -> bool:
+    """Renames a user chat session in chat_sessions collection."""
+    success = False
+    if db_engine and db_engine._db is not None:
+        try:
+            success = await db_engine.rename_chat_session(session_id, new_title)
+            if success:
+                return True
+        except Exception as e:
+            logger.warning(f"Direct rename_chat_session failed: {e}; falling back to MCP.")
+    try:
+        from datetime import datetime
+        now_str = datetime.utcnow().isoformat() + "Z"
+        
+        await _run_mcp_tool("update-many", {
+            "database": "fahem",
+            "collection": "chat_sessions",
+            "filter": {"sessionId": session_id},
+            "update": {
+                "$set": {
+                    "title": new_title,
+                    "updatedAt": now_str
+                }
+            }
+        })
+        logger.info(f"[MCP SESSION RENAMED] {session_id} - New Title: {new_title}")
+        return True
+    except Exception as err:
+        logger.error(f"Failed to rename chat session via MCP: {err}")
+        return False
+
 async def get_user_sessions(user_id: str) -> list:
     """Fetches all chat sessions for a specific user (summary list)."""
     if db_engine and db_engine._db is not None:

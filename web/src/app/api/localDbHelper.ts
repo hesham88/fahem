@@ -18,13 +18,18 @@ interface LocalDb {
   social_replies?: any[];
   users?: any[];
   admin_change_requests?: any[];
+  user_activities?: any[];
+  chat_sessions?: any[];
 }
 
 const DEFAULT_DB: LocalDb = {
   subjects: [
     { _id: "subj_algebra_stats", name: "Pure Mathematics", name_ar: "الرياضيات العامة", emoji: "📐", category: "Math", grade_level: "General", books_count: 1 },
     { _id: "subj_biology", name: "Physics & Chemistry", name_ar: "العلوم والفيزياء", emoji: "🧪", category: "Science", grade_level: "General", books_count: 1 },
-    { _id: "subj_arabic_grammar", name: "Arabic Grammar & Literature", name_ar: "اللغة العربية وآدابها", emoji: "📚", category: "Arabic", grade_level: "General", books_count: 1 }
+    { _id: "subj_arabic_grammar", name: "Arabic Grammar & Literature", name_ar: "اللغة العربية وآدابها", emoji: "📚", category: "Arabic", grade_level: "General", books_count: 1 },
+    { _id: "sub_computer_science_1780535716963", name: "Computer Science", name_ar: "علوم الحاسب", emoji: "💻", category: "Computer Science", grade_level: "General", books_count: 1 },
+    { _id: "subj_business", name: "Business & Economics", name_ar: "الأعمال والاقتصاد", emoji: "💼", category: "Business", grade_level: "General", books_count: 1 },
+    { _id: "subj_social_sciences", name: "Social Sciences & Humanities", name_ar: "العلوم الاجتماعية والإنسانيات", emoji: "🌍", category: "Social Sciences", grade_level: "General", books_count: 1 }
   ],
   books: [
     {
@@ -106,7 +111,8 @@ const DEFAULT_DB: LocalDb = {
     { userId: "user_admin_1", name: "Approved Admin", username: "admin_standard", email: "admin@fahem.edu", role: "admin", userType: "admin", school: "Fahem Academy", isWhitelisted: true, banned: false, avatar: "👤", country: "EG", grade: "General" },
     { userId: "user_super_1", name: "Hesham", username: "hesham1988", email: "hesham1988@gmail.com", role: "super-admin", userType: "admin", school: "Fahem HQ", isWhitelisted: true, banned: false, avatar: "👑", country: "EG", grade: "General" }
   ],
-  admin_change_requests: []
+  admin_change_requests: [],
+  user_activities: []
 };
 
 export function isLocalEnv(): boolean {
@@ -156,6 +162,14 @@ export function getLocalDb(): LocalDb {
       db.admin_change_requests = DEFAULT_DB.admin_change_requests;
       updated = true;
     }
+    if (!db.user_activities) {
+      db.user_activities = [];
+      updated = true;
+    }
+    if (!db.chat_sessions) {
+      db.chat_sessions = [];
+      updated = true;
+    }
     
     if (updated) {
       saveLocalDb(db);
@@ -181,3 +195,19 @@ export function saveLocalDb(db: LocalDb): boolean {
     return false;
   }
 }
+
+export function resolveScriptPath(subPath: string): string {
+  // Try process.cwd()/scripts/subPath
+  const localPath = path.join(process.cwd(), "scripts", subPath);
+  if (fs.existsSync(localPath)) {
+    return localPath;
+  }
+  // Try process.cwd()/../scripts/subPath
+  const parentPath = path.join(process.cwd(), "..", "scripts", subPath);
+  if (fs.existsSync(parentPath)) {
+    return parentPath;
+  }
+  // Fallback to localPath
+  return localPath;
+}
+

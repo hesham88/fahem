@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin } from "../helper";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -36,6 +36,28 @@ export async function GET(req: NextRequest) {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
+      }
+
+      // Check if process has died if still harvesting
+      if (job.status === "harvesting") {
+        let isAlive = false;
+        if (job.active_pid) {
+          try {
+            process.kill(job.active_pid, 0);
+            isAlive = true;
+          } catch (e) {}
+        }
+        
+        if (!isAlive && (!job.active_pid || (Date.now() / 1000 - job.updated_at > 30))) {
+          job.status = "failed";
+          if (!job.logs) job.logs = [];
+          job.logs.push(job.active_pid
+            ? `[SYSTEM] Background crawler process (PID ${job.active_pid}) exited or was terminated unexpectedly.`
+            : `[SYSTEM] Background crawler process failed to initialize or was terminated unexpectedly.`
+          );
+          job.updated_at = Date.now() / 1000;
+          saveLocalDb(db);
+        }
       }
 
       return new Response(JSON.stringify({
@@ -215,7 +237,7 @@ export async function POST(req: NextRequest) {
     // Spawn Python crawling job completely asynchronously
     try {
       const pythonPath = "python";
-      const scriptPath = path.join(process.cwd(), "scripts", "async_crawler.py");
+      const scriptPath = resolveScriptPath("async_crawler.py");
 
       const payload = {
         jobId,
@@ -225,6 +247,41 @@ export async function POST(req: NextRequest) {
       };
 
       const child = spawn(pythonPath, [scriptPath]);
+      const pid = child.pid;
+
+      if (pid) {
+        // Update local DB with active_pid immediately to prevent premature fail status in polling
+        if (isLocalEnv()) {
+          const db = getLocalDb() as any;
+          if (db.crawl_jobs) {
+            const job = db.crawl_jobs.find((j: any) => j._id === jobId);
+            if (job) {
+              job.active_pid = pid;
+              job.updated_at = Date.now() / 1000;
+              saveLocalDb(db);
+            }
+          }
+        }
+
+        // Update MongoDB with active_pid asynchronously
+        (async () => {
+          try {
+            const { MongoClient } = require("mongodb");
+            const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+            const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
+            await client.connect();
+            const db = client.db("fahem");
+            await db.collection("crawl_jobs").updateOne(
+              { _id: jobId },
+              { $set: { active_pid: pid, updated_at: Date.now() / 1000 } }
+            );
+            await client.close();
+          } catch (mongoErr) {
+            // Ignore
+          }
+        })();
+      }
+
       child.stdin.write(JSON.stringify(payload));
       child.stdin.end();
 

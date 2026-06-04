@@ -20,7 +20,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             "/user/token-usage", "/user/token-stats", "/admin/global-stats",
             "/user/profile", "/user/account", "/user/list", "/user/friend",
             "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db",
-            "/admin/mcp-tool"
+            "/admin/sync-db", "/admin/mcp-tool"
         ]
         
         path = request.url.path
@@ -429,6 +429,77 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "error": str(err)
             }
 
+    @app.post("/admin/sync-db")
+    async def custom_db_sync(request: fastapi.Request):
+        try:
+            payload = await request.json()
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            summary = {}
+            for col_name, documents in payload.items():
+                if not isinstance(documents, list):
+                    continue
+                
+                inserted_count = 0
+                for doc in documents:
+                    if not isinstance(doc, dict):
+                        continue
+                    
+                    # Deduce identifier
+                    doc_id = doc.get("_id") or doc.get("id") or doc.get("userId")
+                    if col_name == "users" and "username" in doc:
+                        doc["username_clean"] = str(doc["username"]).strip().lower()
+                    
+                    if col_name == "users" and "email" in doc:
+                        email_val = doc.get("email")
+                        if email_val:
+                            existing_user = db["users"].find_one({"email": email_val})
+                            if existing_user:
+                                doc_id = existing_user["_id"]
+                                if "userId" in doc:
+                                    doc["userId"] = doc_id
+                                if "_id" in doc:
+                                    doc["_id"] = doc_id
+                                    
+                    if col_name == "admins" and "email" in doc:
+                        email_val = doc.get("email")
+                        if email_val:
+                            existing_admin = db["admins"].find_one({"email": email_val})
+                            if existing_admin:
+                                doc_id = existing_admin["_id"]
+                                if "userId" in doc:
+                                    doc["userId"] = doc_id
+                                if "_id" in doc:
+                                    doc["_id"] = doc_id
+
+                    if doc_id:
+                        if "_id" not in doc:
+                            doc["_id"] = doc_id
+                        db[col_name].replace_one({"_id": doc_id}, doc, upsert=True)
+                    else:
+                        db[col_name].insert_one(doc)
+                    inserted_count += 1
+                
+                summary[col_name] = inserted_count
+                
+            client.close()
+            return {
+                "status": "success",
+                "message": "Local database synced successfully to production MongoDB!",
+                "summary": summary
+            }
+        except Exception as err:
+            logger.error(f"[services.py] DB Sync failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"status": "error", "error": str(err)}
+            )
+
     @app.get("/audit-logs")
     async def get_logs_endpoint():
         try:
@@ -509,6 +580,27 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"status": "success" if success else "error"}
         except Exception as err:
             logger.error(f"[services.py] Failed to save chat session: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    @app.post("/user/chat-session/rename")
+    async def post_rename_chat_session(request: fastapi.Request):
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from agent_communications import rename_chat_session
+            data = await request.json()
+            session_id = data.get("sessionId", "")
+            title = data.get("title", "")
+            if not session_id or not title:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "error": "sessionId and title are required"}
+                )
+            success = await rename_chat_session(session_id, title)
+            return {"status": "success" if success else "error"}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to rename chat session: {err}", exc_info=True)
             return {"status": "error", "error": str(err)}
 
     @app.get("/user/chat-session")

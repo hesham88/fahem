@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { isLocalEnv, getLocalDb } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,16 @@ export async function POST(req: NextRequest) {
     const resolvedMode = mode || "mcq";
     const resolvedSubject = subject || "General";
 
+    // Helper to extract content depending on field naming in database
+    const getPageContent = (p: any, lang: string) => {
+      if (p.content) return p.content;
+      if (lang === "ar") {
+        return p.content_ar || p.content_en || "";
+      } else {
+        return p.content_en || p.content_ar || "";
+      }
+    };
+
     // 1. Resolve grounding context from real book pages if bookId is provided
     let contextText = "";
     if (bookId) {
@@ -22,19 +33,18 @@ export async function POST(req: NextRequest) {
         if (bookPages.length > 0) {
           // Select 2 random pages to generate a question
           const selectedPages = bookPages.sort(() => 0.5 - Math.random()).slice(0, 2);
-          contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${p.content}`).join("\n\n");
+          contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${getPageContent(p, resolvedLanguage)}`).join("\n\n");
         }
       } else {
         // Production: We can call MongoDB or the agent directly to get pages.
         // Let's call the proxy agent
         try {
-          const { proxyRequest } = require("../../proxy");
           const res = await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET");
           if (res.ok) {
             const data = await res.json();
             if (data && data.pages && data.pages.length > 0) {
               const selectedPages = data.pages.sort(() => 0.5 - Math.random()).slice(0, 2);
-              contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${p.content}`).join("\n\n");
+              contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${getPageContent(p, resolvedLanguage)}`).join("\n\n");
             }
           }
         } catch (err) {
@@ -92,10 +102,10 @@ You MUST respond with a JSON object strictly matching this schema:
     }
 
     const isOral = resolvedMode === "oral";
-    const modelName = isOral ? "gemini-3.1-flash-live-preview" : (process.env.GEMINI_MODEL || "gemini-3.1-flash-lite");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+    let modelName = isOral ? "gemini-3.1-flash-live-preview" : (process.env.GEMINI_MODEL || "gemini-3.1-flash-lite");
+    let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -105,6 +115,22 @@ You MUST respond with a JSON object strictly matching this schema:
         }
       })
     });
+
+    if (!response.ok && isOral && modelName === "gemini-3.1-flash-live-preview") {
+      console.warn(`[api-practice-generate] gemini-3.1-flash-live-preview failed with status ${response.status}. Falling back to gemini-3.1-flash-lite.`);
+      modelName = "gemini-3.1-flash-lite";
+      const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+      response = await fetch(fallbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

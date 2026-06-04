@@ -6,15 +6,50 @@ import { logInfo, logError } from "@/lib/logger";
 interface InlineFeedbackCardProps {
   language: string;
   dir: string;
+  defaultName?: string;
+  defaultEmail?: string;
+  userId?: string;
 }
 
-const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }) => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({
+  language,
+  dir,
+  defaultName = "",
+  defaultEmail = "",
+  userId = ""
+}) => {
+  const [name, setName] = useState(defaultName);
+  const [email, setEmail] = useState(defaultEmail);
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState("Complaint");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+
+  // Sync default values when they load
+  useEffect(() => {
+    if (defaultName) setName(defaultName);
+    if (defaultEmail) setEmail(defaultEmail);
+  }, [defaultName, defaultEmail]);
+
+  // Check rate limiting on mount or userId change
+  useEffect(() => {
+    const key = `fahem_feedback_timestamps_${userId || "anonymous"}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed: number[] = JSON.parse(raw);
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const recent = parsed.filter((t) => t > oneDayAgo);
+        localStorage.setItem(key, JSON.stringify(recent));
+        if (recent.length >= 3) {
+          setIsRateLimited(true);
+        }
+      }
+    } catch (e) {
+      console.warn("localStorage rate limiting check failed:", e);
+    }
+  }, [userId]);
 
   // Labels based on language
   const labels: Record<string, Record<string, string>> = {
@@ -29,7 +64,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "Complaint/Issue",
       suggestion: "Suggestion",
       question: "Question",
-      other: "Other"
+      other: "Other",
+      limit_reached: "You have reached the daily limit of 3 reports. Please try again tomorrow."
     },
     ar: {
       title: "تقديم شكوى / الإبلاغ عن مشكلة",
@@ -42,7 +78,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "شكوى / مشكلة",
       suggestion: "اقتراح",
       question: "استفسار",
-      other: "أخرى"
+      other: "أخرى",
+      limit_reached: "لقد وصلت إلى الحد الأقصى اليومي (3 شكاوى). يرجى المحاولة مرة أخرى غداً."
     },
     es: {
       title: "Enviar comentarios / Reportar un problema",
@@ -55,7 +92,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "Queja / Problema",
       suggestion: "Sugerencia",
       question: "Pregunta",
-      other: "Otro"
+      other: "Otro",
+      limit_reached: "Ha alcanzado el límite diario de 3 informes. Inténtelo de nuevo mañana."
     },
     fr: {
       title: "Soumettre des commentaires / Signaler un problème",
@@ -68,7 +106,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "Plainte / Problème",
       suggestion: "Suggestion",
       question: "Question",
-      other: "Autre"
+      other: "Autre",
+      limit_reached: "Vous avez atteint la limite quotidienne de 3 signalements. Veuillez réessayer demain."
     },
     de: {
       title: "Feedback senden / Problem melden",
@@ -81,7 +120,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "Beschwerde / Problem",
       suggestion: "Vorschlag",
       question: "Frage",
-      other: "Andere"
+      other: "Andere",
+      limit_reached: "Sie haben das tägliche Limit von 3 Meldungen erreicht. Bitte versuchen Sie es morgen erneut."
     },
     zh: {
       title: "提交反馈 / 报告问题",
@@ -94,7 +134,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "投诉 / 问题",
       suggestion: "建议",
       question: "问题",
-      other: "其他"
+      other: "其他",
+      limit_reached: "您已达到每天最多3次报告的限制。请明天再试。"
     },
     it: {
       title: "Invia feedback / Segnala un problema",
@@ -107,7 +148,8 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
       complaint: "Reclamo / Problema",
       suggestion: "Suggerimento",
       question: "Domanda",
-      other: "Altro"
+      other: "Altro",
+      limit_reached: "Hai raggiunto il limite giornaliero di 3 segnalazioni. Riprova domani."
     }
   };
 
@@ -121,6 +163,23 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedback.trim()) return;
+
+    // Double check rate limiting upon submit
+    const key = `fahem_feedback_timestamps_${userId || "anonymous"}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed: number[] = JSON.parse(raw);
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const recent = parsed.filter((t) => t > oneDayAgo);
+        if (recent.length >= 3) {
+          setIsRateLimited(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn(e);
+    }
 
     setLoading(true);
     try {
@@ -137,6 +196,16 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
           hasEmail: !!email,
           hasName: !!name
         });
+
+        // Store timestamp for rate limiting
+        try {
+          const raw = localStorage.getItem(key);
+          const parsed: number[] = raw ? JSON.parse(raw) : [];
+          parsed.push(Date.now());
+          localStorage.setItem(key, JSON.stringify(parsed));
+        } catch (e) {
+          console.warn("Failed to write rate limiting timestamp:", e);
+        }
       } else {
         const errorText = await response.text();
         throw new Error(errorText || `Status ${response.status}`);
@@ -160,42 +229,74 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({ language, dir }
     );
   }
 
+  if (isRateLimited) {
+    return (
+      <div style={{ 
+        padding: "1rem", 
+        backgroundColor: "rgba(239, 83, 80, 0.1)", 
+        border: "1px solid rgba(239, 83, 80, 0.3)", 
+        borderRadius: "12px",
+        color: "#c62828",
+        fontSize: "0.85rem",
+        fontWeight: 500,
+        lineHeight: "1.4",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.35rem",
+        width: "100%",
+        minWidth: "280px",
+        boxSizing: "border-box"
+      }}>
+        <div style={{ fontWeight: 600, fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          🛑 {language === "ar" ? "تنبيه الحد الأقصى" : "Rate Limit Warning"}
+        </div>
+        <div>
+          {currentLabels.limit_reached || labels["en"].limit_reached}
+        </div>
+      </div>
+    );
+  }
+
+  const showNameEmailInputs = !defaultName || !defaultEmail;
+
   return (
     <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", minWidth: "280px" }}>
       <div style={{ fontWeight: 600, color: "var(--primary)", fontSize: "0.95rem", marginBottom: "0.25rem", borderBottom: "1px dashed rgba(16, 107, 163, 0.15)", paddingBottom: "0.25rem" }}>
         📝 {currentLabels.title}
       </div>
       
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <input
-          type="text"
-          placeholder={currentLabels.name}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{
-            flex: 1,
-            padding: "0.4rem 0.6rem",
-            border: "1px solid var(--card-border)",
-            borderRadius: "8px",
-            fontSize: "0.8rem",
-            outline: "none"
-          }}
-        />
-        <input
-          type="email"
-          placeholder={currentLabels.email}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            flex: 1,
-            padding: "0.4rem 0.6rem",
-            border: "1px solid var(--card-border)",
-            borderRadius: "8px",
-            fontSize: "0.8rem",
-            outline: "none"
-          }}
-        />
-      </div>
+      {showNameEmailInputs && (
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input
+            type="text"
+            placeholder={currentLabels.name}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "0.4rem 0.6rem",
+              border: "1px solid var(--card-border)",
+              borderRadius: "8px",
+              fontSize: "0.8rem",
+              outline: "none"
+            }}
+          />
+          <input
+            type="email"
+            placeholder={currentLabels.email}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "0.4rem 0.6rem",
+              border: "1px solid var(--card-border)",
+              borderRadius: "8px",
+              fontSize: "0.8rem",
+              outline: "none"
+            }}
+          />
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
         <label style={{ fontSize: "0.75rem", fontWeight: 500, color: "#6a7c88" }}>{currentLabels.category}</label>

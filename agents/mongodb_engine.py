@@ -453,6 +453,26 @@ class MongoDBEngine:
             logger.error(f"Failed to save chat session {session_id}: {e}")
             return False
 
+    async def rename_chat_session(self, session_id: str, new_title: str) -> bool:
+        """Renames a specific chat session's title."""
+        if self._db is None:
+            return False
+        try:
+            now_str = datetime.datetime.utcnow().isoformat() + "Z"
+            self._db["chat_sessions"].update_one(
+                {"sessionId": session_id},
+                {
+                    "$set": {
+                        "title": new_title,
+                        "updatedAt": now_str
+                    }
+                }
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to rename chat session {session_id}: {e}")
+            return False
+
     async def get_user_sessions(self, user_id: str) -> List[ChatSessionSchema]:
         """Lists chat session metadata for a user."""
         if self._db is None:

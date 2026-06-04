@@ -54,22 +54,39 @@ export async function POST(req: NextRequest) {
     if (isLocalEnv()) {
       const db = getLocalDb() as any;
       const idx = db.books?.findIndex((b: any) => b._id === bookId);
+      const timestamp = new Date().toLocaleTimeString();
+      const cancelLog = `[${timestamp}] [CANCEL] ⛔ Ingestion task was manually aborted by administrator: ${requesterEmail}`;
+      const releaseLog = `[${timestamp}] [INIT] Releasing virtual machine sandboxed processor context.`;
       
       if (idx >= 0) {
         const book = db.books[idx];
         const existingLogs = book.ingestion_logs || [];
-        const timestamp = new Date().toLocaleTimeString();
         
         book.ingestion_status = "failed";
         book.ingestion_logs = [
           ...existingLogs,
-          `[${timestamp}] [CANCEL] ⛔ Ingestion task was manually aborted by administrator: ${requesterEmail}`,
-          `[${timestamp}] [INIT] Releasing virtual machine sandboxed processor context.`
+          cancelLog,
+          releaseLog
         ];
         book.updated_at = Date.now() / 1000;
-        
-        saveLocalDb(db);
       }
+
+      if (db.ingestion_jobs) {
+        const jobId = `job_${bookId}`;
+        const jobIdx = db.ingestion_jobs.findIndex((j: any) => j._id === jobId);
+        if (jobIdx >= 0) {
+          const job = db.ingestion_jobs[jobIdx];
+          job.status = "failed";
+          job.logs = [
+            ...(job.logs || []),
+            cancelLog,
+            releaseLog
+          ];
+          job.updated_at = Date.now() / 1000;
+        }
+      }
+      
+      saveLocalDb(db);
     }
 
     // 3. Persist cancellation in MongoDB
@@ -96,6 +113,17 @@ export async function POST(req: NextRequest) {
             $set: {
               ingestion_status: "failed",
               ingestion_logs: updatedLogs,
+              updated_at: Date.now() / 1000
+            }
+          }
+        );
+
+        await db.collection("ingestion_jobs").updateOne(
+          { _id: `job_${bookId}` },
+          {
+            $set: {
+              status: "failed",
+              logs: updatedLogs,
               updated_at: Date.now() / 1000
             }
           }

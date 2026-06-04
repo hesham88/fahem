@@ -721,7 +721,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                       (u.country || "").toLowerCase().includes(s)
                     );
                   })
-                  .map((dirUser: any) => {
+                  .map((dirUser: any, idx: number) => {
                     const isFriend = userProfile?.friends?.includes(dirUser.userId);
 
                     // Custom styling for role badge
@@ -741,7 +741,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
 
                     return (
                       <div
-                        key={dirUser.userId}
+                        key={`${dirUser.userId || dirUser._id || "user"}-${idx}`}
                         style={{
                           display: "flex",
                           alignItems: "center",

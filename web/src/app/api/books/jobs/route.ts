@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { isLocalEnv, getLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +13,50 @@ export async function GET(req: NextRequest) {
       const db = getLocalDb() as any;
       const jobs = db.ingestion_jobs || [];
 
+      // Clean up stale "processing" jobs
+      let dbChanged = false;
+      const updatedJobs = jobs.map((job: any) => {
+        if (job.status === "processing") {
+          let isAlive = false;
+          if (job.active_pid) {
+            try {
+              process.kill(job.active_pid, 0);
+              isAlive = true;
+            } catch (e) {}
+          }
+          
+          if (!isAlive && (!job.active_pid || (Date.now() / 1000 - job.updated_at > 30))) {
+            job.status = "failed";
+            if (!job.logs) job.logs = [];
+            job.logs.push(job.active_pid
+              ? `[SYSTEM] Background ingestion pipeline process (PID ${job.active_pid}) is no longer active.`
+              : `[SYSTEM] Background ingestion pipeline process failed to initialize or was terminated unexpectedly.`
+            );
+            job.updated_at = Date.now() / 1000;
+            
+            // Sync back to books collection
+            const book_id = job.metadata?.book_id || job._id.replace("job_", "");
+            if (db.books) {
+              const book = db.books.find((b: any) => b._id === book_id);
+              if (book) {
+                book.ingestion_status = "failed";
+                book.ingestion_logs = job.logs;
+                book.updated_at = Date.now() / 1000;
+              }
+            }
+            dbChanged = true;
+          }
+        }
+        return job;
+      });
+
+      if (dbChanged) {
+        db.ingestion_jobs = updatedJobs;
+        saveLocalDb(db);
+      }
+
       if (jobId) {
-        const job = jobs.find((j: any) => j._id === jobId);
+        const job = updatedJobs.find((j: any) => j._id === jobId);
         if (!job) {
           return new Response(JSON.stringify({ error: "Job metadata not found locally." }), {
             status: 404,
@@ -27,7 +69,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      return new Response(JSON.stringify({ success: true, jobs }), {
+      return new Response(JSON.stringify({ success: true, jobs: updatedJobs }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });

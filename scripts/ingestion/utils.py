@@ -45,9 +45,14 @@ def is_mongodb_enabled():
     if _MONGO_DISABLED is not None:
         return not _MONGO_DISABLED
     
+    uri = get_mongodb_uri()
+    if "-pri" in uri.lower():
+        print("[MongoDB Offline Check] Private MongoDB Atlas URI detected locally. Bypassing MongoDB connection attempt to avoid DNS/timeout hangs.", file=sys.stderr)
+        _MONGO_DISABLED = True
+        return False
+
     try:
         from pymongo import MongoClient
-        uri = get_mongodb_uri()
         client = MongoClient(uri, serverSelectionTimeoutMS=1000)
         client.server_info()
         client.close()

@@ -50,27 +50,26 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
             ? dynamicSubjects.map((subj: any) => {
                 const fallbackMeta =
                   subj._id === "subj_algebra_stats"
-                    ? { nameEn: "Algebra & Statistics", nameAr: "الجبر والإحصاء", icon: "📊", progress: 65, color: "var(--primary)" }
+                    ? { nameEn: "Algebra & Statistics", nameAr: "الجبر والإحصاء", icon: "📊", color: "var(--primary)" }
                     : subj._id === "subj_biology"
-                    ? { nameEn: "Biology", nameAr: "الأحياء", icon: "🧬", progress: 42, color: "#9c27b0" }
+                    ? { nameEn: "Biology", nameAr: "الأحياء", icon: "🧬", color: "#9c27b0" }
                     : subj._id === "subj_arabic_grammar"
-                    ? { nameEn: "Arabic Grammar", nameAr: "النحو والصرف", icon: "📖", progress: 85, color: "#2e7d32" }
-                    : { nameEn: subj.name, nameAr: subj.name_ar || subj.name, icon: subj.emoji || "📚", progress: 20, color: "#ef6c00" };
+                    ? { nameEn: "Arabic Grammar", nameAr: "النحو والصرف", icon: "📖", color: "#2e7d32" }
+                    : { nameEn: subj.name, nameAr: subj.name_ar || subj.name, icon: subj.emoji || "📚", color: "#ef6c00" };
 
                 return {
                   _id: subj._id,
                   nameEn: subj.name || fallbackMeta.nameEn,
                   nameAr: subj.name_ar || fallbackMeta.nameAr,
                   icon: subj.emoji || fallbackMeta.icon,
-                  progress: fallbackMeta.progress,
                   color: fallbackMeta.color,
                 };
               })
             : [
-                { _id: "subj_algebra_stats", nameEn: "Pure Mathematics", nameAr: "الرياضيات العامة", icon: "📐", progress: 65, color: "var(--primary)" },
-                { _id: "subj_biology", nameEn: "Physics & Chemistry", nameAr: "العلوم والفيزياء", icon: "🧪", progress: 42, color: "#9c27b0" },
-                { _id: "subj_arabic_grammar", nameEn: "Arabic Grammar & Literature", nameAr: "اللغة العربية وآدابها", icon: "📚", progress: 85, color: "#2e7d32" },
-                { _id: "subj_history_geo", nameEn: "World History", nameAr: "التاريخ والجغرافيا", icon: "🌍", progress: 20, color: "#ef6c00" },
+                { _id: "subj_algebra_stats", nameEn: "Pure Mathematics", nameAr: "الرياضيات العامة", icon: "📐", color: "var(--primary)" },
+                { _id: "subj_biology", nameEn: "Physics & Chemistry", nameAr: "العلوم والفيزياء", icon: "🧪", color: "#9c27b0" },
+                { _id: "subj_arabic_grammar", nameEn: "Arabic Grammar & Literature", nameAr: "اللغة العربية وآدابها", icon: "📚", color: "#2e7d32" },
+                { _id: "subj_history_geo", nameEn: "World History", nameAr: "التاريخ والجغرافيا", icon: "🌍", color: "#ef6c00" },
               ]
           ).map((item, idx) => {
             const isSelected = selectedSubjectId === item._id;
@@ -108,12 +107,16 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                   <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", fontFamily: "var(--font-sans)" }}>
                     {language === "ar" ? item.nameAr : item.nameEn}
                   </h3>
-                  <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginBottom: "0.25rem" }}>
-                    <div style={{ width: `${item.progress}%`, height: "100%", background: item.color, borderRadius: "3px" }}></div>
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700 }}>
-                    {item.progress}% {language === "ar" ? "مكتمل" : "completed"}
-                  </span>
+                  {(() => {
+                    const booksCount = dynamicBooks ? dynamicBooks.filter((b: any) => b.subject_id === item._id).length : 0;
+                    return (
+                      <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 700, background: "rgba(16, 107, 163, 0.06)", padding: "4px 10px", borderRadius: "10px", display: "inline-block", marginTop: "0.25rem" }}>
+                        {language === "ar"
+                          ? `📚 ${booksCount} من الكتب`
+                          : `📚 ${booksCount} ${booksCount === 1 ? 'Book' : 'Books'}`}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             );

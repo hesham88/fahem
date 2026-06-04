@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin, checkIsSuperadmin } from "../admin/helper";
 import { proxyRequest } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       const db = getLocalDb() as any;
 
       if (bookId) {
-        const book = db.books?.find((b: any) => b._id === bookId);
+        const book = db.books?.find((b: any) => b._id === bookId || b.book_id === bookId);
         if (!book) {
           return new Response(JSON.stringify({ error: "Book not found locally" }), {
             status: 404,
@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
       // Spawn Python process
       try {
         const pythonPath = "python";
-        const scriptPath = path.join(process.cwd(), "scripts", "ingestion", "job_fetch.py");
+        const scriptPath = resolveScriptPath(path.join("ingestion", "job_fetch.py"));
 
         const payload = {
           book_id: bookId,
@@ -430,7 +430,7 @@ export async function POST(req: NextRequest) {
     // Also trigger python process in production container
     try {
       const pythonPath = "python";
-      const scriptPath = path.join(process.cwd(), "scripts", "ingestion", "job_fetch.py");
+      const scriptPath = resolveScriptPath(path.join("ingestion", "job_fetch.py"));
 
       const payload = {
         book_id: bookId,

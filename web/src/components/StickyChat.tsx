@@ -30,7 +30,9 @@ import {
   FiMic,
   FiMicOff,
   FiVolume2,
-  FiVolumeX
+  FiVolumeX,
+  FiEdit2,
+  FiCheck
 } from "react-icons/fi";
 
 interface Message {
@@ -72,6 +74,7 @@ const chatTranslations: Record<string, Record<string, string>> = {
     email_label: "Email:",
     saved_chats: "Saved Chats",
     new_chat: "New Chat",
+    rename_chat: "Rename Chat",
     loading_chats: "Loading chats...",
     no_saved_chats: "No saved chats yet",
     untitled_chat: "Untitled Chat",
@@ -133,6 +136,7 @@ const chatTranslations: Record<string, Record<string, string>> = {
     email_label: "الحساب:",
     saved_chats: "المحادثات المحفوظة",
     new_chat: "محادثة جديدة",
+    rename_chat: "إعادة تسمية المحادثة",
     loading_chats: "جاري تحميل المحادثات...",
     no_saved_chats: "لا توجد محادثات محفوظة بعد",
     untitled_chat: "محادثة بدون عنوان",
@@ -194,6 +198,7 @@ const chatTranslations: Record<string, Record<string, string>> = {
     email_label: "Correo electrónico:",
     saved_chats: "Chats guardados",
     new_chat: "Nuevo chat",
+    rename_chat: "Renombrar Chat",
     loading_chats: "Cargando chats...",
     no_saved_chats: "Aún no hay chats guardados",
     untitled_chat: "Chat sin título",
@@ -487,7 +492,33 @@ export default function StickyChat() {
   // Multimodal Voice (STT & TTS) States & Helpers
   const [isListeningChat, setIsListeningChat] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const speakingMsgIdRef = useRef<string | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  const [selectedVoice, setSelectedVoice] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fahem_tts_voice") || "Aoede";
+    }
+    return "Aoede";
+  });
+
+  const handleVoiceChange = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fahem_tts_voice", voiceId);
+    }
+  };
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = localStorage.getItem("fahem_tts_voice");
+      if (stored && stored !== selectedVoice) {
+        setSelectedVoice(stored);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [selectedVoice]);
 
   useEffect(() => {
     return () => {
@@ -551,13 +582,22 @@ export default function StickyChat() {
     }
   };
 
-  const speakMessageText = (messageId: string, text: string) => {
+  const speakMessageText = async (messageId: string, text: string) => {
     if (speakingMsgId === messageId) {
+      if ((window as any)._activeAudio) {
+        (window as any)._activeAudio.pause();
+        (window as any)._activeAudio = null;
+      }
       window.speechSynthesis.cancel();
       setSpeakingMsgId(null);
+      speakingMsgIdRef.current = null;
       return;
     }
 
+    if ((window as any)._activeAudio) {
+      (window as any)._activeAudio.pause();
+      (window as any)._activeAudio = null;
+    }
     window.speechSynthesis.cancel();
 
     const cleanText = text
@@ -569,95 +609,186 @@ export default function StickyChat() {
       .replace(/-\s+/g, "")
       .trim();
 
-    // Split cleanText into language-specific segments
-    // We split by sentence terminators/newlines, maintaining delimiters
-    const rawSegments = cleanText.split(/([.?!:\n]+)/);
-    
-    interface SpeechSegment {
-      text: string;
-      lang: string;
-    }
-    
-    const tempSegments: SpeechSegment[] = [];
-    let currentText = "";
-    
-    for (let i = 0; i < rawSegments.length; i++) {
-      const part = rawSegments[i];
-      if (!part) continue;
-      
-      if (/^[.?!:\n]+$/.test(part)) {
-        currentText += part;
-      } else {
-        if (currentText.trim()) {
-          const hasArabic = /[\u0600-\u06FF]/.test(currentText);
-          const lang = hasArabic 
-            ? "ar-EG" 
-            : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
-          tempSegments.push({ text: currentText, lang });
-        }
-        currentText = part;
-      }
-    }
-    
-    if (currentText.trim()) {
-      const hasArabic = /[\u0600-\u06FF]/.test(currentText);
-      const lang = hasArabic 
-        ? "ar-EG" 
-        : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
-      tempSegments.push({ text: currentText, lang });
-    }
-
-    // Merge consecutive segments of the same language
-    const mergedSegments: SpeechSegment[] = [];
-    for (const seg of tempSegments) {
-      if (mergedSegments.length > 0 && mergedSegments[mergedSegments.length - 1].lang === seg.lang) {
-        mergedSegments[mergedSegments.length - 1].text += " " + seg.text;
-      } else {
-        mergedSegments.push(seg);
-      }
-    }
-
-    if (mergedSegments.length === 0) return;
+    if (!cleanText) return;
 
     setSpeakingMsgId(messageId);
-    let currentSegIndex = 0;
+    speakingMsgIdRef.current = messageId;
 
-    const playNextSegment = () => {
-      if (currentSegIndex >= mergedSegments.length) {
-        setSpeakingMsgId(null);
+    const runWebSpeechFallback = (txt: string) => {
+      if (speakingMsgIdRef.current !== messageId) {
+        return; // Stopped or switched message!
+      }
+
+      // Split cleanText into language-specific segments
+      const rawSegments = txt.split(/([.?!:\n]+)/);
+      
+      interface SpeechSegment {
+        text: string;
+        lang: string;
+      }
+      
+      const tempSegments: SpeechSegment[] = [];
+      let currentText = "";
+      
+      for (let i = 0; i < rawSegments.length; i++) {
+        const part = rawSegments[i];
+        if (!part) continue;
+        
+        if (/^[.?!:\n]+$/.test(part)) {
+          currentText += part;
+        } else {
+          if (currentText.trim()) {
+            const hasArabic = /[\u0600-\u06FF]/.test(currentText);
+            const lang = hasArabic 
+              ? "ar-EG" 
+              : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+            tempSegments.push({ text: currentText, lang });
+          }
+          currentText = part;
+        }
+      }
+      
+      if (currentText.trim()) {
+        const hasArabic = /[\u0600-\u06FF]/.test(currentText);
+        const lang = hasArabic 
+          ? "ar-EG" 
+          : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+        tempSegments.push({ text: currentText, lang });
+      }
+
+      // Merge consecutive segments of the same language
+      const mergedSegments: SpeechSegment[] = [];
+      for (const seg of tempSegments) {
+        if (mergedSegments.length > 0 && mergedSegments[mergedSegments.length - 1].lang === seg.lang) {
+          mergedSegments[mergedSegments.length - 1].text += " " + seg.text;
+        } else {
+          mergedSegments.push(seg);
+        }
+      }
+
+      if (mergedSegments.length === 0) {
+        if (speakingMsgIdRef.current === messageId) {
+          setSpeakingMsgId(null);
+          speakingMsgIdRef.current = null;
+        }
         return;
       }
 
-      const segment = mergedSegments[currentSegIndex];
-      const utterance = new SpeechSynthesisUtterance(segment.text.trim());
-      (window as any)._activeUtterance = utterance;
-      utterance.lang = segment.lang;
+      let currentSegIndex = 0;
 
-      const voices = window.speechSynthesis.getVoices();
-      const langPrefix = segment.lang.split("-")[0];
-      let selectedVoice = voices.find(v => v.lang.startsWith(langPrefix));
-      if (!selectedVoice) {
-        selectedVoice = voices.find(v => v.lang.startsWith("en"));
-      }
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
+      const playNextSegment = () => {
+        if (speakingMsgIdRef.current !== messageId) {
+          return; // Stopped or switched message!
+        }
 
-      utterance.onend = () => {
-        currentSegIndex++;
-        playNextSegment();
+        if (currentSegIndex >= mergedSegments.length) {
+          setSpeakingMsgId(null);
+          speakingMsgIdRef.current = null;
+          return;
+        }
+
+        const segment = mergedSegments[currentSegIndex];
+        const utterance = new SpeechSynthesisUtterance(segment.text.trim());
+        (window as any)._activeUtterance = utterance;
+        utterance.lang = segment.lang;
+
+        const voices = window.speechSynthesis.getVoices();
+        const langPrefix = segment.lang.split("-")[0];
+        let selectedVoice = voices.find(v => v.lang.startsWith(langPrefix));
+        if (!selectedVoice) {
+          selectedVoice = voices.find(v => v.lang.startsWith("en"));
+        }
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+
+        utterance.onend = () => {
+          if (speakingMsgIdRef.current === messageId) {
+            currentSegIndex++;
+            playNextSegment();
+          }
+        };
+
+        utterance.onerror = (err) => {
+          console.error("Speech Synthesis Segment Error:", err);
+          if (speakingMsgIdRef.current === messageId) {
+            currentSegIndex++;
+            playNextSegment();
+          }
+        };
+
+        window.speechSynthesis.speak(utterance);
       };
 
-      utterance.onerror = (err) => {
-        console.error("Speech Synthesis Segment Error:", err);
-        currentSegIndex++;
-        playNextSegment();
-      };
-
-      window.speechSynthesis.speak(utterance);
+      playNextSegment();
     };
 
-    playNextSegment();
+    try {
+      const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
+      const reqLang = hasArabic ? "ar" : (language || "en");
+      
+      const res = await fetch("/api/audio/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: cleanText,
+          language: reqLang,
+          voice: selectedVoice, // use the user's selected voice dynamically!
+          userId: user?.uid || "anonymous",
+          userEmail: user?.email || "anonymous@fahem.ai"
+        })
+      });
+
+      if (speakingMsgIdRef.current !== messageId) {
+        return; // User cancelled or switched before fetch returned
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (speakingMsgIdRef.current !== messageId) {
+          return; // User cancelled or switched during parsing
+        }
+
+        if (data.success && data.audioContent) {
+          const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
+          const audio = new Audio(audioUrl);
+          (window as any)._activeAudio = audio;
+          
+          audio.onended = () => {
+            if (speakingMsgIdRef.current === messageId) {
+              setSpeakingMsgId(null);
+              speakingMsgIdRef.current = null;
+            }
+            if ((window as any)._activeAudio === audio) {
+              (window as any)._activeAudio = null;
+            }
+          };
+
+          audio.onerror = (e) => {
+            if (speakingMsgIdRef.current !== messageId) {
+              return;
+            }
+            console.error("Premium Audio playback error, falling back to Web Speech:", e);
+            runWebSpeechFallback(cleanText);
+          };
+
+          await audio.play();
+          return;
+        }
+      }
+      
+      if (speakingMsgIdRef.current === messageId) {
+        console.warn("Premium TTS request unsuccessful, falling back to Web Speech");
+        runWebSpeechFallback(cleanText);
+      }
+
+    } catch (err) {
+      if (speakingMsgIdRef.current === messageId) {
+        console.error("Failed to run premium TTS:", err);
+        runWebSpeechFallback(cleanText);
+      }
+    }
   };
 
   // Layout & Context States
@@ -677,6 +808,12 @@ export default function StickyChat() {
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
   const [showHistory, setShowHistory] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string>("");
+  const [editingTitle, setEditingTitle] = useState<string>("");
+
+  // Dynamic Companion Suggestions States
+  const [smartSuggestions, setSmartSuggestions] = useState<{ label: string; query: string; icon?: string }[]>([]);
+  const [userActivities, setUserActivities] = useState<any[]>([]);
 
   const { language, dir, t } = useTranslation();
 
@@ -710,10 +847,11 @@ export default function StickyChat() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Saved Chats on Open
+  // Fetch Saved Chats & Activities on Open
   useEffect(() => {
     if (user && isOpen) {
       fetchSessions(user.uid);
+      fetchUserActivities(user.uid);
     }
   }, [user, isOpen]);
 
@@ -742,6 +880,138 @@ export default function StickyChat() {
     window.addEventListener("fahemBookContext", handleContextChange);
     return () => window.removeEventListener("fahemBookContext", handleContextChange);
   }, [language]);
+
+  // Dynamic predictive companion suggestion engine
+  useEffect(() => {
+    if (isSending) return; // Prevent updates while streaming
+    const isAr = language === "ar";
+    const suggestions: { label: string; query: string; icon?: string }[] = [];
+
+    // 1. Process recent user activity (e.g. active subject, incorrect practice history, last activity)
+    const recentActivity = userActivities && userActivities.length > 0 ? userActivities[0] : null;
+
+    if (recentActivity) {
+      // Find incorrect or practice activity
+      const failedPractice = userActivities.find((act: any) => act.type === "practice" && act.details?.isCorrect === false);
+      if (failedPractice) {
+        const topic = failedPractice.details?.subjectName || failedPractice.details?.bookTitle || failedPractice.details?.topic || "previous topic";
+        suggestions.push({
+          label: isAr ? `مراجعة مفهوم ${topic}` : `Review ${topic} concept`,
+          query: isAr 
+            ? `/explain اشرح لي مفهوم ${topic} بالتفصيل وبشكل مبسط لأنني أخطأت فيه سابقاً.` 
+            : `/explain Please explain the concept of ${topic} step-by-step since I had trouble with it before.`,
+          icon: "💡"
+        });
+      } else {
+        // Just general last activity
+        const actTopic = recentActivity.details?.topic || recentActivity.details?.bookTitle || recentActivity.details?.subjectName;
+        if (actTopic) {
+          suggestions.push({
+            label: isAr ? `واصل مذاكرة ${actTopic}` : `Continue studying ${actTopic}`,
+            query: isAr
+              ? `دعنا نواصل مذاكرة موضوع ${actTopic} الذي كنت أدرسه للتو.`
+              : `Let's continue our study of the topic ${actTopic} that I was just working on.`,
+            icon: "📚"
+          });
+        }
+      }
+    }
+
+    // 2. Process textbook bookContext (current active book and page)
+    if (bookContext && bookContext.currentPage) {
+      const page = bookContext.currentPage;
+      const bTitle = bookContext.bookTitle || (isAr ? "الكتاب المدرسي" : "curriculum textbook");
+      
+      // Page active recall prompt
+      suggestions.push({
+        label: isAr ? `تحدي نشط (صفحة ${page})` : `Active Recall (p. ${page})`,
+        query: isAr
+          ? `/practice اختبرني في المفاهيم الأساسية لصفحة ${page} من كتاب ${bTitle}.`
+          : `/practice Generate an active recall challenge for page ${page} of ${bTitle}.`,
+        icon: "✍️"
+      });
+
+      // Page concept check summary
+      suggestions.push({
+        label: isAr ? `فحص المفاهيم (ص ${page})` : `Concept Check (p. ${page})`,
+        query: isAr
+          ? `ما هي أهم فكرة مفاهيمية أو قانون في صفحة ${page} من ${bTitle}؟`
+          : `What is the most important conceptual takeaway or formula from page ${page} of ${bTitle}?`,
+        icon: "🧠"
+      });
+    }
+
+    // 3. Process current discussion sequence (last assistant message)
+    const assistantMsgs = messages.filter((m) => m.role === "assistant" && m.id !== "welcome");
+    const lastAssistantMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1].text : "";
+
+    if (lastAssistantMsg) {
+      // Analyze discussion context: Math, code, or formulas vs. generic concepts
+      const hasMathOrCode = /[\+\-\*\/=\\\(\)\{\}\$`]|`{3}/.test(lastAssistantMsg);
+      if (hasMathOrCode) {
+        suggestions.push({
+          label: isAr ? "تفكيك الحسابات" : "Step-by-step Math",
+          query: isAr
+            ? "هل يمكنك تفكيك وحساب الخطوات الرياضية أو القوانين السابقة وتوضيحها بالتفصيل؟"
+            : "Can you break down the mathematical steps and formulas in your last response step-by-step?",
+          icon: "➕"
+        });
+        suggestions.push({
+          label: isAr ? "تحدي مسألة مماثلة" : "Similar Practice",
+          query: isAr
+            ? "/practice أعطني مسألة رياضية مماثلة للموضوع السابق لأقوم بحلها بنفسي واختبار فهمي."
+            : "/practice Please generate a similar math problem so I can practice solving it on my own and test my understanding.",
+          icon: "✍️"
+        });
+      } else {
+        suggestions.push({
+          label: isAr ? "لخص الشرح الأخير" : "Summarize last reply",
+          query: isAr
+            ? "/summary لخص لي ردك وشرحك الأخير في نقاط أساسية موجزة وسهلة الحفظ."
+            : "/summary Summarize your last explanation into high-density key bullet points.",
+          icon: "📝"
+        });
+        suggestions.push({
+          label: isAr ? "اختبرني بالنقاط السابقة" : "Quick Concept Check",
+          query: isAr
+            ? "/quiz اختبرني في النقاط التي شرحتها للتو بثلاثة أسئلة اختيار من متعدد."
+            : "/quiz Give me a quick 3-question conceptual quiz on the points you just explained.",
+          icon: "⚡"
+        });
+      }
+    }
+
+    // 4. Fallback to default localized preset queries to maintain variety & seed interest
+    const defaultPresets = [
+      {
+        label: ct("preset1_label"),
+        query: ct("preset1_query"),
+        icon: "📊"
+      },
+      {
+        label: ct("preset2_label"),
+        query: ct("preset2_query"),
+        icon: "🧬"
+      },
+      {
+        label: ct("preset3_label"),
+        query: ct("preset3_query"),
+        icon: "✍️"
+      }
+    ];
+
+    // Combine predictions and fill up to 3 slots
+    const finalSuggestions = [...suggestions];
+    for (const preset of defaultPresets) {
+      if (finalSuggestions.length >= 4) break;
+      // Avoid exact duplicates
+      if (!finalSuggestions.some((s) => s.label === preset.label)) {
+        finalSuggestions.push(preset);
+      }
+    }
+
+    setSmartSuggestions(finalSuggestions.slice(0, 3));
+  }, [messages, bookContext, userActivities, language, isSending]);
 
   // Manage layout class on body for side-panel push effect
   useEffect(() => {
@@ -814,6 +1084,20 @@ export default function StickyChat() {
     }
   }
 
+  async function fetchUserActivities(userIdVal?: string) {
+    const activeUserId = userIdVal || user?.uid;
+    if (!activeUserId) return;
+    try {
+      const response = await fetch(`/api/activity?userId=${encodeURIComponent(activeUserId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserActivities(data.activities || []);
+      }
+    } catch (err) {
+      console.error("Error fetching user activities in companion:", err);
+    }
+  }
+
   async function loadSession(sessionIdVal: string) {
     if (!sessionIdVal) return;
     setIsSessionsLoading(true);
@@ -868,6 +1152,29 @@ export default function StickyChat() {
       }
     } catch (err) {
       console.error("Error deleting session in companion:", err);
+    }
+  }
+
+  async function renameSession(sessionIdVal: string, newTitle: string) {
+    if (!sessionIdVal || !newTitle.trim()) return;
+    try {
+      const response = await fetch("/api/history", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessionIdVal, title: newTitle.trim() })
+      });
+      if (response.ok) {
+        setSessions((prev) =>
+          prev.map((s) => (s.sessionId === sessionIdVal ? { ...s, title: newTitle.trim() } : s))
+        );
+      } else {
+        console.error("Failed to rename session");
+      }
+    } catch (err) {
+      console.error("Error renaming session:", err);
+    } finally {
+      setEditingSessionId("");
+      setEditingTitle("");
     }
   }
 
@@ -938,13 +1245,81 @@ export default function StickyChat() {
   };
 
   const parseInlineMarkdown = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\))/g);
     return parts.map((part, pIdx) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      if (part.startsWith("[") && part.includes("](")) {
+        const closeBracketIdx = part.indexOf("](");
+        const linkText = part.slice(1, closeBracketIdx);
+        const linkUrl = part.slice(closeBracketIdx + 2, -1);
+        
+        if (linkUrl.includes("bookId=") || linkUrl.includes("page=")) {
+          let bookId = "";
+          let pageNum = 1;
+          try {
+            const urlObj = new URL(linkUrl.startsWith("?") ? `http://dummy.com${linkUrl}` : linkUrl);
+            bookId = urlObj.searchParams.get("bookId") || "";
+            const pageParam = urlObj.searchParams.get("page");
+            if (pageParam) {
+              pageNum = parseInt(pageParam, 10) || 1;
+            }
+          } catch (e) {
+            const bookMatch = linkUrl.match(/bookId=([^&]+)/);
+            const pageMatch = linkUrl.match(/page=(\d+)/);
+            if (bookMatch) bookId = decodeURIComponent(bookMatch[1]);
+            if (pageMatch) pageNum = parseInt(pageMatch[1], 10) || 1;
+          }
+          
+          bookId = bookId.replace(/[^a-zA-Z0-9_\u0600-\u06FF\s-]/g, "").trim();
+          
+          return (
+            <a
+              key={pIdx}
+              href={linkUrl}
+              onClick={(e) => {
+                e.preventDefault();
+                const event = new CustomEvent("fahemNavigateBook", {
+                  detail: { bookId, page: pageNum }
+                });
+                window.dispatchEvent(event);
+              }}
+              style={{
+                color: "var(--secondary, #d4af37)",
+                textDecoration: "underline",
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                background: "rgba(212, 175, 55, 0.08)",
+                padding: "2px 6px",
+                borderRadius: "6px",
+                border: "1px solid rgba(212, 175, 55, 0.15)",
+                transition: "all 0.2s"
+              }}
+              title={`Go to ${bookId} - Page ${pageNum}`}
+            >
+              📖 {linkText}
+            </a>
+          );
+        }
+        
+        return (
+          <a
+            key={pIdx}
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--primary)", textDecoration: "underline" }}
+          >
+            {linkText}
+          </a>
+        );
       }
       return part;
     });
@@ -1159,6 +1534,95 @@ export default function StickyChat() {
       setInputValue("");
     }
 
+    const isSearchCommand = queryText.startsWith("/search ") || queryText.startsWith("/بحث ");
+    if (isSearchCommand) {
+      const searchSpaceIdx = queryText.indexOf(" ");
+      const searchQuery = queryText.substring(searchSpaceIdx + 1).trim();
+      
+      const userMsgId = `msg-${Date.now()}-user`;
+      const assistantMsgId = `msg-${Date.now()}-assistant`;
+      
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user", text: queryText, timestamp: new Date() }
+      ]);
+      
+      setIsSending(true);
+      setActiveAgent("Retrieval Agent");
+      setSessionLogs((prev) => [...prev, `[Search Command] Initiating global library page crawl for query: "${searchQuery}"`]);
+      
+      setMessages((prev) => [
+        ...prev,
+        { 
+          id: assistantMsgId, 
+          role: "assistant", 
+          text: language === "ar" ? "جاري البحث في مكتبة الكتب والصفحات... 🔍" : "Searching book library pages... 🔍", 
+          timestamp: new Date(), 
+          activeAgent: "Retrieval Agent" 
+        }
+      ]);
+      
+      try {
+        const response = await fetch(`/api/books/pages?query=${encodeURIComponent(searchQuery)}`);
+        const data = await response.json();
+        
+        let responseText = "";
+        
+        if (data.success && data.results && data.results.length > 0) {
+          if (language === "ar") {
+            responseText = `لقد بحثت في مكتبة المناهج الدراسية عن "**${searchQuery}**". إليك الصفحات المطابقة التي عثرت عليها بدقة:\n\n`;
+            data.results.forEach((res: any) => {
+              const bookTitle = res.bookTitleAr || res.bookTitleEn || res.bookTitle;
+              const pageName = res.titleAr || res.titleEn || `صفحة ${res.pageNumber}`;
+              const link = `?bookId=${encodeURIComponent(res.bookId)}&page=${res.pageNumber}`;
+              responseText += `* 📖 **[${bookTitle} - ${pageName}](${link})**\n`;
+              if (res.snippet) {
+                responseText += `  > "...${res.snippet.trim()}..."\n\n`;
+              }
+            });
+            responseText += `💡 *انقر فوق أي من الروابط أعلاه لفتح الكتاب والانتقال إلى الصفحة المحددة فوراً وبأمان!*`;
+          } else {
+            responseText = `I searched our textbooks library for "**${searchQuery}**". Here are the matching pages I found:\n\n`;
+            data.results.forEach((res: any) => {
+              const bookTitle = res.bookTitleEn || res.bookTitleAr || res.bookTitle;
+              const pageName = res.titleEn || res.titleAr || `Page ${res.pageNumber}`;
+              const link = `?bookId=${encodeURIComponent(res.bookId)}&page=${res.pageNumber}`;
+              responseText += `* 📖 **[${bookTitle} - ${pageName}](${link})**\n`;
+              if (res.snippet) {
+                responseText += `  > "...${res.snippet.trim()}..."\n\n`;
+              }
+            });
+            responseText += `💡 *Click any of the of the links above to open the book and navigate to that page instantly and securely!*`;
+          }
+        } else {
+          if (language === "ar") {
+            responseText = `عذراً، لم أعثر على أي صفحات مطابقة تماماً للبحث عن "**${searchQuery}**" في مكتبة الكتب النشطة حالياً.\n\n💡 *نصيحة: جرب استخدام كلمات مفتاحية أكثر عمومية أو تأكد من إملاء الكلمة بشكل صحيح.*`;
+          } else {
+            responseText = `No exact matching pages were found in the textbooks library for "**${searchQuery}**".\n\n💡 *Tip: Try searching with more general keywords or double-check the spelling.*`;
+          }
+        }
+        
+        setMessages((prev) => 
+          prev.map((msg) => 
+            msg.id === assistantMsgId ? { ...msg, text: responseText, activeAgent: undefined } : msg
+          )
+        );
+        setSessionLogs((prev) => [...prev, `[Search Command] Found ${data.results?.length || 0} page matches. Rendered results.`]);
+      } catch (err) {
+        console.error("Search command failure:", err);
+        const errMsg = language === "ar" ? "عذراً، حدث خطأ أثناء تنفيذ عملية البحث في المناهج." : "Sorry, an error occurred while searching the textbook archives.";
+        setMessages((prev) => 
+          prev.map((msg) => 
+            msg.id === assistantMsgId ? { ...msg, text: errMsg, activeAgent: undefined } : msg
+          )
+        );
+      } finally {
+        setIsSending(false);
+        setActiveAgent(undefined);
+      }
+      return;
+    }
+
     const isFeedbackTrigger = /feedback|report\s+a\s+problem|complaint|bug|issue|complaints|شکوى|تقرير\s+مشكلة|ملاحظات/i.test(queryText);
     if (isFeedbackTrigger) {
       const userMsgId = `msg-${Date.now()}-user`;
@@ -1175,6 +1639,77 @@ export default function StickyChat() {
         ]);
         setIsSending(false);
       }, 600);
+      return;
+    }
+
+    const isCapabilityTrigger = (
+      /what\s+(can\s+you|can\s+it|do\s+you|are\s+your)\s+(do|help|features|capabilities)/i.test(queryText) ||
+      /how\s+(to\s+use|do\s+i\s+use|can\s+you\s+help)/i.test(queryText) ||
+      /\b(help|features|capabilities)\b/i.test(queryText) ||
+      /ماذا\s+(يمكنك|تفعل|تستطيع|هي\s+مميزاتك|تعرف)/i.test(queryText) ||
+      /كيف\s+(تساعدني|أستخدم|استخدم|تشتغل)/i.test(queryText) ||
+      /(ايش|وش|شو)\s+(تسوي|تسوين|تعرف|مساعدتك)/i.test(queryText) ||
+      /\b(مساعدة|المساعدة|مميزات|مزايا|خصائص|وظائفك|عملك)\b/i.test(queryText) ||
+      /zatoona|zatona|الزتونة|زتونة|research\s+node/i.test(queryText)
+    );
+
+    if (isCapabilityTrigger) {
+      const userMsgId = `msg-${Date.now()}-user`;
+      const assistantMsgId = `msg-${Date.now()}-assistant`;
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user", text: queryText, timestamp: new Date() }
+      ]);
+      setIsSending(true);
+      setTimeout(() => {
+        const arabicText = `أنا **مُساعد فاهِم الذكي 🎓**، رفيقك الأكاديمي الشخصي المصمم لمساعدتك في رحلتك التعليمية بأفضل الطرق الممكنة!
+
+إليك ما يمكنني القيام به من أجلك:
+
+#### 1. 📚 رفيق الدراسة الذكي (Research Node)
+أنا متصل بالكامل بصفحات كتبك ومناهجك الدراسية النشطة! عندما تتصفح أي كتاب أو مستند في المنصة:
+* **شرح السياق الحالي:** يمكنك سؤالي عن أي جزء في الصفحة المفتوحة وسأقوم بتبسيط المفاهيم الصعبة فوراً.
+* **حل المعادلات الرياضية:** أستطيع تفكيك وشرح المسائل الرياضية أو الأكواد البرمجية خطوة بخطوة.
+* **الاستدعاء النشط (Active Recall):** اطلب مني اختبارك في الصفحة الحالية وسأقوم بتوليد أسئلة تفاعلية ذكية بناءً على محتوى الدرس المفتوح لتنشيط ذاكرتك.
+* **ملخصات سريعة:** سأقوم بتلخيص أي صفحة دراسية على شكل نقاط واضحة ومباشرة.
+
+#### 2. 🧠 أداة "الزتونة" للبحث الأكاديمي (Zatona AI Research)
+هل تحتاج إلى بحث أكاديمي عميق وشامل؟ يمكنك استخدام **قسم "الزتونة" (Zatona - AI Summary & Research Hub)** في لوحة التحكم الخاصة بك:
+* **تقارير بحثية عميقة:** بضغطة زر واحدة، تولّد "الزتونة" تقريراً أكاديمياً فائق الدقة ومتعدد الفصول حول أي موضوع علمي أو مفهوم تريده.
+* **خلاصات الكتب والمسارات:** تمنحك خلاصة مركزة لأي موضوع دراسي مع تفكيك شامل ومحاذاة المناهج الأكاديمية لتوفير وقتك وجهدك.
+
+---
+💡 **هل تريد تجربة شيء الآن؟** 
+يمكنك أن تسألني: *"اشرح لي مفهوم التمثيل الضوئي"* أو *"اختبرني في الصفحة الحالية"*، أو اذهب إلى **لوحة تحكم "الزتونة"** لبدء بحث أكاديمي شامل!`;
+
+        const englishText = `I am the **Fahem AI Companion 🎓**, your personalized academic study partner designed to supercharge your learning journey!
+
+Here is what I can do for you:
+
+#### 1. 📚 Personalized Study Guide (Research Node)
+I am fully connected to your active textbooks and learning materials! As you browse any book:
+* **Context-Aware Explanations:** Ask me about any concept on your active textbook page, and I will explain it simply and clearly.
+* **Step-by-Step Breakdowns:** I can solve complex math formulas or explain code snippets step-by-step.
+* **Active Recall Practice:** Ask me to test your knowledge on the current page, and I will generate interactive, concept-check questions to challenge you.
+* **Instant Summaries:** Get quick, bullet-point summaries of the page to review the main takeaways.
+
+#### 2. 🧠 Zatona AI Research Tool (Zatona - AI Summary & Research Hub)
+Need a deep dive into an academic topic? Explore the **Zatona Research Tool** in your dashboard:
+* **Multi-Chapter Research Reports:** Generate extremely comprehensive, high-yield research papers on any educational topic or complex concept instantly.
+* **Curriculum Digests:** Get streamlined textbook summaries and conceptual breakdowns to digest heavy academic material in seconds.
+
+---
+💡 **Want to try it now?**
+Ask me to *"Summarize this page"* or *"Create a quick quiz on the current topic"*, or head over to the **Zatona Hub** in your dashboard to generate a full research report!`;
+
+        const responseText = language === "ar" ? arabicText : englishText;
+
+        setMessages((prev) => [
+          ...prev,
+          { id: assistantMsgId, role: "assistant", text: responseText, timestamp: new Date() }
+        ]);
+        setIsSending(false);
+      }, 800);
       return;
     }
 
@@ -1369,6 +1904,7 @@ User Question: ${queryText}`;
 
       setSessionLogs((prev) => [...prev, "[System] Streaming complete successfully."]);
       await fetchSessions(); // Refresh list to catch updated or new chats
+      await fetchUserActivities(); // Refresh activities so suggestions reflect latest topics!
     } catch (err: any) {
       console.error("[sticky-chat] Stream retrieval failed:", err);
       setSessionLogs((prev) => [...prev, `[Error] ${err.message}`]);
@@ -1389,21 +1925,6 @@ User Question: ${queryText}`;
       );
     }
   };
-
-  const presetQueries = [
-    { 
-      label: ct("preset1_label"), 
-      query: ct("preset1_query") 
-    },
-    { 
-      label: ct("preset2_label"), 
-      query: ct("preset2_query") 
-    },
-    { 
-      label: ct("preset3_label"), 
-      query: ct("preset3_query") 
-    }
-  ];
 
   return (
     <>
@@ -1467,14 +1988,14 @@ User Question: ${queryText}`;
           backgroundColor: "rgba(253, 251, 247, 0.95)",
           backdropFilter: "blur(24px) saturate(190%)",
           WebkitBackdropFilter: "blur(24px) saturate(190%)",
-          borderTop: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
-          borderBottom: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderTop: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "0px solid transparent",
+          borderBottom: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "0px solid transparent",
           borderLeft: layoutMode === "compact" 
             ? "1px solid rgba(212, 175, 55, 0.35)" 
-            : ((layoutMode === "side" && dir !== "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none"),
+            : ((layoutMode === "side" && dir !== "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "0px solid transparent"),
           borderRight: layoutMode === "compact" 
             ? "1px solid rgba(212, 175, 55, 0.35)" 
-            : ((layoutMode === "side" && dir === "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none"),
+            : ((layoutMode === "side" && dir === "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "0px solid transparent"),
           borderRadius: layoutMode === "compact" ? "var(--border-radius-lg)" : "0",
           boxShadow: layoutMode === "fullscreen" ? "none" : (dir === "rtl" 
             ? "10px 15px 50px rgba(16, 107, 163, 0.15), -2px 0px 10px rgba(255, 255, 255, 0.5)" 
@@ -1535,7 +2056,7 @@ User Question: ${queryText}`;
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            
+
             {/* Interactive Layout Mode Selectors */}
             <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", padding: "2px", borderRadius: "10px", marginRight: "0.25rem" }}>
               <button
@@ -1780,43 +2301,144 @@ User Question: ${queryText}`;
                     }}
                     className="history-session-item"
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden", flex: 1 }}>
-                      <FiFileText style={{ color: isActive ? "var(--primary)" : "#8a9ca8", flexShrink: 0, fontSize: "1rem" }} />
-                      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}>
-                        <span style={{
-                          fontSize: "0.85rem",
-                          fontWeight: isActive ? 700 : 600,
-                          color: isActive ? "var(--primary)" : "var(--foreground)",
-                          whiteSpace: "nowrap",
-                          textOverflow: "ellipsis",
-                          overflow: "hidden"
-                        }} title={sess.title || "Untitled Chat"}>
-                          {sess.title || ct("untitled_chat")}
-                        </span>
-                        <span style={{ fontSize: "0.72rem", color: "#8a9ca8" }}>
-                          {sess.messageCount} {ct("messages_count")}
-                        </span>
+                    {editingSessionId === sess.sessionId ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: 1, overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") {
+                              renameSession(sess.sessionId, editingTitle);
+                            } else if (e.key === "Escape") {
+                              setEditingSessionId("");
+                              setEditingTitle("");
+                            }
+                          }}
+                          autoFocus
+                          style={{
+                            fontSize: "0.85rem",
+                            padding: "0.2rem 0.4rem",
+                            borderRadius: "var(--border-radius-sm)",
+                            border: "1px solid var(--primary)",
+                            background: "var(--background)",
+                            color: "var(--foreground)",
+                            outline: "none",
+                            flex: 1,
+                            minWidth: 0
+                          }}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            renameSession(sess.sessionId, editingTitle);
+                          }}
+                          style={{
+                            background: "var(--primary)",
+                            border: "none",
+                            padding: "4px 6px",
+                            cursor: "pointer",
+                            color: "#ffffff",
+                            borderRadius: "var(--border-radius-sm)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s"
+                          }}
+                          title={ct("rename_chat")}
+                        >
+                          <FiCheck style={{ fontSize: "0.85rem" }} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSessionId("");
+                            setEditingTitle("");
+                          }}
+                          style={{
+                            background: "rgba(0, 0, 0, 0.05)",
+                            border: "none",
+                            padding: "4px 6px",
+                            cursor: "pointer",
+                            color: "var(--foreground)",
+                            borderRadius: "var(--border-radius-sm)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          <FiX style={{ fontSize: "0.85rem" }} />
+                        </button>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden", flex: 1 }}>
+                          <FiFileText style={{ color: isActive ? "var(--primary)" : "#8a9ca8", flexShrink: 0, fontSize: "1rem" }} />
+                          <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}>
+                            <span style={{
+                              fontSize: "0.85rem",
+                              fontWeight: isActive ? 700 : 600,
+                              color: isActive ? "var(--primary)" : "var(--foreground)",
+                              whiteSpace: "nowrap",
+                              textOverflow: "ellipsis",
+                              overflow: "hidden"
+                            }} title={sess.title || "Untitled Chat"}>
+                              {sess.title || ct("untitled_chat")}
+                            </span>
+                            <span style={{ fontSize: "0.72rem", color: "#8a9ca8" }}>
+                              {sess.messageCount} {ct("messages_count")}
+                            </span>
+                          </div>
+                        </div>
 
-                    <button
-                      onClick={(e) => deleteSession(sess.sessionId, e)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#8a9ca8",
-                        borderRadius: "var(--border-radius-sm)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s"
-                      }}
-                      className="delete-session-btn"
-                    >
-                      <FiTrash2 style={{ fontSize: "0.9rem" }} />
-                    </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSessionId(sess.sessionId);
+                              setEditingTitle(sess.title || "");
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "6px",
+                              cursor: "pointer",
+                              color: "#8a9ca8",
+                              borderRadius: "var(--border-radius-sm)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              transition: "all 0.2s"
+                            }}
+                            className="rename-session-btn"
+                            title={ct("rename_chat")}
+                          >
+                            <FiEdit2 style={{ fontSize: "0.9rem" }} />
+                          </button>
+
+                          <button
+                            onClick={(e) => deleteSession(sess.sessionId, e)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "6px",
+                              cursor: "pointer",
+                              color: "#8a9ca8",
+                              borderRadius: "var(--border-radius-sm)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              transition: "all 0.2s"
+                            }}
+                            className="delete-session-btn"
+                          >
+                            <FiTrash2 style={{ fontSize: "0.9rem" }} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })
@@ -1900,7 +2522,13 @@ User Question: ${queryText}`;
                 {msg.role === "user" ? (
                   <p style={{ margin: 0 }}>{msg.text}</p>
                 ) : msg.showFeedbackCard ? (
-                  <InlineFeedbackCard language={language} dir={dir} />
+                  <InlineFeedbackCard 
+                    language={language} 
+                    dir={dir} 
+                    defaultName={user?.displayName || ""} 
+                    defaultEmail={user?.email || ""} 
+                    userId={user?.uid || ""} 
+                  />
                 ) : (
                   msg.text ? formatMessageText(msg.text) : (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1971,7 +2599,7 @@ User Question: ${queryText}`;
         </div>
 
         {/* Suggestion Chips */}
-        {!isSending && messages.length <= 2 && (
+        {!isSending && smartSuggestions.length > 0 && (
           <div
             style={{
               padding: "0.25rem 1.25rem",
@@ -1981,7 +2609,7 @@ User Question: ${queryText}`;
               marginBottom: "0.5rem"
             }}
           >
-            {presetQueries.map((preset, index) => (
+            {smartSuggestions.map((preset, index) => (
               <button
                 key={index}
                 onClick={() => handleSendMessage(preset.query)}
@@ -2000,14 +2628,18 @@ User Question: ${queryText}`;
                 }}
                 className="chip-btn"
               >
-                <FiCompass style={{ fontSize: "0.8rem" }} />
+                {preset.icon ? (
+                  <span style={{ fontSize: "0.85rem" }}>{preset.icon}</span>
+                ) : (
+                  <FiCompass style={{ fontSize: "0.8rem" }} />
+                )}
                 {preset.label}
               </button>
             ))}
           </div>
         )}
 
-        {/* Interactive Option Toggles (Google Grounding, Session Logs) */}
+        {/* Interactive Option Toggles (Google Grounding, Voice Selector, Session Logs) */}
         <div
           style={{
             padding: "0.5rem 1.25rem",
@@ -2038,6 +2670,36 @@ User Question: ${queryText}`;
               <span>{ct("ground_with_google")}</span>
             </div>
           </label>
+
+          {/* Premium TTS Voice Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <span style={{ fontSize: "0.8rem" }}>🗣️</span>
+            <select
+              value={selectedVoice}
+              onChange={(e) => handleVoiceChange(e.target.value)}
+              style={{
+                padding: "2px 6px",
+                borderRadius: "6px",
+                border: "1px solid var(--card-border)",
+                background: "rgba(255, 255, 255, 0.8)",
+                fontSize: "0.7rem",
+                color: "var(--foreground)",
+                cursor: "pointer",
+                outline: "none",
+                fontWeight: 600,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+              }}
+              title={ct("select_voice") || "Select Premium Voice"}
+            >
+              <option value="Aoede">Aoede</option>
+              <option value="Kore">Kore</option>
+              <option value="Leda">Leda</option>
+              <option value="Zephyr">Zephyr</option>
+              <option value="Puck">Puck</option>
+              <option value="Charon">Charon</option>
+              <option value="Fenrir">Fenrir</option>
+            </select>
+          </div>
 
           {/* Session Logs Toggle */}
           <button
