@@ -569,40 +569,95 @@ export default function StickyChat() {
       .replace(/-\s+/g, "")
       .trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    (window as any)._activeUtterance = utterance;
-    const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
+    // Split cleanText into language-specific segments
+    // We split by sentence terminators/newlines, maintaining delimiters
+    const rawSegments = cleanText.split(/([.?!:\n]+)/);
     
-    let speechLang = "en-US";
-    if (hasArabicChars) {
-      speechLang = "ar-EG";
-    } else {
-      speechLang = language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US";
+    interface SpeechSegment {
+      text: string;
+      lang: string;
     }
-    utterance.lang = speechLang;
-
-    const voices = window.speechSynthesis.getVoices();
-    let selectedVoice = null;
-    const langPrefix = speechLang.split("-")[0];
-    selectedVoice = voices.find(v => v.lang.startsWith(langPrefix));
-    if (!selectedVoice) {
-      selectedVoice = voices.find(v => v.lang.startsWith("en"));
+    
+    const tempSegments: SpeechSegment[] = [];
+    let currentText = "";
+    
+    for (let i = 0; i < rawSegments.length; i++) {
+      const part = rawSegments[i];
+      if (!part) continue;
+      
+      if (/^[.?!:\n]+$/.test(part)) {
+        currentText += part;
+      } else {
+        if (currentText.trim()) {
+          const hasArabic = /[\u0600-\u06FF]/.test(currentText);
+          const lang = hasArabic 
+            ? "ar-EG" 
+            : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+          tempSegments.push({ text: currentText, lang });
+        }
+        currentText = part;
+      }
     }
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    
+    if (currentText.trim()) {
+      const hasArabic = /[\u0600-\u06FF]/.test(currentText);
+      const lang = hasArabic 
+        ? "ar-EG" 
+        : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+      tempSegments.push({ text: currentText, lang });
     }
 
-    utterance.onend = () => {
-      setSpeakingMsgId(null);
-    };
+    // Merge consecutive segments of the same language
+    const mergedSegments: SpeechSegment[] = [];
+    for (const seg of tempSegments) {
+      if (mergedSegments.length > 0 && mergedSegments[mergedSegments.length - 1].lang === seg.lang) {
+        mergedSegments[mergedSegments.length - 1].text += " " + seg.text;
+      } else {
+        mergedSegments.push(seg);
+      }
+    }
 
-    utterance.onerror = (err) => {
-      console.error("Speech Synthesis Error:", err);
-      setSpeakingMsgId(null);
-    };
+    if (mergedSegments.length === 0) return;
 
     setSpeakingMsgId(messageId);
-    window.speechSynthesis.speak(utterance);
+    let currentSegIndex = 0;
+
+    const playNextSegment = () => {
+      if (currentSegIndex >= mergedSegments.length) {
+        setSpeakingMsgId(null);
+        return;
+      }
+
+      const segment = mergedSegments[currentSegIndex];
+      const utterance = new SpeechSynthesisUtterance(segment.text.trim());
+      (window as any)._activeUtterance = utterance;
+      utterance.lang = segment.lang;
+
+      const voices = window.speechSynthesis.getVoices();
+      const langPrefix = segment.lang.split("-")[0];
+      let selectedVoice = voices.find(v => v.lang.startsWith(langPrefix));
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => v.lang.startsWith("en"));
+      }
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+
+      utterance.onend = () => {
+        currentSegIndex++;
+        playNextSegment();
+      };
+
+      utterance.onerror = (err) => {
+        console.error("Speech Synthesis Segment Error:", err);
+        currentSegIndex++;
+        playNextSegment();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    playNextSegment();
   };
 
   // Layout & Context States
@@ -1412,9 +1467,14 @@ User Question: ${queryText}`;
           backgroundColor: "rgba(253, 251, 247, 0.95)",
           backdropFilter: "blur(24px) saturate(190%)",
           WebkitBackdropFilter: "blur(24px) saturate(190%)",
-          border: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
-          borderLeft: (layoutMode === "side" && dir !== "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
-          borderRight: (layoutMode === "side" && dir === "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderTop: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderBottom: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "none",
+          borderLeft: layoutMode === "compact" 
+            ? "1px solid rgba(212, 175, 55, 0.35)" 
+            : ((layoutMode === "side" && dir !== "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none"),
+          borderRight: layoutMode === "compact" 
+            ? "1px solid rgba(212, 175, 55, 0.35)" 
+            : ((layoutMode === "side" && dir === "rtl") ? "1px solid rgba(212, 175, 55, 0.35)" : "none"),
           borderRadius: layoutMode === "compact" ? "var(--border-radius-lg)" : "0",
           boxShadow: layoutMode === "fullscreen" ? "none" : (dir === "rtl" 
             ? "10px 15px 50px rgba(16, 107, 163, 0.15), -2px 0px 10px rgba(255, 255, 255, 0.5)" 

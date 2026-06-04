@@ -167,7 +167,7 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                 })
                 .map((u, i) => (
                   <tr
-                    key={u.userId || i}
+                    key={u.userId ? `${u.userId}-${i}` : i}
                     style={{
                       borderBottom: "1px solid rgba(0,0,0,0.05)",
                       transition: "all 0.15s",
