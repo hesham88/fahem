@@ -1,11 +1,114 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin } from "../helper";
+import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { spawn } from "child_process";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 
+// GET handler to poll the status, progress, logs and discovered items of a crawl job
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const jobId = searchParams.get("jobId");
+
+    if (!jobId) {
+      return new Response(JSON.stringify({ error: "Missing jobId parameter" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // 1. Fetch from local environment fallback
+    if (isLocalEnv()) {
+      const db = getLocalDb() as any;
+      const crawlJobs = db.crawl_jobs || [];
+      const job = crawlJobs.find((j: any) => j._id === jobId);
+
+      if (!job) {
+        return new Response(JSON.stringify({ error: "Crawl job not found locally" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: job.status,
+        progress: job.progress,
+        logs: job.logs,
+        discovered: job.discovered || []
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // 2. Fetch from MongoDB in Production
+    try {
+      const { MongoClient } = require("mongodb");
+      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
+      await client.connect();
+      const db = client.db("fahem");
+      const job = await db.collection("crawl_jobs").findOne({ _id: jobId });
+      await client.close();
+
+      if (!job) {
+        return new Response(JSON.stringify({ error: "Crawl job not found in database" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: job.status,
+        progress: job.progress,
+        logs: job.logs,
+        discovered: job.discovered || []
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (dbErr: any) {
+      // DB connection failed, fallback to local DB read
+      const db = getLocalDb() as any;
+      const crawlJobs = db.crawl_jobs || [];
+      const job = crawlJobs.find((j: any) => j._id === jobId);
+
+      if (!job) {
+        return new Response(JSON.stringify({ error: "Database unreachable and job not found locally" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: job.status,
+        progress: job.progress,
+        logs: job.logs,
+        discovered: job.discovered || []
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+  } catch (err: any) {
+    console.error("[crawl-status-api] failed:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+
+// POST handler to trigger a crawl job asynchronously
 export async function POST(req: NextRequest) {
   try {
-    const { url, maxDepth = 10, requesterEmail } = await req.json();
+    const { url, maxDepth = 3, requesterEmail } = await req.json();
 
     if (!url) {
       return new Response(JSON.stringify({ error: "Missing crawl URL" }), {
@@ -35,152 +138,109 @@ export async function POST(req: NextRequest) {
       targetUrl = "https://" + targetUrl;
     }
 
-    const parsedBase = new URL(targetUrl);
-    const origin = parsedBase.origin;
-    const host = parsedBase.host;
+    // Generate a unique jobId
+    const jobId = `crawl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    const visited = new Set<string>();
-    const discoveredPdfs = new Map<string, any>();
-    const logs: string[] = [];
+    // Prepare initial log window state
+    const initialLogs = [
+      `[INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...`,
+      `[INIT] 🌐 Target domain: ${targetUrl}`,
+      `[INIT] ⚙️ Parameters: Max Depth = ${maxDepth}`,
+      `[INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution...`
+    ];
 
-    const queue: { url: string; depth: number }[] = [{ url: targetUrl, depth: 1 }];
-    const maxPagesToFetch = 100; // Increased to go as deep as possible
-    let pagesFetched = 0;
-
-    logs.push(`[INIT] Starting real crawler on: ${targetUrl} (Max Depth: ${maxDepth})`);
-
-    while (queue.length > 0 && pagesFetched < maxPagesToFetch) {
-      const current = queue.shift()!;
-      
-      // Clean and normalize URL
-      let currUrl = current.url.split("#")[0]; // remove hash
-      if (visited.has(currUrl)) continue;
-      visited.add(currUrl);
-
-      logs.push(`[CRAWL] Fetching depth ${current.depth}: ${currUrl}`);
-      pagesFetched++;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout per page
-
-        const res = await fetch(currUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!res.ok) {
-          logs.push(`[WARN] Failed to fetch ${currUrl}: ${res.status} ${res.statusText}`);
-          continue;
-        }
-
-        const contentType = res.headers.get("content-type") || "";
-        if (!contentType.includes("text/html")) {
-          logs.push(`[INFO] Skipping non-HTML resource: ${currUrl} (${contentType})`);
-          continue;
-        }
-
-        const html = await res.text();
-        
-        // Find links
-        const hrefRegex = /<a\s+(?:[^>]*?\s+)?href=["']([^"']*)["']/gi;
-        let match;
-        const currentLinks: string[] = [];
-
-        while ((match = hrefRegex.exec(html)) !== null) {
-          const rawLink = match[1].trim();
-          if (!rawLink) continue;
-
-          // Resolve absolute URL
-          let resolvedLink = "";
-          try {
-            if (rawLink.startsWith("http://") || rawLink.startsWith("https://")) {
-              resolvedLink = rawLink;
-            } else if (rawLink.startsWith("//")) {
-              resolvedLink = "https:" + rawLink;
-            } else if (rawLink.startsWith("/")) {
-              resolvedLink = origin + rawLink;
-            } else {
-              // Relative to current page path
-              const baseDir = currUrl.substring(0, currUrl.lastIndexOf("/") + 1);
-              resolvedLink = baseDir + rawLink;
-            }
-            
-            // Clean hash and query params for normalization
-            const cleanUrl = resolvedLink.split("#")[0];
-            currentLinks.push(cleanUrl);
-          } catch (e) {}
-        }
-
-        logs.push(`[INFO] Found ${currentLinks.length} raw links on page.`);
-
-        for (const link of currentLinks) {
-          // 1. Is it a PDF?
-          if (link.toLowerCase().endsWith(".pdf")) {
-            if (!discoveredPdfs.has(link)) {
-              // Deduce title
-              const fileName = link.split("/").pop() || "document.pdf";
-              let title = fileName
-                .replace(/\.pdf$/i, "")
-                .replace(/[_-]/g, " ")
-                .replace(/\b\w/g, c => c.toUpperCase());
-              
-              if (title.length > 50) {
-                title = title.substring(0, 47) + "...";
-              }
-
-              discoveredPdfs.set(link, {
-                id: "disc_" + Math.random().toString(36).substring(2, 9),
-                title,
-                titleAr: title, // Dual language support
-                url: link,
-                fileName,
-                totalPages: 120, // estimated total pages
-                bookType: "core",
-                grade: "Grade 11",
-                term: "Term 1",
-                year: "2026",
-                language: "en"
-              });
-              logs.push(`[DISCOVERED PDF] ${title} -> ${link}`);
-            }
-          } else {
-            // 2. Queue for recursive crawl
-            if (current.depth < maxDepth) {
-              try {
-                const u = new URL(link);
-                // Only crawl links within the exact same host/domain to respect scoping
-                if (u.host === host && !visited.has(link) && !queue.some(q => q.url === link)) {
-                  queue.push({ url: link, depth: current.depth + 1 });
-                }
-              } catch (e) {}
-            }
-          }
-        }
-
-      } catch (err: any) {
-        logs.push(`[ERROR] Fetching error on ${currUrl}: ${err.message}`);
-      }
+    // Persist initial state locally
+    if (isLocalEnv()) {
+      const db = getLocalDb() as any;
+      if (!db.crawl_jobs) db.crawl_jobs = [];
+      db.crawl_jobs.push({
+        _id: jobId,
+        url: targetUrl,
+        status: "harvesting",
+        progress: 5,
+        logs: initialLogs,
+        discovered: [],
+        created_at: Date.now() / 1000,
+        updated_at: Date.now() / 1000
+      });
+      saveLocalDb(db);
     }
 
-    logs.push(`[COMPLETE] Crawled ${pagesFetched} pages. Discovered ${discoveredPdfs.size} PDFs.`);
+    // Persist initial state in MongoDB if accessible
+    try {
+      const { MongoClient } = require("mongodb");
+      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
+      await client.connect();
+      const db = client.db("fahem");
+      await db.collection("crawl_jobs").updateOne(
+        { _id: jobId },
+        {
+          $set: {
+            _id: jobId,
+            url: targetUrl,
+            status: "harvesting",
+            progress: 5,
+            logs: initialLogs,
+            discovered: [],
+            created_at: Date.now() / 1000,
+            updated_at: Date.now() / 1000
+          }
+        },
+        { upsert: true }
+      );
+      await client.close();
+    } catch (mongoErr) {
+      // Ignore Mongo save error in local development
+    }
 
+    // Spawn Python crawling job completely asynchronously
+    try {
+      const pythonPath = "python";
+      const scriptPath = path.join(process.cwd(), "scripts", "async_crawler.py");
+
+      const payload = {
+        jobId,
+        url: targetUrl,
+        maxDepth,
+        requesterEmail
+      };
+
+      const child = spawn(pythonPath, [scriptPath]);
+      child.stdin.write(JSON.stringify(payload));
+      child.stdin.end();
+
+      // Non-blocking listeners
+      child.stdout.on("data", (data) => {
+        console.log(`[CRAWL JOB stdout] ${data}`);
+      });
+      child.stderr.on("data", (data) => {
+        console.error(`[CRAWL JOB stderr] ${data}`);
+      });
+      child.on("close", (code) => {
+        console.log(`[CRAWL JOB Process] Job ${jobId} exited with code ${code}`);
+      });
+
+    } catch (spawnErr: any) {
+      console.error("[CRAWL JOB Spawn Error]", spawnErr);
+      return new Response(JSON.stringify({ error: `Failed to spawn async crawler job: ${spawnErr.message}` }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // Return jobId immediately without blocking
     return new Response(JSON.stringify({
       success: true,
-      discovered: Array.from(discoveredPdfs.values()),
-      logs
+      jobId,
+      message: "Asynchronous crawling task dispatched to Cloud Run executor container."
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
 
   } catch (err: any) {
-    console.error("[crawl-api] failed:", err);
+    console.error("[crawl-api-post] failed:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" }

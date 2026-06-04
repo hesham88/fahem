@@ -25,7 +25,11 @@ import {
   FiFileText,
   FiMaximize2,
   FiSidebar,
-  FiMinimize2
+  FiMinimize2,
+  FiMic,
+  FiMicOff,
+  FiVolume2,
+  FiVolumeX
 } from "react-icons/fi";
 
 interface Message {
@@ -47,6 +51,119 @@ export default function StickyChat() {
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+
+  // Multimodal Voice (STT & TTS) States & Helpers
+  const [isListeningChat, setIsListeningChat] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(language === "ar" ? "متصفحك لا يدعم التعرف على الصوت شفهياً." : "Your browser does not support Speech Recognition.");
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = language === "ar" ? "ar-EG" : "en-US";
+
+    rec.onstart = () => {
+      setIsListeningChat(true);
+    };
+
+    rec.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) {
+        setInputValue((prev) => (prev ? prev + " " + transcript : transcript));
+      }
+    };
+
+    rec.onerror = (err: any) => {
+      console.error("Speech Recognition Error:", err);
+      setIsListeningChat(false);
+    };
+
+    rec.onend = () => {
+      setIsListeningChat(false);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListeningChat(false);
+  };
+
+  const toggleSpeechRecognition = () => {
+    if (isListeningChat) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  };
+
+  const speakMessageText = (messageId: string, text: string) => {
+    if (speakingMsgId === messageId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const cleanText = text
+      .replace(/\[\^.*?\]/g, "")
+      .replace(/\*\*|__/g, "")
+      .replace(/\*|_/g, "")
+      .replace(/`.*?`/g, "")
+      .replace(/#+\s+/g, "")
+      .replace(/-\s+/g, "")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
+    utterance.lang = hasArabicChars ? "ar-EG" : "en-US";
+
+    const voices = window.speechSynthesis.getVoices();
+    let selectedVoice = null;
+    if (hasArabicChars) {
+      selectedVoice = voices.find(v => v.lang.startsWith("ar"));
+    } else {
+      selectedVoice = voices.find(v => v.lang.startsWith("en"));
+    }
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+
+    utterance.onend = () => {
+      setSpeakingMsgId(null);
+    };
+
+    utterance.onerror = (err) => {
+      console.error("Speech Synthesis Error:", err);
+      setSpeakingMsgId(null);
+    };
+
+    setSpeakingMsgId(messageId);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Layout & Context States
   const [layoutMode, setLayoutMode] = useState<"compact" | "side" | "fullscreen">("compact");
@@ -1154,6 +1271,35 @@ User Question: ${queryText}`;
                 <span>
                   {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
+                {msg.role === "assistant" && msg.text && (
+                  <>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => speakMessageText(msg.id, msg.text)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: speakingMsgId === msg.id ? "var(--accent-orange)" : "#8fa1ad",
+                        cursor: "pointer",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        transition: "all 0.2s"
+                      }}
+                      title={language === "ar" ? "قراءة بصوت عالٍ شفهي" : "Read Aloud"}
+                    >
+                      {speakingMsgId === msg.id ? <FiVolumeX style={{ animation: "pulse-kf 1s infinite" }} /> : <FiVolume2 />}
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700 }}>
+                        {speakingMsgId === msg.id 
+                          ? (language === "ar" ? "إيقاف" : "Stop") 
+                          : (language === "ar" ? "استماع شفهي" : "Listen")}
+                      </span>
+                    </button>
+                  </>
+                )}
                 {msg.activeAgent && (
                   <>
                     <span>•</span>
@@ -1347,6 +1493,29 @@ User Question: ${queryText}`;
               ))}
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={toggleSpeechRecognition}
+            style={{
+              width: "2.5rem",
+              height: "2.5rem",
+              borderRadius: "50%",
+              backgroundColor: isListeningChat ? "#ef4444" : "rgba(16, 107, 163, 0.08)",
+              color: isListeningChat ? "#ffffff" : "var(--primary)",
+              border: "none",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxShadow: isListeningChat ? "0 0 12px rgba(239, 68, 68, 0.4)" : "none",
+            }}
+            title={language === "ar" ? "إدخال بالصوت شفهي" : "Voice Dictation / Oral Input"}
+            className={isListeningChat ? "pulse-icon" : ""}
+          >
+            {isListeningChat ? <FiMicOff style={{ fontSize: "1.1rem" }} /> : <FiMic style={{ fontSize: "1.1rem" }} />}
+          </button>
 
           <input
             type="text"

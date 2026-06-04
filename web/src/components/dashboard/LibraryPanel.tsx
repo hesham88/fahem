@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import React, { useState } from "react";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
 interface Book {
@@ -74,6 +74,137 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   handleStartStudy,
   t
 }) => {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifierLog, setVerifierLog] = useState<string[]>([]);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectedInfo, setRejectedInfo] = useState<any>(null);
+
+  const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
+    setIsVerifying(true);
+    setVerifierLog([
+      language === "ar" ? "🕵️‍♂️ بدء وكيل التحقق الأكاديمي لـ فهم..." : "🕵️‍♂️ Starting Fahem Academic Verifier Agent...",
+    ]);
+
+    const addLogWithDelay = (msg: string, delay: number) => {
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          setVerifierLog((prev) => [...prev, msg]);
+          resolve();
+        }, delay);
+      });
+    };
+
+    await addLogWithDelay(
+      language === "ar" 
+        ? `📂 تحليل خصائص الملف: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+        : `📂 Analyzing file properties: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+      400
+    );
+
+    await addLogWithDelay(
+      language === "ar"
+        ? `🔒 استخراج التوقيع الرقمي وصيغة الملف: ${file.name.split('.').pop()?.toUpperCase()}`
+        : `🔒 Extracting digital signature and format: ${file.name.split('.').pop()?.toUpperCase()}`,
+      500
+    );
+
+    await addLogWithDelay(
+      language === "ar"
+        ? "🧠 تشغيل نموذج الذكاء الاصطناعي لفحص المحتوى والملاءمة التعليمية..."
+        : "🧠 Calling AI model to evaluate content & educational relevance...",
+      600
+    );
+
+    try {
+      const response = await fetch("/api/books/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileFormat: file.name.split('.').pop() || "",
+          downloadUrl: downloadURL,
+          userId: user?.uid,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.verdict) {
+        const verdict = data.verdict;
+        if (verdict.isAcademic) {
+          await addLogWithDelay(
+            language === "ar"
+              ? `✅ تم التحقق بنجاح! التصنيف: ${verdict.category} (الثقة: ${verdict.confidence}%)`
+              : `✅ Verification Successful! Category: ${verdict.category} (Confidence: ${verdict.confidence}%)`,
+            400
+          );
+
+          // Trigger ingestion in /api/books
+          await fetch("/api/books", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: file.name.replace(/\.[^/.]+$/, ""),
+              userId: user?.uid,
+              storagePath: storagePath,
+              downloadUrl: downloadURL,
+              sizeBytes: file.size,
+              format: file.name.split('.').pop()?.toUpperCase() || "PDF"
+            })
+          });
+
+          const categoryToSubject: Record<string, string> = {
+            "Mathematics": "Math",
+            "Science": "Science",
+            "History": "History",
+            "Language": "Arabic",
+            "Computer Science": "Science",
+            "Engineering": "Science",
+            "General Education": "Science"
+          };
+          const detectedSubject = categoryToSubject[verdict.category] || "Science";
+
+          const newBook = {
+            titleEn: file.name.replace(/\.[^/.]+$/, ""),
+            titleAr: file.name.replace(/\.[^/.]+$/, ""),
+            subject: detectedSubject,
+            size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
+            format: file.name.split('.').pop()?.toUpperCase() || "PDF",
+            downloads: "0",
+            isUserUpload: true
+          };
+
+          setCustomUploadedBooks(prev => [newBook, ...prev]);
+        } else {
+          // Rejecting
+          await addLogWithDelay(
+            language === "ar" ? "❌ فشل التحقق! الملف لا يحتوي على مواد أكاديمية أو تعليمية." : "❌ Verification Failed! Non-academic content detected.",
+            400
+          );
+
+          // Delete from storage
+          const storageRef = ref(storage, storagePath);
+          await deleteObject(storageRef);
+
+          setRejectedInfo({
+            fileName: file.name,
+            confidence: verdict.confidence,
+            category: verdict.category,
+            rationaleEn: verdict.rationaleEn,
+            rationaleAr: verdict.rationaleAr,
+          });
+          setShowRejectModal(true);
+        }
+      } else {
+        throw new Error("Invalid response structure from verifier API.");
+      }
+    } catch (err) {
+      console.error("Verification system error:", err);
+      alert(language === "ar" ? "حدث خطأ أثناء فحص الملف." : "An error occurred during file verification.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {selectedBookReader ? (
@@ -449,7 +580,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 <span>📁 {language === "ar" ? "تحميل مستند دراسي" : "Upload Document"}</span>
                 <input
                   type="file"
-                  accept=".pdf,image/*"
+                  accept=".pdf,.docx,image/*"
                   style={{ display: "none" }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -463,37 +594,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       }
                       const storagePath = "user_uploads/" + user?.uid + "/" + Date.now() + "_" + file.name;
                       const storageRef = ref(storage, storagePath);
+                      
+                      setIsVerifying(true);
+                      setVerifierLog([
+                        language === "ar" ? "⏳ جاري رفع الملف إلى الخزنة السحابية الآمنة..." : "⏳ Uploading file to the secure cloud vault..."
+                      ]);
+
                       uploadBytes(storageRef, file).then((snapshot) => {
                         getDownloadURL(snapshot.ref).then((downloadURL) => {
-                          // Trigger async POST to /api/books carrying file metadata for ingestion
-                          fetch("/api/books", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              title: file.name.replace(/\.[^/.]+$/, ""),
-                              userId: user?.uid,
-                              storagePath: storagePath,
-                              downloadUrl: downloadURL,
-                              sizeBytes: file.size,
-                              format: file.name.split('.').pop()?.toUpperCase() || "PDF"
-                            })
-                          }).catch((err) => console.error("Error triggering async book ingestion API:", err));
-
-                          alert(language === "ar" ? "تم تحميل مستندك الشخصي بنجاح إلى الخزنة الآمنة وبدأت عملية الفهرسة الفورية!" : "Your personal notes have been ingested securely into the vault and real-time processing has started!");
-                          const newBook = {
-                            titleEn: file.name.replace(/\.[^/.]+$/, ""),
-                            titleAr: file.name.replace(/\.[^/.]+$/, ""),
-                            subject: "Science",
-                            size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-                            format: file.name.split('.').pop()?.toUpperCase() || "PDF",
-                            downloads: "0",
-                            isUserUpload: true
-                          };
-                          setCustomUploadedBooks(prev => [newBook, ...prev]);
+                          runVerifierAgent(file, storagePath, downloadURL);
                         });
                       }).catch((err) => {
                         console.error("Upload error:", err);
                         alert(language === "ar" ? "حدث خطأ أثناء تحميل الملف." : "An error occurred while uploading your document.");
+                        setIsVerifying(false);
                       });
                     }
                   }}
@@ -532,6 +646,132 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verification Loading Overlay */}
+      {isVerifying && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          backgroundColor: "rgba(10, 25, 41, 0.75)", backdropFilter: "blur(12px)",
+          display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999
+        }}>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(4px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+          <div style={{
+            background: "rgba(255, 255, 255, 0.95)", border: "1px solid rgba(16, 107, 163, 0.2)",
+            borderRadius: "24px", padding: "2.5rem", width: "90%", maxWidth: "500px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.15)", textAlign: "center",
+            display: "flex", flexDirection: "column", gap: "1.5rem"
+          }}>
+            <div className="spinner" style={{
+              width: "60px", height: "60px", border: "5px solid rgba(16, 107, 163, 0.1)",
+              borderTop: "5px solid var(--primary)", borderRadius: "50%", margin: "0 auto",
+              animation: "spin 1s linear infinite"
+            }} />
+            <div>
+              <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--foreground)", fontWeight: 800, fontSize: "1.3rem" }}>
+                {language === "ar" ? "فحص المواد الدراسية" : "Auditing Academic Asset"}
+              </h3>
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "#6a7c88" }}>
+                {language === "ar" ? "يقوم وكيل فهم الذكي بفحص الملف لضمان توافقه التعليمي..." : "Fahem Academic Verifier Agent is analyzing the file structure & context..."}
+              </p>
+            </div>
+            <div style={{
+              textAlign: "left", background: "#0f172a", color: "#38bdf8", fontFamily: "monospace",
+              padding: "1rem", borderRadius: "12px", fontSize: "0.75rem", maxHeight: "160px",
+              overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem",
+              direction: "ltr", border: "1px solid rgba(56, 189, 248, 0.2)"
+            }}>
+              {verifierLog.map((log, idx) => (
+                <div key={idx} style={{ animation: "fadeIn 0.2s ease-out" }}>{log}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Academic Rejection Modal */}
+      {showRejectModal && rejectedInfo && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          backgroundColor: "rgba(10, 25, 41, 0.75)", backdropFilter: "blur(12px)",
+          display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999
+        }}>
+          <div style={{
+            background: "#ffffff", border: "2px solid #ef4444",
+            borderRadius: "24px", padding: "2.5rem", width: "90%", maxWidth: "550px",
+            boxShadow: "0 0 24px rgba(239, 68, 68, 0.25)",
+            display: "flex", flexDirection: "column", gap: "1.5rem", position: "relative"
+          }}>
+            <div style={{
+              background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", width: "50px", height: "50px",
+              borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1.5rem", margin: "0 auto"
+            }}>
+              ⚠️
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ margin: "0 0 0.5rem 0", color: "#ef4444", fontWeight: 800, fontSize: "1.4rem" }}>
+                {language === "ar" ? "عذرًا، تم رفض المستند الأكاديمي" : "Academic Document Ingestion Rejected"}
+              </h3>
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "#ef4444", fontWeight: 600 }}>
+                {language === "ar" 
+                  ? `اسم الملف: ${rejectedInfo.fileName}` 
+                  : `File Name: ${rejectedInfo.fileName}`}
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{
+                background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "12px",
+                padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem"
+              }}>
+                <h4 style={{ margin: 0, fontSize: "0.9rem", color: "#991b1b", fontWeight: 700 }}>
+                  English Audit Rationale (Confidence: {rejectedInfo.confidence}%):
+                </h4>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#7f1d1d", lineHeight: 1.4 }}>
+                  {rejectedInfo.rationaleEn}
+                </p>
+              </div>
+
+              <div style={{
+                background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "12px",
+                padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "right"
+              }}>
+                <h4 style={{ margin: 0, fontSize: "0.9rem", color: "#991b1b", fontWeight: 700 }}>
+                  تقرير وكيل التدقيق الأكاديمي (مستوى الثقة: {rejectedInfo.confidence}%):
+                </h4>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#7f1d1d", lineHeight: 1.4 }}>
+                  {rejectedInfo.rationaleAr}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowRejectModal(false);
+                setRejectedInfo(null);
+              }}
+              style={{
+                background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#ffffff",
+                border: "none", borderRadius: "12px", padding: "0.75rem", fontSize: "0.9rem",
+                fontWeight: 700, cursor: "pointer", transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}
+            >
+              {language === "ar" ? "مفهوم، سأقوم بتحميل ملف دراسي" : "Understood, let me upload academic material"}
+            </button>
           </div>
         </div>
       )}

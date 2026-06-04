@@ -57,6 +57,63 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceFeedback, setPracticeFeedback] = useState<any>(null);
   const [practiceShowHint, setPracticeShowHint] = useState<boolean>(false);
 
+  // Multimodal TTS states & helpers
+  const [speakingType, setSpeakingElement] = useState<"question" | "feedback" | null>(null);
+
+  const speakPracticeText = (text: string, type: "question" | "feedback") => {
+    if (speakingType === type) {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeakingElement(null);
+      return;
+    }
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    const cleanText = text
+      .replace(/\*\*|__/g, "")
+      .replace(/\*|_/g, "")
+      .replace(/`.*?`/g, "")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
+    utterance.lang = hasArabicChars ? "ar-EG" : "en-US";
+
+    const voices = window.speechSynthesis.getVoices();
+    let selectedVoice = null;
+    if (hasArabicChars) {
+      selectedVoice = voices.find(v => v.lang.startsWith("ar"));
+    } else {
+      selectedVoice = voices.find(v => v.lang.startsWith("en"));
+    }
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+
+    utterance.onend = () => {
+      setSpeakingElement(null);
+    };
+
+    utterance.onerror = (err) => {
+      console.error("Practice Speech Synthesis Error:", err);
+      setSpeakingElement(null);
+    };
+
+    setSpeakingElement(type);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingElement(null);
+  }, [practiceCurrentQuestion, practiceFeedback]);
+
   // Web Speech API / Oral specific states
   const [isListening, setIsListening] = useState<boolean>(false);
   const [micError, setMicError] = useState<string>("");
@@ -130,6 +187,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
         try {
           speechRecognition.stop();
         } catch (e) {}
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
       }
     };
   }, [speechRecognition]);
@@ -641,13 +701,36 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
           {/* Main Challenge Card */}
           <div className="panel-card" style={{ padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div>
-              <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
-                {language === "ar" ? "الاستفسار / التحدي الحالي" : "Current AI Quest Objective"}
-              </span>
-              <h3 style={{ fontSize: "1.25rem", margin: "0.35rem 0 0 0", color: "var(--primary)", fontWeight: 800, lineHeight: "1.5", fontFamily: "var(--font-sans)" }}>
-                {practiceCurrentQuestion.question}
-              </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+              <div>
+                <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
+                  {language === "ar" ? "الاستفسار / التحدي الحالي" : "Current AI Quest Objective"}
+                </span>
+                <h3 style={{ fontSize: "1.25rem", margin: "0.35rem 0 0 0", color: "var(--primary)", fontWeight: 800, lineHeight: "1.5", fontFamily: "var(--font-sans)" }}>
+                  {practiceCurrentQuestion.question}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => speakPracticeText(practiceCurrentQuestion.question, "question")}
+                style={{
+                  background: speakingType === "question" ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 107, 163, 0.08)",
+                  border: "none",
+                  borderRadius: "12px",
+                  width: "40px",
+                  height: "40px",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  cursor: "pointer",
+                  color: speakingType === "question" ? "#ef4444" : "var(--primary)",
+                  transition: "all 0.2s",
+                  fontSize: "1.2rem"
+                }}
+                title={language === "ar" ? "استماع للسؤال" : "Listen to Question"}
+              >
+                {speakingType === "question" ? "🛑" : "🔊"}
+              </button>
             </div>
 
             {/* Dynamic Answer Inputs */}
@@ -1171,13 +1254,36 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     alignItems: "center",
                   }}
                 >
-                  <div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: practiceFeedback.isCorrect ? "#2e7d32" : "#c62828", textTransform: "uppercase" }}>
-                      {language === "ar" ? "التقييم الفوري والقرار" : "AI Tutor Verdict"}
-                    </span>
-                    <h4 style={{ margin: "0.25rem 0 0 0", fontSize: "1rem", fontWeight: 800, color: practiceFeedback.isCorrect ? "#2e7d32" : "#c62828" }}>
-                      {practiceFeedback.feedback}
-                    </h4>
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <div>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: practiceFeedback.isCorrect ? "#2e7d32" : "#c62828", textTransform: "uppercase" }}>
+                        {language === "ar" ? "التقييم الفوري والقرار" : "AI Tutor Verdict"}
+                      </span>
+                      <h4 style={{ margin: "0.25rem 0 0 0", fontSize: "1rem", fontWeight: 800, color: practiceFeedback.isCorrect ? "#2e7d32" : "#c62828" }}>
+                        {practiceFeedback.feedback}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => speakPracticeText(practiceFeedback.feedback, "feedback")}
+                      style={{
+                        background: speakingType === "feedback" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 107, 163, 0.08)",
+                        border: "none",
+                        borderRadius: "8px",
+                        width: "36px",
+                        height: "36px",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        cursor: "pointer",
+                        color: speakingType === "feedback" ? "#ef4444" : "var(--primary)",
+                        transition: "all 0.2s",
+                        fontSize: "1rem"
+                      }}
+                      title={language === "ar" ? "استماع للتقييم شفهياً" : "Listen to Verdict"}
+                    >
+                      {speakingType === "feedback" ? "🛑" : "🔊"}
+                    </button>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6a7c88" }}>{language === "ar" ? "الخبرة المكتسبة" : "Reward"}</span>

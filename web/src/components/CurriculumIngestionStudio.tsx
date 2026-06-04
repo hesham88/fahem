@@ -159,6 +159,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const [crawlUrl, setBookCrawlUrl] = useState("https://openstax.org");
   const [crawlMaxDepth, setCrawlDepth] = useState<number>(3); // Set to max depth (3) by default
   const [isCrawling, setIsCrawling] = useState(false);
+  const [crawlProgress, setCrawlProgress] = useState(0);
   const [crawlLogs, setCrawlLogs] = useState<string[]>([]);
   const [discoveredResources, setDiscoveredResources] = useState<any[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<"all" | "pdf" | "html">("pdf"); // Set to pdf filter by default
@@ -780,11 +781,12 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     }
   };
 
-  // Real Crawler & Content Discovery
+  // Real Crawler & Content Discovery (Asynchronous / Polling)
   const handleStartCrawling = async () => {
     if (!crawlUrl) return;
     setIsCrawling(true);
-    setCrawlLogs([]);
+    setCrawlProgress(0);
+    setCrawlLogs([`[INIT] Despatching asynchronous request...`]);
     setDiscoveredResources([]);
     setSelectedResources({});
 
@@ -804,45 +806,82 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       const data = await res.json();
       if (!res.ok || data.error) {
         setIsCrawling(false);
-        addTerminalLog(`[CRAWLER ERROR] ${data.error || "Failed to crawl target site."}`);
-        setCrawlLogs([`[ERROR] Crawler terminated: ${data.error || "Failed to crawl target site."}`]);
+        addTerminalLog(`[CRAWLER ERROR] ${data.error || "Failed to initiate crawl job."}`);
+        setCrawlLogs([`[ERROR] Crawler initialization failed: ${data.error || "Failed to initiate crawl job."}`]);
         return;
       }
 
-      // Map the discovered resources to match subjectsList automatically
-      const mappedDiscovered = (data.discovered || []).map((book: any) => {
-        const matchingSubj = subjectsList.find(s => 
-          book.title.toLowerCase().includes(s.name.toLowerCase()) || 
-          s.name.toLowerCase().includes(book.title.toLowerCase()) ||
-          book.fileName.toLowerCase().includes(s.name.toLowerCase())
-        ) || subjectsList[0];
+      const jobId = data.jobId;
+      addTerminalLog(`[CRAWLER] Async job created: ${jobId}. Active Cloud Run polling sequence engaged...`);
 
-        return {
-          ...book,
-          subjectId: matchingSubj ? matchingSubj._id : "subj_algebra_stats",
-          subject: matchingSubj ? matchingSubj.name : "Pure Mathematics"
-        };
-      });
+      // Start Polling Interval
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`/api/admin/crawl?jobId=${jobId}`);
+          if (!pollRes.ok) {
+            console.error("Crawl job polling failed");
+            return;
+          }
+          const pollData = await pollRes.json();
+          if (pollData.success) {
+            // Update logs in the crawler terminal log feed
+            if (pollData.logs && Array.isArray(pollData.logs)) {
+              setCrawlLogs(pollData.logs);
+            }
 
-      setDiscoveredResources(mappedDiscovered);
-      
-      if (data.logs && Array.isArray(data.logs)) {
-        setCrawlLogs(data.logs);
-      }
+            // Update crawlProgress
+            if (typeof pollData.progress === "number") {
+              setCrawlProgress(pollData.progress);
+            }
 
-      const folderMap: Record<string, boolean> = {};
-      mappedDiscovered.forEach((book: any) => {
-        if (book.subject) {
-          folderMap[book.subject] = true;
+            // Map and update discovered list
+            if (pollData.discovered && Array.isArray(pollData.discovered)) {
+              const mappedDiscovered = pollData.discovered.map((book: any) => {
+                const matchingSubj = subjectsList.find(s => 
+                  book.title.toLowerCase().includes(s.name.toLowerCase()) || 
+                  s.name.toLowerCase().includes(book.title.toLowerCase()) ||
+                  book.fileName.toLowerCase().includes(s.name.toLowerCase())
+                ) || subjectsList[0];
+
+                return {
+                  ...book,
+                  subjectId: matchingSubj ? matchingSubj._id : "subj_algebra_stats",
+                  subject: matchingSubj ? matchingSubj.name : "Pure Mathematics"
+                };
+              });
+
+              setDiscoveredResources(mappedDiscovered);
+
+              // Update folders expanded state
+              const folderMap: Record<string, boolean> = {};
+              mappedDiscovered.forEach((book: any) => {
+                if (book.subject) {
+                  folderMap[book.subject] = true;
+                }
+              });
+              setExpandedFolders(prev => ({ ...prev, ...folderMap }));
+            }
+
+            // Check if job finished
+            if (pollData.status === "completed") {
+              clearInterval(pollInterval);
+              setIsCrawling(false);
+              setCrawlProgress(100);
+              addTerminalLog(`[CRAWLER] Asynchronous job ${jobId} successfully completed! Discovered ${pollData.discovered?.length || 0} PDFs.`);
+            } else if (pollData.status === "failed") {
+              clearInterval(pollInterval);
+              setIsCrawling(false);
+              addTerminalLog(`[CRAWLER ERROR] Asynchronous job ${jobId} reported failure status.`);
+            }
+          }
+        } catch (err: any) {
+          console.error("Exception during crawl status polling:", err);
         }
-      });
-      setExpandedFolders(folderMap);
+      }, 1500);
 
-      addTerminalLog(`[CRAWLER] Success. Discovered ${mappedDiscovered.length} real PDF documents.`);
     } catch (err: any) {
-      addTerminalLog(`[CRAWLER FAULT] ${err.message || "Failed to contact crawling API."}`);
-    } finally {
       setIsCrawling(false);
+      addTerminalLog(`[CRAWLER FAULT] ${err.message || "Failed to contact crawling API."}`);
     }
   };
 
@@ -1673,6 +1712,28 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                   </>
                 )}
               </button>
+
+              {isCrawling && (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700 }}>
+                      {language === "ar" ? "تقدم الزحف والاستخلاص:" : "Crawl & Extraction Progress:"}
+                    </span>
+                    <span style={{ fontSize: "0.7rem", color: "var(--primary)", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                      {crawlProgress}%
+                    </span>
+                  </div>
+                  <div style={{ height: "6px", background: "rgba(16, 107, 163, 0.1)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{
+                      width: `${crawlProgress}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, var(--primary) 0%, #00e5ff 100%)",
+                      borderRadius: "3px",
+                      transition: "width 0.4s ease-out"
+                    }} />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Crawler Terminal Output */}
@@ -3129,7 +3190,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                             setBookSourceUrl(e.target.value);
                             if (e.target.value) {
                               const cleanName = e.target.value.split("/").pop() || "textbook.pdf";
-                              setBookStoragePath(`Textbooks/${cleanName}`);
+                              setBookStoragePath(`MOE Library/${cleanName}`);
                             }
                           }}
                           style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
@@ -3162,7 +3223,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                               const file = e.target.files?.[0];
                               if (file) {
                                 setIsAdminUploading(true);
-                                const path = `Textbooks/${Date.now()}_${file.name}`;
+                                const path = `MOE Library/${Date.now()}_${file.name}`;
                                 const storageRef = ref(storage, path);
                                 uploadBytes(storageRef, file).then((snapshot) => {
                                   getDownloadURL(snapshot.ref).then((downloadURL) => {
