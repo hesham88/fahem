@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       if (resolvedSubject === "Math") {
         contextText = "Topic: Matrices, determinants, Cramer's rule, and linear systems.";
       } else if (resolvedSubject === "Science") {
-        contextText = "Topic: Atomic structure, chemical bonds, periodic table, and basic chemical reactions.";
+        contextText = "Topic: Gases and thermodynamics (Ideal gas law, Boyle's law, Charles's law, heat, work, internal energy, laws of thermodynamics, molecular kinetics, pressure and temperature).";
       } else if (resolvedSubject === "Arabic") {
         contextText = "Topic: Arabic grammar, parsing (إعراب), nominative/accusative/genitive states, and parts of speech.";
       } else {

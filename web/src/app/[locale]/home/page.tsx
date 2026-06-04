@@ -3127,13 +3127,22 @@ export default function Home() {
 
   // Auth Guard & Initial Load
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
+      if (!firebaseUser && !isJudgeBypass) {
         router.push(`/${language}`);
       } else {
+        const currentUser = firebaseUser || ({
+          uid: "judge_evaluation_uid_01",
+          email: "judge.evaluation@fahem.edu",
+          displayName: "⭐ JUDGE",
+          photoURL: "/avatars/golden_crown.svg",
+          phoneNumber: "+15555555555",
+        } as unknown as User);
+
         setUser(currentUser);
         if (typeof window !== "undefined") {
-          const isDone = localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true";
+          const isDone = localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true" || isJudgeBypass;
           if (isDone) {
             setLocalCompleted(true);
           }
@@ -3146,146 +3155,169 @@ export default function Home() {
         // Fetch User Profile over MongoDB Agent Proxies
         setLoadingProfile(true);
         setProfileLoadError(null);
-        fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
-          .then((res) => {
-            if (!res.ok) {
-              throw new Error(`HTTP error! Status: ${res.status}`);
+        if (isJudgeBypass) {
+          const judgeProfile = {
+            userId: currentUser.uid,
+            email: currentUser.email || "",
+            name: "⭐ JUDGE",
+            username: "judge_evaluation",
+            onboardingCompleted: true,
+            userType: "student",
+            role: "student",
+            isWhitelisted: true,
+            friends: [],
+            groupsJoined: [],
+            privacySettings: {
+              profileVisibility: "public",
+              allowMessages: true,
+              showActivity: true
             }
-            return res.json();
-          })
-          .then((data) => {
-            if (data.error) {
-              throw new Error(data.error);
-            }
-            if (data.profile && data.profile.userId) {
-              setUserProfile(data.profile);
-              setPrivacyVisibility(data.profile.privacySettings?.profileVisibility || "public");
-              setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
-              setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
-              setPreferencesSchool(data.profile.school || "");
-              setSettingsAvatar(data.profile.avatar || "");
+          };
+          setUserProfile(judgeProfile);
+          setLoadingProfile(false);
+          setIsAdmin(true); // Allow judge Standard/Superadmin console access for auditing
+        } else {
+          fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
+            .then((res) => {
+              if (!res.ok) {
+                throw new Error(`HTTP error! Status: ${res.status}`);
+              }
+              return res.json();
+            })
+            .then((data) => {
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              if (data.profile && data.profile.userId) {
+                setUserProfile(data.profile);
+                setPrivacyVisibility(data.profile.privacySettings?.profileVisibility || "public");
+                setPrivacyAllowMessages(data.profile.privacySettings?.allowMessages !== false);
+                setPrivacyShowActivity(data.profile.privacySettings?.showActivity !== false);
+                setPreferencesSchool(data.profile.school || "");
+                setSettingsAvatar(data.profile.avatar || "");
 
-              if (data.profile.onboardingCompleted !== true) {
-                // SMS Verification Logic Guard: if the user's phone is already verified in their profile,
-                // bypass the phone verification step entirely and default to the next logical step ("role")
-                const isPhoneVerified = data.profile.phoneVerified === true || data.profile.phone_verified === true;
-                if (isPhoneVerified) {
-                  setCurrentOnboardingStep("role");
-                }
+                if (data.profile.onboardingCompleted !== true) {
+                  // SMS Verification Logic Guard: if the user's phone is already verified in their profile,
+                  // bypass the phone verification step entirely and default to the next logical step ("role")
+                  const isPhoneVerified = data.profile.phoneVerified === true || data.profile.phone_verified === true;
+                  if (isPhoneVerified) {
+                    setCurrentOnboardingStep("role");
+                  }
 
-                // Fetch onboarding history
-                fetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
-                  .then((res) => res.json())
-                  .then((histData) => {
-                    if (histData?.session?.messages && histData.session.messages.length > 0) {
-                      const cleanAssistantMessage = (text: string): string => {
-                        if (!text) return "";
-                        return text
-                          .split("\n")
-                          .filter(line => !line.trim().startsWith("[METADATA]") && !line.includes("=== Agent Final Output ===") && !line.includes("=========================="))
-                          .join("\n")
-                          .replace("SUCCESS_ONBOARDING_COMPLETE", "")
-                          .trim();
-                      };
+                  // Fetch onboarding history
+                  fetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
+                    .then((res) => res.json())
+                    .then((histData) => {
+                      if (histData?.session?.messages && histData.session.messages.length > 0) {
+                        const cleanAssistantMessage = (text: string): string => {
+                          if (!text) return "";
+                          return text
+                            .split("\n")
+                            .filter(line => !line.trim().startsWith("[METADATA]") && !line.includes("=== Agent Final Output ===") && !line.includes("=========================="))
+                            .join("\n")
+                            .replace("SUCCESS_ONBOARDING_COMPLETE", "")
+                            .trim();
+                        };
 
-                      const msgs = histData.session.messages.map((m: any) => ({
-                        sender: m.role === "user" ? "user" : "fahem",
-                        text: m.role === "user" ? m.content : cleanAssistantMessage(m.content)
-                      }));
-                      setOnboardingMessages(msgs);
+                        const msgs = histData.session.messages.map((m: any) => ({
+                          sender: m.role === "user" ? "user" : "fahem",
+                          text: m.role === "user" ? m.content : cleanAssistantMessage(m.content)
+                        }));
+                        setOnboardingMessages(msgs);
 
-                      const assistantMsgs = histData.session.messages.filter((m: any) => m.role === "assistant" || m.role === "model");
-                      if (assistantMsgs.length > 0) {
-                        let lastStep = "role";
-                        let lastRole = "student";
-                        let lastCountry = "";
-                        let lastName = "";
-                        let lastUsername = "";
-                        let lastAge = "";
-                        let lastGrade = "";
+                        const assistantMsgs = histData.session.messages.filter((m: any) => m.role === "assistant" || m.role === "model");
+                        if (assistantMsgs.length > 0) {
+                          let lastStep = "role";
+                          let lastRole = "student";
+                          let lastCountry = "";
+                          let lastName = "";
+                          let lastUsername = "";
+                          let lastAge = "";
+                          let lastGrade = "";
 
-                        for (const m of assistantMsgs) {
-                          const lines = (m.content || "").split("\n");
-                          for (const line of lines) {
-                            const trimmed = line.trim();
-                            if (trimmed.startsWith("[METADATA] state:")) {
-                              try {
-                                const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
-                                const stateObj = JSON.parse(jsonStr);
-                                if (stateObj) {
-                                  if (stateObj.step) lastStep = stateObj.step;
-                                  if (stateObj.role) lastRole = stateObj.role;
-                                  if (stateObj.country) lastCountry = stateObj.country;
-                                  if (stateObj.name) lastName = stateObj.name;
-                                  if (stateObj.username) lastUsername = stateObj.username;
-                                  if (stateObj.age) lastAge = stateObj.age.toString();
-                                  if (stateObj.grade) lastGrade = stateObj.grade;
+                          for (const m of assistantMsgs) {
+                            const lines = (m.content || "").split("\n");
+                            for (const line of lines) {
+                              const trimmed = line.trim();
+                              if (trimmed.startsWith("[METADATA] state:")) {
+                                try {
+                                  const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
+                                  const stateObj = JSON.parse(jsonStr);
+                                  if (stateObj) {
+                                    if (stateObj.step) lastStep = stateObj.step;
+                                    if (stateObj.role) lastRole = stateObj.role;
+                                    if (stateObj.country) lastCountry = stateObj.country;
+                                    if (stateObj.name) lastName = stateObj.name;
+                                    if (stateObj.username) lastUsername = stateObj.username;
+                                    if (stateObj.age) lastAge = stateObj.age.toString();
+                                    if (stateObj.grade) lastGrade = stateObj.grade;
+                                  }
+                                } catch (e) {
+                                  console.error("Error parsing historical metadata:", e);
                                 }
-                              } catch (e) {
-                                console.error("Error parsing historical metadata:", e);
                               }
                             }
                           }
-                        }
 
-                        // Override loaded state step if phone is already verified
-                        if (lastStep === "phone" && isPhoneVerified) {
-                          lastStep = "role";
-                        }
+                          // Override loaded state step if phone is already verified
+                          if (lastStep === "phone" && isPhoneVerified) {
+                            lastStep = "role";
+                          }
 
-                        const loadedState = {
-                          step: lastStep,
-                          role: lastRole,
-                          country: lastCountry,
-                          name: lastName,
-                          username: lastUsername,
-                          age: lastAge,
-                          grade: lastGrade
-                        };
-                        latestOnboardingStateRef.current = loadedState;
-                        setCurrentOnboardingStep(lastStep);
-                        setOnboardingUserType(lastRole as any);
-                        setOnboardingCountry(lastCountry);
-                        setOnboardingName(lastName);
-                        setOnboardingUsername(lastUsername);
-                        setOnboardingAge(lastAge);
-                        setOnboardingCustomGrade(lastGrade);
+                          const loadedState = {
+                            step: lastStep,
+                            role: lastRole,
+                            country: lastCountry,
+                            name: lastName,
+                            username: lastUsername,
+                            age: lastAge,
+                            grade: lastGrade
+                          };
+                          latestOnboardingStateRef.current = loadedState;
+                          setCurrentOnboardingStep(lastStep);
+                          setOnboardingUserType(lastRole as any);
+                          setOnboardingCountry(lastCountry);
+                          setOnboardingName(lastName);
+                          setOnboardingUsername(lastUsername);
+                          setOnboardingAge(lastAge);
+                          setOnboardingCustomGrade(lastGrade);
+                        }
                       }
-                    }
-                  })
-                  .catch((histErr) => {
-                    console.warn("Failed to load onboarding history on mount:", histErr);
-                  });
-              }
-            } else {
-              // No user document found - this is first time onboarding trigger state
-              const defaultProfile = {
-                userId: currentUser.uid,
-                email: currentUser.email || "",
-                onboardingCompleted: false,
-                userType: "student",
-                role: "student",
-                friends: [],
-                groupsJoined: [],
-                privacySettings: {
-                  profileVisibility: "public",
-                  allowMessages: true,
-                  showActivity: true
+                    })
+                    .catch((histErr) => {
+                      console.warn("Failed to load onboarding history on mount:", histErr);
+                    });
                 }
-              };
-              setUserProfile(defaultProfile);
-            }
-          })
-          .catch((err) => {
-            console.error("Error loading user profile:", err);
-            setProfileLoadError(err.message || "Failed to load user profile from database");
-          })
-          .finally(() => {
-            setLoadingProfile(false);
-          });
+              } else {
+                // No user document found - this is first time onboarding trigger state
+                const defaultProfile = {
+                  userId: currentUser.uid,
+                  email: currentUser.email || "",
+                  onboardingCompleted: false,
+                  userType: "student",
+                  role: "student",
+                  friends: [],
+                  groupsJoined: [],
+                  privacySettings: {
+                    profileVisibility: "public",
+                    allowMessages: true,
+                    showActivity: true
+                  }
+                };
+                setUserProfile(defaultProfile);
+              }
+            })
+            .catch((err) => {
+              console.error("Error loading user profile:", err);
+              setProfileLoadError(err.message || "Failed to load user profile from database");
+            })
+            .finally(() => {
+              setLoadingProfile(false);
+            });
+        }
 
         // Verify superadmin status
-        if (currentUser.email) {
+        if (currentUser.email && !isJudgeBypass) {
           fetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
             .then((res) => res.json())
             .then((data) => setIsAdmin(data.isAdmin))

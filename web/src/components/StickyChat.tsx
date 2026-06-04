@@ -56,6 +56,9 @@ export default function StickyChat() {
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
   const [mentionSearch, setMentionQuery] = useState<string>("");
   const [showMentionsDropdown, setShowMentionsDropdown] = useState<boolean>(false);
+  const [dbSubjects, setDbSubjects] = useState<any[]>([]);
+  const [dbBooks, setDbBooks] = useState<any[]>([]);
+
 
   // Saved Chats States
   const [sessions, setSessions] = useState<any[]>([]);
@@ -154,6 +157,34 @@ export default function StickyChat() {
     }
   }, [sessionLogs]);
 
+  // Fetch subjects and books for mentions dropdown autocomplete
+  useEffect(() => {
+    const fetchMetadataForMentions = async () => {
+      try {
+        const [subRes, booksRes] = await Promise.all([
+          fetch("/api/subjects"),
+          fetch("/api/books")
+        ]);
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          if (subData.success) {
+            setDbSubjects(subData.subjects || []);
+          }
+        }
+        if (booksRes.ok) {
+          const booksData = await booksRes.json();
+          if (booksData.success) {
+            setDbBooks(booksData.books || []);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching subjects/books for mentions autocomplete:", err);
+      }
+    };
+    fetchMetadataForMentions();
+  }, []);
+
+
   async function fetchSessions(userIdVal?: string) {
     const activeUserId = userIdVal || user?.uid;
     if (!activeUserId) return;
@@ -250,21 +281,33 @@ export default function StickyChat() {
 
   const getMentionOptions = () => {
     if (mentionType === "subject") {
-      const opts = [
-        { id: "@math", label: language === "ar" ? "➕ الرياضيات" : "📊 Math", desc: language === "ar" ? "مواضيع الجبر والإحصاء" : "Algebra & Statistics" },
-        { id: "@science", label: language === "ar" ? "🧪 العلوم" : "🧬 Science", desc: language === "ar" ? "الأحياء والفيزياء والكيمياء" : "Biology, Physics, Chem" },
-        { id: "@arabic", label: language === "ar" ? "📖 اللغة العربية" : "✍️ Arabic", desc: language === "ar" ? "قواعد النحو واللغة" : "Arabic Linguistics & Grammar" },
-        { id: "@history", label: language === "ar" ? "🌍 التاريخ" : "🏛️ History", desc: language === "ar" ? "الدراسات الاجتماعية والتاريخية" : "Modern History & Social Studies" }
-      ];
+      const opts = dbSubjects.map(sub => ({
+        id: `@${sub._id || sub.id}`,
+        label: `${sub.emoji || sub.icon_emoji || "📚"} ${language === "ar" ? sub.name_ar || sub.name : sub.name}`,
+        desc: sub.category || (language === "ar" ? "مادة دراسية" : "Academic Subject")
+      }));
+      if (opts.length === 0) {
+        opts.push(
+          { id: "@math", label: language === "ar" ? "➕ الرياضيات" : "📊 Math", desc: language === "ar" ? "مواضيع الجبر والإحصاء" : "Algebra & Statistics" },
+          { id: "@science", label: language === "ar" ? "🧪 العلوم" : "🧬 Science", desc: language === "ar" ? "الأحياء والفيزياء والكيمياء" : "Biology, Physics, Chem" },
+          { id: "@arabic", label: language === "ar" ? "📖 اللغة العربية" : "✍️ Arabic", desc: language === "ar" ? "قواعد النحو واللغة" : "Arabic Linguistics & Grammar" }
+        );
+      }
       return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
     }
     if (mentionType === "book") {
-      const opts = [
-        { id: "#college-algebra", label: "📚 College Algebra 2e", desc: language === "ar" ? "مرجع الجبر من OpenStax" : "OpenStax Algebra Textbook" },
-        { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: language === "ar" ? "مرجع الكيمياء العامة" : "OpenStax Chemistry Volume" },
-        { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: language === "ar" ? "كتاب شرح قواعد اللغة" : "Simplified Arabic Grammar Rules" },
-        { id: "#middleeast-history", label: "🌍 Middle East History", desc: language === "ar" ? "مرجع التاريخ الحديث والمعاصر" : "Modern Middle East History Guide" }
-      ];
+      const opts = dbBooks.map(b => ({
+        id: `#${b._id || b.id}`,
+        label: `📚 ${language === "ar" ? b.title_ar || b.title : b.title}`,
+        desc: b.grade || (language === "ar" ? "كتاب مدرسي" : "Curriculum Book")
+      }));
+      if (opts.length === 0) {
+        opts.push(
+          { id: "#college-algebra", label: "📚 College Algebra 2e", desc: language === "ar" ? "مرجع الجبر من OpenStax" : "OpenStax Algebra Textbook" },
+          { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: language === "ar" ? "مرجع الكيمياء العامة" : "OpenStax Chemistry Volume" },
+          { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: language === "ar" ? "كتاب شرح قواعد اللغة" : "Simplified Arabic Grammar Rules" }
+        );
+      }
       return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
     }
     if (mentionType === "command") {

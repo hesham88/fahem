@@ -28,11 +28,17 @@ Evaluation Rules:
    - If correct, award 15-25 XP.
    - If incorrect, award 0 XP.
 
-2. If mode is "text" or "oral":
+2. If mode is "text":
    - Assess the "User's Answer" for correctness, context, and quality against the "Question".
    - If it is accurate and shows good understanding, set isCorrect to true, and award 20-30 XP based on the depth/accuracy of the response.
    - If it is partially correct, set isCorrect to true (or false if too inaccurate) and award 5-15 XP.
    - If it is incorrect or completely irrelevant, set isCorrect to false, and award 0 XP.
+
+3. If mode is "oral":
+   - Assess the transcribed "User's Answer" against the "Question" (often focused on scientific topics like gases/thermodynamics).
+   - Rate the response across 5 dimensions: Pronunciation, Confidence, Accuracy, Structure, and Overall % (all scores out of 100).
+   - CRITICAL (Egyptian Arabic Accent Normalization): If the user responds in Arabic, you MUST apply Egyptian Arabic accent normalization. Do NOT penalize typical Egyptian dialect pronunciations. For example, pronouncing 'ج' as a hard 'g' /g/, 'ق' as a glottal stop / hamza 'أ' or 'ء', 'ث' as 'س' or 'ت', and 'ذ' as 'ز' or 'د' must be treated as perfectly correct.
+   - Set isCorrect to true if Overall % is 60 or higher. Award 20-35 XP proportional to performance.
 
 Gamification & Tone:
 - Provide high-energy, gaming-style feedback (e.g., "Critical Hit! 🎯", "Quest Completed!", "Deflected! 🛡️ Try again", "Level Up!").
@@ -44,8 +50,22 @@ You MUST respond with a JSON object strictly matching this schema:
   "isCorrect": boolean,
   "xpGained": number,
   "feedback": "Gamified feedback with emojis",
-  "correctExplanation": "A clear, pedagogical explanation of the correct answer or how to improve"
-}
+  "correctExplanation": "A clear, pedagogical explanation of the correct answer or how to improve",
+  "rubric": {
+    "overall": number,
+    "pronunciation": number,
+    "confidence": number,
+    "accuracy": number,
+    "structure": number,
+    "accentNormalizationApplied": boolean,
+    "feedbackDetails": {
+      "pronunciationFeedback": "feedback in Arabic/English",
+      "confidenceFeedback": "feedback in Arabic/English",
+      "accuracyFeedback": "feedback in Arabic/English",
+      "structureFeedback": "feedback in Arabic/English"
+    }
+  }
+} (For 'mcq' and 'text' modes, you can set 'rubric' to null or omit it, but for 'oral' mode it must be populated).
 `;
 
     // Call Gemini API

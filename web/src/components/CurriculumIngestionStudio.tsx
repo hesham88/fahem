@@ -169,6 +169,23 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   // Ingestion Queue States
   const [queue, setQueue] = useState<QueueJob[]>([]);
 
+  // TSK-079 Bulk Operations & Duplicate states
+  const [expandedRepoFolders, setExpandedRepoFolders] = useState<Record<string, boolean>>({});
+  const [selectedRepoBooks, setSelectedRepoBooks] = useState<Record<string, boolean>>({});
+  const [isDeletingBulkRepo, setIsDeletingBulkRepo] = useState(false);
+  const [isReindexingBulkRepo, setIsReindexingBulkRepo] = useState(false);
+
+  // Duplicate Safeguard Helper
+  const checkIfBookDuplicate = (title: string, subjectId: string, sourceUrl?: string) => {
+    return booksList.some((b: any) => {
+      if (sourceUrl && b.source_url && b.source_url === sourceUrl) return true;
+      return (
+        b.title.toLowerCase() === title.toLowerCase() &&
+        b.subject_id === subjectId
+      );
+    });
+  };
+
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     "[SYSTEM] Ingestion Studio Queue initialized.",
     "[INFO] Cloud Run Async Executor listening on secure gcp-vpc router.",
@@ -569,6 +586,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
   const handleIngestSingleDiscovered = async (book: any) => {
     if (!email) return;
+
+    // Client-side safeguard check
+    if (checkIfBookDuplicate(book.title, book.subjectId, book.url)) {
+      addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Blocked client ingestion of duplicate discovered textbook: "${book.title}"`);
+      setBookError(language === "ar" ? "⚠️ هذا الكتاب موجود بالفعل في النظام." : "⚠️ This book already exists in the system.");
+      setTimeout(() => setBookError(null), 4000);
+      return;
+    }
+
     addTerminalLog(`[CRAWLER] Initiating single book ingestion for: "${book.title}"...`);
 
     try {
@@ -593,6 +619,13 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.message && data.message.includes("already exists")) {
+          addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Server intercepted duplicate discovered textbook: "${book.title}". Ingestion bypassed.`);
+          setBookError(language === "ar" ? "⚠️ الكتاب مسجل مسبقاً!" : "⚠️ Textbook is already registered!");
+          setTimeout(() => setBookError(null), 4000);
+          return;
+        }
+
         addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
         const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
@@ -651,6 +684,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const handleIngestBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !bookSubjId || !bookTitle || !bookTitleAr) return;
+
+    // Client-side safeguard check
+    if (checkIfBookDuplicate(bookTitle, bookSubjId, bookSourceUrl)) {
+      addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Blocked client ingestion of duplicate textbook: "${bookTitle}"`);
+      setBookError(language === "ar" ? "⚠️ هذا الكتاب موجود بالفعل في النظام." : "⚠️ This book already exists in the system.");
+      setTimeout(() => setBookError(null), 4000);
+      return;
+    }
+
     setIsIngestingBook(true);
     setBookSuccess(null);
     setBookError(null);
@@ -678,6 +720,14 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.message && data.message.includes("already exists")) {
+          addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Server intercepted duplicate textbook: "${bookTitle}". Ingestion bypassed.`);
+          setBookError(language === "ar" ? "⚠️ الكتاب مسجل مسبقاً!" : "⚠️ Textbook is already registered!");
+          setTimeout(() => setBookError(null), 4000);
+          setIsIngestingBook(false);
+          return;
+        }
+
         setBookSuccess(
           language === "ar" 
             ? "📚 تم حفظ مسودة الكتاب بنجاح وإرسال مهمة المعالجة اللامركزية!" 
@@ -806,8 +856,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
     let importedCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
 
     for (const book of selectedList) {
+      if (checkIfBookDuplicate(book.title, book.subjectId, book.url)) {
+        skippedCount++;
+        addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Skipping duplicate discovered book: "${book.title}"`);
+        continue;
+      }
+
       addTerminalLog(`[CRAWLER] Registering book details in MongoDB for: "${book.title}"...`);
       try {
         const res = await fetch("/api/books", {
@@ -831,6 +888,12 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
         const data = await res.json();
         if (res.ok && data.success) {
+          if (data.message && data.message.includes("already exists")) {
+            skippedCount++;
+            addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Server intercepted duplicate textbook: "${book.title}". Bypassed.`);
+            continue;
+          }
+
           importedCount++;
           addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
@@ -871,15 +934,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     if (failedCount === 0) {
       setBookSuccess(
         language === "ar"
-          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لعدد ${importedCount} كتب بنجاح!`
-          : `🎉 Successfully registered and scheduled ${importedCount} textbooks for async indexing!`
+          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لعدد ${importedCount} كتب بنجاح! تم تخطي ${skippedCount} مكرر.`
+          : `🎉 Successfully registered and scheduled ${importedCount} textbooks for async indexing! Skipped ${skippedCount} duplicates.`
       );
       setTimeout(() => setBookSuccess(null), 5000);
     } else {
       setBookError(
         language === "ar"
-          ? `⚠️ اكتمل الاستيراد مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}. تفحص السجلات.`
-          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}. Check terminal logs.`
+          ? `⚠️ اكتمل الاستيراد مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}، المكرر المتخطى: ${skippedCount}. تفحص السجلات.`
+          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}, Skipped duplicates: ${skippedCount}. Check terminal logs.`
       );
       setTimeout(() => setBookError(null), 5000);
     }
@@ -894,8 +957,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
     let importedCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
 
     for (const book of discoveredResources) {
+      if (checkIfBookDuplicate(book.title, book.subjectId, book.url)) {
+        skippedCount++;
+        addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Skipping duplicate discovered book: "${book.title}"`);
+        continue;
+      }
+
       addTerminalLog(`[CRAWLER] Registering book details in MongoDB for: "${book.title}"...`);
       try {
         const res = await fetch("/api/books", {
@@ -919,6 +989,12 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
         const data = await res.json();
         if (res.ok && data.success) {
+          if (data.message && data.message.includes("already exists")) {
+            skippedCount++;
+            addTerminalLog(`[DUPLICATE_SAFEGUARD] [WARNING] Server intercepted duplicate textbook: "${book.title}". Bypassed.`);
+            continue;
+          }
+
           importedCount++;
           addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
@@ -959,18 +1035,134 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     if (failedCount === 0) {
       setBookSuccess(
         language === "ar"
-          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لجميع الكتب (${importedCount} كتاب) بنجاح!`
-          : `🎉 Successfully registered and scheduled all ${importedCount} discovered textbooks for async indexing!`
+          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لجميع الكتب (${importedCount} كتاب) بنجاح! تم تخطي ${skippedCount} مكرر.`
+          : `🎉 Successfully registered and scheduled all ${importedCount} discovered textbooks for async indexing! Skipped ${skippedCount} duplicates.`
       );
       setTimeout(() => setBookSuccess(null), 5000);
     } else {
       setBookError(
         language === "ar"
-          ? `⚠️ اكتمل استيراد جميع الكتب مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}. تفحص السجلات.`
-          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}. Check terminal logs.`
+          ? `⚠️ اكتمل استيراد جميع الكتب مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}، المكرر المتخطى: ${skippedCount}. تفحص السجلات.`
+          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}, Skipped duplicates: ${skippedCount}. Check terminal logs.`
       );
       setTimeout(() => setBookError(null), 5000);
     }
+  };
+
+  // TSK-079 Custom Bulk Operations Handlers
+  const handleBulkDeleteRepoBooks = async () => {
+    const selectedIds = Object.keys(selectedRepoBooks).filter(id => selectedRepoBooks[id]);
+    if (selectedIds.length === 0) return;
+    if (!email) return;
+
+    if (!confirm(
+      language === "ar" 
+        ? `هل أنت متأكد من حذف ${selectedIds.length} من الكتب المحددة نهائياً؟` 
+        : `Are you sure you want to permanently delete the ${selectedIds.length} selected books?`
+    )) return;
+
+    setIsDeletingBulkRepo(true);
+    addTerminalLog(`[BULK_OPERATIONS] Initiating bulk deletion of ${selectedIds.length} textbooks...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/books?id=${id}&requesterEmail=${encodeURIComponent(email)}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          successCount++;
+          addTerminalLog(`[BULK_DELETE] Successfully deleted book with ID: ${id}`);
+        } else {
+          failCount++;
+          addTerminalLog(`[BULK_DELETE] [ERROR] Failed to delete book ${id}: ${data.error || "Unknown Error"}`);
+        }
+      } catch (err: any) {
+        failCount++;
+        addTerminalLog(`[BULK_DELETE] [FATAL] Exception during deletion of book ${id}: ${err.message}`);
+      }
+    }
+
+    setIsDeletingBulkRepo(false);
+    setSelectedRepoBooks({});
+    fetchSubjects();
+
+    if (failCount === 0) {
+      setBookSuccess(
+        language === "ar"
+          ? `🎉 تم حذف عدد ${successCount} كتب بنجاح!`
+          : `🎉 Successfully deleted ${successCount} textbooks!`
+      );
+      setTimeout(() => setBookSuccess(null), 4000);
+    } else {
+      setBookError(
+        language === "ar"
+          ? `⚠️ اكتمل الحذف الجماعي مع أخطاء. ناجح: ${successCount}، فاشل: ${failCount}`
+          : `⚠️ Bulk delete completed with errors. Succeeded: ${successCount}, Failed: ${failCount}`
+      );
+      setTimeout(() => setBookError(null), 4000);
+    }
+  };
+
+  const handleBulkReindexRepoBooks = async () => {
+    const selectedIds = Object.keys(selectedRepoBooks).filter(id => selectedRepoBooks[id]);
+    if (selectedIds.length === 0) return;
+
+    setIsReindexingBulkRepo(true);
+    addTerminalLog(`[BULK_OPERATIONS] Initiating bulk re-indexing of ${selectedIds.length} textbooks...`);
+
+    let queuedCount = 0;
+
+    for (const id of selectedIds) {
+      const book = booksList.find((b: any) => b._id === id);
+      if (!book) continue;
+
+      const cleanFileName = book.source_url 
+        ? book.source_url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf` 
+        : book.storage_path 
+          ? book.storage_path.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`
+          : `${book.title.replace(/\s+/g, "_")}.pdf`;
+
+      const totalPages = book.total_pages || (book.chapters && book.chapters.length > 0 ? Math.max(...book.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 120);
+
+      const targetSubject = subjectsList.find(s => s._id === book.subject_id);
+      const subjectName = targetSubject ? (language === "ar" ? targetSubject.name_ar : targetSubject.name) : book.subject_id;
+
+      const newJob: QueueJob = {
+        id: `reindex_${id}_${Date.now()}`,
+        fileName: cleanFileName,
+        bookTitle: book.title,
+        bookTitleAr: book.title_ar,
+        subjectName,
+        status: "idle",
+        progress: 0,
+        totalPages,
+        processedPages: 0,
+        speed: 0,
+        eta: 0,
+        startTime: 0,
+        isLocalSessionJob: true
+      };
+
+      setQueue(prev => [newJob, ...prev]);
+      addTerminalLog(`[BULK_REINDEX] Enqueued re-indexing job for "${book.title}" (${totalPages} pages)`);
+      queuedCount++;
+    }
+
+    setIsReindexingBulkRepo(true);
+    setTimeout(() => {
+      setIsReindexingBulkRepo(false);
+      setSelectedRepoBooks({});
+      setBookSuccess(
+        language === "ar"
+          ? `🎉 تم إرسال ${queuedCount} كتب لجدولة إعادة الفهرسة!`
+          : `🎉 Successfully enqueued ${queuedCount} books for re-indexing!`
+      );
+      setTimeout(() => setBookSuccess(null), 4000);
+    }, 1000);
   };
 
   const handlePreFillFromCrawler = (res: any) => {
@@ -1114,7 +1306,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
               {/* Job Info Grid */}
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                 gap: "1rem"
               }}>
                 <div>
@@ -2558,9 +2750,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                       </div>
                     )}
 
-                    {/* Book catalog grouped by subject */}
-                    <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)", maxHeight: "400px", overflowY: "auto" }}>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px", marginBottom: "0.5rem" }}>
+                    {/* Book catalog grouped by subject - Premium Collapsible Accordion checklist tree */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)", maxHeight: "500px", overflowY: "auto" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px", marginBottom: "0.75rem" }}>
                         📚 {language === "ar" ? "فهرس ومستودع الكتب الحالية" : "Active Textbook Repository"}
                       </span>
 
@@ -2568,58 +2760,272 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                         <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{language === "ar" ? "لا توجد كتب مضافة حالياً." : "No books active in DB."}</span>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                          {/* Group books by subject */}
+                          
+                          {/* Accordion and Selection Toolbar */}
+                          <div style={{
+                            display: "flex", 
+                            justifyContent: "space-between", 
+                            alignItems: "center", 
+                            background: "rgba(255, 255, 255, 0.6)", 
+                            padding: "0.5rem 0.75rem", 
+                            borderRadius: "8px", 
+                            border: "1px solid var(--card-border)", 
+                            marginBottom: "0.25rem",
+                            gap: "0.5rem",
+                            flexWrap: "wrap"
+                          }}>
+                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const allIds: Record<string, boolean> = {};
+                                  booksList.forEach(b => { allIds[b._id] = true; });
+                                  setSelectedRepoBooks(allIds);
+                                  addTerminalLog(`[REPOS_SELECTION] Selected all ${booksList.length} textbooks in repository.`);
+                                }}
+                                style={{
+                                  background: "rgba(16, 107, 163, 0.1)",
+                                  color: "var(--primary)",
+                                  border: "1px solid var(--primary)",
+                                  borderRadius: "6px",
+                                  padding: "0.3rem 0.6rem",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 700,
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {language === "ar" ? "تحديد الكل" : "Select All"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRepoBooks({});
+                                  addTerminalLog(`[REPOS_SELECTION] Cleared active repository selection.`);
+                                }}
+                                style={{
+                                  background: "rgba(100, 116, 139, 0.1)",
+                                  color: "#475569",
+                                  border: "1px solid rgba(100, 116, 139, 0.3)",
+                                  borderRadius: "6px",
+                                  padding: "0.3rem 0.6rem",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 700,
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {language === "ar" ? "إلغاء التحديد" : "Clear All"}
+                              </button>
+                              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)" }}>
+                                {Object.keys(selectedRepoBooks).filter(id => selectedRepoBooks[id]).length} {language === "ar" ? "محدد" : "Selected"}
+                              </span>
+                            </div>
+
+                            {/* Floating Action Bar / Operations Panel */}
+                            {Object.keys(selectedRepoBooks).filter(id => selectedRepoBooks[id]).length > 0 && (
+                              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                                <button
+                                  type="button"
+                                  disabled={isReindexingBulkRepo}
+                                  onClick={handleBulkReindexRepoBooks}
+                                  style={{
+                                    background: "linear-gradient(135deg, #1ba39c 0%, #106ba3 100%)",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    padding: "0.35rem 0.75rem",
+                                    fontSize: "0.7rem",
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    boxShadow: "0 2px 8px rgba(27, 163, 156, 0.35)"
+                                  }}
+                                >
+                                  {isReindexingBulkRepo ? <FiRefreshCw className="spinning-icon" /> : <FiZap />}
+                                  <span>{language === "ar" ? "إعادة الفهرسة" : "Bulk Re-index"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isDeletingBulkRepo}
+                                  onClick={handleBulkDeleteRepoBooks}
+                                  style={{
+                                    background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    padding: "0.35rem 0.75rem",
+                                    fontSize: "0.7rem",
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.35)"
+                                  }}
+                                >
+                                  {isDeletingBulkRepo ? <FiRefreshCw className="spinning-icon" /> : <FiTrash2 />}
+                                  <span>{language === "ar" ? "حذف جماعي" : "Bulk Delete"}</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Group books by subject in an Accordion tree */}
                           {subjectsList.map((subj) => {
                             const subjBooks = booksList.filter(b => b.subject_id === subj._id);
                             if (subjBooks.length === 0) return null;
+                            const isExpanded = !!expandedRepoFolders[subj._id];
+
                             return (
-                              <div key={subj._id} style={{ display: "flex", flexDirection: "column", gap: "0.35rem", borderBottom: "1px solid rgba(16, 107, 163, 0.05)", paddingBottom: "0.5rem" }}>
-                                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px" }}>
-                                  {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
-                                </span>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.35rem", paddingInlineStart: "0.75rem" }}>
-                                  {subjBooks.map((b) => (
-                                    <div key={b._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255, 255, 255, 0.8)", padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
-                                      <div style={{ display: "flex", flexDirection: "column" }}>
-                                        <span style={{ fontWeight: 700 }}>📖 {language === "ar" ? b.title_ar : b.title}</span>
-                                        <span style={{ fontSize: "0.65rem", color: "#64748b" }}>
-                                          Type: {b.book_type} • Lang: {b.language} • {b.chapters?.length || 0} chapters
-                                        </span>
-                                      </div>
-                                      <div style={{ display: "flex", gap: "0.25rem" }}>
-                                        <button
-                                          onClick={() => {
-                                            setEditingBookId(b._id);
-                                            setEditingBookSubjId(b.subject_id);
-                                            setEditingBookTitle(b.title);
-                                            setEditingBookTitleAr(b.title_ar);
-                                            setEditingBookGrade(b.grade || "Grade 11");
-                                            setEditingBookTerm(b.term || "Term 1");
-                                            setEditingBookYear(b.year || "2026");
-                                            setEditingBookLang(b.language || "ar");
-                                            setEditingBookType(b.book_type || "core");
-                                            setEditingBookSourceUrl(b.source_url || "");
-                                            setEditingBookStoragePath(b.storage_path || "");
-                                            setEditingBookChapters(b.chapters || []);
-                                            setBookError(null);
-                                            setBookSuccess(null);
-                                          }}
-                                          style={{ background: "transparent", border: "none", color: "var(--primary)", cursor: "pointer" }}
-                                          title="Edit Book Details"
-                                        >
-                                          <FiEdit />
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeleteBook(b._id)}
-                                          style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer" }}
-                                          title="Delete Book"
-                                        >
-                                          <FiTrash2 />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
+                              <div key={subj._id} style={{
+                                border: "1px solid var(--card-border)", 
+                                borderRadius: "8px", 
+                                marginBottom: "0.25rem", 
+                                background: "rgba(255,255,255,0.7)",
+                                overflow: "hidden",
+                                transition: "all 0.25s ease-in-out"
+                              }}>
+                                {/* Subject Header (Accordion Toggler) */}
+                                <div 
+                                  onClick={() => setExpandedRepoFolders(prev => ({ ...prev, [subj._id]: !isExpanded }))}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    padding: "0.6rem 0.8rem",
+                                    background: isExpanded ? "rgba(16, 107, 163, 0.08)" : "transparent",
+                                    cursor: "pointer",
+                                    borderBottom: isExpanded ? "1px solid var(--card-border)" : "none",
+                                    transition: "background 0.2s ease"
+                                  }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    {isExpanded ? <FiChevronDown style={{ color: "var(--primary)" }} /> : <FiChevronRight style={{ color: "#64748b" }} />}
+                                    <FiFolder style={{ color: "var(--primary)", fill: isExpanded ? "rgba(16,107,163,0.2)" : "transparent" }} />
+                                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>
+                                      {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
+                                    </span>
+                                    <span style={{
+                                      fontSize: "0.65rem",
+                                      background: "rgba(16,107,163,0.1)",
+                                      color: "var(--primary)",
+                                      padding: "1px 6px",
+                                      borderRadius: "10px",
+                                      fontWeight: 700
+                                    }}>
+                                      {subjBooks.length} {language === "ar" ? "كتب" : "Books"}
+                                    </span>
+                                  </div>
+
+                                  {/* Header selection helper checkbox */}
+                                  <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center" }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={subjBooks.every(b => !!selectedRepoBooks[b._id])}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setSelectedRepoBooks(prev => {
+                                          const updated = { ...prev };
+                                          subjBooks.forEach(b => {
+                                            updated[b._id] = checked;
+                                          });
+                                          return updated;
+                                        });
+                                        addTerminalLog(`[REPOS_SELECTION] ${checked ? "Selected" : "Deselected"} all books under ${subj.name}.`);
+                                      }}
+                                      style={{ width: "14px", height: "14px", cursor: "pointer" }}
+                                      title={language === "ar" ? "تحديد كل كتب هذه المادة" : "Select all books in this subject"}
+                                    />
+                                  </div>
                                 </div>
+
+                                {/* Accordion Content / Books List under this subject */}
+                                {isExpanded && (
+                                  <div style={{ 
+                                    display: "grid", 
+                                    gridTemplateColumns: "1fr", 
+                                    gap: "0.5rem", 
+                                    padding: "0.75rem",
+                                    background: "rgba(255, 255, 255, 0.45)"
+                                  }}>
+                                    {subjBooks.map((b) => {
+                                      const isBookChecked = !!selectedRepoBooks[b._id];
+                                      return (
+                                        <div key={b._id} style={{ 
+                                          display: "flex", 
+                                          justifyContent: "space-between", 
+                                          alignItems: "center", 
+                                          background: isBookChecked ? "rgba(27, 163, 156, 0.05)" : "rgba(255, 255, 255, 0.9)", 
+                                          padding: "0.5rem 0.75rem", 
+                                          borderRadius: "6px", 
+                                          border: isBookChecked ? "1px solid var(--secondary)" : "1px solid var(--card-border)", 
+                                          fontSize: "0.75rem",
+                                          transition: "all 0.2s ease"
+                                        }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
+                                            {/* Select Checkbox */}
+                                            <input
+                                              type="checkbox"
+                                              checked={isBookChecked}
+                                              onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setSelectedRepoBooks(prev => ({
+                                                  ...prev,
+                                                  [b._id]: checked
+                                                }));
+                                                addTerminalLog(`[REPOS_SELECTION] ${checked ? "Selected" : "Deselected"} book: "${b.title}"`);
+                                              }}
+                                              style={{ width: "14px", height: "14px", cursor: "pointer" }}
+                                            />
+
+                                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                              <span style={{ fontWeight: 700, color: "var(--primary)" }}>📖 {language === "ar" ? b.title_ar : b.title}</span>
+                                              <span style={{ fontSize: "0.65rem", color: "#64748b" }}>
+                                                Type: {b.book_type} • Lang: {b.language} • {b.chapters?.length || 0} chapters
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Edit & Delete Action Buttons */}
+                                          <div style={{ display: "flex", gap: "0.25rem" }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setEditingBookId(b._id);
+                                                setEditingBookSubjId(b.subject_id);
+                                                setEditingBookTitle(b.title);
+                                                setEditingBookTitleAr(b.title_ar);
+                                                setEditingBookGrade(b.grade || "Grade 11");
+                                                setEditingBookTerm(b.term || "Term 1");
+                                                setEditingBookYear(b.year || "2026");
+                                                setEditingBookLang(b.language || "ar");
+                                                setEditingBookType(b.book_type || "core");
+                                                setEditingBookSourceUrl(b.source_url || "");
+                                                setEditingBookStoragePath(b.storage_path || "");
+                                                setEditingBookChapters(b.chapters || []);
+                                                setBookError(null);
+                                                setBookSuccess(null);
+                                              }}
+                                              style={{ background: "transparent", border: "none", color: "var(--primary)", cursor: "pointer" }}
+                                              title="Edit Book Details"
+                                            >
+                                              <FiEdit />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteBook(b._id)}
+                                              style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer" }}
+                                              title="Delete Book"
+                                            >
+                                              <FiTrash2 />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}

@@ -57,6 +57,83 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceFeedback, setPracticeFeedback] = useState<any>(null);
   const [practiceShowHint, setPracticeShowHint] = useState<boolean>(false);
 
+  // Web Speech API / Oral specific states
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [micError, setMicError] = useState<string>("");
+  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRec) {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = language === "ar" ? "ar-EG" : "en-US";
+
+        rec.onresult = (event: any) => {
+          let interimText = "";
+          let finalTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimText += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript) {
+            setPracticeAnswer((prev) => (prev ? prev + " " + finalTranscript : finalTranscript));
+          }
+        };
+
+        rec.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          if (event.error === "not-allowed") {
+            setMicError(language === "ar" ? "وصول الميكروفون مرفوض" : "Microphone access denied");
+          } else {
+            setMicError(event.error);
+          }
+          setIsListening(false);
+        };
+
+        rec.onend = () => {
+          setIsListening(false);
+        };
+
+        setSpeechRecognition(rec);
+      }
+    }
+  }, [language]);
+
+  const toggleListening = () => {
+    if (!speechRecognition) {
+      alert(language === "ar" ? "التعرف على الصوت غير مدعوم في متصفحك" : "Web Speech recognition is not supported in this browser");
+      return;
+    }
+    if (isListening) {
+      speechRecognition.stop();
+      setIsListening(false);
+    } else {
+      setMicError("");
+      try {
+        speechRecognition.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (speechRecognition) {
+        try {
+          speechRecognition.stop();
+        } catch (e) {}
+      }
+    };
+  }, [speechRecognition]);
+
   // Session aggregate statistics
   const [practiceSessionXpGained, setPracticeSessionXpGained] = useState<number>(0);
   const [practiceSessionCorrectAnswers, setPracticeSessionCorrectAnswers] = useState<number>(0);
@@ -654,71 +731,210 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
               </div>
             ) : (
               /* Text & Oral recall modes */
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "#4f6371" }}>
-                    {practiceMode === "oral"
-                      ? language === "ar"
-                        ? "أدخل صياغتك للتسميع الشفوي (النسخ واللصق معطل):"
-                        : "Type your oral explanation/response (paste is blocked):"
-                      : language === "ar"
-                      ? "اكتب صياغة الإجابة الكاملة (النسخ واللصق معطل):"
-                      : "Type your comprehensive recall response (paste is blocked):"}
-                  </label>
-                  {practiceMode === "oral" && (
-                    <span
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <style>{`
+                  @keyframes bounceSoundWave {
+                    0% { height: 4px; transform: scaleY(1); }
+                    100% { height: 26px; transform: scaleY(1.3); }
+                  }
+                  @keyframes pulseGlow {
+                    0% { box-shadow: 0 0 0 0 rgba(16, 107, 163, 0.4); }
+                    70% { box-shadow: 0 0 0 12px rgba(16, 107, 163, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(16, 107, 163, 0); }
+                  }
+                  @keyframes recordPulse {
+                    0% { transform: scale(1); opacity: 0.9; }
+                    50% { transform: scale(1.1); opacity: 1; }
+                    100% { transform: scale(1); opacity: 0.9; }
+                  }
+                `}</style>
+
+                {practiceMode === "oral" ? (
+                  /* Advanced Web Speech Console for Oral Practice */
+                  <div
+                    style={{
+                      background: "rgba(16, 107, 163, 0.03)",
+                      border: "1px dashed rgba(16, 107, 163, 0.3)",
+                      borderRadius: "12px",
+                      padding: "1.5rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "1rem",
+                      position: "relative",
+                    }}
+                  >
+                    <div style={{ textAlign: "center" }}>
+                      <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)" }}>
+                        {language === "ar" ? "🎙️ استوديو التسميع الشفوي الذكي" : "🎙️ AI Oral Recitation Console"}
+                      </h4>
+                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.75rem", color: "#6a7c88" }}>
+                        {language === "ar"
+                          ? "تحدث بلغة فصيحة أو بلهجة مصرية، معيار التقييم يدمج التعرف التلقائي"
+                          : "Speak clearly. System auto-normalizes Egyptian Arabic accents."}
+                      </p>
+                    </div>
+
+                    {/* Microphone Action Button */}
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      disabled={practiceHasAnswered}
                       style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 800,
-                        background: "rgba(212, 175, 55, 0.1)",
-                        color: "#b28900",
-                        padding: "2px 8px",
-                        borderRadius: "10px",
+                        width: "70px",
+                        height: "70px",
+                        borderRadius: "50%",
+                        border: "none",
+                        background: isListening
+                          ? "linear-gradient(135deg, #d32f2f, #f44336)"
+                          : "linear-gradient(135deg, var(--primary), var(--secondary))",
+                        color: "#ffffff",
+                        fontSize: "2rem",
                         display: "flex",
                         alignItems: "center",
-                        gap: "0.25rem",
+                        justifyContent: "center",
+                        cursor: practiceHasAnswered ? "not-allowed" : "pointer",
+                        animation: isListening ? "pulseGlow 1.5s infinite" : "none",
+                        opacity: practiceHasAnswered ? 0.6 : 1,
+                        transition: "all 0.3s ease",
+                        boxShadow: "0 6px 15px rgba(16, 107, 163, 0.3)",
                       }}
                     >
-                      🎙️ {language === "ar" ? "صوت افتراضي" : "Oral Simulation Active"}
-                    </span>
-                  )}
-                </div>
+                      {isListening ? "⏹️" : "🎙️"}
+                    </button>
 
-                <textarea
-                  id="active-practice-textarea"
-                  value={practiceAnswer}
-                  onChange={(e) => {
-                    if (!practiceHasAnswered) {
-                      setPracticeAnswer(e.target.value);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    e.preventDefault();
-                    alert(
-                      language === "ar"
-                        ? "تنبيه: تم تعطيل النسخ واللصق لتشجيع الفهم النشط والكتابة الذاتية!"
-                        : "Notice: Copy-pasting is disabled to encourage active recall and typing your own answers!"
-                    );
-                  }}
-                  disabled={practiceHasAnswered}
-                  placeholder={
-                    language === "ar"
-                      ? "اكتب الإجابة التفصيلية هنا مستعيناً بذاكرتك الشخصية..."
-                      : "Type your comprehensive, detailed response here based on your recall..."
-                  }
-                  style={{
-                    width: "100%",
-                    height: "110px",
-                    padding: "0.85rem",
-                    borderRadius: "8px",
-                    border: "1px solid var(--card-border)",
-                    outline: "none",
-                    fontSize: "0.9rem",
-                    fontFamily: "var(--font-sans)",
-                    resize: "none",
-                    transition: "border 0.2s",
-                  }}
-                />
+                    {/* Status & Simulated/Live Sound Waves */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+                      <span
+                        style={{
+                          fontSize: "0.8rem",
+                          fontWeight: 800,
+                          color: isListening ? "#d32f2f" : "var(--primary)",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {isListening
+                          ? language === "ar"
+                            ? "🔴 جاري الاستماع لتسميعك..."
+                            : "🔴 Recording recitation live..."
+                          : language === "ar"
+                          ? "اضغط على الميكروفون لبدء التسجيل"
+                          : "Click microphone to start reciting"}
+                      </span>
+
+                      {/* Sound wave visualizer bars */}
+                      <div style={{ display: "flex", gap: "4px", alignItems: "center", height: "30px", justifyContent: "center" }}>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: "4px",
+                              background: isListening
+                                ? "linear-gradient(180deg, #d32f2f, #ff7961)"
+                                : "linear-gradient(180deg, var(--secondary), var(--primary))",
+                              borderRadius: "2px",
+                              height: isListening ? `${10 + Math.random() * 20}px` : "5px",
+                              animation: isListening ? `bounceSoundWave 0.5s ease-in-out infinite alternate ${i * 0.04}s` : "none",
+                              transition: "height 0.2s ease",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {micError && (
+                      <div
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          background: "rgba(211, 47, 47, 0.1)",
+                          color: "#d32f2f",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        ⚠️ {micError}
+                      </div>
+                    )}
+
+                    {/* Live Dictation transcript box */}
+                    <div style={{ width: "100%", marginTop: "0.5rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
+                          {language === "ar" ? "نص التسميع المكتوب:" : "Captured Transcript Output:"}
+                        </span>
+                        <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>
+                          {language === "ar" ? "(يمكنك التعديل اليدوي قبل التأكيد)" : "(Feel free to edit text if needed)"}
+                        </span>
+                      </div>
+                      <textarea
+                        value={practiceAnswer}
+                        onChange={(e) => setPracticeAnswer(e.target.value)}
+                        disabled={practiceHasAnswered}
+                        placeholder={
+                          language === "ar"
+                            ? "تحدث ليتم نسخ كلامك هنا تلقائياً، أو اكتب إجابتك مباشرة..."
+                            : "Your spoken words will transcribe here automatically, or type your answer..."
+                        }
+                        style={{
+                          width: "100%",
+                          height: "100px",
+                          padding: "0.75rem",
+                          borderRadius: "8px",
+                          border: "1px solid var(--card-border)",
+                          fontSize: "0.85rem",
+                          resize: "none",
+                          fontFamily: "var(--font-sans)",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Standard Text Recall Mode */
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "#4f6371" }}>
+                      {language === "ar"
+                        ? "اكتب صياغة الإجابة الكاملة (النسخ واللصق معطل):"
+                        : "Type your comprehensive recall response (paste is blocked):"}
+                    </label>
+                    <textarea
+                      id="active-practice-textarea"
+                      value={practiceAnswer}
+                      onChange={(e) => {
+                        if (!practiceHasAnswered) {
+                          setPracticeAnswer(e.target.value);
+                        }
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        alert(
+                          language === "ar"
+                            ? "تنبيه: تم تعطيل النسخ واللصق لتشجيع الفهم النشط والكتابة الذاتية!"
+                            : "Notice: Copy-pasting is disabled to encourage active recall and typing your own answers!"
+                        );
+                      }}
+                      disabled={practiceHasAnswered}
+                      placeholder={
+                        language === "ar"
+                          ? "اكتب الإجابة التفصيلية هنا مستعيناً بذاكرتك الشخصية..."
+                          : "Type your comprehensive, detailed response here based on your recall..."
+                      }
+                      style={{
+                        width: "100%",
+                        height: "110px",
+                        padding: "0.85rem",
+                        borderRadius: "8px",
+                        border: "1px solid var(--card-border)",
+                        outline: "none",
+                        fontSize: "0.9rem",
+                        fontFamily: "var(--font-sans)",
+                        resize: "none",
+                        transition: "border 0.2s",
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -970,6 +1186,134 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Oral Practice Assessment Rubric Dashboard */}
+                {practiceMode === "oral" && practiceFeedback.rubric && (
+                  <div
+                    className="panel-card"
+                    style={{
+                      padding: "1.5rem",
+                      background: "linear-gradient(135deg, rgba(212, 175, 55, 0.03), rgba(16, 107, 163, 0.03))",
+                      border: "2px solid #d4af37",
+                      borderRadius: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.25rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(212,175,55,0.3)", paddingBottom: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "1.5rem" }}>📊</span>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "var(--foreground)" }}>
+                            {language === "ar" ? "لوحة التقييم الشفوي النطقي" : "Oral Performance Assessment Rubric"}
+                          </h4>
+                          <p style={{ margin: 0, fontSize: "0.75rem", color: "#6a7c88" }}>
+                            {language === "ar" ? "تحليل النطق والطلاقة ودقة المحتوى الفني" : "Detailed metrics of pronunciation, speech fluency and content accuracy"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {practiceFeedback.rubric.accentNormalizationApplied && (
+                        <span
+                          style={{
+                            background: "rgba(39, 174, 96, 0.1)",
+                            color: "#27ae60",
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            padding: "4px 8px",
+                            borderRadius: "15px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            border: "1px solid rgba(39,174,96,0.2)",
+                          }}
+                        >
+                          ✨ {language === "ar" ? "تم تفعيل التسامح اللهجي المصري" : "Egyptian Accent Normalization applied"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Overall Score Circle/Badge */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem", alignItems: "center" }} className="grid-cols-1">
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#6a7c88", textTransform: "uppercase" }}>
+                          {language === "ar" ? "التقييم العام" : "Overall Score"}
+                        </span>
+                        <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "#d4af37", margin: "0.25rem 0" }}>
+                          {practiceFeedback.rubric.overall}%
+                        </div>
+                        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: practiceFeedback.rubric.overall >= 60 ? "#27ae60" : "#d32f2f" }}>
+                          {practiceFeedback.rubric.overall >= 60
+                            ? language === "ar" ? "اجتياز مستحق 🛡️" : "PASS 🛡️"
+                            : language === "ar" ? "بحاجة لمراجعة ⚠️" : "REVIEW ⚠️"}
+                        </span>
+                      </div>
+
+                      {/* Sub-metrics cards */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                        {[
+                          { key: "pronunciation", labelAr: "مخارج الحروف والنطق", labelEn: "Pronunciation", val: practiceFeedback.rubric.pronunciation, icon: "🗣️", color: "#106ba3" },
+                          { key: "confidence", labelAr: "الطلاقة والثقة بالنفس", labelEn: "Confidence / Fluency", val: practiceFeedback.rubric.confidence, icon: "⚡", color: "#f39c12" },
+                          { key: "accuracy", labelAr: "الدقة العلمية للمحتوى", labelEn: "Scientific Accuracy", val: practiceFeedback.rubric.accuracy, icon: "🎯", color: "#27ae60" },
+                          { key: "structure", labelAr: "ترتيب وصياغة الفكرة", labelEn: "Logical Structure", val: practiceFeedback.rubric.structure, icon: "🧱", color: "#9b59b6" },
+                        ].map((metric) => (
+                          <div
+                            key={metric.key}
+                            style={{
+                              padding: "0.75rem",
+                              background: "#ffffff",
+                              borderRadius: "8px",
+                              border: "1px solid var(--card-border)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.25rem",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
+                                {metric.icon} {language === "ar" ? metric.labelAr : metric.labelEn}
+                              </span>
+                              <strong style={{ fontSize: "0.85rem", color: metric.color }}>{metric.val}%</strong>
+                            </div>
+                            <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden" }}>
+                              <div style={{ width: `${metric.val}%`, height: "100%", background: metric.color, borderRadius: "3px" }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Detailed Rubric Bullet Points */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.85rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
+                        📌 {language === "ar" ? "الملاحظات الدقيقة لمقيم الأداء:" : "Detailed Feedback on Oral Rubric:"}
+                      </span>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", fontSize: "0.75rem", color: "var(--foreground)" }} className="grid-cols-1">
+                        {practiceFeedback.rubric.feedbackDetails && (
+                          <>
+                            <div>
+                              <strong>🗣️ {language === "ar" ? "النطق ومخارج الحروف:" : "Pronunciation:"}</strong>{" "}
+                              <span>{practiceFeedback.rubric.feedbackDetails.pronunciationFeedback}</span>
+                            </div>
+                            <div>
+                              <strong>⚡ {language === "ar" ? "الطلاقة والثقة:" : "Confidence:"}</strong>{" "}
+                              <span>{practiceFeedback.rubric.feedbackDetails.confidenceFeedback}</span>
+                            </div>
+                            <div>
+                              <strong>🎯 {language === "ar" ? "الدقة الفنية:" : "Accuracy:"}</strong>{" "}
+                              <span>{practiceFeedback.rubric.feedbackDetails.accuracyFeedback}</span>
+                            </div>
+                            <div>
+                              <strong>🧱 {language === "ar" ? "الصياغة والترتيب:" : "Structure:"}</strong>{" "}
+                              <span>{practiceFeedback.rubric.feedbackDetails.structureFeedback}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Rich Pedagogical Explanation */}
                 <div style={{ padding: "1.25rem", background: "#f8fafd", border: "1px solid var(--card-border)", borderRadius: "10px" }}>

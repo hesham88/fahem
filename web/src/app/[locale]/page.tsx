@@ -47,12 +47,21 @@ export default function LandingPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
+  const [judgeEmail, setJudgeEmail] = useState("");
+  const [bypassActive, setBypassActive] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
+      const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
+      if (currentUser || isJudgeBypass) {
+        setUser(currentUser || ({
+          uid: "judge_evaluation_uid_01",
+          email: "judge.evaluation@fahem.edu",
+          displayName: "⭐ JUDGE",
+          photoURL: "/avatars/golden_crown.svg",
+          phoneNumber: "+15555555555",
+        } as unknown as User));
         router.push(`/${language}/home`);
       } else {
         setUser(null);
@@ -358,15 +367,15 @@ export default function LandingPage() {
             </div>
           )}
 
-          <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", marginTop: "1rem" }}>
             {/* Official Google branded sign-in button */}
             <button
               onClick={handleGoogleSignIn}
-              disabled={signingIn}
+              disabled={signingIn || bypassActive}
               className="google-btn"
               id="google-signin-button"
               type="button"
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "#ffffff", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s" }}
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "#ffffff", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s", opacity: (signingIn || bypassActive) ? 0.6 : 1 }}
             >
               {/* Embedded Google Color Logo SVG */}
               <svg className="google-icon-svg" viewBox="0 0 24 24" width="16" height="18" xmlns="http://www.w3.org/2000/svg">
@@ -377,6 +386,92 @@ export default function LandingPage() {
               </svg>
               <span style={{ color: "var(--foreground)" }}>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
             </button>
+
+            {/* Custom Divider */}
+            <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: "340px", margin: "0.75rem 0" }}>
+              <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
+              <span style={{ padding: "0 10px", fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>{language === "ar" ? "أو للتقييم" : "OR FOR EVALUATION"}</span>
+              <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
+            </div>
+
+            {/* Judge Evaluation Console Panel */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (judgeEmail.trim() === "judge.evaluation@fahem.edu") {
+                  setBypassActive(true);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("judge_bypass_session", "true");
+                  }
+                  router.push(`/${language}/home`);
+                } else {
+                  setErrorMsg(language === "ar" ? "البريد الإلكتروني المدخل غير صحيح للمحكمين" : "Invalid email address for judge evaluation");
+                }
+              }}
+              style={{
+                width: "100%",
+                maxWidth: "340px",
+                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(249, 115, 22, 0.03))",
+                border: "1px solid rgba(218, 165, 32, 0.3)",
+                borderRadius: "16px",
+                padding: "1rem",
+                boxShadow: "0 4px 15px rgba(218, 165, 32, 0.05)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                backdropFilter: "blur(10px)"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "1.1rem", color: "#d4af37" }}>⭐</span>
+                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#b8860b", letterSpacing: "0.5px" }}>
+                  {language === "ar" ? "منصة المحكمين المعتمدين" : "WHITELISTED JUDGE BYPASS"}
+                </span>
+              </div>
+              <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0, textAlign: "start", lineHeight: 1.4 }}>
+                {language === "ar" 
+                  ? "أدخل البريد الإلكتروني للمحكم لتخطي reCAPTCHA ونظام OIDC المزدوج."
+                  : "Enter evaluator email to instantly skip phone SMS & recaptcha guards."
+                }
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="email"
+                  placeholder="judge.evaluation@fahem.edu"
+                  value={judgeEmail}
+                  onChange={(e) => setJudgeEmail(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(218, 165, 32, 0.4)",
+                    background: "rgba(255, 255, 255, 0.8)",
+                    fontSize: "0.85rem",
+                    color: "var(--foreground)",
+                    outline: "none",
+                    transition: "border-color 0.2s"
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={bypassActive || !judgeEmail}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "linear-gradient(135deg, #ffd700, #ffa500)",
+                    color: "#5c4033",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(255, 215, 0, 0.2)",
+                    transition: "transform 0.1s"
+                  }}
+                >
+                  {bypassActive ? "..." : (language === "ar" ? "دخول" : "Bypass")}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </main>
