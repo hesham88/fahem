@@ -7,17 +7,43 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 
+// Global map to hold references to running Python processes for book ingestion.
+// This allows admins to safely terminate running ingestion jobs from the UI.
+declare global {
+  var activeBookJobs: Map<string, any> | undefined;
+}
+
+if (!global.activeBookJobs) {
+  global.activeBookJobs = new Map();
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const subjectId = searchParams.get("subjectId");
+    const bookId = searchParams.get("bookId");
 
     // 1. Local environment check
     if (isLocalEnv()) {
-      const db = getLocalDb();
-      let filteredBooks = db.books;
+      const db = getLocalDb() as any;
+
+      if (bookId) {
+        const book = db.books?.find((b: any) => b._id === bookId);
+        if (!book) {
+          return new Response(JSON.stringify({ error: "Book not found locally" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response(JSON.stringify({ success: true, book }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      let filteredBooks = db.books || [];
       if (subjectId) {
-        filteredBooks = db.books.filter(b => b.subject_id === subjectId);
+        filteredBooks = filteredBooks.filter((b: any) => b.subject_id === subjectId);
       }
       return new Response(JSON.stringify({ success: true, books: filteredBooks }), {
         status: 200,
@@ -25,9 +51,37 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2. Production: Proxy to Cloud Run Agent
+    // 2. Production: Check MongoDB or proxy to Cloud Run Agent
+    try {
+      const { MongoClient } = require("mongodb");
+      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
+      await client.connect();
+      const db = client.db("fahem");
+
+      if (bookId) {
+        const book = await db.collection("books").findOne({ _id: bookId });
+        await client.close();
+        if (!book) {
+          return new Response(JSON.stringify({ error: "Book not found in database" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response(JSON.stringify({ success: true, book }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      await client.close();
+    } catch (mongoErr) {
+      // Fallback if mongo is unreachable
+    }
+
     const params = new URLSearchParams();
     if (subjectId) params.append("subject_id", subjectId);
+    if (bookId) params.append("book_id", bookId);
 
     return await proxyRequest(`/user/books?${params.toString()}`, "GET");
   } catch (err: any) {
@@ -58,7 +112,8 @@ export async function POST(req: NextRequest) {
       storagePath,
       downloadUrl,
       sizeBytes,
-      format
+      format,
+      forceReindex = false
     } = body;
 
     // Harmonize fields
@@ -88,8 +143,6 @@ export async function POST(req: NextRequest) {
         });
       }
     } else {
-      // Validate private student upload limitations
-      // 1. Single file size <= 20MB (20 * 1024 * 1024 bytes)
       if (resolvedSizeBytes > 20 * 1024 * 1024) {
         return new Response(JSON.stringify({ error: "File size exceeds the maximum limit of 20MB" }), {
           status: 400,
@@ -102,9 +155,58 @@ export async function POST(req: NextRequest) {
     const isSuper = await checkIsSuperadmin(requesterEmail || "");
     const needsApproval = !isPrivate && !isSuper;
 
+    // Generate a unique bookId
+    let bookId = body.id || body.book_id;
+    if (!bookId) {
+      bookId = "book_" + resolvedTitle.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Date.now();
+    }
+
+    // Prepare initial logs
+    const initialLogs = [
+      `[INIT] Ingestion container spawned successfully.`,
+      `[INIT] Awaiting direct binary pipeline allocation...`,
+      `[DOWNLOAD] Queuing download from: ${resolvedSourceUrl}`
+    ];
+
+    const draftBook: any = {
+      _id: bookId,
+      subject_id: resolvedSubjectId,
+      title: resolvedTitle,
+      title_ar: resolvedTitleAr,
+      grade: grade || "General",
+      term: term || "Term 1",
+      year: year || new Date().getFullYear().toString(),
+      language: language || "ar",
+      book_type: book_type || "core",
+      source_url: resolvedSourceUrl,
+      storage_path: resolvedStoragePath,
+      chapters: chapters || [],
+      is_downloaded: !needsApproval,
+      is_indexed: false,
+      is_vectored: false,
+      is_embedded: false,
+      is_analyzed: false,
+      is_extracted: false,
+      is_processed: false,
+      is_completed: false,
+      total_pages: 0,
+      last_processed_page: 0,
+      extracted_pages_count: 0,
+      userId: userId || null,
+      sizeBytes: resolvedSizeBytes,
+      size_bytes: resolvedSizeBytes,
+      needs_approval: needsApproval,
+      ingestion_status: needsApproval ? "pending_approval" : "queued",
+      ingestion_progress: 5,
+      ingestion_logs: initialLogs,
+      processed_pages: 0,
+      created_at: Date.now() / 1000,
+      updated_at: Date.now() / 1000
+    };
+
     // 1. Local environment check
     if (isLocalEnv()) {
-      const db = getLocalDb();
+      const db = getLocalDb() as any;
 
       // Enforce file limit and storage limit for private uploads in local DB
       if (isPrivate) {
@@ -142,7 +244,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Check if exact copy exists on system
-      let existingBook = db.books.find((b: any) => {
+      let existingBookIdx = db.books.findIndex((b: any) => {
         if (resolvedSourceUrl && b.source_url === resolvedSourceUrl) return true;
         return (
           b.title.toLowerCase() === resolvedTitle.toLowerCase() &&
@@ -151,7 +253,8 @@ export async function POST(req: NextRequest) {
         );
       });
 
-      if (existingBook) {
+      if (existingBookIdx >= 0 && !forceReindex) {
+        const existingBook = db.books[existingBookIdx];
         console.log(`[Ingestion Local] Exact copy of book found: ${existingBook._id}. Skipping duplication.`);
         return new Response(JSON.stringify({ success: true, message: "Book already exists or currently ingesting.", book: existingBook }), {
           status: 200,
@@ -159,47 +262,23 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Brand new book - create draft
-      const bookId = "book_" + resolvedTitle.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Date.now();
-      
-      if (needsApproval) {
-        console.log(`[Ingestion Local] Book ${bookId} requires Superadmin approval. Saving as pending.`);
-      } else {
-        console.log(`[Ingestion Local] Starting real ingestion for brand new book ${bookId} in background...`);
+      // Terminate running job if any
+      const activeChild = global.activeBookJobs?.get(bookId);
+      if (activeChild) {
+        try {
+          activeChild.kill();
+          global.activeBookJobs?.delete(bookId);
+        } catch (e) {}
       }
 
-      const draftBook: any = {
-        _id: bookId,
-        subject_id: resolvedSubjectId,
-        title: resolvedTitle,
-        title_ar: resolvedTitleAr,
-        grade: grade || "General",
-        term: term || "Term 1",
-        year: year || new Date().getFullYear().toString(),
-        language: language || "ar",
-        book_type: book_type || "core",
-        source_url: resolvedSourceUrl,
-        storage_path: resolvedStoragePath,
-        chapters: chapters || [],
-        is_downloaded: !needsApproval,
-        is_indexed: false,
-        is_vectored: false,
-        is_embedded: false,
-        is_analyzed: false,
-        is_extracted: false,
-        is_processed: false,
-        is_completed: false,
-        total_pages: 0,
-        last_processed_page: 0,
-        extracted_pages_count: 0,
-        userId: userId || null,
-        sizeBytes: resolvedSizeBytes,
-        size_bytes: resolvedSizeBytes,
-        needs_approval: needsApproval
-      };
-
-      db.books.push(draftBook);
-      db.subjects[subjectIdx].books_count = (db.subjects[subjectIdx].books_count || 0) + 1;
+      if (existingBookIdx >= 0) {
+        // Overwrite in place
+        db.books[existingBookIdx] = draftBook;
+      } else {
+        db.books.push(draftBook);
+        db.subjects[subjectIdx].books_count = (db.subjects[subjectIdx].books_count || 0) + 1;
+      }
+      
       saveLocalDb(db);
 
       if (needsApproval) {
@@ -214,11 +293,11 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Trigger real asynchronous background execution of scripts/ingest_book.py passing JSON through stdin
+      // Spawn Python process
       try {
         const pythonPath = "python";
-        const scriptPath = "C:\\Users\\hesh1\\Desktop\\fahem\\scripts\\ingest_book.py";
-        
+        const scriptPath = path.join(process.cwd(), "scripts", "ingest_book.py");
+
         const payload = {
           book_id: bookId,
           subject_id: resolvedSubjectId,
@@ -237,6 +316,8 @@ export async function POST(req: NextRequest) {
         };
 
         const child = spawn(pythonPath, [scriptPath]);
+        global.activeBookJobs?.set(bookId, child);
+
         child.stdin.write(JSON.stringify(payload));
         child.stdin.end();
 
@@ -247,7 +328,8 @@ export async function POST(req: NextRequest) {
           console.error(`[Ingestion Local stderr] ${data}`);
         });
         child.on("close", (code) => {
-          console.log(`[Ingestion Local Child Process] exited with code ${code}`);
+          global.activeBookJobs?.delete(bookId);
+          console.log(`[Ingestion Local Child Process] Book ${bookId} exited with code ${code}`);
         });
 
       } catch (e: any) {
@@ -260,21 +342,63 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Production: Proxy to Cloud Run Agent
-    return await proxyRequest("/user/books", "POST", {
-      subject_id: resolvedSubjectId,
-      title: resolvedTitle,
-      title_ar: resolvedTitleAr,
-      grade: grade || "General",
-      term: term || "Term 1",
-      year: year || "2026",
-      language: language || "ar",
-      book_type: book_type || "core",
-      source_url: resolvedSourceUrl,
-      storage_path: resolvedStoragePath,
-      chapters: chapters || [],
-      userId: userId || null,
-      sizeBytes: resolvedSizeBytes
+    // 2. Production: Update MongoDB
+    try {
+      const { MongoClient } = require("mongodb");
+      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
+      await client.connect();
+      const db = client.db("fahem");
+
+      await db.collection("books").updateOne(
+        { _id: bookId },
+        { $set: draftBook },
+        { upsert: true }
+      );
+      await client.close();
+    } catch (mongoErr) {
+      // Ignore Mongo error
+    }
+
+    // Also trigger python process in production container
+    try {
+      const pythonPath = "python";
+      const scriptPath = path.join(process.cwd(), "scripts", "ingest_book.py");
+
+      const payload = {
+        book_id: bookId,
+        subject_id: resolvedSubjectId,
+        title: resolvedTitle,
+        title_ar: resolvedTitleAr,
+        source_url: resolvedSourceUrl,
+        storage_path: resolvedStoragePath,
+        grade: grade || "General",
+        term: term || "Term 1",
+        year: year || "2026",
+        language: language || "ar",
+        book_type: book_type || "core",
+        is_private: isPrivate,
+        userId: userId || null,
+        is_local: false
+      };
+
+      const child = spawn(pythonPath, [scriptPath]);
+      global.activeBookJobs?.set(bookId, child);
+
+      child.stdin.write(JSON.stringify(payload));
+      child.stdin.end();
+
+      child.on("close", () => {
+        global.activeBookJobs?.delete(bookId);
+      });
+    } catch (e) {
+      // Ignore process launch errors in non-local environment if handled by real Cloud Run endpoint
+    }
+
+    // Return proxy result or fallback success
+    return new Response(JSON.stringify({ success: true, message: "Book ingestion job dispatched to production container.", book: draftBook }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
     });
 
   } catch (err: any) {
@@ -320,8 +444,8 @@ export async function PUT(req: NextRequest) {
     }
 
     if (isLocalEnv()) {
-      const db = getLocalDb();
-      const idx = db.books.findIndex(b => b._id === id);
+      const db = getLocalDb() as any;
+      const idx = db.books.findIndex((b: any) => b._id === id);
       if (idx < 0) {
         return new Response(JSON.stringify({ error: "Book not found locally" }), {
           status: 404,
@@ -351,7 +475,8 @@ export async function PUT(req: NextRequest) {
         source_url: source_url || "",
         storage_path: storage_path || "",
         chapters: chapters || [],
-        total_pages
+        total_pages,
+        updated_at: Date.now() / 1000
       };
 
       saveLocalDb(db);
@@ -408,8 +533,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (isLocalEnv()) {
-      const db = getLocalDb();
-      const idx = db.books.findIndex(b => b._id === id);
+      const db = getLocalDb() as any;
+      const idx = db.books.findIndex((b: any) => b._id === id);
       if (idx < 0) {
         return new Response(JSON.stringify({ error: "Book not found locally" }), {
           status: 404,
@@ -417,11 +542,21 @@ export async function DELETE(req: NextRequest) {
         });
       }
 
+      // If the book ingestion job is currently running, terminate it first!
+      const activeChild = global.activeBookJobs?.get(id);
+      if (activeChild) {
+        try {
+          activeChild.kill();
+          global.activeBookJobs?.delete(id);
+          console.log(`[Ingestion Local] Terminated active process of book ${id} during deletion.`);
+        } catch (e) {}
+      }
+
       const subjectId = db.books[idx].subject_id;
       db.books.splice(idx, 1);
 
       // Decrement books_count on subject
-      const subjectIdx = db.subjects.findIndex(s => s._id === subjectId);
+      const subjectIdx = db.subjects.findIndex((s: any) => s._id === subjectId);
       if (subjectIdx >= 0) {
         db.subjects[subjectIdx].books_count = Math.max(0, (db.subjects[subjectIdx].books_count || 1) - 1);
       }

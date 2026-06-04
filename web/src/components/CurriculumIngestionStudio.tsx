@@ -59,7 +59,7 @@ interface QueueJob {
   bookTitle: string;
   bookTitleAr: string;
   subjectName: string;
-  status: "idle" | "processing" | "completed" | "paused" | "failed";
+  status: "idle" | "processing" | "completed" | "paused" | "failed" | "queued" | "downloading" | "pending_approval";
   progress: number; // 0 to 100
   totalPages: number;
   processedPages: number;
@@ -67,6 +67,7 @@ interface QueueJob {
   eta: number; // seconds
   startTime: number;
   isLocalSessionJob?: boolean;
+  logs?: string[];
 }
 
 export default function CurriculumIngestionStudio({ language, email }: { language: string; email?: string }) {
@@ -169,6 +170,16 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
   // Ingestion Queue States
   const [queue, setQueue] = useState<QueueJob[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    "[SYSTEM] Ingestion Studio Queue initialized.",
+    "[INFO] Cloud Run Async Executor listening on secure gcp-vpc router.",
+    "[DEBUG] Shared lock system active on MongoDB Atlas primary database."
+  ]);
+
+  // Derived state for Terminal Log Viewer
+  const jobForLogs = queue.find(j => j.id === selectedJobId) || queue.find(j => ["processing", "downloading", "queued", "idle"].includes(j.status));
+  const logsToRender = jobForLogs && jobForLogs.logs && jobForLogs.logs.length > 0 ? jobForLogs.logs : terminalLogs;
 
   // TSK-079 Bulk Operations & Duplicate states
   const [expandedRepoFolders, setExpandedRepoFolders] = useState<Record<string, boolean>>({});
@@ -186,12 +197,6 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       );
     });
   };
-
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    "[SYSTEM] Ingestion Studio Queue initialized.",
-    "[INFO] Cloud Run Async Executor listening on secure gcp-vpc router.",
-    "[DEBUG] Shared lock system active on MongoDB Atlas primary database."
-  ]);
 
   const addTerminalLog = (msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -257,9 +262,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                 : `${b.title.replace(/\s+/g, "_")}.pdf`;
 
             const totalPages = b.total_pages || (b.chapters && b.chapters.length > 0 ? Math.max(...b.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 120);
-            const processedPages = totalPages; // Always completed on load to prevent fake spinning
-            const progress = 100; // Force 100% progress
-            const status: "completed" | "processing" | "idle" = "completed"; // Force completed status
+            const processedPages = b.processed_pages !== undefined ? b.processed_pages : (b.ingestion_status === "completed" ? totalPages : 0);
+            const progress = b.ingestion_progress !== undefined ? b.ingestion_progress : (b.ingestion_status === "completed" ? 100 : 0);
+            const status = b.ingestion_status || "completed";
 
             return {
               id: b._id,
@@ -274,25 +279,14 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
               speed: 0,
               eta: 0,
               startTime: b.created_at ? b.created_at * 1000 : Date.now(),
-              isLocalSessionJob: false // Mark books loaded from DB as NOT local session jobs to prevent fake loops
+              isLocalSessionJob: false,
+              logs: b.ingestion_logs || []
             };
           });
 
           // Sort by newest first
           mappedJobs.sort((a: any, b: any) => b.startTime - a.startTime);
-          
-          setQueue(prevQueue => {
-            // Keep local jobs that are currently active (processing) or pending (idle) so their simulation is not interrupted
-            const activeOrIdleLocalJobs = prevQueue.filter(j => j.status === "processing" || j.status === "idle");
-            // Filter out any database jobs that match the active local jobs' titles or IDs to prevent duplicates
-            const filteredMapped = mappedJobs.filter((mj: any) => 
-              !activeOrIdleLocalJobs.some(lj => lj.id === mj.id || lj.bookTitle === mj.bookTitle)
-            );
-            const merged = [...activeOrIdleLocalJobs, ...filteredMapped];
-            // Sort merged queue by startTime descending to keep latest books at the top
-            merged.sort((a: any, b: any) => b.startTime - a.startTime);
-            return merged;
-          });
+          setQueue(mappedJobs);
         }
       }
     } catch (err) {
@@ -332,7 +326,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     if (terminalContainerRef.current) {
       terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
     }
-  }, [terminalLogs]);
+  }, [queue, selectedJobId, terminalLogs]);
 
   useEffect(() => {
     if (crawlerContainerRef.current) {
@@ -340,86 +334,23 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     }
   }, [crawlLogs]);
 
-  // Real-time Queue Processor Simulation Timer
+  // Adaptive Polling for active background jobs
   useEffect(() => {
+    const hasActiveJobs = queue.some(job => 
+      job.status === "processing" || 
+      job.status === "downloading" || 
+      job.status === "queued" || 
+      job.status === "idle"
+    );
+
+    if (!hasActiveJobs) return;
+
     const interval = setInterval(() => {
-      setQueue((prevQueue) => {
-        // Find the first local session job that is either "processing" or "idle" to work on
-        const activeIdx = prevQueue.findIndex((job) => job.status === "processing" && job.isLocalSessionJob === true);
-        
-        if (activeIdx === -1) {
-          // No processing job. If there is an 'idle' local session job, make it processing!
-          const idleIdx = prevQueue.findIndex((job) => job.status === "idle" && job.isLocalSessionJob === true);
-          if (idleIdx !== -1) {
-            const updated = [...prevQueue];
-            updated[idleIdx] = {
-              ...updated[idleIdx],
-              status: "processing",
-              startTime: Date.now(),
-              speed: parseFloat((Math.random() * 8 + 12).toFixed(1)) // 12-20 pages per sec
-            };
-            addTerminalLog(`[LAUNCH] Initializing asynchronous Cloud Run Job container for ${updated[idleIdx].fileName}...`);
-            addTerminalLog(`[STORAGE] Downloading direct binary payload from ${updated[idleIdx].fileName}`);
-            addTerminalLog(`[OCR] Optical Character Recognition pipeline spinning up...`);
-            return updated;
-          }
-          return prevQueue;
-        }
+      fetchBooks();
+    }, 3000);
 
-        const updated = [...prevQueue];
-        const activeJob = updated[activeIdx];
-
-        // Increment processed pages
-        const speed = parseFloat((Math.random() * 4 + 14).toFixed(1)); // fluctuate speed slightly
-        const increment = Math.ceil(speed * 1.5); // page processing per ticker
-        const newProcessed = Math.min(activeJob.processedPages + increment, activeJob.totalPages);
-        const progress = Math.round((newProcessed / activeJob.totalPages) * 100);
-        
-        // Calculate dynamic ETA
-        const remainingPages = activeJob.totalPages - newProcessed;
-        const eta = remainingPages > 0 ? Math.ceil(remainingPages / speed) : 0;
-
-        // Logging events periodically
-        if (newProcessed > activeJob.processedPages && newProcessed < activeJob.totalPages) {
-          if (Math.random() > 0.6) {
-            addTerminalLog(
-              `[PROCESSING] [${activeJob.fileName}] Parsed pages ${activeJob.processedPages}-${newProcessed}. Executing semantic text chunking...`
-            );
-          }
-          if (Math.random() > 0.75) {
-            addTerminalLog(
-              `[VECTOR_ARMOR] [${activeJob.fileName}] Generating 1536-dim embeddings via Gemini Text-Embedding-004. Batch size: 16`
-            );
-          }
-        }
-
-        if (newProcessed >= activeJob.totalPages) {
-          // Finished!
-          updated[activeIdx] = {
-            ...activeJob,
-            status: "completed",
-            progress: 100,
-            processedPages: activeJob.totalPages,
-            speed: 0,
-            eta: 0
-          };
-          addTerminalLog(`[VECTOR_INDEX] [${activeJob.fileName}] Ingested ${activeJob.totalPages} pages into MongoDB Atlas Vector clusters successfully!`);
-          addTerminalLog(`[SUCCESS] Cloud Run Ingestion Job ${activeJob.id} finished successfully. Container teardown in progress.`);
-        } else {
-          updated[activeIdx] = {
-            ...activeJob,
-            processedPages: newProcessed,
-            progress,
-            speed,
-            eta
-          };
-        }
-
-        return updated;
-      });
-    }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [queue]);
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !subjName || !subjNameAr) return;
@@ -629,24 +560,10 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
         addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
-        const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
-        const newJob: QueueJob = {
-          id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          fileName: cleanFileName,
-          bookTitle: book.title,
-          bookTitleAr: book.titleAr,
-          subjectName: book.subject,
-          status: "idle",
-          progress: 0,
-          totalPages: book.totalPages,
-          processedPages: 0,
-          speed: 0,
-          eta: 0,
-          startTime: 0,
-          isLocalSessionJob: true
-        };
+        if (data.book && data.book._id) {
+          setSelectedJobId(data.book._id);
+        }
 
-        setQueue(prev => [newJob, ...prev]);
         fetchSubjects();
         setBookSuccess(language === "ar" ? `🎉 تم بدء استيراد "${book.titleAr}" بنجاح!` : `🎉 Successfully started ingestion for "${book.title}"!`);
         setTimeout(() => setBookSuccess(null), 4000);
@@ -735,30 +652,14 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
             : "📚 Book metadata committed. Processing task pushed to Cloud Run Job queue!"
         );
 
-        // 2. Add to local simulated Ingestion Queue representing GCP Cloud Run Job
-        const targetSubject = subjectsList.find(s => s._id === bookSubjId);
-        const subjectName = targetSubject ? targetSubject.name : "Curriculum";
+        if (data.book && data.book._id) {
+          setSelectedJobId(data.book._id);
+        }
+
         const cleanFileName = bookSourceUrl 
           ? bookSourceUrl.split("/").pop() || `${bookTitle.replace(/\s+/g, "_")}.pdf` 
           : `${bookTitle.replace(/\s+/g, "_")}.pdf`;
 
-        const newJob: QueueJob = {
-          id: `job_${Date.now()}`,
-          fileName: cleanFileName,
-          bookTitle,
-          bookTitleAr,
-          subjectName,
-          status: "idle",
-          progress: 0,
-          totalPages: pendingChapters.length > 0 ? pendingChapters[pendingChapters.length - 1].page_end : 120,
-          processedPages: 0,
-          speed: 0,
-          eta: 0,
-          startTime: 0,
-          isLocalSessionJob: true
-        };
-
-        setQueue(prev => [...prev, newJob]);
         addTerminalLog(`[QUEUE] Pushed async processing job to GCP Cloud Run pool for: ${cleanFileName}`);
 
         // Refresh subjects and books count from the database
@@ -936,26 +837,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           importedCount++;
           addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
-          // Spawn live local queue task that processes page-by-page
-          const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
-          const newJob: QueueJob = {
-            id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            fileName: cleanFileName,
-            bookTitle: book.title,
-            bookTitleAr: book.titleAr,
-            subjectName: book.subject,
-            status: "idle",
-            progress: 0,
-            totalPages: book.totalPages,
-            processedPages: 0,
-            speed: 0,
-            eta: 0,
-            startTime: 0,
-            isLocalSessionJob: true
-          };
-
-          setQueue(prev => [...prev, newJob]);
-          addTerminalLog(`[QUEUE] Registered Cloud Run Task for: ${cleanFileName}`);
+          if (data.book && data.book._id) {
+            setSelectedJobId(data.book._id);
+          }
         } else {
           failedCount++;
           addTerminalLog(`[ERROR] Registration failed for: "${book.title}". Reason: ${data.error || "Server Error"}`);
@@ -1037,26 +921,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           importedCount++;
           addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
 
-          // Spawn live local queue task that processes page-by-page
-          const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
-          const newJob: QueueJob = {
-            id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            fileName: cleanFileName,
-            bookTitle: book.title,
-            bookTitleAr: book.titleAr,
-            subjectName: book.subject,
-            status: "idle",
-            progress: 0,
-            totalPages: book.totalPages,
-            processedPages: 0,
-            speed: 0,
-            eta: 0,
-            startTime: 0,
-            isLocalSessionJob: true
-          };
-
-          setQueue(prev => [...prev, newJob]);
-          addTerminalLog(`[QUEUE] Registered Cloud Run Task for: ${cleanFileName}`);
+          if (data.book && data.book._id) {
+            setSelectedJobId(data.book._id);
+          }
         } else {
           failedCount++;
           addTerminalLog(`[ERROR] Registration failed for: "${book.title}". Reason: ${data.error || "Server Error"}`);
@@ -1154,54 +1021,69 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     addTerminalLog(`[BULK_OPERATIONS] Initiating bulk re-indexing of ${selectedIds.length} textbooks...`);
 
     let queuedCount = 0;
+    let failedCount = 0;
 
     for (const id of selectedIds) {
       const book = booksList.find((b: any) => b._id === id);
       if (!book) continue;
 
-      const cleanFileName = book.source_url 
-        ? book.source_url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf` 
-        : book.storage_path 
-          ? book.storage_path.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`
-          : `${book.title.replace(/\s+/g, "_")}.pdf`;
+      try {
+        addTerminalLog(`[BULK_REINDEX] Dispatching re-indexing request for "${book.title}"...`);
+        const res = await fetch("/api/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: book._id,
+            subject_id: book.subject_id,
+            title: book.title,
+            title_ar: book.title_ar,
+            grade: book.grade || "General",
+            term: book.term || "Term 1",
+            year: book.year || "2026",
+            language: book.language || "ar",
+            book_type: book.book_type || "core",
+            source_url: book.source_url || "",
+            storage_path: book.storage_path || "",
+            chapters: book.chapters || [],
+            requesterEmail: email || "hesham1988@gmail.com",
+            forceReindex: true
+          })
+        });
 
-      const totalPages = book.total_pages || (book.chapters && book.chapters.length > 0 ? Math.max(...book.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 120);
-
-      const targetSubject = subjectsList.find(s => s._id === book.subject_id);
-      const subjectName = targetSubject ? (language === "ar" ? targetSubject.name_ar : targetSubject.name) : book.subject_id;
-
-      const newJob: QueueJob = {
-        id: `reindex_${id}_${Date.now()}`,
-        fileName: cleanFileName,
-        bookTitle: book.title,
-        bookTitleAr: book.title_ar,
-        subjectName,
-        status: "idle",
-        progress: 0,
-        totalPages,
-        processedPages: 0,
-        speed: 0,
-        eta: 0,
-        startTime: 0,
-        isLocalSessionJob: true
-      };
-
-      setQueue(prev => [newJob, ...prev]);
-      addTerminalLog(`[BULK_REINDEX] Enqueued re-indexing job for "${book.title}" (${totalPages} pages)`);
-      queuedCount++;
+        const data = await res.json();
+        if (res.ok && data.success) {
+          queuedCount++;
+          addTerminalLog(`[SUCCESS] Re-indexing job triggered for: "${book.title}". Process registered under ID: ${book._id}`);
+          setSelectedJobId(book._id);
+        } else {
+          failedCount++;
+          addTerminalLog(`[ERROR] Re-indexing failed for "${book.title}": ${data.error || "Server Error"}`);
+        }
+      } catch (err: any) {
+        failedCount++;
+        addTerminalLog(`[ERROR] Network fault re-indexing "${book.title}": ${err.message}`);
+      }
     }
 
-    setIsReindexingBulkRepo(true);
-    setTimeout(() => {
-      setIsReindexingBulkRepo(false);
-      setSelectedRepoBooks({});
+    setIsReindexingBulkRepo(false);
+    setSelectedRepoBooks({});
+    fetchSubjects();
+
+    if (failedCount === 0) {
       setBookSuccess(
         language === "ar"
-          ? `🎉 تم إرسال ${queuedCount} كتب لجدولة إعادة الفهرسة!`
-          : `🎉 Successfully enqueued ${queuedCount} books for re-indexing!`
+          ? `🎉 تم إرسال ${queuedCount} كتب لجدولة إعادة الفهرسة بنجاح!`
+          : `🎉 Successfully enqueued ${queuedCount} books for real-time re-indexing!`
       );
       setTimeout(() => setBookSuccess(null), 4000);
-    }, 1000);
+    } else {
+      setBookError(
+        language === "ar"
+          ? `⚠️ اكتملت إعادة الفهرسة مع وجود أخطاء. الناجح: ${queuedCount}، الفاشل: ${failedCount}.`
+          : `⚠️ Bulk re-indexing finished with errors. Success: ${queuedCount}, Failed: ${failedCount}.`
+      );
+      setTimeout(() => setBookError(null), 5000);
+    }
   };
 
   const handlePreFillFromCrawler = (res: any) => {
@@ -1216,9 +1098,27 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     addTerminalLog(`[CRAWLER] Auto-filled book metadata from discovered resource: ${res.fileName}`);
   };
 
-  const handleCancelJob = (id: string) => {
-    setQueue(prev => prev.filter(job => job.id !== id));
-    addTerminalLog(`[QUEUE] Terminated Ingestion Job ${id} on Cloud Run cluster.`);
+  const handleCancelJob = async (id: string) => {
+    if (!email) return;
+    try {
+      addTerminalLog(`[QUEUE] Attempting manual administrative abort for Ingestion Job ${id}...`);
+      const res = await fetch(`/api/books/cancel?bookId=${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterEmail: email })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addTerminalLog(`[QUEUE] Manually aborted Ingestion Job ${id}. Marking status failed in DB.`);
+        fetchSubjects();
+      } else {
+        addTerminalLog(`[ERROR] Failed to abort job ${id}: ${data.error || "Unknown Error"}`);
+        alert(data.error || "Failed to cancel job.");
+      }
+    } catch (err: any) {
+      console.error("Failed to cancel job:", err);
+      addTerminalLog(`[FATAL] Error aborting Ingestion Job ${id}: ${err.message}`);
+    }
   };
 
   // Queue states calculation helper
