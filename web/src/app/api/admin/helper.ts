@@ -45,3 +45,32 @@ export async function checkIsAdmin(email: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Checks if an email is an authorized superadmin.
+ * Superadmins are configured in process.env.SUPERADMIN_USER.
+ * In a local environment, 'hesham1988@gmail.com' is treated as a default superadmin for testing.
+ */
+export async function checkIsSuperadmin(email: string): Promise<boolean> {
+  if (!email) return false;
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  let raw = process.env.SUPERADMIN_USER || "";
+  raw = raw.trim().replace(/^['"]|['"]$/g, "");
+  const envSuperadmins = raw
+    ? raw.split(",").map((addr) => addr.trim().toLowerCase().replace(/^['"]|['"]$/g, ""))
+    : [];
+  
+  if (envSuperadmins.includes(normalizedEmail)) {
+    return true;
+  }
+  
+  if (isLocalEnv()) {
+    if (normalizedEmail === "hesham1988@gmail.com") {
+      return true;
+    }
+  }
+  
+  return false;
+}
+

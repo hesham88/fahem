@@ -95,7 +95,7 @@ export async function getOidcToken(): Promise<string | null> {
 
 export async function proxyRequest(
   path: string,
-  method: "GET" | "POST" | "DELETE" = "GET",
+  method: string = "GET",
   body?: any
 ): Promise<Response> {
   if (!cloudRunUrl) {

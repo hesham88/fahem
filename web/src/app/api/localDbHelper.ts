@@ -13,6 +13,11 @@ interface LocalDb {
     monthlyAllocationLimit: number;
     maxUploadSize: number; // in MB, e.g. 2 for 2MB
   };
+  social_groups?: any[];
+  social_threads?: any[];
+  social_replies?: any[];
+  users?: any[];
+  admin_change_requests?: any[];
 }
 
 const DEFAULT_DB: LocalDb = {
@@ -53,23 +58,66 @@ const DEFAULT_DB: LocalDb = {
     }
   ],
   admins: [
-    { email: "admin.candidate@fahem.edu", name: "Anas Al-Sayed", isApprovedAdmin: false },
-    { email: "contact@asdaa.co", name: "Asdaa Tech", isApprovedAdmin: true },
-    { email: "hesham1988@gmail.com", name: "Hesham", isApprovedAdmin: true }
+    { email: "hesham1988@gmail.com", name: "Hesham", isApprovedAdmin: true },
+    { email: "admin@fahem.edu", name: "Approved Admin", isApprovedAdmin: true }
   ],
   config: {
     isTokenControlActive: true,
     weeklyAllocationLimit: 250000,
     monthlyAllocationLimit: 1000000,
     maxUploadSize: 2 // 2MB
-  }
+  },
+  social_groups: [
+    { _id: "group_math", name: "Pure Mathematics Club", name_ar: "نادي الرياضيات البحتة", description: "Math enthusiasts and algebra discussion.", description_ar: "مساحة مخصصة لعشاق الرياضيات ومناقشة المسائل الجبرية.", category: "Math", emoji: "📐", members_count: 12 },
+    { _id: "group_science", name: "Physics & Chemistry Lab", name_ar: "مختبر الفيزياء والكيمياء", description: "Scientific experiments and theory chat.", description_ar: "تجارب ونقاشات حول النظريات الفيزيائية والتفاعلات الكيميائية.", category: "Science", emoji: "🧪", members_count: 8 },
+    { _id: "group_arabic", name: "Arabic Literature Circle", name_ar: "حلقة الأدب العربي", description: "Arabic grammar, prose and poetry discussion.", description_ar: "منبر لمناقشة قواعد اللغة العربية، النثر والقصائد الأدبية.", category: "Arabic", emoji: "📚", members_count: 15 }
+  ],
+  social_threads: [
+    {
+      _id: "thread_math_1",
+      group_id: "group_math",
+      title: "How to solve complex quadratic equations quickly?",
+      title_ar: "كيفية حل المعادلات التربيعية المعقدة بسرعة؟",
+      content: "Does anyone have a fast method or shortcut for resolving quadratic equations with high constants without drawing the whole parabola?",
+      content_ar: "هل لدى أحدكم طريقة سريعة أو اختصار لحل المعادلات التربيعية ذات الثوابت الكبيرة دون الحاجة لرسم المنحنى البياني بالكامل؟",
+      author_id: "user_student_1",
+      author_name: "Ahmed Al-Mansoori",
+      author_avatar: "👨‍🎓",
+      created_at: "2026-06-03T12:00:00Z",
+      likes_count: 4,
+      replies_count: 1
+    }
+  ],
+  social_replies: [
+    {
+      _id: "reply_math_1_1",
+      thread_id: "thread_math_1",
+      content: "You can use the quadratic formula directly, or look for perfect square trinomial decompositions. If constants are very high, try dividing by common factors first!",
+      content_ar: "يمكنك استخدام القانون العام مباشرة، أو البحث عن تحليل المربع الكامل. إذا كانت الثوابت كبيرة جداً، جرب القسمة على العوامل المشتركة أولاً!",
+      author_id: "user_teacher_1",
+      author_name: "Mr. Mostafa",
+      author_avatar: "👨‍🏫",
+      created_at: "2026-06-03T14:30:00Z"
+    }
+  ],
+  users: [
+    { userId: "user_student_1", name: "Ahmed Al-Mansoori", username: "ahmed_student", email: "ahmed@student.edu", role: "student", userType: "student", school: "Al-Ahram School", isWhitelisted: false, banned: false, avatar: "👨‍🎓", country: "EG", grade: "Grade 9" },
+    { userId: "user_teacher_1", name: "Mr. Mostafa", username: "mostafa_teacher", email: "mostafa@teacher.edu", role: "teacher", userType: "teacher", school: "El Nasr School", isWhitelisted: true, banned: false, avatar: "👨‍🏫", country: "EG", grade: "Grade 10" },
+    { userId: "user_admin_1", name: "Approved Admin", username: "admin_standard", email: "admin@fahem.edu", role: "admin", userType: "admin", school: "Fahem Academy", isWhitelisted: true, banned: false, avatar: "👤", country: "EG", grade: "General" },
+    { userId: "user_super_1", name: "Hesham", username: "hesham1988", email: "hesham1988@gmail.com", role: "super-admin", userType: "admin", school: "Fahem HQ", isWhitelisted: true, banned: false, avatar: "👑", country: "EG", grade: "General" }
+  ],
+  admin_change_requests: []
 };
 
 export function isLocalEnv(): boolean {
-  // If MONGODB_URI is not set, or contains -pri (internal VPC), or we are not in GCP Cloud Run
-  const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
   const isCloudRun = !!process.env.K_SERVICE;
-  return !isCloudRun || hasPri || process.env.NODE_ENV === "development";
+  if (isCloudRun) {
+    return false; // Production/Cloud Run is NEVER local
+  }
+  // If running locally, check if MONGODB_URI is not set or contains -pri (meaning it's private and unreachable locally)
+  const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
+  const noUri = !process.env.MONGODB_URI;
+  return noUri || hasPri || process.env.NODE_ENV === "development";
 }
 
 export function getLocalDb(): LocalDb {
@@ -84,7 +132,36 @@ export function getLocalDb(): LocalDb {
       return DEFAULT_DB;
     }
     const data = fs.readFileSync(LOCAL_DB_PATH, "utf8");
-    return JSON.parse(data);
+    const db = JSON.parse(data) as LocalDb;
+    
+    // Ensure social keys are initialized if they don't exist in existing JSON file
+    let updated = false;
+    if (!db.social_groups) {
+      db.social_groups = DEFAULT_DB.social_groups;
+      updated = true;
+    }
+    if (!db.social_threads) {
+      db.social_threads = DEFAULT_DB.social_threads;
+      updated = true;
+    }
+    if (!db.social_replies) {
+      db.social_replies = DEFAULT_DB.social_replies;
+      updated = true;
+    }
+    if (!db.users) {
+      db.users = DEFAULT_DB.users;
+      updated = true;
+    }
+    if (!db.admin_change_requests) {
+      db.admin_change_requests = DEFAULT_DB.admin_change_requests;
+      updated = true;
+    }
+    
+    if (updated) {
+      saveLocalDb(db);
+    }
+    
+    return db;
   } catch (err) {
     console.error("[localDbHelper] Error reading local DB:", err);
     return DEFAULT_DB;

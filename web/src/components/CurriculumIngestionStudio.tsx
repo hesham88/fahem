@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { storage } from "../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   FiBookOpen,
   FiPlus,
@@ -27,7 +29,9 @@ import {
   FiChevronDown,
   FiFolder,
   FiFileText,
-  FiInfo
+  FiInfo,
+  FiEdit,
+  FiSettings
 } from "react-icons/fi";
 
 interface Subject {
@@ -62,12 +66,30 @@ interface QueueJob {
   speed: number; // pages/sec
   eta: number; // seconds
   startTime: number;
+  isLocalSessionJob?: boolean;
 }
 
 export default function CurriculumIngestionStudio({ language, email }: { language: string; email?: string }) {
   // Lists and loading
   const [subjectsList, setSubjectsList] = useState<Subject[]>([]);
+  const [booksList, setBooksList] = useState<any[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
+
+  // Dynamic Editable Lists with Default Grade support
+  const [gradeLevels, setGradeLevels] = useState<string[]>(["Grade 10", "Grade 11", "Grade 12", "General"]);
+  const [categories, setCategories] = useState<string[]>(["Science", "Mathematics", "Languages", "Social Studies"]);
+  const [terms, setTerms] = useState<string[]>(["Term 1", "Term 2", "Term 3", "Full Year"]);
+  const [languagesList, setLanguagesList] = useState<string[]>(["ar", "en", "fr"]);
+  const [defaultGrade, setDefaultGrade] = useState<string>("Grade 11");
+
+  // Inline inputs for appending custom selections
+  const [newGradeVal, setNewGradeVal] = useState("");
+  const [newCategoryVal, setNewCategoryVal] = useState("");
+  const [newTermVal, setNewTermVal] = useState("");
+  const [newLangVal, setNewLangVal] = useState("");
+
+  // Tabs for the ROW 3 Management Console
+  const [activeTab, setActiveTab] = useState<"subjects" | "books" | "ingest" | "lists">("subjects");
 
   // Subject Form States
   const [subjName, setSubjName] = useState("");
@@ -78,6 +100,14 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const [isCreatingSubject, setIsCreatingSubject] = useState(false);
   const [subjectSuccess, setSubjectSuccess] = useState<string | null>(null);
   const [subjectError, setSubjectError] = useState<string | null>(null);
+
+  // Subject Editing States
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [editingSubjName, setEditingSubjName] = useState("");
+  const [editingSubjNameAr, setEditingSubjNameAr] = useState("");
+  const [editingSubjGrade, setEditingSubjGrade] = useState("Grade 11");
+  const [editingSubjCategory, setEditingSubjCategory] = useState("Science");
+  const [editingSubjEmoji, setEditingSubjEmoji] = useState("🔬");
 
   // Book Form States
   const [bookSubjId, setBookSubjId] = useState("");
@@ -90,7 +120,29 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   const [bookType, setBookType] = useState("core");
   const [bookSourceUrl, setBookSourceUrl] = useState("");
   const [bookStoragePath, setBookStoragePath] = useState("");
+  const [isAdminUploading, setIsAdminUploading] = useState(false);
   const [pendingChapters, setPendingChapters] = useState<ChapterSegment[]>([]);
+
+  // Book Editing States
+  const [editingBookId, setEditingBookId] = useState<string | null>(null);
+  const [editingBookSubjId, setEditingBookSubjId] = useState("");
+  const [editingBookTitle, setEditingBookTitle] = useState("");
+  const [editingBookTitleAr, setEditingBookTitleAr] = useState("");
+  const [editingBookGrade, setEditingBookGrade] = useState("Grade 11");
+  const [editingBookTerm, setEditingBookTerm] = useState("Term 1");
+  const [editingBookYear, setEditingBookYear] = useState("2026");
+  const [editingBookLang, setEditingBookLang] = useState("ar");
+  const [editingBookType, setEditingBookType] = useState("core");
+  const [editingBookSourceUrl, setEditingBookSourceUrl] = useState("");
+  const [editingBookStoragePath, setEditingBookStoragePath] = useState("");
+  const [editingBookChapters, setEditingBookChapters] = useState<ChapterSegment[]>([]);
+
+  // Edit Book Chapter Builder States
+  const [editChTitle, setEditChTitle] = useState("");
+  const [editChTitleAr, setEditChTitleAr] = useState("");
+  const [editChStartPage, setEditChStartPage] = useState<number>(1);
+  const [editChEndPage, setEditChEndPage] = useState<number>(15);
+  const [editChConcepts, setEditChConcepts] = useState("");
 
   // Interactive Chapter Builder States
   const [chTitle, setChTitle] = useState("");
@@ -105,60 +157,17 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
   // Web Crawler / Exploration Studio States
   const [crawlUrl, setBookCrawlUrl] = useState("https://openstax.org");
-  const [crawlMaxDepth, setCrawlDepth] = useState<number>(2);
+  const [crawlMaxDepth, setCrawlDepth] = useState<number>(3); // Set to max depth (3) by default
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlLogs, setCrawlLogs] = useState<string[]>([]);
   const [discoveredResources, setDiscoveredResources] = useState<any[]>([]);
-  const [selectedFormat, setSelectedFormat] = useState<"all" | "pdf" | "html">("pdf");
+  const [selectedFormat, setSelectedFormat] = useState<"all" | "pdf" | "html">("pdf"); // Set to pdf filter by default
   const [selectedResources, setSelectedResources] = useState<Record<string, boolean>>({});
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [importingBulk, setImportingBulk] = useState(false);
 
   // Ingestion Queue States
-  const [queue, setQueue] = useState<QueueJob[]>([
-    {
-      id: "job_01",
-      fileName: "Ministry_Physics_Grade11_Part1.pdf",
-      bookTitle: "Physics Eleventh Grade Vol 1",
-      bookTitleAr: "الفيزياء للصف الحادي عشر - الجزء الأول",
-      subjectName: "Physics",
-      status: "completed",
-      progress: 100,
-      totalPages: 168,
-      processedPages: 168,
-      speed: 0,
-      eta: 0,
-      startTime: Date.now() - 1200000
-    },
-    {
-      id: "job_02",
-      fileName: "Ministry_Chemistry_Grade11_Part2.pdf",
-      bookTitle: "Organic Chemistry Principles",
-      bookTitleAr: "مبادئ الكيمياء العضوية",
-      subjectName: "Chemistry",
-      status: "idle",
-      progress: 0,
-      totalPages: 240,
-      processedPages: 0,
-      speed: 0,
-      eta: 0,
-      startTime: 0
-    },
-    {
-      id: "job_03",
-      fileName: "Advanced_English_Interactive_Tutor.pdf",
-      bookTitle: "High School English Level II",
-      bookTitleAr: "اللغة الإنجليزية المتقدمة - المستوى الثاني",
-      subjectName: "Languages",
-      status: "idle",
-      progress: 0,
-      totalPages: 112,
-      processedPages: 0,
-      speed: 0,
-      eta: 0,
-      startTime: 0
-    }
-  ]);
+  const [queue, setQueue] = useState<QueueJob[]>([]);
 
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     "[SYSTEM] Ingestion Studio Queue initialized.",
@@ -166,8 +175,112 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     "[DEBUG] Shared lock system active on MongoDB Atlas primary database."
   ]);
 
+  const addTerminalLog = (msg: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setTerminalLogs((prev) => [...prev, `[${timestamp}] ${msg}`]);
+  };
+
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const crawlerContainerRef = useRef<HTMLDivElement>(null);
+
+  // Automatically update form fields to match default grade whenever it changes
+  useEffect(() => {
+    setSubjGrade(defaultGrade);
+    setBookGrade(defaultGrade);
+  }, [defaultGrade]);
+
+  // Load and persist list configurations in localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedGrades = localStorage.getItem("fahem_gradeLevels");
+      const storedCats = localStorage.getItem("fahem_categories");
+      const storedTerms = localStorage.getItem("fahem_terms");
+      const storedLangs = localStorage.getItem("fahem_languages");
+      const storedDefGrade = localStorage.getItem("fahem_defaultGrade");
+
+      if (storedGrades) setGradeLevels(JSON.parse(storedGrades));
+      if (storedCats) setCategories(JSON.parse(storedCats));
+      if (storedTerms) setTerms(JSON.parse(storedTerms));
+      if (storedLangs) setLanguagesList(JSON.parse(storedLangs));
+      if (storedDefGrade) setDefaultGrade(storedDefGrade);
+    }
+  }, []);
+
+  const saveListsToStorage = (updatedGrades?: string[], updatedCats?: string[], updatedTerms?: string[], updatedLangs?: string[], updatedDefGrade?: string) => {
+    if (typeof window !== "undefined") {
+      if (updatedGrades) localStorage.setItem("fahem_gradeLevels", JSON.stringify(updatedGrades));
+      if (updatedCats) localStorage.setItem("fahem_categories", JSON.stringify(updatedCats));
+      if (updatedTerms) localStorage.setItem("fahem_terms", JSON.stringify(updatedTerms));
+      if (updatedLangs) localStorage.setItem("fahem_languages", JSON.stringify(updatedLangs));
+      if (updatedDefGrade) localStorage.setItem("fahem_defaultGrade", updatedDefGrade);
+    }
+  };
+
+  // Load and fetch initial books from database
+  const fetchBooks = async (currentSubjectsList?: Subject[]) => {
+    try {
+      const response = await fetch("/api/books");
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.books)) {
+          setBooksList(data.books); // Populate our list state of books
+
+          const listToUse = currentSubjectsList || subjectsList;
+          const mappedJobs = data.books.map((b: any) => {
+            const targetSubject = listToUse.find(s => s._id === b.subject_id);
+            const subjectName = targetSubject 
+              ? (language === "ar" ? targetSubject.name_ar : targetSubject.name) 
+              : b.subject_id;
+            
+            const cleanFileName = b.source_url 
+              ? b.source_url.split("/").pop() || `${b.title.replace(/\s+/g, "_")}.pdf` 
+              : b.storage_path 
+                ? b.storage_path.split("/").pop() || `${b.title.replace(/\s+/g, "_")}.pdf`
+                : `${b.title.replace(/\s+/g, "_")}.pdf`;
+
+            const totalPages = b.total_pages || (b.chapters && b.chapters.length > 0 ? Math.max(...b.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 120);
+            const processedPages = totalPages; // Always completed on load to prevent fake spinning
+            const progress = 100; // Force 100% progress
+            const status: "completed" | "processing" | "idle" = "completed"; // Force completed status
+
+            return {
+              id: b._id,
+              fileName: cleanFileName,
+              bookTitle: b.title,
+              bookTitleAr: b.title_ar,
+              subjectName: subjectName,
+              status,
+              progress,
+              totalPages,
+              processedPages,
+              speed: 0,
+              eta: 0,
+              startTime: b.created_at ? b.created_at * 1000 : Date.now(),
+              isLocalSessionJob: false // Mark books loaded from DB as NOT local session jobs to prevent fake loops
+            };
+          });
+
+          // Sort by newest first
+          mappedJobs.sort((a: any, b: any) => b.startTime - a.startTime);
+          
+          setQueue(prevQueue => {
+            // Keep local jobs that are currently active (processing) or pending (idle) so their simulation is not interrupted
+            const activeOrIdleLocalJobs = prevQueue.filter(j => j.status === "processing" || j.status === "idle");
+            // Filter out any database jobs that match the active local jobs' titles or IDs to prevent duplicates
+            const filteredMapped = mappedJobs.filter((mj: any) => 
+              !activeOrIdleLocalJobs.some(lj => lj.id === mj.id || lj.bookTitle === mj.bookTitle)
+            );
+            const merged = [...activeOrIdleLocalJobs, ...filteredMapped];
+            // Sort merged queue by startTime descending to keep latest books at the top
+            merged.sort((a: any, b: any) => b.startTime - a.startTime);
+            return merged;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch books list:", err);
+    }
+  };
 
   // Load and fetch initial subjects
   const fetchSubjects = async () => {
@@ -181,6 +294,8 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           if (data.subjects.length > 0 && !bookSubjId) {
             setBookSubjId(data.subjects[0]._id);
           }
+          // Fetch books immediately after receiving subjects
+          fetchBooks(data.subjects);
         }
       }
     } catch (err) {
@@ -211,12 +326,12 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   useEffect(() => {
     const interval = setInterval(() => {
       setQueue((prevQueue) => {
-        // Find the first job that is either "processing" or "idle" to work on
-        const activeIdx = prevQueue.findIndex((job) => job.status === "processing");
+        // Find the first local session job that is either "processing" or "idle" to work on
+        const activeIdx = prevQueue.findIndex((job) => job.status === "processing" && job.isLocalSessionJob === true);
         
         if (activeIdx === -1) {
-          // No processing job. If there is an 'idle' job, make it processing!
-          const idleIdx = prevQueue.findIndex((job) => job.status === "idle");
+          // No processing job. If there is an 'idle' local session job, make it processing!
+          const idleIdx = prevQueue.findIndex((job) => job.status === "idle" && job.isLocalSessionJob === true);
           if (idleIdx !== -1) {
             const updated = [...prevQueue];
             updated[idleIdx] = {
@@ -284,16 +399,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
         return updated;
       });
-    }, 1500);
-
+    }, 2000);
     return () => clearInterval(interval);
-  }, [queue]);
-
-  const addTerminalLog = (msg: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setTerminalLogs((prev) => [...prev, `[${timestamp}] ${msg}`]);
-  };
-
+  }, []);
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !subjName || !subjNameAr) return;
@@ -321,7 +429,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
         setSubjName("");
         setSubjNameAr("");
         fetchSubjects();
-        addTerminalLog(`[CATALOG] Admin added new subject schema: ${subjName} (${subjGrade})`);
+        addTerminalLog(`[CATALOG] Admin added new subject: ${subjName} (${subjGrade})`);
         setTimeout(() => setSubjectSuccess(null), 4000);
       } else {
         setSubjectError(data.error || "Failed to create subject.");
@@ -330,6 +438,191 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       setSubjectError(err.message || "Network error occurred while saving subject.");
     } finally {
       setIsCreatingSubject(false);
+    }
+  };
+
+  const handleUpdateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !editingSubjectId || !editingSubjName || !editingSubjNameAr) return;
+    setIsCreatingSubject(true);
+    setSubjectSuccess(null);
+    setSubjectError(null);
+
+    try {
+      const res = await fetch("/api/subjects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingSubjectId,
+          name: editingSubjName,
+          name_ar: editingSubjNameAr,
+          grade_level: editingSubjGrade,
+          category: editingSubjCategory,
+          icon_emoji: editingSubjEmoji,
+          requesterEmail: email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubjectSuccess(language === "ar" ? "🏆 تم تعديل المادة الدراسية بنجاح!" : "🏆 Subject updated successfully!");
+        setEditingSubjectId(null);
+        fetchSubjects();
+        addTerminalLog(`[CATALOG] Admin updated subject details: ${editingSubjName}`);
+        setTimeout(() => setSubjectSuccess(null), 4000);
+      } else {
+        setSubjectError(data.error || "Failed to update subject.");
+      }
+    } catch (err: any) {
+      setSubjectError(err.message || "Network error occurred while saving subject.");
+    } finally {
+      setIsCreatingSubject(false);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (!email) return;
+    if (!confirm(language === "ar" ? "هل أنت متأكد من حذف هذه المادة وجميع الكتب المرتبطة بها؟" : "Are you sure you want to delete this subject and all associated textbooks?")) return;
+
+    try {
+      const res = await fetch(`/api/subjects?id=${id}&requesterEmail=${encodeURIComponent(email)}`, {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addTerminalLog(`[CATALOG] Deleted subject with ID ${id}`);
+        fetchSubjects();
+      } else {
+        alert(data.error || "Failed to delete subject.");
+      }
+    } catch (err: any) {
+      console.error("Failed to delete subject:", err);
+    }
+  };
+
+  const handleUpdateBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !editingBookId || !editingBookSubjId || !editingBookTitle || !editingBookTitleAr) return;
+    setIsIngestingBook(true);
+    setBookSuccess(null);
+    setBookError(null);
+
+    try {
+      const res = await fetch("/api/books", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingBookId,
+          subject_id: editingBookSubjId,
+          title: editingBookTitle,
+          title_ar: editingBookTitleAr,
+          grade: editingBookGrade,
+          term: editingBookTerm,
+          year: editingBookYear,
+          language: editingBookLang,
+          book_type: editingBookType,
+          source_url: editingBookSourceUrl,
+          storage_path: editingBookStoragePath,
+          chapters: editingBookChapters,
+          requesterEmail: email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBookSuccess(language === "ar" ? "📚 تم تعديل معلومات الكتاب بنجاح!" : "📚 Book updated successfully!");
+        setEditingBookId(null);
+        fetchSubjects(); // Refreshes and fetches books list
+        addTerminalLog(`[CATALOG] Updated textbook metadata for: ${editingBookTitle}`);
+        setTimeout(() => setBookSuccess(null), 4000);
+      } else {
+        setBookError(data.error || "Failed to update book.");
+      }
+    } catch (err: any) {
+      setBookError(err.message || "Network error occurred.");
+    } finally {
+      setIsIngestingBook(false);
+    }
+  };
+
+  const handleDeleteBook = async (id: string) => {
+    if (!email) return;
+    if (!confirm(language === "ar" ? "هل أنت متأكد من حذف هذا الكتاب؟" : "Are you sure you want to delete this book?")) return;
+
+    try {
+      const res = await fetch(`/api/books?id=${id}&requesterEmail=${encodeURIComponent(email)}`, {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addTerminalLog(`[CATALOG] Deleted book with ID ${id}`);
+        fetchSubjects();
+      } else {
+        alert(data.error || "Failed to delete book.");
+      }
+    } catch (err: any) {
+      console.error("Failed to delete book:", err);
+    }
+  };
+
+  const handleIngestSingleDiscovered = async (book: any) => {
+    if (!email) return;
+    addTerminalLog(`[CRAWLER] Initiating single book ingestion for: "${book.title}"...`);
+
+    try {
+      const res = await fetch("/api/books", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject_id: book.subjectId,
+          title: book.title,
+          title_ar: book.titleAr,
+          grade: book.grade,
+          term: book.term,
+          year: book.year,
+          language: book.language,
+          book_type: book.bookType,
+          source_url: book.url,
+          storage_path: `/fahem-core-store/textbooks/${book.fileName}`,
+          chapters: book.chapters,
+          requesterEmail: email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
+
+        const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
+        const newJob: QueueJob = {
+          id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          fileName: cleanFileName,
+          bookTitle: book.title,
+          bookTitleAr: book.titleAr,
+          subjectName: book.subject,
+          status: "idle",
+          progress: 0,
+          totalPages: book.totalPages,
+          processedPages: 0,
+          speed: 0,
+          eta: 0,
+          startTime: 0,
+          isLocalSessionJob: true
+        };
+
+        setQueue(prev => [newJob, ...prev]);
+        fetchSubjects();
+        setBookSuccess(language === "ar" ? `🎉 تم بدء استيراد "${book.titleAr}" بنجاح!` : `🎉 Successfully started ingestion for "${book.title}"!`);
+        setTimeout(() => setBookSuccess(null), 4000);
+      } else {
+        addTerminalLog(`[ERROR] Registration failed for: "${book.title}". Reason: ${data.error || "Server Error"}`);
+        setBookError(data.error || "Failed to register book.");
+        setTimeout(() => setBookError(null), 4000);
+      }
+    } catch (err: any) {
+      addTerminalLog(`[ERROR] System fault during import: ${err.message}`);
     }
   };
 
@@ -410,11 +703,15 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           processedPages: 0,
           speed: 0,
           eta: 0,
-          startTime: 0
+          startTime: 0,
+          isLocalSessionJob: true
         };
 
         setQueue(prev => [...prev, newJob]);
         addTerminalLog(`[QUEUE] Pushed async processing job to GCP Cloud Run pool for: ${cleanFileName}`);
+
+        // Refresh subjects and books count from the database
+        fetchSubjects();
 
         // Reset form
         setBookTitle("");
@@ -433,416 +730,70 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     }
   };
 
-  // Simulated Crawler & Content Discovery
-  const handleStartCrawling = () => {
+  // Real Crawler & Content Discovery
+  const handleStartCrawling = async () => {
     if (!crawlUrl) return;
     setIsCrawling(true);
     setCrawlLogs([]);
     setDiscoveredResources([]);
     setSelectedResources({});
 
-    const logMessages = [
-      `Initializing premium web spider agent targeting ${crawlUrl}...`,
-      "Enforcing strict compliance with robots.txt policy... Allowed",
-      "Scanning target server HTML anchors, breadcrumbs, & metadata tags...",
-      `Crawling depth level: Resolving nested links up to max_depth: ${crawlMaxDepth}`,
-      "Following breadcrumb hierarchy path: Home -> Subjects -> Core Books -> Assets...",
-      "Analyzing link tree hierarchies to classify book types (Core vs Student/Instructor Support)...",
-      "[DETECTION] Parsing path: /subjects/computer-science -> Core Book: Introduction to Python Programming -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/computer-science -> Student Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Student_Solutions.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/computer-science -> Instructor Resources -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Instructor_Guide.pdf (Supporting Book - Instructor)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> Core Book: Calculus Volume 1 -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus-Volume1-OP.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> Student solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Student_Solutions_Manual.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> Instructor answer guide -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Instructor_Answer_Guide.pdf (Supporting Book - Instructor)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> Core Book: College Algebra -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra-WEB.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> College Algebra solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Student_Solutions_Manual.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/mathematics -> College Algebra key -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
-      "[DETECTION] Parsing path: /subjects/physics -> Core Book: College Physics -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/CollegePhysics-OP.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/physics -> Student Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Student_Solutions_Manual.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/physics -> Instructor Answer Key -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
-      "[DETECTION] Parsing path: /subjects/chemistry -> Core Book: Chemistry 2e -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry2e-OP.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/chemistry -> Study Guide & Solutions -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Student_Solutions_Manual.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/chemistry -> Instructor Answers -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
-      "[DETECTION] Parsing path: /subjects/biology -> Core Book: Biology 2e -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology2e-OP.pdf (Core Book)",
-      "[DETECTION] Parsing path: /subjects/biology -> Student Review Manual -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Student_Solutions_Manual.pdf (Supporting Book - Student)",
-      "[DETECTION] Parsing path: /subjects/biology -> Instructor Exam Keys -> URL: https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Instructor_Answer_Key.pdf (Supporting Book - Instructor)",
-      "Spider crawled successfully! Analyzed link breadcrumbs and classified 15 direct PDF textbooks & manuals.",
-      "Structuring directories and generating visual stats dashboard..."
-    ];
+    addTerminalLog(`[CRAWLER] Initiating real web spider agent targeting ${crawlUrl}...`);
 
-    let currentMsgIdx = 0;
-    const logInterval = setInterval(() => {
-      if (currentMsgIdx < logMessages.length) {
-        const timestamp = new Date().toLocaleTimeString();
-        setCrawlLogs((prev) => [...prev, `[${timestamp}] 🕷️ ${logMessages[currentMsgIdx]}`]);
-        currentMsgIdx++;
-      } else {
-        clearInterval(logInterval);
+    try {
+      const res = await fetch("/api/admin/crawl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: crawlUrl,
+          maxDepth: crawlMaxDepth,
+          requesterEmail: email || "hesham1988@gmail.com"
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
         setIsCrawling(false);
-
-        const csSubjId = subjectsList.find(s => s.name.toLowerCase().includes("science") || s.name.toLowerCase().includes("comput"))?._id || "subj_computer_science";
-        const mathSubjId = subjectsList.find(s => s.name.toLowerCase().includes("math"))?._id || "subj_mathematics";
-        const physSubjId = subjectsList.find(s => s.name.toLowerCase().includes("physic"))?._id || "subj_physics";
-        const chemSubjId = subjectsList.find(s => s.name.toLowerCase().includes("chemist"))?._id || "subj_chemistry";
-        const bioSubjId = subjectsList.find(s => s.name.toLowerCase().includes("biolog"))?._id || "subj_biology";
-
-        setDiscoveredResources([
-          // Computer Science
-          {
-            id: "os_py_core",
-            title: "Introduction to Python Programming",
-            titleAr: "مقدمة في البرمجة بلغة بايثون",
-            subject: "Computer Science",
-            subjectId: csSubjId,
-            fileName: "Introduction_to_Python_Programming-WEB.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf",
-            totalPages: 240,
-            bookType: "core",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Introduction to Programming", title_ar: "مقدمة في البرمجة", page_start: 1, page_end: 45, concepts: ["variables", "expressions", "types"] },
-              { title: "Control Structures & Loops", title_ar: "جمل التحكم والتكرار", page_start: 46, page_end: 110, concepts: ["conditionals", "while loops", "for loops"] },
-              { title: "Functions & Scope", title_ar: "الدوال ونطاق المتغيرات", page_start: 111, page_end: 175, concepts: ["def", "parameters", "return", "local scope"] },
-              { title: "Data Structures & Objects", title_ar: "بنيات البيانات والكائنات", page_start: 176, page_end: 240, concepts: ["lists", "dicts", "classes", "methods"] }
-            ]
-          },
-          {
-            id: "os_py_student",
-            title: "Introduction to Python Programming (Student Solutions Manual)",
-            titleAr: "دليل حلول الطالب - البرمجة بلغة بايثون",
-            subject: "Computer Science",
-            subjectId: csSubjId,
-            fileName: "Introduction_to_Python_Programming_Student_Solutions.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Student_Solutions.pdf",
-            totalPages: 110,
-            bookType: "student_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Exercises & Workouts", title_ar: "حلول وتمارين مبسطة", page_start: 1, page_end: 110, concepts: ["exercise solutions", "debugging"] }
-            ]
-          },
-          {
-            id: "os_py_instructor",
-            title: "Introduction to Python Programming (Instructor Teaching Guide)",
-            titleAr: "دليل إجابات وتدريس المعلم - لغة بايثون",
-            subject: "Computer Science",
-            subjectId: csSubjId,
-            fileName: "Introduction_to_Python_Programming_Instructor_Guide.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming_Instructor_Guide.pdf",
-            totalPages: 160,
-            bookType: "instructor_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Teaching Guides & Assessments", title_ar: "أسئلة وتقييمات المعلم", page_start: 1, page_end: 160, concepts: ["teaching models", "rubrics", "test bank"] }
-            ]
-          },
-
-          // Mathematics
-          {
-            id: "os_calc_core",
-            title: "Calculus Volume 1",
-            titleAr: "حساب التفاضل والتكامل - الجزء الأول",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "Calculus-Volume1-OP.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus-Volume1-OP.pdf",
-            totalPages: 184,
-            bookType: "core",
-            grade: "Grade 12",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Functions and Graphs", title_ar: "الدوال والتمثيلات البيانية", page_start: 1, page_end: 60, concepts: ["domains", "ranges", "linear models"] },
-              { title: "Limits & Continuity", title_ar: "النهايات والاتصال", page_start: 61, page_end: 130, concepts: ["limit laws", "asymptotes", "continuity"] },
-              { title: "Derivatives", title_ar: "المشتقات", page_start: 131, page_end: 184, concepts: ["power rule", "product rule", "chain rule"] }
-            ]
-          },
-          {
-            id: "os_calc_student",
-            title: "Calculus Volume 1 (Student Solutions Manual)",
-            titleAr: "دليل حلول الطالب - التفاضل والتكامل 1",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "Calculus_Volume_1_Student_Solutions_Manual.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Student_Solutions_Manual.pdf",
-            totalPages: 95,
-            bookType: "student_support",
-            grade: "Grade 12",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Calculus Exercises & Solutions", title_ar: "حلول تمارين التفاضل والتكامل", page_start: 1, page_end: 95, concepts: ["derivatives solutions", "limits"] }
-            ]
-          },
-          {
-            id: "os_calc_instructor",
-            title: "Calculus Volume 1 (Instructor Answer Guide)",
-            titleAr: "دليل إجابات المعلم - التفاضل والتكامل 1",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "Calculus_Volume_1_Instructor_Answer_Guide.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_Instructor_Answer_Guide.pdf",
-            totalPages: 120,
-            bookType: "instructor_support",
-            grade: "Grade 12",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Calculus Grading Material", title_ar: "مواد اختبار وتوزيع درجات المادة", page_start: 1, page_end: 120, concepts: ["calculus curriculum", "final exam"] }
-            ]
-          },
-          {
-            id: "os_alg_core",
-            title: "College Algebra",
-            titleAr: "الجبر الجامعي المتقدم",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "College_Algebra-WEB.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra-WEB.pdf",
-            totalPages: 210,
-            bookType: "core",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Prerequisites & Algebra Basics", title_ar: "المتطلبات الأساسية ومبادئ الجبر", page_start: 1, page_end: 70, concepts: ["real numbers", "exponents", "radicals"] },
-              { title: "Equations & Inequalities", title_ar: "المعادلات والمتباينات الجبرية", page_start: 71, page_end: 140, concepts: ["linear equations", "quadratic equations", "complex numbers"] },
-              { title: "Functions & Systems", title_ar: "الدوال والأنظمة الخطية والرسوم", page_start: 141, page_end: 210, concepts: ["composition of functions", "inverse functions"] }
-            ]
-          },
-          {
-            id: "os_alg_student",
-            title: "College Algebra (Student Solutions Manual)",
-            titleAr: "دليل دراسة وحلول الطالب المنهجية - الجبر",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "College_Algebra_Student_Solutions_Manual.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Student_Solutions_Manual.pdf",
-            totalPages: 80,
-            bookType: "student_support",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Algebra step-by-step workouts", title_ar: "خطوات حلول التمارين الجبرية", page_start: 1, page_end: 80, concepts: ["factoring", "inequalities solutions"] }
-            ]
-          },
-          {
-            id: "os_alg_instructor",
-            title: "College Algebra (Instructor Answer Key)",
-            titleAr: "دليل حلول وإرشادات المعلم - كتاب الجبر",
-            subject: "Mathematics",
-            subjectId: mathSubjId,
-            fileName: "College_Algebra_Instructor_Answer_Key.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Algebra_Instructor_Answer_Key.pdf",
-            totalPages: 105,
-            bookType: "instructor_support",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Algebra Lesson Plans & Exams", title_ar: "خطط الدروس والاختبارات المعتمدة", page_start: 1, page_end: 105, concepts: ["curriculum design", "lesson pacing"] }
-            ]
-          },
-
-          // Physics
-          {
-            id: "os_phys_core",
-            title: "College Physics",
-            titleAr: "الفيزياء الكلاسيكية والحديثة للجامعات",
-            subject: "Physics",
-            subjectId: physSubjId,
-            fileName: "CollegePhysics-OP.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/CollegePhysics-OP.pdf",
-            totalPages: 175,
-            bookType: "core",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Kinematics", title_ar: "علم الحركة المجردة", page_start: 1, page_end: 50, concepts: ["velocity", "acceleration", "displacement"] },
-              { title: "Dynamics and Force", title_ar: "القوى وقوانين الحركة الكلاسيكية", page_start: 51, page_end: 110, concepts: ["newtons laws", "friction", "drag forces"] },
-              { title: "Work & Kinetic Energy", title_ar: "الشغل المبذول وطاقة الحركة والوضع", page_start: 111, page_end: 175, concepts: ["kinetic energy", "potential energy", "conservation of energy"] }
-            ]
-          },
-          {
-            id: "os_phys_student",
-            title: "College Physics (Student Solutions Manual)",
-            titleAr: "دليل مراجعة وحلول الطالب - الفيزياء العامة",
-            subject: "Physics",
-            subjectId: physSubjId,
-            fileName: "College_Physics_Student_Solutions_Manual.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Student_Solutions_Manual.pdf",
-            totalPages: 90,
-            bookType: "student_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Kinematics & Dynamics Solutions", title_ar: "حلول ميكانيكا وحرآة الأجسام", page_start: 1, page_end: 90, concepts: ["free-body forces", "friction solutions"] }
-            ]
-          },
-          {
-            id: "os_phys_instructor",
-            title: "College Physics (Instructor Answer Key)",
-            titleAr: "مفتاح إجابات واختبارات المعلم - كتاب الفيزياء",
-            subject: "Physics",
-            subjectId: physSubjId,
-            fileName: "College_Physics_Instructor_Answer_Key.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/College_Physics_Instructor_Answer_Key.pdf",
-            totalPages: 115,
-            bookType: "instructor_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Laboratory answers and grading rubrics", title_ar: "حلول تجارب المعمل وتوزيع الدرجات", page_start: 1, page_end: 115, concepts: ["lab safety", "experimental analysis"] }
-            ]
-          },
-
-          // Chemistry
-          {
-            id: "os_chem_core",
-            title: "Chemistry 2e",
-            titleAr: "كيمياء المواد والعناصر - الطبعة الثانية",
-            subject: "Chemistry",
-            subjectId: chemSubjId,
-            fileName: "Chemistry2e-OP.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry2e-OP.pdf",
-            totalPages: 195,
-            bookType: "core",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Atoms, Molecules, and Ions", title_ar: "الذرات والجزيئات والروابط الأيونية", page_start: 1, page_end: 65, concepts: ["atomic structure", "molecular formulas"] },
-              { title: "Stoichiometry of Reactions", title_ar: "حسابات كيمياء المعادلات والتفاعلات", page_start: 66, page_end: 130, concepts: ["stoichiometry", "yields"] },
-              { title: "Thermochemistry & Energy", title_ar: "الكيمياء الحرارية وتبادل الطاقة", page_start: 131, page_end: 195, concepts: ["calorimetry", "enthalpy rules"] }
-            ]
-          },
-          {
-            id: "os_chem_student",
-            title: "Chemistry 2e (Student Study Guide & Workbook)",
-            titleAr: "كراسة تدريبات وحلول الطالب المبسطة - كيمياء",
-            subject: "Chemistry",
-            subjectId: chemSubjId,
-            fileName: "Chemistry_2e_Student_Solutions_Manual.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Student_Solutions_Manual.pdf",
-            totalPages: 100,
-            bookType: "student_support",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Stoichiometry & Reaction Workouts", title_ar: "تبسيط حلول التفاعلات الكيميائية", page_start: 1, page_end: 100, concepts: ["balanced equation solutions", "limiting reagents"] }
-            ]
-          },
-          {
-            id: "os_chem_instructor",
-            title: "Chemistry 2e (Instructor Solutions Manual)",
-            titleAr: "دليل حلول وتقييمات المعلم - كتاب الكيمياء",
-            subject: "Chemistry",
-            subjectId: chemSubjId,
-            fileName: "Chemistry_2e_Instructor_Answer_Key.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Chemistry_2e_Instructor_Answer_Key.pdf",
-            totalPages: 130,
-            bookType: "instructor_support",
-            grade: "Grade 10",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Instructor Lab setups & answer schemes", title_ar: "إرشادات تجهيز المختبر وحلول الأسئلة", page_start: 1, page_end: 130, concepts: ["chemical reagents safety", "grading lab exams"] }
-            ]
-          },
-
-          // Biology
-          {
-            id: "os_bio_core",
-            title: "Biology 2e",
-            titleAr: "علم الأحياء والكائنات الحية - الطبعة الثانية",
-            subject: "Biology",
-            subjectId: bioSubjId,
-            fileName: "Biology2e-OP.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology2e-OP.pdf",
-            totalPages: 215,
-            bookType: "core",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "The Chemistry of Life", title_ar: "التركيب الكيميائي للخلايا والماء", page_start: 1, page_end: 70, concepts: ["organic molecules", "macromolecules"] },
-              { title: "Cell Structure & Photosynthesis", title_ar: "تركيب الخلية النباتية والحيوانية والبناء الضوئي", page_start: 71, page_end: 145, concepts: ["mitochondria", "photosynthesis", "cell respiration"] },
-              { title: "Genetics and Inheritance Rules", title_ar: "علم هندسة الجينات الوراثية وتضاعف الـ DNA", page_start: 146, page_end: 215, concepts: ["meiosis", "gene mapping", "mendel inheritance"] }
-            ]
-          },
-          {
-            id: "os_bio_student",
-            title: "Biology 2e (Student Review & Diagrams Manual)",
-            titleAr: "مذكرة رسوم الأحياء ومراجعة المنهج للطالب",
-            subject: "Biology",
-            subjectId: bioSubjId,
-            fileName: "Biology_2e_Student_Solutions_Manual.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Student_Solutions_Manual.pdf",
-            totalPages: 85,
-            bookType: "student_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Cellular Diagram Labeling & Quiz prep", title_ar: "مراجعات الرسوم البيانية للخلية الوراثية", page_start: 1, page_end: 85, concepts: ["labelling cells", "practice tests"] }
-            ]
-          },
-          {
-            id: "os_bio_instructor",
-            title: "Biology 2e (Instructor Classroom Slide Guides)",
-            titleAr: "شرائح ومفتاح إجابات المعلم - علم الأحياء",
-            subject: "Biology",
-            subjectId: bioSubjId,
-            fileName: "Biology_2e_Instructor_Answer_Key.pdf",
-            url: "https://assets.openstax.org/oscms-prodcms/media/documents/Biology_2e_Instructor_Answer_Key.pdf",
-            totalPages: 110,
-            bookType: "instructor_support",
-            grade: "Grade 11",
-            term: "Term 1",
-            year: "2026",
-            language: "en",
-            chapters: [
-              { title: "Lecture Slides Notes & Final Keys", title_ar: "مذكرات العرض المساعد ومفاتيح الأسئلة", page_start: 1, page_end: 110, concepts: ["lecture schedules", "biology final solutions"] }
-            ]
-          }
-        ]);
-        setExpandedFolders({
-          "Computer Science": true,
-          "Mathematics": true,
-          "Physics": true,
-          "Chemistry": true,
-          "Biology": true
-        });
+        addTerminalLog(`[CRAWLER ERROR] ${data.error || "Failed to crawl target site."}`);
+        setCrawlLogs([`[ERROR] Crawler terminated: ${data.error || "Failed to crawl target site."}`]);
+        return;
       }
-    }, 500);
+
+      // Map the discovered resources to match subjectsList automatically
+      const mappedDiscovered = (data.discovered || []).map((book: any) => {
+        const matchingSubj = subjectsList.find(s => 
+          book.title.toLowerCase().includes(s.name.toLowerCase()) || 
+          s.name.toLowerCase().includes(book.title.toLowerCase()) ||
+          book.fileName.toLowerCase().includes(s.name.toLowerCase())
+        ) || subjectsList[0];
+
+        return {
+          ...book,
+          subjectId: matchingSubj ? matchingSubj._id : "subj_algebra_stats",
+          subject: matchingSubj ? matchingSubj.name : "Pure Mathematics"
+        };
+      });
+
+      setDiscoveredResources(mappedDiscovered);
+      
+      if (data.logs && Array.isArray(data.logs)) {
+        setCrawlLogs(data.logs);
+      }
+
+      const folderMap: Record<string, boolean> = {};
+      mappedDiscovered.forEach((book: any) => {
+        if (book.subject) {
+          folderMap[book.subject] = true;
+        }
+      });
+      setExpandedFolders(folderMap);
+
+      addTerminalLog(`[CRAWLER] Success. Discovered ${mappedDiscovered.length} real PDF documents.`);
+    } catch (err: any) {
+      addTerminalLog(`[CRAWLER FAULT] ${err.message || "Failed to contact crawling API."}`);
+    } finally {
+      setIsCrawling(false);
+    }
   };
 
   // Bulk Ingest selected textbooks into system
@@ -857,7 +808,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     let failedCount = 0;
 
     for (const book of selectedList) {
-      addTerminalLog(`[CRAWLER] Registering schema metadata in MongoDB for: "${book.title}"...`);
+      addTerminalLog(`[CRAWLER] Registering book details in MongoDB for: "${book.title}"...`);
       try {
         const res = await fetch("/api/books", {
           method: "POST",
@@ -897,7 +848,8 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
             processedPages: 0,
             speed: 0,
             eta: 0,
-            startTime: 0
+            startTime: 0,
+            isLocalSessionJob: true
           };
 
           setQueue(prev => [...prev, newJob]);
@@ -933,6 +885,94 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     }
   };
 
+  // Bulk Ingest all discovered resources (fully functional third ingestion flow)
+  const handleImportAllCrawled = async () => {
+    if (discoveredResources.length === 0) return;
+
+    setImportingBulk(true);
+    addTerminalLog(`[CRAWLER] Initiating full importation queue on GCP Cloud Run for all ${discoveredResources.length} discovered assets...`);
+
+    let importedCount = 0;
+    let failedCount = 0;
+
+    for (const book of discoveredResources) {
+      addTerminalLog(`[CRAWLER] Registering book details in MongoDB for: "${book.title}"...`);
+      try {
+        const res = await fetch("/api/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject_id: book.subjectId,
+            title: book.title,
+            title_ar: book.titleAr,
+            grade: book.grade,
+            term: book.term,
+            year: book.year,
+            language: book.language,
+            book_type: book.bookType,
+            source_url: book.url,
+            storage_path: `/fahem-core-store/textbooks/${book.fileName}`,
+            chapters: book.chapters,
+            requesterEmail: email
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          importedCount++;
+          addTerminalLog(`[SUCCESS] Registered textbook: "${book.title}". Spawning isolated Cloud Run indexing job...`);
+
+          // Spawn live local queue task that processes page-by-page
+          const cleanFileName = book.url.split("/").pop() || `${book.title.replace(/\s+/g, "_")}.pdf`;
+          const newJob: QueueJob = {
+            id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            fileName: cleanFileName,
+            bookTitle: book.title,
+            bookTitleAr: book.titleAr,
+            subjectName: book.subject,
+            status: "idle",
+            progress: 0,
+            totalPages: book.totalPages,
+            processedPages: 0,
+            speed: 0,
+            eta: 0,
+            startTime: 0,
+            isLocalSessionJob: true
+          };
+
+          setQueue(prev => [...prev, newJob]);
+          addTerminalLog(`[QUEUE] Registered Cloud Run Task for: ${cleanFileName}`);
+        } else {
+          failedCount++;
+          addTerminalLog(`[ERROR] Registration failed for: "${book.title}". Reason: ${data.error || "Server Error"}`);
+        }
+      } catch (err: any) {
+        failedCount++;
+        addTerminalLog(`[ERROR] System fault during import: ${err.message}`);
+      }
+    }
+
+    setImportingBulk(false);
+    setSelectedResources({});
+    fetchSubjects();
+
+    if (failedCount === 0) {
+      setBookSuccess(
+        language === "ar"
+          ? `🎉 تم استيراد وتفعيل قائمة المعالجة لجميع الكتب (${importedCount} كتاب) بنجاح!`
+          : `🎉 Successfully registered and scheduled all ${importedCount} discovered textbooks for async indexing!`
+      );
+      setTimeout(() => setBookSuccess(null), 5000);
+    } else {
+      setBookError(
+        language === "ar"
+          ? `⚠️ اكتمل استيراد جميع الكتب مع وجود أخطاء. الناجح: ${importedCount}، الفاشل: ${failedCount}. تفحص السجلات.`
+          : `⚠️ Import completed with errors. Succeeded: ${importedCount}, Failed: ${failedCount}. Check terminal logs.`
+      );
+      setTimeout(() => setBookError(null), 5000);
+    }
+  };
+
   const handlePreFillFromCrawler = (res: any) => {
     setBookTitle(res.title);
     setBookTitleAr(res.titleAr);
@@ -942,7 +982,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
     if (res.subjectId) {
       setBookSubjId(res.subjectId);
     }
-    addTerminalLog(`[CRAWLER] Auto-filled book schema from discovered resource: ${res.fileName}`);
+    addTerminalLog(`[CRAWLER] Auto-filled book metadata from discovered resource: ${res.fileName}`);
   };
 
   const handleCancelJob = (id: string) => {
@@ -1258,9 +1298,33 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
           {/* Queue List Table */}
           <div style={{ marginTop: "1rem" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#4f6371", display: "block", marginBottom: "0.5rem" }}>
-              📋 {language === "ar" ? "سجل وجدول مهام الاستيراد المعلقة" : "Ingestion Cluster Task Schedule"}
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#4f6371" }}>
+                📋 {language === "ar" ? "سجل وجدول مهام الاستيراد المعلقة" : "Ingestion Cluster Task Schedule"}
+              </span>
+              <button
+                type="button"
+                onClick={() => fetchBooks()}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--primary)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <FiRefreshCw /> {language === "ar" ? "تحديث" : "Refresh"}
+              </button>
+            </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", textAlign: language === "ar" ? "right" : "left" }}>
                 <thead>
@@ -1372,31 +1436,17 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عمق الزحف (Max Depth)" : "Recursion Depth"}</label>
-                  <select
-                    value={crawlMaxDepth}
-                    onChange={(e) => setCrawlDepth(Number(e.target.value))}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}
-                  >
-                    <option value={1}>1 (Single Page)</option>
-                    <option value={2}>2 (Standard Links)</option>
-                    <option value={3}>3 (Deep Recursion)</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "نوع الملفات" : "Format Filter"}</label>
-                  <select
-                    value={selectedFormat}
-                    onChange={(e: any) => setSelectedFormat(e.target.value)}
-                    style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}
-                  >
-                    <option value="pdf">Direct PDF textbooks</option>
-                    <option value="html">Educational Web Pages</option>
-                    <option value="all">All Content</option>
-                  </select>
-                </div>
+              <div style={{
+                background: "rgba(16, 107, 163, 0.04)",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "1px dashed rgba(16, 107, 163, 0.15)",
+                fontSize: "0.75rem",
+                color: "var(--primary)"
+              }}>
+                ℹ️ {language === "ar" 
+                  ? "تم تهيئة الزحف آلياً بالعمق الأقصى (3) وتصفية ملفات الـ PDF المباشرة للوصول الدقيق للمناهج."
+                  : "Crawler set to Max Depth (3) and PDF-Only filter by default to accurately index direct textbook files."}
               </div>
 
               <button
@@ -1718,42 +1768,81 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                     </span>
                   </div>
 
-                  <button
-                    onClick={handleImportSelectedBooks}
-                    disabled={selectedCount === 0 || importingBulk}
-                    type="button"
-                    style={{
-                      background: selectedCount === 0 ? "#cbd5e1" : "linear-gradient(135deg, var(--secondary), var(--primary))",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "6px 16px",
-                      fontSize: "0.8rem",
-                      fontWeight: 800,
-                      cursor: (selectedCount === 0 || importingBulk) ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      boxShadow: selectedCount === 0 ? "none" : "0 4px 12px rgba(16, 107, 163, 0.15)",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    {importingBulk ? (
-                      <>
-                        <FiRefreshCw className="spinning-icon" />
-                        <span>{language === "ar" ? "جاري استيراد الحزمة..." : "Importing Selected to Cluster..."}</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiDownloadCloud />
-                        <span>
-                          {language === "ar" 
-                            ? `استيراد الحزمة المحددة لـ ${selectedCount} كتب` 
-                            : `Bulk Ingest Selected (${selectedCount} Books)`}
-                        </span>
-                      </>
-                    )}
-                  </button>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <button
+                      onClick={handleImportSelectedBooks}
+                      disabled={selectedCount === 0 || importingBulk}
+                      type="button"
+                      style={{
+                        background: selectedCount === 0 ? "#cbd5e1" : "linear-gradient(135deg, var(--secondary), var(--primary))",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "6px 16px",
+                        fontSize: "0.8rem",
+                        fontWeight: 800,
+                        cursor: (selectedCount === 0 || importingBulk) ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: selectedCount === 0 ? "none" : "0 4px 12px rgba(16, 107, 163, 0.15)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {importingBulk ? (
+                        <>
+                          <FiRefreshCw className="spinning-icon" />
+                          <span>{language === "ar" ? "جاري استيراد الحزمة..." : "Importing Selected to Cluster..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiDownloadCloud />
+                          <span>
+                            {language === "ar" 
+                              ? `استيراد الحزمة المحددة لـ ${selectedCount} كتب` 
+                              : `Bulk Ingest Selected (${selectedCount} Books)`}
+                          </span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleImportAllCrawled}
+                      disabled={totalDiscovered === 0 || importingBulk}
+                      type="button"
+                      style={{
+                        background: totalDiscovered === 0 ? "#cbd5e1" : "linear-gradient(135deg, #10b981, #059669)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "6px 16px",
+                        fontSize: "0.8rem",
+                        fontWeight: 800,
+                        cursor: (totalDiscovered === 0 || importingBulk) ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: totalDiscovered === 0 ? "none" : "0 4px 12px rgba(16, 185, 129, 0.15)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {importingBulk ? (
+                        <>
+                          <FiRefreshCw className="spinning-icon" />
+                          <span>{language === "ar" ? "جاري استيراد الكل..." : "Importing All Explored..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiDownloadCloud />
+                          <span>
+                            {language === "ar" 
+                              ? "استيراد جميع المناهج المستكشفة" 
+                              : "Import All Explored"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* DIRECTORY TREE EXPLORER */}
@@ -1958,34 +2047,66 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                                       {res.totalPages} p
                                     </span>
 
-                                    {/* Action button to pre-fill */}
-                                    <button
-                                      onClick={() => handlePreFillFromCrawler(res)}
-                                      type="button"
-                                      title={language === "ar" ? "تعبئة البيانات يدوياً للتعديل" : "Pre-fill Ingestion Schema Form"}
-                                      style={{
-                                        padding: "4px",
-                                        borderRadius: "4px",
-                                        border: "1px solid rgba(16, 107, 163, 0.2)",
-                                        background: "transparent",
-                                        color: "var(--primary)",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        transition: "all 0.15s"
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = "var(--primary)";
-                                        e.currentTarget.style.color = "#ffffff";
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = "transparent";
-                                        e.currentTarget.style.color = "var(--primary)";
-                                      }}
-                                    >
-                                      <FiSliders style={{ fontSize: "0.75rem" }} />
-                                    </button>
+                                    {/* Action buttons inside crawler list item */}
+                                    <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+                                      {/* Pre-fill Form */}
+                                      <button
+                                        onClick={() => handlePreFillFromCrawler(res)}
+                                        type="button"
+                                        title={language === "ar" ? "التهيئة والاستيراد يدوياً" : "Configure & Import Manually"}
+                                        style={{
+                                          padding: "4px",
+                                          borderRadius: "4px",
+                                          border: "1px solid rgba(16, 107, 163, 0.2)",
+                                          background: "transparent",
+                                          color: "var(--primary)",
+                                          cursor: "pointer",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          transition: "all 0.15s"
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = "var(--primary)";
+                                          e.currentTarget.style.color = "#ffffff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = "transparent";
+                                          e.currentTarget.style.color = "var(--primary)";
+                                        }}
+                                      >
+                                        <FiSliders style={{ fontSize: "0.75rem" }} />
+                                      </button>
+
+                                      {/* Direct Individual Ingestion */}
+                                      <button
+                                        onClick={() => handleIngestSingleDiscovered(res)}
+                                        type="button"
+                                        title={language === "ar" ? "استيراد هذا الكتاب فوراً" : "Direct Ingest Single Textbook"}
+                                        style={{
+                                          padding: "4px",
+                                          borderRadius: "4px",
+                                          border: "1px solid rgba(27, 163, 156, 0.2)",
+                                          background: "transparent",
+                                          color: "var(--secondary)",
+                                          cursor: "pointer",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          transition: "all 0.15s"
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = "var(--secondary)";
+                                          e.currentTarget.style.color = "#ffffff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = "transparent";
+                                          e.currentTarget.style.color = "var(--secondary)";
+                                        }}
+                                      >
+                                        <FiZap style={{ fontSize: "0.75rem" }} />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -2002,384 +2123,842 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
           })()}
         </section>
 
-        {/* ROW 3: CRUD Subject & Book Metadata Commit Controls */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "1.5rem"
-        }}>
+        {/* ROW 3: Tabbed Subjects & Books Relational Console */}
+        <section className="panel-card" style={{ width: "100%", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
           
-          {/* Column 3.1: Add New Subject Schema */}
-          <section className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem", margin: 0 }}>
-              <FiPlus style={{ color: "var(--primary)" }} />
-              <span>{language === "ar" ? "إضافة مادة دراسية جديدة" : "Add New Subject Schema"}</span>
-            </h3>
-
-            {subjectError && (
-              <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
-                {subjectError}
-              </div>
-            )}
-            {subjectSuccess && (
-              <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
-                {subjectSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateSubject} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (إنجليزي)" : "Subject Name (English)"}</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Pure Mathematics"
-                  value={subjName}
-                  onChange={(e) => setSubjName(e.target.value)}
-                  required
-                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (عربي)" : "Subject Name (Arabic)"}</label>
-                <input
-                  type="text"
-                  placeholder="مثال: الرياضيات البحتة"
-                  value={subjNameAr}
-                  onChange={(e) => setSubjNameAr(e.target.value)}
-                  required
-                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", fontFamily: "Cairo, var(--font-sans)" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "المرحلة الدراسية" : "Grade Level"}</label>
-                  <select
-                    value={subjGrade}
-                    onChange={(e) => setSubjGrade(e.target.value)}
-                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                  >
-                    <option value="Grade 10">Grade 10</option>
-                    <option value="Grade 11">Grade 11</option>
-                    <option value="Grade 12">Grade 12</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "التصنيف" : "Category"}</label>
-                  <select
-                    value={subjCategory}
-                    onChange={(e) => setSubjCategory(e.target.value)}
-                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                  >
-                    <option value="Science">Science</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Languages">Languages</option>
-                    <option value="Social Studies">Social Studies</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "رمز تعبيري (Emoji)" : "Icon Emoji"}</label>
-                <input
-                  type="text"
-                  placeholder="📚"
-                  value={subjEmoji}
-                  onChange={(e) => setSubjEmoji(e.target.value)}
-                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", width: "50px", textAlign: "center" }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isCreatingSubject}
-                style={{
-                  background: "var(--primary)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "0.6rem",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: isCreatingSubject ? "not-allowed" : "pointer",
+          {/* Custom Emojis List for the Picker */}
+          {(() => {
+            const emojisList = ["📚", "🔬", "📐", "🧪", "🪐", "🧬", "💻", "🎨", "🌍", "🗺️", "🧠", "⚖️", "📜", "💬", "🤖", "📖", "🔢", "✍️", "⚙️", "🛠️"];
+            
+            return (
+              <>
+                {/* Visual Tab Selection Header */}
+                <div style={{
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  marginTop: "0.5rem"
-                }}
-              >
-                {isCreatingSubject ? (
-                  <FiRefreshCw className="spinning-icon" />
-                ) : (
-                  <>
-                    <FiPlus />
-                    <span>{language === "ar" ? "إنشاء المادة ودفعها للمستودع" : "Create New Subject Schema"}</span>
-                  </>
+                  borderBottom: "1px solid rgba(16, 107, 163, 0.1)",
+                  marginBottom: "1rem",
+                  gap: "1.25rem",
+                  paddingBottom: "0.25rem",
+                  flexWrap: "wrap"
+                }}>
+                  {[
+                    { id: "subjects", titleAr: "📂 إدارة المواد الدراسية", titleEn: "📂 Subjects Console" },
+                    { id: "books", titleAr: "📚 كتالوج الكتب المنهجية", titleEn: "📚 Textbook Catalog" },
+                    { id: "ingest", titleAr: "✍️ استيراد يدوي", titleEn: "✍️ Manual Ingester" },
+                    { id: "lists", titleAr: "⚙️ تهيئة القوائم", titleEn: "⚙️ Configuration Lists" }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setSubjectError(null);
+                        setSubjectSuccess(null);
+                        setBookError(null);
+                        setBookSuccess(null);
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "0.9rem",
+                        fontWeight: 800,
+                        color: activeTab === tab.id ? "var(--primary)" : "#64748b",
+                        cursor: "pointer",
+                        padding: "0.5rem 0.75rem",
+                        borderBottom: activeTab === tab.id ? "3px solid var(--primary)" : "3px solid transparent",
+                        transition: "all 0.15s",
+                        fontFamily: language === "ar" ? "Cairo, var(--font-sans)" : "var(--font-sans)"
+                      }}
+                    >
+                      {language === "ar" ? tab.titleAr : tab.titleEn}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Main Notifications inside bottom console */}
+                {subjectError && (
+                  <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
+                    {subjectError}
+                  </div>
                 )}
-              </button>
-            </form>
-          </section>
+                {subjectSuccess && (
+                  <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
+                    {subjectSuccess}
+                  </div>
+                )}
+                {bookError && (
+                  <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
+                    {bookError}
+                  </div>
+                )}
+                {bookSuccess && (
+                  <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
+                    {bookSuccess}
+                  </div>
+                )}
 
-          {/* Column 3.2: Ingest New Textbook metadata */}
-          <section className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem", margin: 0 }}>
-              <FiBookOpen style={{ color: "var(--secondary)" }} />
-              <span>{language === "ar" ? "استيراد وتجهيز كتاب منهجي جديد" : "Ingest New Textbook Context"}</span>
-            </h3>
+                {/* TAB 1: Subjects Console */}
+                {activeTab === "subjects" && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "start" }}>
+                    
+                    {/* Add or Edit Form Panel */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                      {editingSubjectId ? (
+                        <form onSubmit={handleUpdateSubject} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>✏️ {language === "ar" ? "تعديل المادة الدراسية" : "Edit Subject"}</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubjectId(null)}
+                              style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
+                            >
+                              {language === "ar" ? "إلغاء التعديل" : "Cancel Edit"}
+                            </button>
+                          </div>
 
-            {bookError && (
-              <div style={{ padding: "0.5rem", background: "rgba(211, 47, 47, 0.08)", border: "1px solid rgba(211, 47, 47, 0.15)", borderRadius: "4px", color: "#f87171", fontSize: "0.8rem" }}>
-                {bookError}
-              </div>
-            )}
-            {bookSuccess && (
-              <div style={{ padding: "0.5rem", background: "rgba(39, 174, 96, 0.08)", border: "1px solid rgba(39, 174, 96, 0.15)", borderRadius: "4px", color: "var(--accent-green)", fontSize: "0.8rem" }}>
-                {bookSuccess}
-              </div>
-            )}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (إنجليزي)" : "Subject Name (English)"}</label>
+                            <input
+                              type="text"
+                              value={editingSubjName}
+                              onChange={(e) => setEditingSubjName(e.target.value)}
+                              required
+                              style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}
+                            />
+                          </div>
 
-            <form onSubmit={handleIngestBook} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اختر المادة المرتبطة" : "Select Target Subject"}</label>
-                <select
-                  value={bookSubjId}
-                  onChange={(e) => setBookSubjId(e.target.value)}
-                  required
-                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                >
-                  {subjectsList.length === 0 ? (
-                    <option value="">{language === "ar" ? "جاري تحميل المواد الدراسية..." : "Loading subjects..."}</option>
-                  ) : (
-                    subjectsList.map((subj) => (
-                      <option key={subj._id} value={subj._id}>
-                        {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (عربي)" : "Subject Name (Arabic)"}</label>
+                            <input
+                              type="text"
+                              value={editingSubjNameAr}
+                              onChange={(e) => setEditingSubjNameAr(e.target.value)}
+                              required
+                              style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem", fontFamily: "Cairo" }}
+                            />
+                          </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (إنجليزي)" : "Book Title (English)"}</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Calculus Volume I"
-                    value={bookTitle}
-                    onChange={(e) => setBookTitle(e.target.value)}
-                    required
-                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                  />
-                </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "المرحلة الدراسية" : "Grade Level"}</label>
+                              <select value={editingSubjGrade} onChange={(e) => setEditingSubjGrade(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}>
+                                {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "التصنيف" : "Category"}</label>
+                              <select value={editingSubjCategory} onChange={(e) => setEditingSubjCategory(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}>
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                          </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (عربي)" : "Book Title (Arabic)"}</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: التفاضل والتكامل ج1"
-                    value={bookTitleAr}
-                    onChange={(e) => setBookTitleAr(e.target.value)}
-                    required
-                    style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", fontFamily: "Cairo, var(--font-sans)" }}
-                  />
-                </div>
-              </div>
+                          {/* Clickable Emoji Picker Grid */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>
+                              {language === "ar" ? `الرمز المختار: ${editingSubjEmoji}` : `Selected Icon: ${editingSubjEmoji}`}
+                            </label>
+                            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", background: "rgba(255,255,255,0.7)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)" }}>
+                              {emojisList.map(em => (
+                                <button
+                                  key={em}
+                                  type="button"
+                                  onClick={() => setEditingSubjEmoji(em)}
+                                  style={{
+                                    background: editingSubjEmoji === em ? "var(--primary)" : "transparent",
+                                    border: editingSubjEmoji === em ? "1px solid var(--primary)" : "1px solid transparent",
+                                    borderRadius: "4px",
+                                    fontSize: "1rem",
+                                    padding: "4px",
+                                    cursor: "pointer",
+                                    transition: "all 0.1s"
+                                  }}
+                                >
+                                  {em}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.35rem" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Grade</label>
-                  <select value={bookGrade} onChange={(e) => setBookGrade(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
-                    <option value="Grade 10">Grade 10</option>
-                    <option value="Grade 11">Grade 11</option>
-                    <option value="Grade 12">Grade 12</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Term</label>
-                  <select value={bookTerm} onChange={(e) => setBookTerm(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
-                    <option value="Term 1">Term 1</option>
-                    <option value="Term 2">Term 2</option>
-                    <option value="Term 3">Term 3</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Lang</label>
-                  <select value={bookLang} onChange={(e) => setBookLang(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
-                    <option value="ar">العربية</option>
-                    <option value="en">English</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Type</label>
-                  <select value={bookType} onChange={(e) => setBookType(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
-                    <option value="core">Core</option>
-                    <option value="supplementary">Extra</option>
-                  </select>
-                </div>
-              </div>
+                          <button type="submit" disabled={isCreatingSubject} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", padding: "0.5rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                            {isCreatingSubject ? <FiRefreshCw className="spinning-icon" /> : <><FiCheck /> <span>{language === "ar" ? "حفظ التعديلات" : "Save Changes"}</span></>}
+                          </button>
+                        </form>
+                      ) : (
+                        <form onSubmit={handleCreateSubject} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px" }}>➕ {language === "ar" ? "إضافة مادة دراسية جديدة" : "Add New Subject"}</span>
+                          
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (إنجليزي)" : "Subject Name (English)"}</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Computer Science"
+                              value={subjName}
+                              onChange={(e) => setSubjName(e.target.value)}
+                              required
+                              style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}
+                            />
+                          </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "رابط المصدر (PDF URL)" : "Source Document URL"}</label>
-                <input
-                  type="url"
-                  placeholder="https://ellibrary.moe.gov.eg/calc_g11.pdf"
-                  value={bookSourceUrl}
-                  onChange={(e) => setBookSourceUrl(e.target.value)}
-                  style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
-                />
-              </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اسم المادة (عربي)" : "Subject Name (Arabic)"}</label>
+                            <input
+                              type="text"
+                              placeholder="مثال: علوم الحاسب"
+                              value={subjNameAr}
+                              onChange={(e) => setSubjNameAr(e.target.value)}
+                              required
+                              style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem", fontFamily: "Cairo" }}
+                            />
+                          </div>
 
-              {/* Interactive Chapters List Section */}
-              <div style={{
-                background: "rgba(0,0,0,0.02)",
-                border: "1px dashed var(--card-border)",
-                borderRadius: "8px",
-                padding: "0.75rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem"
-              }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", color: "var(--primary)" }}>
-                  <FiList />
-                  {language === "ar" ? "مسودة فصول الكتاب المكتشفة" : "Chapter Blueprint Segments"}
-                </span>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "المرحلة الدراسية" : "Grade Level"}</label>
+                              <select value={subjGrade} onChange={(e) => setSubjGrade(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}>
+                                {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "التصنيف" : "Category"}</label>
+                              <select value={subjCategory} onChange={(e) => setSubjCategory(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}>
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                          </div>
 
-                {pendingChapters.length === 0 ? (
-                  <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
-                    {language === "ar" ? "لا توجد فصول مضافة بعد. أضف فصولاً بالأسفل:" : "No segments defined. Build and link chapters below:"}
-                  </span>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", maxHeight: "120px", overflowY: "auto", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
-                    {pendingChapters.map((ch, index) => (
-                      <div key={index} style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        background: "rgba(255,255,255,0.9)",
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        border: "1px solid var(--card-border)"
-                      }}>
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <span>{language === "ar" ? ch.title_ar : ch.title}</span>
-                          <span style={{ fontSize: "0.65rem", color: "#64748b" }}>Pages {ch.page_start} - {ch.page_end} • Concepts: {ch.concepts.join(", ")}</span>
+                          {/* Clickable Emoji Picker Grid */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>
+                              {language === "ar" ? `الرمز المختار: ${subjEmoji}` : `Selected Icon: ${subjEmoji}`}
+                            </label>
+                            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", background: "rgba(255,255,255,0.7)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)" }}>
+                              {emojisList.map(em => (
+                                <button
+                                  key={em}
+                                  type="button"
+                                  onClick={() => setSubjEmoji(em)}
+                                  style={{
+                                    background: subjEmoji === em ? "var(--primary)" : "transparent",
+                                    border: subjEmoji === em ? "1px solid var(--primary)" : "1px solid transparent",
+                                    borderRadius: "4px",
+                                    fontSize: "1rem",
+                                    padding: "4px",
+                                    cursor: "pointer",
+                                    transition: "all 0.1s"
+                                  }}
+                                >
+                                  {em}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button type="submit" disabled={isCreatingSubject} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", padding: "0.5rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                            {isCreatingSubject ? <FiRefreshCw className="spinning-icon" /> : <><FiPlus /> <span>{language === "ar" ? "إنشاء المادة الدراسية" : "Create Subject"}</span></>}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+
+                    {/* Active Subjects List */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)", maxHeight: "400px", overflowY: "auto" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px", marginBottom: "0.5rem" }}>
+                        📂 {language === "ar" ? "المواد الدراسية النشطة" : "Active Subjects Catalog"}
+                      </span>
+
+                      {subjectsList.length === 0 ? (
+                        <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{language === "ar" ? "لا توجد مواد مضافة بعد." : "No subjects loaded."}</span>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                          {subjectsList.map((subj) => (
+                            <div key={subj._id} style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              background: "rgba(255, 255, 255, 0.85)",
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "6px",
+                              border: "1px solid var(--card-border)",
+                              fontSize: "0.8rem"
+                            }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <span style={{ fontSize: "1.2rem" }}>{subj.icon_emoji}</span>
+                                <div style={{ display: "flex", flexDirection: "column" }}>
+                                  <span style={{ fontWeight: 700 }}>{language === "ar" ? subj.name_ar : subj.name}</span>
+                                  <span style={{ fontSize: "0.65rem", color: "#64748b" }}>{subj.grade_level} • {subj.category} • {subj.books_count || 0} books</span>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "0.25rem" }}>
+                                <button
+                                  onClick={() => {
+                                    setEditingSubjectId(subj._id);
+                                    setEditingSubjName(subj.name);
+                                    setEditingSubjNameAr(subj.name_ar);
+                                    setEditingSubjGrade(subj.grade_level);
+                                    setEditingSubjCategory(subj.category);
+                                    setEditingSubjEmoji(subj.icon_emoji || "📚");
+                                    setSubjectError(null);
+                                    setSubjectSuccess(null);
+                                  }}
+                                  style={{ background: "transparent", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: "0.9rem" }}
+                                  title="Edit Subject"
+                                >
+                                  <FiEdit />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSubject(subj._id)}
+                                  style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.9rem" }}
+                                  title="Delete Subject"
+                                >
+                                  <FiTrash2 />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveChapter(index)}
-                          style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.85rem" }}
-                        >
-                          <FiTrash2 />
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+                {/* TAB 2: Textbook Catalog */}
+                {activeTab === "books" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    
+                    {/* Expandable inline book edit console */}
+                    {editingBookId && (
+                      <div style={{ background: "rgba(16, 107, 163, 0.05)", border: "1px solid rgba(16, 107, 163, 0.2)", borderRadius: "8px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(16, 107, 163, 0.15)", paddingBottom: "4px" }}>
+                          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>✏️ {language === "ar" ? "تعديل بيانات وفصول الكتاب المنهجي" : "Edit Textbook Metadata & Chapters"}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingBookId(null)}
+                            style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
+                          >
+                            {language === "ar" ? "إلغاء التعديل" : "Cancel Book Edit"}
+                          </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateBook} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "العنوان (إنجليزي)" : "Book Title (English)"}</label>
+                              <input
+                                type="text"
+                                value={editingBookTitle}
+                                onChange={(e) => setEditingBookTitle(e.target.value)}
+                                required
+                                style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem" }}
+                              />
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "العنوان (عربي)" : "Book Title (Arabic)"}</label>
+                              <input
+                                type="text"
+                                value={editingBookTitleAr}
+                                onChange={(e) => setEditingBookTitleAr(e.target.value)}
+                                required
+                                style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem", fontFamily: "Cairo" }}
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.35rem" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.65rem", fontWeight: 700 }}>Subject</label>
+                              <select value={editingBookSubjId} onChange={(e) => setEditingBookSubjId(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                {subjectsList.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.65rem", fontWeight: 700 }}>Grade</label>
+                              <select value={editingBookGrade} onChange={(e) => setEditingBookGrade(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.65rem", fontWeight: 700 }}>Term</label>
+                              <select value={editingBookTerm} onChange={(e) => setEditingBookTerm(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                {terms.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.65rem", fontWeight: 700 }}>Lang</label>
+                              <select value={editingBookLang} onChange={(e) => setEditingBookLang(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                {languagesList.map(l => <option key={l} value={l}>{l === "ar" ? "العربية" : l === "en" ? "English" : l}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.65rem", fontWeight: 700 }}>Type</label>
+                              <select value={editingBookType} onChange={(e) => setEditingBookType(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                <option value="core">Core Book</option>
+                                <option value="student_support">Student Guide</option>
+                                <option value="instructor_support">Instructor Guide</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700 }}>Source URL</label>
+                              <input type="text" value={editingBookSourceUrl} onChange={(e) => setEditingBookSourceUrl(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <label style={{ fontSize: "0.7rem", fontWeight: 700 }}>Storage Path</label>
+                              <input type="text" value={editingBookStoragePath} onChange={(e) => setEditingBookStoragePath(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                            </div>
+                          </div>
+
+                          {/* Editable Chapters Builder inside Edit Book */}
+                          <div style={{ background: "rgba(0,0,0,0.02)", border: "1px dashed rgba(16, 107, 163, 0.2)", borderRadius: "6px", padding: "0.5rem" }}>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)", display: "block", marginBottom: "0.35rem" }}>📑 Chapters Segments Blueprint ({editingBookChapters.length})</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", maxHeight: "100px", overflowY: "auto", marginBottom: "0.5rem" }}>
+                              {editingBookChapters.map((ch, idx) => (
+                                <div key={idx} style={{ display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.85)", padding: "2px 6px", borderRadius: "4px", fontSize: "0.7rem", border: "1px solid var(--card-border)" }}>
+                                  <span>{language === "ar" ? ch.title_ar : ch.title} (Pages {ch.page_start}-{ch.page_end})</span>
+                                  <button type="button" onClick={() => setEditingBookChapters(editingBookChapters.filter((_, i) => i !== idx))} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer" }}><FiTrash2 /></button>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", gap: "0.25rem", alignItems: "center" }}>
+                              <input type="text" placeholder="Ch Title" value={editChTitle} onChange={(e) => setEditChTitle(e.target.value)} style={{ padding: "0.25rem", fontSize: "0.7rem", borderRadius: "4px", border: "1px solid var(--card-border)" }} />
+                              <input type="text" placeholder="العنوان" value={editChTitleAr} onChange={(e) => setEditChTitleAr(e.target.value)} style={{ padding: "0.25rem", fontSize: "0.7rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontFamily: "Cairo" }} />
+                              <input type="number" placeholder="Start" value={editChStartPage} onChange={(e) => setEditChStartPage(Number(e.target.value))} style={{ padding: "0.25rem", fontSize: "0.7rem", borderRadius: "4px", border: "1px solid var(--card-border)" }} />
+                              <input type="number" placeholder="End" value={editChEndPage} onChange={(e) => setEditChEndPage(Number(e.target.value))} style={{ padding: "0.25rem", fontSize: "0.7rem", borderRadius: "4px", border: "1px solid var(--card-border)" }} />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!editChTitle || !editChTitleAr) return;
+                                  setEditingBookChapters([...editingBookChapters, {
+                                    title: editChTitle,
+                                    title_ar: editChTitleAr,
+                                    page_start: Number(editChStartPage),
+                                    page_end: Number(editChEndPage),
+                                    concepts: editChConcepts ? editChConcepts.split(",").map(c => c.trim()).filter(Boolean) : []
+                                  }]);
+                                  setEditChTitle("");
+                                  setEditChTitleAr("");
+                                  setEditChStartPage(Number(editChEndPage) + 1);
+                                  setEditChEndPage(Number(editChEndPage) + 15);
+                                  setEditChConcepts("");
+                                }}
+                                style={{ background: "rgba(27,163,156,0.1)", border: "1px solid var(--secondary)", borderRadius: "4px", padding: "4px", cursor: "pointer", fontSize: "0.7rem" }}
+                              >
+                                Add
+                              </button>
+                            </div>
+                            <input type="text" placeholder="Concepts (comma-separated)" value={editChConcepts} onChange={(e) => setEditChConcepts(e.target.value)} style={{ padding: "0.25rem", fontSize: "0.7rem", borderRadius: "4px", border: "1px solid var(--card-border)", width: "100%", marginTop: "0.25rem" }} />
+                          </div>
+
+                          <button type="submit" disabled={isIngestingBook} style={{ background: "var(--secondary)", color: "#fff", border: "none", borderRadius: "6px", padding: "0.5rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                            {isIngestingBook ? <FiRefreshCw className="spinning-icon" /> : <><FiCheck /> <span>{language === "ar" ? "حفظ تعديلات الكتاب" : "Commit Textbook Changes"}</span></>}
+                          </button>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* Book catalog grouped by subject */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)", maxHeight: "400px", overflowY: "auto" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px", marginBottom: "0.5rem" }}>
+                        📚 {language === "ar" ? "فهرس ومستودع الكتب الحالية" : "Active Textbook Repository"}
+                      </span>
+
+                      {booksList.length === 0 ? (
+                        <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{language === "ar" ? "لا توجد كتب مضافة حالياً." : "No books active in DB."}</span>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          {/* Group books by subject */}
+                          {subjectsList.map((subj) => {
+                            const subjBooks = booksList.filter(b => b.subject_id === subj._id);
+                            if (subjBooks.length === 0) return null;
+                            return (
+                              <div key={subj._id} style={{ display: "flex", flexDirection: "column", gap: "0.35rem", borderBottom: "1px solid rgba(16, 107, 163, 0.05)", paddingBottom: "0.5rem" }}>
+                                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                  {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
+                                </span>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.35rem", paddingInlineStart: "0.75rem" }}>
+                                  {subjBooks.map((b) => (
+                                    <div key={b._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255, 255, 255, 0.8)", padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                                      <div style={{ display: "flex", flexDirection: "column" }}>
+                                        <span style={{ fontWeight: 700 }}>📖 {language === "ar" ? b.title_ar : b.title}</span>
+                                        <span style={{ fontSize: "0.65rem", color: "#64748b" }}>
+                                          Type: {b.book_type} • Lang: {b.language} • {b.chapters?.length || 0} chapters
+                                        </span>
+                                      </div>
+                                      <div style={{ display: "flex", gap: "0.25rem" }}>
+                                        <button
+                                          onClick={() => {
+                                            setEditingBookId(b._id);
+                                            setEditingBookSubjId(b.subject_id);
+                                            setEditingBookTitle(b.title);
+                                            setEditingBookTitleAr(b.title_ar);
+                                            setEditingBookGrade(b.grade || "Grade 11");
+                                            setEditingBookTerm(b.term || "Term 1");
+                                            setEditingBookYear(b.year || "2026");
+                                            setEditingBookLang(b.language || "ar");
+                                            setEditingBookType(b.book_type || "core");
+                                            setEditingBookSourceUrl(b.source_url || "");
+                                            setEditingBookStoragePath(b.storage_path || "");
+                                            setEditingBookChapters(b.chapters || []);
+                                            setBookError(null);
+                                            setBookSuccess(null);
+                                          }}
+                                          style={{ background: "transparent", border: "none", color: "var(--primary)", cursor: "pointer" }}
+                                          title="Edit Book Details"
+                                        >
+                                          <FiEdit />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteBook(b._id)}
+                                          style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer" }}
+                                          title="Delete Book"
+                                        >
+                                          <FiTrash2 />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+                {/* TAB 3: Manual Textbook Ingester */}
+                {activeTab === "ingest" && (
+                  <form onSubmit={handleIngestBook} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", borderBottom: "1px solid var(--card-border)", paddingBottom: "4px" }}>✍️ {language === "ar" ? "استيراد وتجهيز كتاب منهجي جديد" : "Ingest New Textbook Context"}</span>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "اختر المادة المرتبطة" : "Select Target Subject"}</label>
+                      <select
+                        value={bookSubjId}
+                        onChange={(e) => setBookSubjId(e.target.value)}
+                        required
+                        style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                      >
+                        {subjectsList.length === 0 ? (
+                          <option value="">{language === "ar" ? "جاري تحميل المواد الدراسية..." : "Loading subjects..."}</option>
+                        ) : (
+                          subjectsList.map((subj) => (
+                            <option key={subj._id} value={subj._id}>
+                              {subj.icon_emoji} {language === "ar" ? subj.name_ar : subj.name} ({subj.grade_level})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (إنجليزي)" : "Book Title (English)"}</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Calculus Volume I"
+                          value={bookTitle}
+                          onChange={(e) => setBookTitle(e.target.value)}
+                          required
+                          style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                        />
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>{language === "ar" ? "عنوان الكتاب (عربي)" : "Book Title (Arabic)"}</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: التفاضل والتكامل ج1"
+                          value={bookTitleAr}
+                          onChange={(e) => setBookTitleAr(e.target.value)}
+                          required
+                          style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem", fontFamily: "Cairo" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Grade</label>
+                        <select value={bookGrade} onChange={(e) => setBookGrade(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                          {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Term</label>
+                        <select value={bookTerm} onChange={(e) => setBookTerm(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                          {terms.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Lang</label>
+                        <select value={bookLang} onChange={(e) => setBookLang(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                          {languagesList.map(l => <option key={l} value={l}>{l === "ar" ? "العربية" : l === "en" ? "English" : l}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>Type</label>
+                        <select value={bookType} onChange={(e) => setBookType(e.target.value)} style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}>
+                          <option value="core">Core Book</option>
+                          <option value="student_support">Student Guide</option>
+                          <option value="instructor_support">Instructor Guide</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4f6371" }}>
+                        {language === "ar" ? "رابط المصدر أو تحميل ملف PDF" : "Source Document URL or Upload PDF File"}
+                      </label>
+                      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                        <input
+                          type="url"
+                          placeholder="https://ellibrary.moe.gov.eg/calc_g11.pdf"
+                          value={bookSourceUrl}
+                          onChange={(e) => {
+                            setBookSourceUrl(e.target.value);
+                            if (e.target.value) {
+                              const cleanName = e.target.value.split("/").pop() || "textbook.pdf";
+                              setBookStoragePath(`Textbooks/${cleanName}`);
+                            }
+                          }}
+                          style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}
+                        />
+                        <label style={{
+                          padding: "0.5rem 1rem",
+                          background: "var(--primary)",
+                          color: "#fff",
+                          borderRadius: "6px",
+                          fontSize: "0.8rem",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap"
+                        }}>
+                          {isAdminUploading ? (
+                            <FiRefreshCw className="spinning-icon" />
+                          ) : (
+                            <FiDownloadCloud />
+                          )}
+                          <span>{language === "ar" ? "تحميل ملف" : "Upload File"}</span>
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            style={{ display: "none" }}
+                            disabled={isAdminUploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setIsAdminUploading(true);
+                                const path = `Textbooks/${Date.now()}_${file.name}`;
+                                const storageRef = ref(storage, path);
+                                uploadBytes(storageRef, file).then((snapshot) => {
+                                  getDownloadURL(snapshot.ref).then((downloadURL) => {
+                                    setBookSourceUrl(downloadURL);
+                                    setBookStoragePath(path);
+                                    setIsAdminUploading(false);
+                                    alert(language === "ar" ? "تم تحميل الملف بنجاح إلى Firebase Storage!" : "File uploaded successfully to Firebase Storage!");
+                                  });
+                                }).catch((err) => {
+                                  console.error("Admin upload failed:", err);
+                                  setIsAdminUploading(false);
+                                  alert(language === "ar" ? "فشل تحميل الملف." : "Failed to upload file.");
+                                });
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Interactive chapters list builder */}
+                    <div style={{ background: "rgba(0,0,0,0.02)", border: "1px dashed var(--card-border)", borderRadius: "8px", padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", color: "var(--primary)" }}><FiList /> {language === "ar" ? "فصول الكتاب المقترحة" : "Chapter Blueprint Segments"}</span>
+                      {pendingChapters.length === 0 ? (
+                        <span style={{ fontSize: "0.7rem", color: "#64748b" }}>{language === "ar" ? "لا توجد فصول مضافة بعد. أضف فصولاً بالأسفل:" : "No segments defined. Build and link chapters below:"}</span>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", maxHeight: "100px", overflowY: "auto", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
+                          {pendingChapters.map((ch, index) => (
+                            <div key={index} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.9)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", border: "1px solid var(--card-border)" }}>
+                              <span>{language === "ar" ? ch.title_ar : ch.title} (Pages {ch.page_start}-{ch.page_end})</span>
+                              <button type="button" onClick={() => handleRemoveChapter(index)} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.85rem" }}><FiTrash2 /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", background: "rgba(255,255,255,0.6)", padding: "0.5rem", borderRadius: "6px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
+                          <input type="text" placeholder="Chapter Title" value={chTitle} onChange={(e) => setChTitle(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                          <input type="text" placeholder="عنوان الفصل بالعربي" value={chTitleAr} onChange={(e) => setChTitleAr(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", fontFamily: "Cairo" }} />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "0.35rem", alignItems: "center" }}>
+                          <input type="number" placeholder="Start" value={chStartPage} onChange={(e) => setChStartPage(Number(e.target.value))} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                          <input type="number" placeholder="End" value={chEndPage} onChange={(e) => setChEndPage(Number(e.target.value))} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                          <input type="text" placeholder="Concepts (comma-separated)" value={chConcepts} onChange={(e) => setChConcepts(e.target.value)} style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }} />
+                        </div>
+                        <button type="button" onClick={handleAddChapter} disabled={!chTitle || !chTitleAr} style={{ background: "rgba(27, 163, 156, 0.12)", color: "var(--secondary)", border: "1px solid rgba(27,163,156,0.2)", borderRadius: "4px", padding: "4px", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "2px" }}>
+                          <FiPlus /> <span>{language === "ar" ? "إضافة فصل للمسودة" : "Add Chapter Segment"}</span>
                         </button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+
+                    <button type="submit" disabled={isIngestingBook || !bookSubjId || !bookTitle || !bookTitleAr} style={{ background: "var(--secondary)", color: "#fff", border: "none", borderRadius: "6px", padding: "0.6rem", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                      {isIngestingBook ? <FiRefreshCw className="spinning-icon" /> : <><FiZap /> <span>{language === "ar" ? "دفع للمزامنة والبدء بالاستيراد" : "Ingest Textbook & Start Indexing"}</span></>}
+                    </button>
+                  </form>
                 )}
 
-                {/* Interactive Builder Form Row */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", background: "rgba(255,255,255,0.6)", padding: "0.5rem", borderRadius: "6px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
-                    <input
-                      type="text"
-                      placeholder="Chapter Title"
-                      value={chTitle}
-                      onChange={(e) => setChTitle(e.target.value)}
-                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="عنوان الفصل بالعربي"
-                      value={chTitleAr}
-                      onChange={(e) => setChTitleAr(e.target.value)}
-                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", fontFamily: "Cairo, var(--font-sans)" }}
-                    />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "0.35rem", alignItems: "center" }}>
-                    <input
-                      type="number"
-                      placeholder="Start"
-                      value={chStartPage}
-                      onChange={(e) => setChStartPage(Number(e.target.value))}
-                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="End"
-                      value={chEndPage}
-                      onChange={(e) => setChEndPage(Number(e.target.value))}
-                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Concepts (comma-separated)"
-                      value={chConcepts}
-                      onChange={(e) => setChConcepts(e.target.value)}
-                      style={{ padding: "0.35rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem" }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddChapter}
-                    disabled={!chTitle || !chTitleAr}
-                    style={{
-                      background: "rgba(27, 163, 156, 0.12)",
-                      color: "var(--secondary)",
-                      border: "1px solid rgba(27, 163, 156, 0.2)",
-                      borderRadius: "4px",
-                      padding: "4px",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      cursor: (!chTitle || !chTitleAr) ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "2px"
-                    }}
-                  >
-                    <FiPlus />
-                    <span>{language === "ar" ? "إضافة فصل للمسودة" : "Add Chapter Segment"}</span>
-                  </button>
-                </div>
-              </div>
+                {/* TAB 4: List Configurations */}
+                {activeTab === "lists" && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "start" }}>
+                    
+                    {/* Dynamic appends lists */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      
+                      {/* Default Grade Selector */}
+                      <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.5rem" }}>⭐ {language === "ar" ? "المرحلة الدراسية الافتراضية" : "Default Selection Grade"}</span>
+                        <select
+                          value={defaultGrade}
+                          onChange={(e) => {
+                            setDefaultGrade(e.target.value);
+                            saveListsToStorage(undefined, undefined, undefined, undefined, e.target.value);
+                            addTerminalLog(`[CONFIG] Saved default grade level: ${e.target.value}`);
+                          }}
+                          style={{ padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.8rem", width: "100%" }}
+                        >
+                          {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
 
-              <button
-                type="submit"
-                disabled={isIngestingBook || !bookSubjId || !bookTitle || !bookTitleAr}
-                style={{
-                  background: "var(--secondary)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "0.6rem",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: (isIngestingBook || !bookSubjId || !bookTitle || !bookTitleAr) ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  marginTop: "0.5rem"
-                }}
-              >
-                {isIngestingBook ? (
-                  <FiRefreshCw className="spinning-icon" />
-                ) : (
-                  <>
-                    <FiZap />
-                    <span>{language === "ar" ? "دفع للمزامنة والبدء بالاستيراد" : "Ingest Textbook & Start Indexing"}</span>
-                  </>
+                      {/* Grade Levels Panel */}
+                      <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.5rem" }}>🎓 {language === "ar" ? "المراحل الدراسية" : "Grade Levels"}</span>
+                        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+                          {gradeLevels.map(g => (
+                            <span key={g} style={{ fontSize: "0.75rem", padding: "2px 8px", background: "rgba(16,107,163,0.08)", color: "var(--primary)", border: "1px solid rgba(16,107,163,0.15)", borderRadius: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {g}
+                              <button onClick={() => {
+                                const updated = gradeLevels.filter(item => item !== g);
+                                setGradeLevels(updated);
+                                saveListsToStorage(updated);
+                              }} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.65rem", padding: 0 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <input type="text" placeholder="Add Grade" value={newGradeVal} onChange={(e) => setNewGradeVal(e.target.value)} style={{ padding: "0.3rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", flex: 1 }} />
+                          <button onClick={() => {
+                            if (!newGradeVal) return;
+                            const updated = [...gradeLevels, newGradeVal];
+                            setGradeLevels(updated);
+                            saveListsToStorage(updated);
+                            setNewGradeVal("");
+                          }} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", padding: "0 0.5rem", fontSize: "0.75rem", cursor: "pointer" }}>Add</button>
+                        </div>
+                      </div>
+
+                      {/* Categories Panel */}
+                      <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.5rem" }}>🔬 {language === "ar" ? "الأقسام والتصنيفات" : "Categories"}</span>
+                        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+                          {categories.map(c => (
+                            <span key={c} style={{ fontSize: "0.75rem", padding: "2px 8px", background: "rgba(27,163,156,0.08)", color: "var(--secondary)", border: "1px solid rgba(27,163,156,0.15)", borderRadius: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {c}
+                              <button onClick={() => {
+                                const updated = categories.filter(item => item !== c);
+                                setCategories(updated);
+                                saveListsToStorage(undefined, updated);
+                              }} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.65rem", padding: 0 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <input type="text" placeholder="Add Category" value={newCategoryVal} onChange={(e) => setNewCategoryVal(e.target.value)} style={{ padding: "0.3rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", flex: 1 }} />
+                          <button onClick={() => {
+                            if (!newCategoryVal) return;
+                            const updated = [...categories, newCategoryVal];
+                            setCategories(updated);
+                            saveListsToStorage(undefined, updated);
+                            setNewCategoryVal("");
+                          }} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", padding: "0 0.5rem", fontSize: "0.75rem", cursor: "pointer" }}>Add</button>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      
+                      {/* Terms Panel */}
+                      <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.5rem" }}>⏱️ {language === "ar" ? "الفصول الدراسية" : "Terms"}</span>
+                        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+                          {terms.map(t => (
+                            <span key={t} style={{ fontSize: "0.75rem", padding: "2px 8px", background: "rgba(0,0,0,0.05)", color: "#475569", border: "1px solid var(--card-border)", borderRadius: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {t}
+                              <button onClick={() => {
+                                const updated = terms.filter(item => item !== t);
+                                setTerms(updated);
+                                saveListsToStorage(undefined, undefined, updated);
+                              }} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.65rem", padding: 0 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <input type="text" placeholder="Add Term" value={newTermVal} onChange={(e) => setNewTermVal(e.target.value)} style={{ padding: "0.3rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", flex: 1 }} />
+                          <button onClick={() => {
+                            if (!newTermVal) return;
+                            const updated = [...terms, newTermVal];
+                            setTerms(updated);
+                            saveListsToStorage(undefined, undefined, updated);
+                            setNewTermVal("");
+                          }} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", padding: "0 0.5rem", fontSize: "0.75rem", cursor: "pointer" }}>Add</button>
+                        </div>
+                      </div>
+
+                      {/* Languages Panel */}
+                      <div style={{ background: "rgba(255, 255, 255, 0.45)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--card-border)" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.5rem" }}>🌍 {language === "ar" ? "اللغات المدعومة" : "Languages"}</span>
+                        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+                          {languagesList.map(l => (
+                            <span key={l} style={{ fontSize: "0.75rem", padding: "2px 8px", background: "rgba(0,0,0,0.05)", color: "#475569", border: "1px solid var(--card-border)", borderRadius: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {l === "ar" ? "ar (العربية)" : l === "en" ? "en (English)" : l}
+                              <button onClick={() => {
+                                const updated = languagesList.filter(item => item !== l);
+                                setLanguagesList(updated);
+                                saveListsToStorage(undefined, undefined, undefined, updated);
+                              }} style={{ background: "transparent", border: "none", color: "#d32f2f", cursor: "pointer", fontSize: "0.65rem", padding: 0 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <input type="text" placeholder="Add Lang" value={newLangVal} onChange={(e) => setNewLangVal(e.target.value)} style={{ padding: "0.3rem", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.75rem", flex: 1 }} />
+                          <button onClick={() => {
+                            if (!newLangVal) return;
+                            const updated = [...languagesList, newLangVal];
+                            setLanguagesList(updated);
+                            saveListsToStorage(undefined, undefined, undefined, updated);
+                            setNewLangVal("");
+                          }} style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", padding: "0 0.5rem", fontSize: "0.75rem", cursor: "pointer" }}>Add</button>
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
                 )}
-              </button>
-            </form>
-          </section>
+              </>
+            );
+          })()}
 
-        </div>
+        </section>
       </div>
     </div>
   );

@@ -9,6 +9,16 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
 import CurriculumIngestionStudio from "../../../components/CurriculumIngestionStudio";
+import { UserAccountsPanel } from "../../../components/dashboard/UserAccountsPanel";
+import { LibraryPanel } from "../../../components/dashboard/LibraryPanel";
+import { SubjectsPanel } from "../../../components/dashboard/SubjectsPanel";
+import { PracticePanel } from "../../../components/dashboard/PracticePanel";
+import { StudyPlanPanel } from "../../../components/dashboard/StudyPlanPanel";
+import { TimetablePanel } from "../../../components/dashboard/TimetablePanel";
+import { ZatonaPanel } from "../../../components/dashboard/ZatonaPanel";
+import { SocialPanel } from "../../../components/dashboard/SocialPanel";
+import { SettingsPanel } from "../../../components/dashboard/SettingsPanel";
+
 import { 
   FiCpu, 
   FiTerminal, 
@@ -635,6 +645,23 @@ export default function Home() {
   const [settingsAvatar, setSettingsAvatar] = useState<string>("");
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsStatusText, setSettingsStatusText] = useState("");
+
+  // Gamification telemetry metrics
+  const getLevelBadgeText = () => {
+    const xp = userProfile?.xp || 150;
+    if (xp > 5000) return language === "ar" ? "🥇 عبقري فاهم" : "🥇 Fahem Sage";
+    if (xp > 2000) return language === "ar" ? "🥈 باحث متميز" : "🥈 Elite Scholar";
+    return language === "ar" ? "🥉 طالب واعد" : "🥉 Bright Spark";
+  };
+  const activeXp = userProfile?.xp || 150;
+  const activeLevel = Math.floor(activeXp / 1000) + 1;
+  const activeStreak = userProfile?.streak || 3;
+  const nextLevelXp = activeLevel * 1000;
+  const xpProgressPercent = (activeXp % 1000) / 10;
+  const consumedClt = userProfile?.consumedClt || 42;
+  const totalAllocatedClt = userProfile?.totalAllocatedClt || 100;
+  const tokenProgressPercent = (consumedClt / totalAllocatedClt) * 100;
+  const remainingClt = totalAllocatedClt - consumedClt;
   const [placesResults, setPlacesResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [selectedPlaceForBranch, setSelectedPlaceForBranch] = useState<any | null>(null);
@@ -679,6 +706,48 @@ export default function Home() {
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
+
+  const [loadedBookPages, setLoadedBookPages] = useState<any[]>([]);
+  const [loadingBookPages, setLoadingBookPages] = useState<boolean>(false);
+
+  const getAllPages = (book: any, pagesState: any[]) => {
+    if (!book) return [];
+    const bookData = TEXTBOOK_PAGES[book.subject] || {
+      titleEn: book.titleEn || book.title || "Custom Material",
+      titleAr: book.titleAr || book.title_ar || book.title || "وثيقة مخصصة",
+      chapters: [
+        {
+          titleEn: "Chapter 1: Study Content",
+          titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
+          pages: [
+            {
+              pageNum: 1,
+              titleEn: "Section 1: General Core Overview",
+              titleAr: "القسم الأول: نظرة عامة شاملة",
+              contentEn: `This personal study note contains curated context for ${book.titleEn || book.title}. Ground your AI study assistant directly in this material by using mentions like @, #, or / in the companion panel.`,
+              contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${book.titleAr || book.title_ar || book.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر استخدام الإشارات الذكية مثل @ أو # أو / في لوحة الرفيق المساعد.`,
+              formulas: ["Syllabus Grounding Key: S = G × (1 - E)"],
+              tipEn: "Type @ to select a subject, # to select a book, or / to invoke specialized companion commands in the chat!",
+              tipAr: "اكتب @ لاختيار المادة، # لاختيار الكتاب، أو / لتفعيل الأوامر الذكية لرفيق المذاكرة فهم!"
+            }
+          ]
+        }
+      ]
+    };
+
+    const allPages: any[] = [];
+    bookData.chapters.forEach((ch: any, chIdx: number) => {
+      ch.pages.forEach((p: any) => {
+        allPages.push({
+          ...p,
+          chapterTitleEn: ch.titleEn,
+          chapterTitleAr: ch.titleAr,
+          chapterIndex: chIdx
+        });
+      });
+    });
+    return allPages;
+  };
 
   const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
 
@@ -1015,61 +1084,6 @@ export default function Home() {
     addSpaceHistory("Updated timetable events", "تم تعديل جدول المواعيد والحصص");
   };
 
-  // 4. Quizzes Spaces State
-  const [activeQuizzes, setActiveQuizzes] = useState<any[]>([
-    {
-      id: "quiz_1",
-      nameEn: "General Knowledge Assessment",
-      nameAr: "نموذج اختبار التقييم التحصيلي الشامل",
-      quizQuestionIndex: 0,
-      quizAnswers: {},
-      quizFinished: false
-    },
-    {
-      id: "quiz_2",
-      nameEn: "Alternative Science Trial Quiz",
-      nameAr: "الاختبار التدريبي البديل للعلوم والفيزياء",
-      quizQuestionIndex: 0,
-      quizAnswers: {},
-      quizFinished: false
-    }
-  ]);
-  const [selectedQuizId, setSelectedQuizId] = useState<string>("quiz_1");
-  const currentQuiz = activeQuizzes.find(q => q.id === selectedQuizId) || activeQuizzes[0];
-  const quizQuestionIndex = currentQuiz?.quizQuestionIndex || 0;
-  const quizAnswers = currentQuiz?.quizAnswers || {};
-  const quizFinished = currentQuiz?.quizFinished || false;
-
-  const setQuizQuestionIndex = (valOrFunc: any) => {
-    setActiveQuizzes(prev => prev.map(q => {
-      if (q.id === selectedQuizId) {
-        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizQuestionIndex) : valOrFunc;
-        return { ...q, quizQuestionIndex: nextVal };
-      }
-      return q;
-    }));
-  };
-
-  const setQuizAnswers = (valOrFunc: any) => {
-    setActiveQuizzes(prev => prev.map(q => {
-      if (q.id === selectedQuizId) {
-        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizAnswers) : valOrFunc;
-        return { ...q, quizAnswers: nextVal };
-      }
-      return q;
-    }));
-  };
-
-  const setQuizFinished = (valOrFunc: any) => {
-    setActiveQuizzes(prev => prev.map(q => {
-      if (q.id === selectedQuizId) {
-        const nextVal = typeof valOrFunc === "function" ? valOrFunc(q.quizFinished) : valOrFunc;
-        return { ...q, quizFinished: nextVal };
-      }
-      return q;
-    }));
-    addSpaceHistory("Updated quiz answers/finished status", "تم تحديث إجابات أو حالة اكتمال الاختبار");
-  };
 
   // 5. Zatonas Spaces State
   const [activeZatonas, setActiveZatonas] = useState<any[]>([
@@ -1128,7 +1142,7 @@ export default function Home() {
   const [spaceModalConfig, setSpaceModalConfig] = useState<{
     isOpen: boolean;
     type: "new" | "edit";
-    tab: "practice" | "plan" | "timetable" | "quiz" | "zatona";
+    tab: "practice" | "plan" | "timetable" | "zatona";
     spaceId?: string;
     nameEn: string;
     nameAr: string;
@@ -1142,7 +1156,7 @@ export default function Home() {
   });
 
   // --- ACADEMIC SPACES CRUD & UI HELPERS ---
-  const renderSpaceSelectorBar = (tab: "practice" | "plan" | "timetable" | "quiz" | "zatona") => {
+  const renderSpaceSelectorBar = (tab: "practice" | "plan" | "timetable" | "zatona") => {
     let list: any[] = [];
     let selectedId = "";
     let setSelectedId: (id: string) => void = () => {};
@@ -1167,12 +1181,6 @@ export default function Home() {
       setSelectedId = setSelectedTimetableId;
       tabTitleEn = "Class Schedule Planners";
       tabTitleAr = "جداول الحصص الدراسية";
-    } else if (tab === "quiz") {
-      list = activeQuizzes;
-      selectedId = selectedQuizId;
-      setSelectedId = setSelectedQuizId;
-      tabTitleEn = "Knowledge Assessment Arenas";
-      tabTitleAr = "مساحات الاختبارات والتقييم الذاتي";
     } else if (tab === "zatona") {
       list = activeZatonas;
       selectedId = selectedZatonaId;
@@ -1231,9 +1239,6 @@ export default function Home() {
       } else if (tab === "timetable") {
         setActiveTimetables(updatedList);
         setSelectedTimetableId(updatedList[0].id);
-      } else if (tab === "quiz") {
-        setActiveQuizzes(updatedList);
-        setSelectedQuizId(updatedList[0].id);
       } else if (tab === "zatona") {
         setActiveZatonas(updatedList);
         setSelectedZatonaId(updatedList[0].id);
@@ -1389,15 +1394,6 @@ export default function Home() {
           };
           setActiveTimetables(prev => [...prev, newItem]);
           setSelectedTimetableId(newId);
-        } else if (tab === "quiz") {
-          newItem = {
-            ...newItem,
-            quizQuestionIndex: 0,
-            quizAnswers: {},
-            quizFinished: false
-          };
-          setActiveQuizzes(prev => [...prev, newItem]);
-          setSelectedQuizId(newId);
         } else if (tab === "zatona") {
           newItem = {
             ...newItem,
@@ -1427,8 +1423,6 @@ export default function Home() {
           setActivePlans(prev => prev.map(p => p.id === spaceId ? updateItem(p) : p));
         } else if (tab === "timetable") {
           setActiveTimetables(prev => prev.map(t => t.id === spaceId ? updateItem(t) : t));
-        } else if (tab === "quiz") {
-          setActiveQuizzes(prev => prev.map(q => q.id === spaceId ? updateItem(q) : q));
         } else if (tab === "zatona") {
           setActiveZatonas(prev => prev.map(z => z.id === spaceId ? updateItem(z) : z));
         }
@@ -2792,16 +2786,24 @@ export default function Home() {
             if (res.ok) {
               const data = await res.json();
               if (data.profile && data.profile.userId) {
-                setUserProfile(data.profile);
+                setUserProfile({
+                  ...data.profile,
+                  onboardingCompleted: true
+                });
                 setSettingsAvatar(data.profile.avatar || "");
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("onboarding_completed_" + user.uid, "true");
-                }
-                await logActivity("onboarding_completed", "success", "Completed onboarding via conversational agent");
               }
             }
+            if (typeof window !== "undefined") {
+              localStorage.setItem("onboarding_completed_" + user.uid, "true");
+            }
+            setLocalCompleted(true);
+            await logActivity("onboarding_completed", "success", "Completed onboarding via conversational agent");
           } catch (err) {
             console.error("Error reloading profile on completion:", err);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("onboarding_completed_" + user.uid, "true");
+            }
+            setLocalCompleted(true);
           } finally {
             setLoadingProfile(false);
           }
@@ -2898,12 +2900,18 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: targetUserId,
-          profile: updatedProfile
+          profile: updatedProfile,
+          requesterEmail: user?.email
         })
       });
       if (res.ok) {
-        alert(language === "ar" ? "تم تحديث بيانات العضو بنجاح!" : "User updated successfully!");
-        await fetchAllUsersList();
+        const data = await res.json();
+        if (data.needsApproval) {
+          alert(language === "ar" ? "تم تقديم طلب تعديل بيانات العضو للموافقة عليه من قبل المسؤول الأعلى!" : "Your request to update the user has been submitted for Superadmin approval.");
+        } else {
+          alert(language === "ar" ? "تم تحديث بيانات العضو بنجاح!" : "User updated successfully!");
+          await fetchAllUsersList();
+        }
       } else {
         alert(language === "ar" ? "فشل تحديث العضو." : "Failed to update user.");
       }
@@ -3124,6 +3132,12 @@ export default function Home() {
         router.push(`/${language}`);
       } else {
         setUser(currentUser);
+        if (typeof window !== "undefined") {
+          const isDone = localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true";
+          if (isDone) {
+            setLocalCompleted(true);
+          }
+        }
         fetchMetadata(currentUser.email || undefined); // Fetch live database metadata on mount
         fetchUserSessions(currentUser.uid); // Fetch user sessions
         fetchUserTokenStats(currentUser.uid); // Fetch user token usage stats
@@ -5228,14 +5242,7 @@ export default function Home() {
               <span>{language === "ar" ? "جدول الحصص واليوم" : "Weekly Schedule"}</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab("quiz")}
-              className={`sidebar-nav-btn ${activeTab === "quiz" ? "active" : ""}`}
-              type="button"
-            >
-              <FiTerminal />
-              <span>{language === "ar" ? "الاختبارات الذكية" : "Quiz Assessment"}</span>
-            </button>
+
 
             <button
               onClick={() => setActiveTab("zatona")}
@@ -5415,2457 +5422,152 @@ export default function Home() {
             <CurriculumIngestionStudio language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "super-admin-users" ? (
-          /* Tabular Super-Admin User Manager Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <section className="panel-card" style={{ padding: "2rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.6rem", margin: 0, fontWeight: 800 }}>
-                  <FiUsers style={{ color: "var(--primary)" }} />
-                  <span>{language === "ar" ? "قائمة الأعضاء وإدارة الصلاحيات" : "User Accounts & Role Manager"}</span>
-                </h2>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="text"
-                    placeholder={language === "ar" ? "ابحث بالاسم أو البريد..." : "Search name or email..."}
-                    value={adminUserSearch}
-                    onChange={(e) => setAdminUserSearch(e.target.value)}
-                    style={{
-                      padding: "0.5rem 0.75rem", borderRadius: "var(--border-radius-sm)", border: "1px solid var(--card-border)",
-                      fontSize: "0.85rem", outline: "none", fontFamily: "var(--font-sans)"
-                    }}
-                  />
-                  <button 
-                    onClick={fetchAllUsersList}
-                    className="btn btn-secondary" 
-                    style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
-                  >
-                    <FiRefreshCw className="pulse-icon" />
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: language === "ar" ? "right" : "left", fontFamily: "var(--font-sans)", fontSize: "0.9rem" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "2px solid var(--card-border)", color: "var(--primary)", fontWeight: 700 }}>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "العضو" : "User"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "البريد الإلكتروني" : "Email"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "الدور الدراسي" : "User Role"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "المدرسة/الجامعة" : "School"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "قائمة القبول" : "Whitelist/Judge"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem" }}>{language === "ar" ? "الحالة" : "Status"}</th>
-                      <th style={{ padding: "0.75rem 0.5rem", textAlign: "center" }}>{language === "ar" ? "الإجراءات" : "Actions"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allUsers
-                      .filter(u => {
-                        const s = adminUserSearch.toLowerCase();
-                        return (u.name || "").toLowerCase().includes(s) || 
-                               (u.username || "").toLowerCase().includes(s) || 
-                               (u.email || "").toLowerCase().includes(s);
-                      })
-                      .map((u, i) => (
-                        <tr key={u.userId || i} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", transition: "all 0.15s" }} onMouseOver={(e)=>e.currentTarget.style.background="rgba(16, 107, 163, 0.02)"} onMouseOut={(e)=>e.currentTarget.style.background="none"}>
-                          <td style={{ padding: "0.75rem 0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            {renderAvatar(u.avatar, "1.2rem")}
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <span style={{ fontWeight: 700 }}>{u.name || "N/A"}</span>
-                              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>@{u.username || "N/A"}</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: "0.75rem 0.5rem", color: "#4f6371" }}>{u.email || "N/A"}</td>
-                          <td style={{ padding: "0.75rem 0.5rem" }}>
-                            <select
-                              value={u.role || u.userType || "student"}
-                              onChange={(e) => handleAdminUpdateUser(u.userId, { role: e.target.value, userType: e.target.value })}
-                              style={{ padding: "3px 6px", borderRadius: "4px", border: "1px solid var(--card-border)", fontSize: "0.8rem", background: "#ffffff" }}
-                            >
-                              <option value="student">{language === "ar" ? "طالب" : "Student"}</option>
-                              <option value="teacher">{language === "ar" ? "معلم" : "Teacher"}</option>
-                              <option value="parent">{language === "ar" ? "ولي أمر" : "Parent"}</option>
-                              <option value="admin">{language === "ar" ? "مشرف" : "Admin"}</option>
-                            </select>
-                          </td>
-                          <td style={{ padding: "0.75rem 0.5rem", fontSize: "0.8rem", color: "#4f6371", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={u.school}>{u.school || "N/A"}</td>
-                          <td style={{ padding: "0.75rem 0.5rem" }}>
-                            <button
-                              onClick={() => handleAdminUpdateUser(u.userId, { isWhitelisted: !u.isWhitelisted })}
-                                style={{
-                                  padding: "4px 8px",
-                                  borderRadius: "10px",
-                                  cursor: "pointer",
-                                  fontSize: "0.75rem",
-                                  fontWeight: 700,
-                                  background: u.isWhitelisted ? "rgba(212, 175, 55, 0.15)" : "rgba(16, 107, 163, 0.08)",
-                                  color: u.isWhitelisted ? "var(--secondary)" : "#4f6371",
-                                  border: u.isWhitelisted ? "1px solid rgba(212, 175, 55, 0.3)" : "1px solid transparent",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  transition: "all 0.2s"
-                                }}
-                            >
-                              {u.isWhitelisted ? (
-                                <>⭐ {language === "ar" ? "معتمد (حكم)" : "Whitelisted Judge"}</>
-                              ) : (
-                                <>⚪ {language === "ar" ? "عادي" : "Standard User"}</>
-                              )}
-                            </button>
-                          </td>
-                          <td style={{ padding: "0.75rem 0.5rem" }}>
-                            {u.banned ? (
-                              <span style={{ padding: "2px 6px", borderRadius: "10px", fontSize: "0.7rem", fontWeight: 700, background: "rgba(211, 47, 47, 0.12)", color: "#d32f2f" }}>
-                                {language === "ar" ? "محظور 🛑" : "Banned 🛑"}
-                              </span>
-                            ) : (
-                              <span style={{ padding: "2px 6px", borderRadius: "10px", fontSize: "0.7rem", fontWeight: 700, background: "rgba(46, 125, 50, 0.12)", color: "#2e7d32" }}>
-                                {language === "ar" ? "نشط ✅" : "Active ✅"}
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: "0.75rem 0.5rem", display: "flex", gap: "0.35rem", justifyContent: "center" }}>
-                            <button
-                              onClick={() => handleAdminUpdateUser(u.userId, { banned: !u.banned })}
-                              style={{
-                                padding: "4px 8px", borderRadius: "var(--border-radius-sm)", border: "none", cursor: "pointer",
-                                fontSize: "0.75rem", fontWeight: 700, transition: "all 0.2s",
-                                background: u.banned ? "rgba(46, 125, 50, 0.1)" : "rgba(211, 47, 47, 0.1)",
-                                color: u.banned ? "#2e7d32" : "#d32f2f"
-                              }}
-                            >
-                              {u.banned ? (language === "ar" ? "تنشيط الحساب" : "Activate") : (language === "ar" ? "حظر العضو" : "Ban Account")}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setInspectedUser(u);
-                              }}
-                              style={{
-                                padding: "4px 8px", borderRadius: "var(--border-radius-sm)", border: "1px solid rgba(16,107,163,0.2)",
-                                background: "none", color: "var(--primary)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer"
-                              }}
-                            >
-                              {language === "ar" ? "تتبع الأنشطة" : "Trail"}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    {allUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "#6a7c88" }}>
-                          {language === "ar" ? "لا يوجد أعضاء مسجلين حالياً." : "No registered members found."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            {/* Inspection Overlay Modal for Activity Trail */}
-            {inspectedUser && (
-              <div style={{
-                position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000,
-                background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", padding: "1.5rem"
-              }}>
-                <div className="panel-card" style={{ width: "100%", maxWidth: "600px", padding: "1.5rem", position: "relative", background: "#fbf8f0", border: "1px solid var(--primary)" }}>
-                  <button 
-                    onClick={() => setInspectedUser(null)}
-                    style={{ position: "absolute", top: "1rem", left: language === "ar" ? "1rem" : "auto", right: language === "ar" ? "auto" : "1rem", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", color: "var(--primary)" }}
-                  >
-                    <FiX />
-                  </button>
-                  <h3 style={{ fontSize: "1.2rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <FiActivity style={{ color: "var(--primary)" }} />
-                    <span>{language === "ar" ? `سجل أنشطة العضو: ${inspectedUser.name}` : `Activity Trail: ${inspectedUser.name}`}</span>
-                  </h3>
-                  <div style={{ maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }} className="custom-scrollbar">
-                    <div style={{ padding: "0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.03)" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", display: "block" }}>{language === "ar" ? "تسجيل الدخول الأول" : "Account Onboarding Success"}</span>
-                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>📍 {language === "ar" ? "الدولة:" : "Country:"} {inspectedUser.country || "Egypt"} | {language === "ar" ? "الدور:" : "Role:"} {inspectedUser.role || "student"}</span>
-                    </div>
-                    <div style={{ padding: "0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.03)" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", display: "block" }}>{language === "ar" ? "التحاق تعليمي" : "Academic Enrolment"}</span>
-                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>📍 {language === "ar" ? "المدرسة/الجامعة:" : "Institution:"} {inspectedUser.school || "N/A"} | {language === "ar" ? "الصف:" : "Grade:"} {inspectedUser.grade || "N/A"}</span>
-                    </div>
-                    <div style={{ padding: "0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.03)" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", display: "block" }}>{language === "ar" ? "إعداد الملف الرمزي" : "Avatar Update"}</span>
-                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>📍 {language === "ar" ? "الرمز المختار:" : "Chosen Icon:"} {inspectedUser.avatar || "👤"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <UserAccountsPanel
+            language={language}
+            allUsers={allUsers}
+            adminUserSearch={adminUserSearch}
+            setAdminUserSearch={setAdminUserSearch}
+            fetchAllUsersList={fetchAllUsersList}
+            handleAdminUpdateUser={handleAdminUpdateUser}
+            inspectedUser={inspectedUser}
+            setInspectedUser={setInspectedUser}
+            renderAvatar={renderAvatar}
+            t={t}
+          />
         ) : activeTab === "library" ? (
-          /* Knowledge Library Panel */
-          selectedBookReader ? (
-            /* Premium Dual-Panel Interactive Reader Layout */
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              {/* Reader Header Bar */}
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                background: "rgba(255, 255, 255, 0.4)", backdropFilter: "blur(10px)",
-                padding: "1rem 1.5rem", borderRadius: "16px", border: "1px solid rgba(16, 107, 163, 0.08)"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <button
-                    onClick={() => setSelectedBookReader(null)}
-                    style={{
-                      padding: "8px 16px", borderRadius: "20px", border: "1px solid var(--card-border)",
-                      background: "#ffffff", color: "var(--primary)", fontWeight: 700, fontSize: "0.85rem",
-                      cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "0.4rem"
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = "#ffffff"; }}
-                  >
-                    ⬅️ {language === "ar" ? "المكتبة" : "Library"}
-                  </button>
-                  <div>
-                    <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
-                      {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
-                    </h2>
-                    <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>
-                      {language === "ar" ? "جلسة دراسة تفاعلية نشطة مع رفيق فهم" : "Active chapter-linked study companion session"}
-                    </p>
-                  </div>
-                </div>
-                <div style={{
-                  padding: "6px 14px", borderRadius: "20px", background: "rgba(16, 107, 163, 0.08)",
-                  color: "var(--primary)", fontWeight: 800, fontSize: "0.8rem"
-                }}>
-                  🎓 {selectedBookReader.subject === "Math" ? (language === "ar" ? "رياضيات" : "Math") :
-                      selectedBookReader.subject === "Science" ? (language === "ar" ? "علوم" : "Science") :
-                      selectedBookReader.subject === "Arabic" ? (language === "ar" ? "عربي" : "Arabic") :
-                      (language === "ar" ? "تاريخ" : "History")}
-                </div>
-              </div>
-
-              {/* Reader Split Panels */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }} className="grid-cols-1">
-                {/* Left Panel - Textbook Viewer */}
-                {(() => {
-                  const bookData = TEXTBOOK_PAGES[selectedBookReader.subject] || {
-                    titleEn: selectedBookReader.titleEn || selectedBookReader.title || "Custom Material",
-                    titleAr: selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title || "وثيقة مخصصة",
-                    chapters: [
-                      {
-                        titleEn: "Chapter 1: Study Content",
-                        titleAr: "الفصل الأول: محتوى المذاكرة والمراجعة",
-                        pages: [
-                          {
-                            pageNum: 1,
-                            titleEn: "Section 1: General Core Overview",
-                            titleAr: "القسم الأول: نظرة عامة شاملة",
-                            contentEn: `This personal study note contains curated context for ${selectedBookReader.titleEn || selectedBookReader.title}. Ground your AI study assistant directly in this material by using mentions like @, #, or / in the companion panel.`,
-                            contentAr: `تحتوي هذه المذكرة الدراسية على السياق المنسق لمذاكرة كتاب "${selectedBookReader.titleAr || selectedBookReader.title_ar || selectedBookReader.title}". وجه مساعدك الدراسي مباشرة في هذا المحتوى عبر استخدام الإشارات الذكية مثل @ أو # أو / في لوحة الرفيق المساعد.`,
-                            formulas: ["Syllabus Grounding Key: S = G × (1 - E)"],
-                            tipEn: "Type @ to select a subject, # to select a book, or / to invoke specialized companion commands in the chat!",
-                            tipAr: "اكتب @ لاختيار المادة، # لاختيار الكتاب، أو / لتفعيل الأوامر الذكية لرفيق المذاكرة فهم!"
-                          }
-                        ]
-                      }
-                    ]
-                  };
-
-                  const allPages: any[] = [];
-                  bookData.chapters.forEach((ch: any, chIdx: number) => {
-                    ch.pages.forEach((p: any) => {
-                      allPages.push({
-                        ...p,
-                        chapterTitleEn: ch.titleEn,
-                        chapterTitleAr: ch.titleAr,
-                        chapterIndex: chIdx
-                      });
-                    });
-                  });
-
-                  const totalPagesCount = allPages.length || 1;
-                  const activePage = allPages[readerCurrentPage - 1] || allPages[0] || {
-                    pageNum: 1,
-                    titleEn: "Untitled Section",
-                    titleAr: "قسم غير معنون",
-                    contentEn: "",
-                    contentAr: ""
-                  };
-
-                  return (
-                    <div 
-                      className="panel-card" 
-                      onMouseUp={() => {
-                        const selection = window.getSelection();
-                        if (!selection) return;
-                        const text = selection.toString().trim();
-                        if (text.length > 5) {
-                          const range = selection.getRangeAt(0);
-                          const rect = range.getBoundingClientRect();
-                          setBubbleCoords({
-                            x: rect.left + rect.width / 2 + window.scrollX,
-                            y: rect.top - 48 + window.scrollY
-                          });
-                          setSelectedText(text);
-                        } else {
-                          setBubbleCoords(null);
-                          setSelectedText("");
-                        }
-                      }}
-                      style={{
-                        padding: "1.75rem", display: "flex", flexDirection: "column",
-                        justifyContent: "space-between", minHeight: "550px", position: "relative",
-                        background: "rgba(255, 255, 255, 0.75)", backdropFilter: "blur(14px)",
-                        border: "1px solid rgba(16, 107, 163, 0.1)",
-                        userSelect: "text"
-                      }}
-                    >
-                      <div>
-                        {/* Page Navigation & Chapters */}
-                        <div style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          marginBottom: "1.5rem", borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
-                          paddingBottom: "0.75rem"
-                        }}>
-                          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                            |📖 {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
-                          </span>
-                          
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <button
-                              disabled={readerCurrentPage <= 1}
-                              onClick={() => setReaderCurrentPage(prev => Math.max(1, prev - 1))}
-                              style={{
-                                width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--card-border)",
-                                background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center",
-                                cursor: readerCurrentPage <= 1 ? "not-allowed" : "pointer", opacity: readerCurrentPage <= 1 ? 0.4 : 1,
-                                transition: "all 0.2s"
-                              }}
-                            >
-                              {language === "ar" ? "➡️" : "⬅️"}
-                            </button>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 700, minWidth: "80px", textAlign: "center" }}>
-                              {language === "ar" ? `صفحة ${readerCurrentPage} من ${totalPagesCount}` : `Page ${readerCurrentPage} of ${totalPagesCount}`}
-                            </span>
-                            <button
-                              disabled={readerCurrentPage >= totalPagesCount}
-                              onClick={() => setReaderCurrentPage(prev => Math.min(totalPagesCount, prev + 1))}
-                              style={{
-                                width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--card-border)",
-                                background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center",
-                                cursor: readerCurrentPage >= totalPagesCount ? "not-allowed" : "pointer", opacity: readerCurrentPage >= totalPagesCount ? 0.4 : 1,
-                                transition: "all 0.2s"
-                              }}
-                            >
-                              {language === "ar" ? "⬅️" : "➡️"}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Page Title & Body in Beautiful Custom Cards */}
-                        <div style={{ direction: language === "ar" ? "rtl" : "ltr", textAlign: "start" }}>
-                          {/* Unit Card Banner */}
-                          <div style={{
-                            alignItems: "center", gap: "0.5rem",
-                            padding: "6px 12px", borderRadius: "10px", background: "rgba(16, 107, 163, 0.05)",
-                            border: "1px solid rgba(16, 107, 163, 0.08)", marginBottom: "1rem", display: "inline-flex"
-                          }}>
-                            <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>
-                              🏛️ {language === "ar" ? "الوحدة الدراسية" : "Unit / Course Section"}: {language === "ar" ? activePage.chapterTitleAr : activePage.chapterTitleEn}
-                            </span>
-                          </div>
-
-                          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, margin: "0 0 1.25rem 0", color: "var(--primary)" }}>
-                            📖 {language === "ar" ? activePage.titleAr : activePage.titleEn}
-                          </h3>
-
-                          {/* Concept card */}
-                          <div style={{
-                            padding: "1.25rem", borderRadius: "16px",
-                            background: "rgba(255, 255, 255, 0.5)",
-                            border: "1px solid rgba(16, 107, 163, 0.12)",
-                            boxShadow: "0 8px 32px rgba(31, 38, 135, 0.03)",
-                            backdropFilter: "blur(4px)",
-                            marginBottom: "1.5rem"
-                          }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.75rem" }}>
-                              <span style={{ fontSize: "0.75rem", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent)" }}>
-                                💡 {language === "ar" ? "المفهوم الأساسي والشرح" : "Core Educational Concept"}
-                              </span>
-                            </div>
-                            <p style={{
-                              fontSize: "0.95rem", lineHeight: "1.7", color: "var(--foreground)",
-                              margin: 0, whiteSpace: "pre-wrap"
-                            }}>
-                              {language === "ar" ? (activePage.contentAr || activePage.contentEn) : (activePage.contentEn || activePage.contentAr)}
-                            </p>
-                          </div>
-
-                          {/* Highlights taker */}
-                          <div style={{
-                            borderLeft: language === "ar" ? "none" : "4px solid var(--accent)",
-                            borderRight: language === "ar" ? "4px solid var(--accent)" : "none",
-                            padding: "0.75rem 1rem",
-                            background: "rgba(212, 175, 55, 0.05)",
-                            borderRadius: "8px",
-                            marginBottom: "1.5rem"
-                          }}>
-                            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--accent)", display: "block", marginBottom: "0.25rem" }}>
-                              🎯 {language === "ar" ? "إضاءة سريعة للفهم" : "Interactive Study Highlight"}
-                            </span>
-                            <p style={{ margin: 0, fontSize: "0.85rem", color: "#4f6371", fontStyle: "italic", lineHeight: "1.4" }}>
-                              {language === "ar" 
-                                ? "حدد أي نص أو عبارة داخل الصفحة لتشغيل ميزة \"الشرّاح الذكي\" لرفيق فهم للتبسيط الفوري!"
-                                : "Select or highlight any paragraph above to immediately query your AI Study Companion for a simplified breakdown!"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Custom Formatted Math/Chemistry Formulas */}
-                        {activePage.formulas && activePage.formulas.length > 0 && (
-                          <div style={{
-                            margin: "1.25rem 0", padding: "1.15rem", borderRadius: "14px",
-                            background: "linear-gradient(135deg, #0f172a, #1e293b)",
-                            border: "1.5px solid rgba(212, 175, 55, 0.4)",
-                            boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-                            direction: "ltr", textAlign: "start"
-                          }}>
-                            <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--secondary)", display: "block", marginBottom: "0.5rem" }}>
-                              📐 {language === "ar" ? "القوانين والصيغ الجوهرية" : "Key Formulations"}
-                            </span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                              {activePage.formulas.map((form: string, fIdx: number) => (
-                                <code key={fIdx} style={{ fontSize: "0.95rem", color: "#38bdf8", fontWeight: 700, fontFamily: "monospace", paddingLeft: "0.5rem" }}>
-                                  • {form}
-                                </code>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Premium Study Tip */}
-                        {(activePage.tipEn || activePage.tipAr) && (
-                          <div style={{
-                            margin: "1.25rem 0", padding: "1rem 1.25rem", borderRadius: "14px",
-                            background: "rgba(212, 175, 55, 0.08)", border: "1px solid rgba(212, 175, 55, 0.25)",
-                            display: "flex", gap: "0.75rem", alignItems: "flex-start",
-                            direction: language === "ar" ? "rtl" : "ltr", textAlign: "start"
-                          }}>
-                            <span style={{ fontSize: "1.3rem", marginTop: "-3px" }}>💡</span>
-                            <div>
-                              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--accent)", display: "block", marginBottom: "0.15rem" }}>
-                                {language === "ar" ? "نصيحة دراسية" : "Study Tip"}
-                              </span>
-                              <p style={{ margin: 0, fontSize: "0.82rem", color: "#4f6371", lineHeight: "1.4" }}>
-                                {language === "ar" ? (activePage.tipAr || activePage.tipEn) : (activePage.tipEn || activePage.tipAr)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Left Panel Footer - Mentions Quick Help Guide */}
-                      <div style={{
-                        marginTop: "1.5rem",
-                        padding: "1.1rem",
-                        borderRadius: "14px",
-                        background: "rgba(16, 107, 163, 0.05)",
-                        border: "1px dashed rgba(16, 107, 163, 0.2)",
-                        textAlign: "start"
-                      }}>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)", display: "block", marginBottom: "0.4rem" }}>
-                          💬 {language === "ar" ? "تلميحات وإشارات رفيق الدراسة فهم" : "Fahem Companion Mentions"}
-                        </span>
-                        <p style={{ margin: 0, fontSize: "0.78rem", color: "#4f6371", lineHeight: "1.4" }}>
-                          {language === "ar" 
-                            ? "اكتب الرموز الخاصة في محادثة الرفيق الذكي لتخصيص سياق المذاكرة: اكتب @ للمواد، # للمراجع والكتب، أو / للأوامر التعليمية الذكية!" 
-                            : "Type special characters in the companion chat to target your context: use @ for subjects, # for reference books, or / for specialized academic commands!"}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          ) : (
-            /* Standard Knowledge Library Catalog */
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  {["all", "Math", "Science", "Arabic", "History"].map(sub => (
-                    <button
-                      key={sub}
-                      onClick={() => setLibrarySubject(sub)}
-                      style={{
-                        padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer",
-                        fontSize: "0.8rem", fontWeight: 700, transition: "all 0.2s",
-                        borderColor: librarySubject === sub ? "var(--primary)" : "rgba(16, 107, 163, 0.12)",
-                        background: librarySubject === sub ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "rgba(255,255,255,0.6)",
-                        color: librarySubject === sub ? "#ffffff" : "var(--primary)",
-                        fontFamily: "var(--font-display)"
-                      }}
-                    >
-                      {sub === "all" ? (language === "ar" ? "الكل" : "All Subjects") :
-                       sub === "Math" ? (language === "ar" ? "الرياضيات" : "Math") :
-                       sub === "Science" ? (language === "ar" ? "العلوم" : "Science") :
-                       sub === "Arabic" ? (language === "ar" ? "اللغة العربية" : "Arabic") :
-                       (language === "ar" ? "التاريخ" : "History")}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  placeholder={language === "ar" ? "ابحث في المكتبة..." : "Search text books..."}
-                  value={librarySearch}
-                  onChange={(e) => setLibrarySearch(e.target.value)}
-                  style={{
-                    padding: "0.5rem 1rem", borderRadius: "20px", border: "1px solid var(--card-border)",
-                    outline: "none", fontSize: "0.85rem", width: "220px", fontFamily: "var(--font-sans)"
-                  }}
-                />
-              </div>
-
-              {/* Textbooks List */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
-                {((() => {
-                  const dynamicList = [
-                    ...(moeIngestedBooks && moeIngestedBooks.length > 0 ? moeIngestedBooks.map((b: any) => ({
-                      titleEn: b.titleEn,
-                      titleAr: b.titleAr,
-                      subject: b.subject,
-                      size: b.size,
-                      format: b.format,
-                      downloads: b.downloads,
-                      isMoeIngested: true
-                    })) : []),
-                    ...(dynamicBooks && dynamicBooks.length > 0 ? dynamicBooks.map((b: any) => ({
-                      titleEn: b.title,
-                      titleAr: b.title_ar || b.title,
-                      subject: b.subject_id === "subj_algebra_stats" ? "Math" : b.subject_id === "subj_biology" ? "Science" : b.subject_id === "subj_arabic_grammar" ? "Arabic" : "History",
-                      size: "15.0 MB",
-                      format: "PDF",
-                      downloads: "1,450"
-                    })) : [])
-                  ];
-                  if (dynamicList.length > 0) {
-                    return dynamicList;
-                  }
-                  return [
-                    { titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math", size: "14.5 MB", format: "PDF", downloads: "1,240" },
-                    { titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science", size: "18.2 MB", format: "PDF", downloads: "854" },
-                    { titleEn: "Arabic Literature and Poetry Anthology", titleAr: "روائع الأدب العربي والشعر", subject: "Arabic", size: "9.1 MB", format: "EPUB", downloads: "2,105" },
-                    { titleEn: "Modern History of the Middle East", titleAr: "التاريخ الحديث للشرق الأوسط", subject: "History", size: "12.4 MB", format: "PDF", downloads: "412" },
-                    { titleEn: "Physics Principles & Mechanics", titleAr: "أسس الفيزياء والميكانيكا الكلاسيكية", subject: "Science", size: "22.1 MB", format: "PDF", downloads: "931" },
-                    { titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic", size: "5.4 MB", format: "PDF", downloads: "1,674" }
-                  ];
-                })() as any[])
-                  .filter(item => {
-                    const s = librarySearch.toLowerCase();
-                    const matchesSearch = item.titleEn.toLowerCase().includes(s) || item.titleAr.includes(s);
-                    const matchesSub = librarySubject === "all" || item.subject === librarySubject;
-                    return matchesSearch && matchesSub;
-                  })
-                  .map((item, idx) => (
-                    <div key={idx} className="panel-card" style={{ padding: "1.25rem", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "190px", position: "relative", transition: "all 0.2s" }} onMouseOver={(e)=>{e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor="var(--primary)"}} onMouseLeave={(e)=>{e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor="var(--card-border)"}}>
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.3rem" }}>
-                          <span style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", background: "rgba(16, 107, 163, 0.08)", color: "var(--primary)", padding: "2px 8px", borderRadius: "10px", display: "inline-block" }}>
-                            {item.subject === "Math" ? (language === "ar" ? "رياضيات" : "Math") :
-                             item.subject === "Science" ? (language === "ar" ? "علوم" : "Science") :
-                             item.subject === "Arabic" ? (language === "ar" ? "عربي" : "Arabic") :
-                             (language === "ar" ? "تاريخ" : "History")}
-                          </span>
-                          {item.isMoeIngested && (
-                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "rgba(46, 125, 50, 0.12)", color: "var(--accent-green)", padding: "2px 6px", borderRadius: "8px", display: "inline-block" }}>
-                              🏛️ {language === "ar" ? "منهج رسمي معتمد" : "MOE Official"}
-                            </span>
-                          )}
-                        </div>
-                        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", color: "var(--foreground)", fontFamily: "var(--font-sans)" }}>
-                          {language === "ar" ? item.titleAr : item.titleEn}
-                        </h3>
-                        <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>💾 {item.format} | 📦 {item.size}</p>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", borderTop: "1px solid rgba(0,0,0,0.04)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.75rem", color: "#4f6371" }}>📥 {item.downloads} {language === "ar" ? "تحميل" : "downloads"}</span>
-                          <div style={{ display: "flex", gap: "0.3rem" }}>
-                            <button
-                              onClick={() => alert(language === "ar" ? `جاري تحميل ملف: ${item.titleAr}` : `Downloading textbook: ${item.titleEn}`)}
-                              style={{
-                                padding: "4px 8px", borderRadius: "20px", border: "1px solid rgba(16, 107, 163, 0.15)", cursor: "pointer",
-                                background: "#ffffff", color: "var(--primary)",
-                                fontSize: "0.75rem", fontWeight: 700
-                              }}
-                            >
-                              📥
-                            </button>
-                            <button
-                              onClick={() => handleStartStudy(item)}
-                              style={{
-                                padding: "4px 10px", borderRadius: "20px", border: "none", cursor: "pointer",
-                                background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                                fontSize: "0.75rem", fontWeight: 700
-                              }}
-                            >
-                              📖 {language === "ar" ? "دراسة وتفاعل" : "Study"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-
-              {/* Study Vault - User Personal Uploads Section */}
-              <div style={{
-                marginTop: "2.5rem", padding: "1.75rem", borderRadius: "20px",
-                background: "linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(212, 175, 55, 0.05))",
-                border: "1px solid rgba(212, 175, 55, 0.15)", backdropFilter: "blur(12px)"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
-                  <div>
-                    <h3 style={{ fontSize: "1.25rem", fontWeight: 800, margin: 0, color: "var(--foreground)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      🔒 {language === "ar" ? "خزنة دراستي الخاصة (تحميل آمن)" : "My Study Vault (Secure Ingestion)"}
-                    </h3>
-                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "#6a7c88" }}>
-                      {language === "ar" 
-                        ? `قم بتحميل وثائقك وأبحاثك الشخصية لدراستها ومذاكرتها بشكل تفاعلي مع رفيق فهم (بحد أقصى ${dynamicMaxUploadSize} ميجابايت).`
-                        : `Upload personal notes or guides to study interactively with your companion (strict ${dynamicMaxUploadSize}MB limit).`}
-                    </p>
-                  </div>
-
-                  <label style={{
-                    padding: "0.75rem 1.25rem", fontSize: "0.85rem", fontWeight: 700, borderRadius: "12px",
-                    background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", transition: "all 0.2s"
-                  }} onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }} onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}>
-                    <span>📁 {language === "ar" ? "تحميل مستند دراسي" : "Upload Document"}</span>
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > dynamicMaxUploadSize * 1024 * 1024) {
-                            alert(language === "ar" 
-                              ? `خطأ: حجم الملف يتجاوز الحد الأقصى (${dynamicMaxUploadSize} ميجابايت) للمستندات الخاصة.` 
-                              : `Error: Study document exceeds the strict ${dynamicMaxUploadSize}MB upload limit.`);
-                            e.target.value = "";
-                            return;
-                          }
-                          const storagePath = "User Uploads/" + user?.uid + "_" + Date.now() + "_" + file.name;
-                          const storageRef = ref(storage, storagePath);
-                          uploadBytes(storageRef, file).then((snapshot) => {
-                            getDownloadURL(snapshot.ref).then((downloadURL) => {
-                              // Trigger async POST to /api/books carrying file metadata for ingestion
-                              fetch("/api/books", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  title: file.name.replace(/\.[^/.]+$/, ""),
-                                  userId: user?.uid,
-                                  storagePath: storagePath,
-                                  downloadUrl: downloadURL,
-                                  sizeBytes: file.size,
-                                  format: file.name.split('.').pop()?.toUpperCase() || "PDF"
-                                })
-                              }).catch((err) => console.error("Error triggering async book ingestion API:", err));
-
-                              alert(language === "ar" ? "تم تحميل مستندك الشخصي بنجاح إلى الخزنة الآمنة وبدأت عملية الفهرسة الفورية!" : "Your personal notes have been ingested securely into the vault and real-time processing has started!");
-                              const newBook = {
-                                titleEn: file.name.replace(/\.[^/.]+$/, ""),
-                                titleAr: file.name.replace(/\.[^/.]+$/, ""),
-                                subject: "Science",
-                                size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-                                format: file.name.split('.').pop()?.toUpperCase() || "PDF",
-                                downloads: "0",
-                                isUserUpload: true
-                              };
-                              setCustomUploadedBooks(prev => [newBook, ...prev]);
-                            });
-                          }).catch((err) => {
-                            console.error("Upload error:", err);
-                            alert(language === "ar" ? "حدث خطأ أثناء تحميل الملف." : "An error occurred while uploading your document.");
-                          });
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-
-                {/* Render Vault File Cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" }}>
-                  {customUploadedBooks.map((item, idx) => (
-                    <div key={idx} className="panel-card" style={{
-                      padding: "1.15rem", display: "flex", flexDirection: "column",
-                      justifyContent: "space-between", height: "140px", border: "1px dashed rgba(212,175,55,0.3)"
-                    }}>
-                      <div>
-                        <span style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase", background: "rgba(212,175,55,0.12)", color: "#b45309", padding: "2px 6px", borderRadius: "8px", display: "inline-block", marginBottom: "0.4rem" }}>
-                          🔒 {language === "ar" ? "ملف دراسي خاص" : "Private Vault File"}
-                        </span>
-                        <h4 style={{ fontSize: "0.85rem", fontWeight: 700, margin: "0 0 0.25rem 0", color: "var(--foreground)" }}>
-                          {language === "ar" ? item.titleAr : item.titleEn}
-                        </h4>
-                        <p style={{ fontSize: "0.72rem", color: "#6a7c88", margin: 0 }}>💾 {item.format} | 📦 {item.size}</p>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <button
-                          onClick={() => handleStartStudy(item)}
-                          style={{
-                            padding: "4px 10px", borderRadius: "12px", border: "none", cursor: "pointer",
-                            background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                            fontSize: "0.75rem", fontWeight: 700
-                          }}
-                        >
-                          📖 {language === "ar" ? "دراسة وتفاعل" : "Study & Interact"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )
+          <LibraryPanel
+            language={language}
+            user={user}
+            selectedBookReader={selectedBookReader}
+            setSelectedBookReader={setSelectedBookReader}
+            loadedBookPages={loadedBookPages}
+            setLoadedBookPages={setLoadedBookPages}
+            loadingBookPages={loadingBookPages}
+            readerCurrentPage={readerCurrentPage}
+            setReaderCurrentPage={setReaderCurrentPage}
+            selectedText={selectedText}
+            setSelectedText={setSelectedText}
+            bubbleCoords={bubbleCoords}
+            setBubbleCoords={setBubbleCoords}
+            getAllPages={getAllPages}
+            moeIngestedBooks={moeIngestedBooks}
+            dynamicBooks={dynamicBooks}
+            librarySearch={librarySearch}
+            setLibrarySearch={setLibrarySearch}
+            librarySubject={librarySubject}
+            setLibrarySubject={setLibrarySubject}
+            customUploadedBooks={customUploadedBooks}
+            setCustomUploadedBooks={setCustomUploadedBooks}
+            dynamicMaxUploadSize={dynamicMaxUploadSize}
+            handleStartStudy={handleStartStudy}
+            t={t}
+          />
         ) : activeTab === "subjects" ? (
-          /* Course Subjects Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem" }} className="grid-cols-1">
-              {/* Core subjects progress cards */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {(dynamicSubjects && dynamicSubjects.length > 0 ? dynamicSubjects.map((subj: any) => {
-                  const fallbackMeta = subj._id === "subj_algebra_stats" 
-                    ? { nameEn: "Algebra & Statistics", nameAr: "الجبر والإحصاء", icon: "📊", progress: 65, color: "var(--primary)" }
-                    : subj._id === "subj_biology"
-                    ? { nameEn: "Biology", nameAr: "الأحياء", icon: "🧬", progress: 42, color: "#9c27b0" }
-                    : subj._id === "subj_arabic_grammar"
-                    ? { nameEn: "Arabic Grammar", nameAr: "النحو والصرف", icon: "📖", progress: 85, color: "#2e7d32" }
-                    : { nameEn: subj.name, nameAr: subj.name_ar || subj.name, icon: subj.emoji || "📚", progress: 20, color: "#ef6c00" };
-                  
-                  return {
-                    _id: subj._id,
-                    nameEn: subj.name || fallbackMeta.nameEn,
-                    nameAr: subj.name_ar || fallbackMeta.nameAr,
-                    icon: subj.emoji || fallbackMeta.icon,
-                    progress: fallbackMeta.progress,
-                    color: fallbackMeta.color
-                  };
-                }) : [
-                  { _id: "subj_algebra_stats", nameEn: "Pure Mathematics", nameAr: "الرياضيات العامة", icon: "📐", progress: 65, color: "var(--primary)" },
-                  { _id: "subj_biology", nameEn: "Physics & Chemistry", nameAr: "العلوم والفيزياء", icon: "🧪", progress: 42, color: "#9c27b0" },
-                  { _id: "subj_arabic_grammar", nameEn: "Arabic Grammar & Literature", nameAr: "اللغة العربية وآدابها", icon: "📚", progress: 85, color: "#2e7d32" },
-                  { _id: "subj_history_geo", nameEn: "World History", nameAr: "التاريخ والجغرافيا", icon: "🌍", progress: 20, color: "#ef6c00" }
-                ]).map((item, idx) => {
-                  const isSelected = selectedSubjectId === item._id;
-                  return (
-                    <div 
-                      key={idx} 
-                      className="panel-card" 
-                      onClick={() => setSelectedSubjectId(item._id)}
-                      style={{ 
-                        padding: "1.25rem", 
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: "1rem",
-                        cursor: "pointer",
-                        border: isSelected ? `2px solid ${item.color}` : "1px solid var(--card-border)",
-                        transform: isSelected ? "scale(1.02)" : "scale(1)",
-                        boxShadow: isSelected ? "0 8px 16px rgba(0,0,0,0.06)" : "none",
-                        transition: "all 0.25s ease-in-out"
-                      }}
-                      onMouseOver={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.borderColor = item.color;
-                          e.currentTarget.style.transform = "scale(1.01)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.borderColor = "var(--card-border)";
-                          e.currentTarget.style.transform = "scale(1)";
-                        }
-                      }}
-                    >
-                      <div style={{ fontSize: "2rem" }}>{item.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.25rem 0", fontFamily: "var(--font-sans)" }}>{language === "ar" ? item.nameAr : item.nameEn}</h3>
-                        <div style={{ width: "100%", height: "6px", background: "rgba(0,0,0,0.05)", borderRadius: "3px", overflow: "hidden", marginBottom: "0.25rem" }}>
-                          <div style={{ width: `${item.progress}%`, height: "100%", background: item.color, borderRadius: "3px" }}></div>
-                        </div>
-                        <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700 }}>{item.progress}% {language === "ar" ? "مكتمل" : "completed"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Module Accordion Workspace */}
-              <div className="panel-card" style={{ padding: "1.5rem" }}>
-                <h3 style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800 }}>
-                  {language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}
-                </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {(() => {
-                    const activeBook = dynamicBooks && dynamicBooks.find((b: any) => b.subject_id === selectedSubjectId);
-                    const modulesList = activeBook && activeBook.chapters && activeBook.chapters.length > 0
-                      ? activeBook.chapters.map((ch: any) => ({
-                          titleAr: ch.title_ar || ch.title,
-                          titleEn: ch.title,
-                          lessons: ch.concepts || []
-                        }))
-                      : (selectedSubjectId === "subj_algebra_stats"
-                        ? [
-                            { titleAr: "الوحدة الأولى: الجبر والنسب المثلثية", titleEn: "Module 1: Algebra & Trigonometry Trigonometric Functions", lessons: ["المعادلات التربيعية", "المتطابقات المثلثية", "المصفوفات والمحددات"] },
-                            { titleAr: "الوحدة الثانية: علم التفاضل والتكامل المبسط", titleEn: "Module 2: Basics of Calculus & Limits", lessons: ["النهايات والاتصال", "قواعد الاشتقاق وتطبيقاته", "المشتقات العليا"] },
-                            { titleAr: "الوحدة الثالثة: الاحتمالات والإحصاء التطبيقي", titleEn: "Module 3: Probability & Applied Statistics", lessons: ["التوزيع الطبيعي المعتدل", "معامل الارتباط وبيرسون", "مبدأ العد والتباديل"] }
-                          ]
-                        : selectedSubjectId === "subj_biology"
-                        ? [
-                            { titleAr: "الوحدة الأولى: التغذية والعمليات الذاتية", titleEn: "Module 1: Nutrition & Autotrophic Processes", lessons: ["التغذية الذاتية والغير ذاتية", "البناء الضوئي وتفاعلاته", "حلقة كالفن وإنتاج الطاقة"] },
-                            { titleAr: "الوحدة الثانية: النقل في الكائنات الحية", titleEn: "Module 2: Transport in Living Organisms", lessons: ["جهاز الدوران في الإنسان", "تركيب الدم والقلب والأوعية", "النظام الليمفاوي ومقاومة الأمراض"] }
-                          ]
-                        : selectedSubjectId === "subj_arabic_grammar"
-                        ? [
-                            { titleAr: "الوحدة الأولى: الأفعال الناسخة المقاربة والشروع", titleEn: "Module 1: Dynamic Verbs (Kaada & her Sisters)", lessons: ["اسم كاد وخبرها الجملة الفعلية", "شروط اقتران الخبر بأن", "الفروق الجوهرية بين كان وكاد"] },
-                            { titleAr: "الوحدة الثانية: أسلوب الاستثناء وأدواته", titleEn: "Module 2: Style of Exception (Al-Mustathna)", lessons: ["أحكام المستثنى بعد إلا وغير وسوى", "الاستثناء التام والناقص المنفي", "أحكام الاستثناء بخلا وعدا وحاشا"] }
-                          ]
-                        : [
-                            { titleAr: "الوحدة الأولى: المناهج العامة والدراسات", titleEn: "Module 1: General Curriculum & Studies", lessons: ["مراجعة عامة", "مفاهيم أساسية", "تدريبات وتطبيقات مخصصة"] }
-                          ]);
-
-                    return modulesList.map((mod: any, index: number) => (
-                      <div key={index} style={{ border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-sm)", background: "#ffffff", overflow: "hidden" }}>
-                        <button
-                          onClick={() => setExpandedModule(expandedModule === index ? null : index)}
-                          style={{
-                            width: "100%", padding: "1rem", border: "none", background: "none", cursor: "pointer",
-                            display: "flex", justifyContent: "space-between", alignItems: "center",
-                            fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-sans)", fontSize: "0.9rem"
-                          }}
-                        >
-                          <span>{language === "ar" ? mod.titleAr : mod.titleEn}</span>
-                          <span>{expandedModule === index ? "▼" : "▶"}</span>
-                        </button>
-                        {expandedModule === index && (
-                          <div style={{ padding: "0.5rem 1rem 1rem 1rem", borderTop: "1px solid rgba(0,0,0,0.04)", background: "rgba(16, 107, 163, 0.01)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                            {mod.lessons.map((les: string, lessonIdx: number) => (
-                              <div key={lessonIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem", background: "#ffffff", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "4px" }}>
-                                <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>📚 {les}</span>
-                                <button
-                                  onClick={() => alert(language === "ar" ? `جاري بدء الدرس التفاعلي الموثق بالصفحات الدراسية لـ: ${les}` : `Starting page-grounded interactive tutor lesson for: ${les}`)}
-                                  style={{
-                                    padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer",
-                                    background: "var(--primary)", color: "#ffffff", fontSize: "0.75rem", fontWeight: 700
-                                  }}
-                                >
-                                  {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-            </div>
-          </div>
+          <SubjectsPanel
+            language={language}
+            dynamicSubjects={dynamicSubjects}
+            dynamicBooks={dynamicBooks}
+            selectedSubjectId={selectedSubjectId}
+            setSelectedSubjectId={setSelectedSubjectId}
+            t={t}
+          />
         ) : activeTab === "practice" ? (
-          /* Practice Workstation Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {renderSpaceSelectorBar("practice")}
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
-              {/* Flashcard Player Widget with flip animation */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div 
-                  onClick={() => setFlashcardFlipped(!flashcardFlipped)}
-                  style={{
-                    height: "220px", borderRadius: "var(--border-radius-lg)", border: "1px solid var(--primary)",
-                    background: "radial-gradient(circle at top right, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03)), #ffffff",
-                    display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-                    cursor: "pointer", padding: "2rem", textAlign: "center", position: "relative",
-                    boxShadow: "var(--shadow-sm)", transition: "all 0.4s ease", transformStyle: "preserve-3d"
-                  }}
-                >
-                  <div style={{ position: "absolute", top: "0.75rem", right: "1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", textTransform: "uppercase" }}>
-                    {language === "ar" ? "بطاقة مراجعة تفاعلية" : "Interactive Flashcard"}
-                  </div>
-                  
-                  {!flashcardFlipped ? (
-                    <div>
-                      <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 700 }}>{language === "ar" ? "السؤال / المفهوم" : "Question / Concept"}</span>
-                      <h3 style={{ fontSize: "1.25rem", color: "var(--primary)", margin: "0.5rem 0 0 0", fontWeight: 800, fontFamily: "var(--font-sans)" }}>
-                        {language === "ar" ? [
-                          "ما هو تعريف المشتقة الأولى في التفاضل؟",
-                          "ما هي الصيغة الكيميائية لغاز ثنائي أكسيد الكربون؟",
-                          "من هو مؤلف كتاب كليلة ودمنة؟"
-                        ][flashcardIndex] : [
-                          "What is the definition of the derivative in Calculus?",
-                          "What is the chemical formula for carbon dioxide?",
-                          "Who is the author of the Arabic classic 'Kalila and Demna'?"
-                        ][flashcardIndex]}
-                      </h3>
-                      <p style={{ fontSize: "0.8rem", color: "rgba(16, 107, 163, 0.6)", marginTop: "1rem", fontWeight: 700 }}>💡 {language === "ar" ? "اضغط لقلب البطاقة ومعرفة الإجابة" : "Click to flip and reveal answer"}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <span style={{ fontSize: "0.8rem", color: "#2e7d32", fontWeight: 700 }}>{language === "ar" ? "الإجابة النموذجية" : "Model Answer"}</span>
-                      <p style={{ fontSize: "1.1rem", color: "var(--foreground)", margin: "0.5rem 0 0 0", fontWeight: 700, lineHeight: "1.6", fontFamily: "var(--font-sans)" }}>
-                        {language === "ar" ? [
-                          "هي معدل التغير اللحظي للدالة بالنسبة لمتغيرها المستقل، وتمثل هندسياً بميل المماس لمنحنى الدالة عند نقطة.",
-                          "الصيغة الكيميائية هي CO₂، ويتكون من جزيء كربون وجزيئين أكسجين.",
-                          "ابن المقفع، وهو كاتب وأديب فارسي الأصل قام بترجمته وصياغته بأسلوب عربي بليغ."
-                        ][flashcardIndex] : [
-                          "It is the instantaneous rate of change of a function with respect to its variable, geometrically representing the slope of the tangent.",
-                          "The chemical formula is CO₂, consisting of one carbon atom and two oxygen atoms.",
-                          "Ibn al-Muqaffa, who translated and adapted these ancient Indian fables into classical Arabic prose."
-                        ][flashcardIndex]}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Player controls */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <button
-                    onClick={() => {
-                      setFlashcardFlipped(false);
-                      setFlashcardIndex(prev => (prev === 0 ? 2 : prev - 1));
-                    }}
-                    style={{ padding: "6px 12px", border: "1px solid var(--card-border)", borderRadius: "6px", background: "#ffffff", cursor: "pointer", fontWeight: 700 }}
-                  >
-                    ◀ {language === "ar" ? "السابق" : "Prev"}
-                  </button>
-                  <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>{flashcardIndex + 1} / 3</span>
-                  <button
-                    onClick={() => {
-                      setFlashcardFlipped(false);
-                      setFlashcardIndex(prev => (prev === 2 ? 0 : prev + 1));
-                    }}
-                    style={{ padding: "6px 12px", border: "1px solid var(--card-border)", borderRadius: "6px", background: "#ffffff", cursor: "pointer", fontWeight: 700 }}
-                  >
-                    {language === "ar" ? "التالي" : "Next"} ▶
-                  </button>
-                </div>
-              </div>
-
-              {/* Practice Questions generator */}
-              <div className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>{language === "ar" ? "مولد أسئلة التدريب الذكي" : "AI Question Workstation"}</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 700 }}>{language === "ar" ? "اختر المادة الدراسية" : "Select Subject"}</label>
-                  <select
-                    value={practiceSubject}
-                    onChange={(e) => setPracticeSubject(e.target.value)}
-                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff" }}
-                  >
-                    <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
-                    <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
-                    <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
-                  </select>
-                </div>
-                <button
-                  onClick={() => {
-                    setPracticeLoading(true);
-                    setPracticeResult("");
-                    setPracticeAnswer("");
-                    setTimeout(() => {
-                      const questions: Record<string, { en: string; ar: string }> = {
-                        Math: {
-                          en: "Given a matrix A where det(A) = 0, what can be inferred about its inverse? Explain your answer with matrix algebra concepts.",
-                          ar: "إذا كانت المصفوفة أ بحيث محددها يساوي صفرًا (det(A) = 0)، فماذا يمكن استنتاجه عن معكوسها الضربي؟ اشرح إجابتك رياضياً."
-                        },
-                        Science: {
-                          en: "Explain the process of Photosynthesis in chloroplasts. What are the key stages, reactions, and where do they occur?",
-                          ar: "اشرح بالتفصيل عملية البناء الضوئي داخل البلاستيدات الخضراء. ما هي المراحل الأساسية والتفاعلات الضوئية واللاضوئية؟"
-                        },
-                        Arabic: {
-                          en: "Explain the rules governing Kaada (كاد) and her sisters' predicates. How does it compare to Kana (كان)? Support your answer with grammatical examples.",
-                          ar: "اشرح بالتفصيل حكم اقتران خبر كاد وأخواتها بأن المصدرية مبيناً أوجه الاختلاف والاتفاق بين كاد وكان مع الأمثلة النحوية."
-                        }
-                      };
-                      setGeneratedQuestion(language === "ar" ? questions[practiceSubject].ar : questions[practiceSubject].en);
-                      setPracticeLoading(false);
-                    }, 800);
-                  }}
-                  style={{
-                    padding: "10px", borderRadius: "var(--border-radius-sm)", border: "none", cursor: "pointer",
-                    background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                    fontWeight: 700, fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
-                  }}
-                  disabled={practiceLoading}
-                >
-                  {practiceLoading ? (
-                    <FiRefreshCw className="spinning-icon" />
-                  ) : "✨"}
-                  <span>{language === "ar" ? "توليد سؤال تدريبي مخصص" : "Generate Custom Question"}</span>
-                </button>
-
-                {generatedQuestion && (
-                  <div style={{ marginTop: "1rem", borderTop: "1px dashed rgba(235, 220, 185, 0.4)", paddingTop: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ padding: "0.75rem", background: "rgba(16, 107, 163, 0.04)", borderLeft: "3px solid var(--primary)", borderRight: language === "ar" ? "3px solid var(--primary)" : "none", borderRadius: "4px" }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", textTransform: "uppercase" }}>
-                        {language === "ar" ? "السؤال المولد بالذكاء الاصطناعي:" : "AI Generated Worksheet:"}
-                      </span>
-                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", fontWeight: 700, lineHeight: "1.5" }}>{generatedQuestion}</p>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
-                        {language === "ar" ? "أدخل إجابتك (النسخ واللصق معطل):" : "Type your answer (paste is blocked):"}
-                      </label>
-                      <textarea
-                        id="text-practice-input"
-                        value={practiceAnswer}
-                        onChange={(e) => setPracticeAnswer(e.target.value)}
-                        onPaste={(e) => {
-                          e.preventDefault();
-                          alert(language === "ar" 
-                            ? "تنبيه: تم تعطيل النسخ واللصق لتشجيع الفهم النشط والكتابة الذاتية!" 
-                            : "Notice: Copy-pasting is disabled to encourage active recall and typing your own answers!");
-                        }}
-                        placeholder={language === "ar" ? "اكتب صياغتك وإجابتك الكاملة هنا..." : "Type your comprehensive response here..."}
-                        style={{
-                          width: "100%", height: "100px", padding: "0.75rem", borderRadius: "6px",
-                          border: "1px solid var(--card-border)", outline: "none", fontSize: "0.85rem",
-                          fontFamily: "var(--font-sans)", resize: "none"
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setPracticeLoading(true);
-                        setTimeout(() => {
-                          const answersFeedback: Record<string, { en: string; ar: string }> = {
-                            Math: {
-                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 14]\n\nExcellent try! You correctly identified that a matrix with determinant zero is singular and lacks a multiplicative inverse. Your explanation matches Section 1.2 on matrix inversion conditions. To get full points, make sure to state that A is singular.",
-                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٤]\n\nمحاولة ممتازة وصحيحة تماماً! لقد حددت بشكل صحيح أن المصفوفة ذات المحدد الصفري تسمى مصفوفة منفردة (شاذة) ولا يوجد لها معكوس ضربي. إجابتك تطابق تماماً ما ورد في الباب الأول للمصفوفات. استمر في هذا الأداء الرائع!"
-                            },
-                            Science: {
-                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 12]\n\nGreat explanation of the autotrophic process! You accurately described the role of chloroplasts and light-dependent reactions. Remember that the dark reaction (Calvin Cycle) occurs in the stroma as detailed on page 15.",
-                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٢]\n\nتفسير رائع لعملية البناء الذاتي والتحول الضوئي! لقد وصفت بدقة دور البلاستيدات والتفاعلات الضوئية. تذكر دائماً أن التفاعلات اللاضوئية (حلقة كالفن) تحدث في الستروما (الأرضية) كما هو مفصل في صفحة ١٥ من كتاب الأحياء."
-                            },
-                            Arabic: {
-                              en: "[Fahem AI Page Grounded Feedback - Textbook Page 18]\n\nWonderful analysis! You correctly specified that the predicate of 'Kaada' must be a phrasal verb starting with a present tense verb. This aligns perfectly with the Thanaweya curriculum guidelines.",
-                              ar: "[تقرير تقييم فاهم المدعم بالكتاب المدرسي - صفحة ١٨]\n\nشرح وافٍ وبليغ! لقد بينت بشكل ممتاز أن خبر كاد وأخواتها لا بد أن يكون جملة فعلية فعلها مضارع، وذكرت شروط اقترانه بأن المصدرية بدقة. إجابتك تطابق المنهج المقرر في كتاب النحو والصرف."
-                            }
-                          };
-                          setPracticeResult(language === "ar" ? answersFeedback[practiceSubject].ar : answersFeedback[practiceSubject].en);
-                          setPracticeLoading(false);
-                        }, 1200);
-                      }}
-                      style={{
-                        padding: "8px 12px", borderRadius: "4px", border: "none", cursor: "pointer",
-                        background: "var(--primary)", color: "#ffffff", fontWeight: 700, fontSize: "0.8rem",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
-                      }}
-                      disabled={practiceLoading || !practiceAnswer.trim()}
-                    >
-                      {practiceLoading ? <FiRefreshCw className="spinning-icon" /> : "📝"}
-                      <span>{language === "ar" ? "إرسال الإجابة للتقييم" : "Submit Response"}</span>
-                    </button>
-
-                    {practiceResult && (
-                      <div style={{ marginTop: "0.5rem", padding: "0.75rem", background: "#f1f8e9", border: "1px solid #c5e1a5", borderRadius: "4px" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#2e7d32" }}>
-                          {language === "ar" ? "تحليل المعلم الذكي والتقييم المعتمد:" : "AI Grounded Tutor Evaluation:"}
-                        </span>
-                        <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "#33691e", lineHeight: "1.5", whiteSpace: "pre-line" }}>{practiceResult}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            {renderSpaceHistory()}
-          </div>
+          <PracticePanel
+            language={language}
+            dynamicBooks={dynamicBooks}
+            renderSpaceSelectorBar={renderSpaceSelectorBar}
+            renderSpaceHistory={renderSpaceHistory}
+            renderPremiumContent={renderPremiumContent}
+            t={t}
+          />
         ) : activeTab === "plan" ? (
-          /* Study Planner Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
-              {/* Custom planner checklist */}
-              <div className="panel-card" style={{ padding: "1.5rem" }}>
-                <h3 style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800 }}>
-                  {language === "ar" ? "خطة الدراسة ومتابعة المهام الأسبوعية" : "My Weekly Academic Plan & Tasks"}
-                </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {[
-                    { textAr: "دراسة درس المتطابقات المثلثية وحل 10 مسائل", textEn: "Study Trigonometric Functions and solve 10 exercises", checked: true, dayAr: "السبت", dayEn: "Sat" },
-                    { textAr: "مراجعة قواعد كتابة الهمزة المتوسطة وحل الكراسة", textEn: "Review Arabic spelling rules and complete exercises", checked: true, dayAr: "الأحد", dayEn: "Sun" },
-                    { textAr: "تجربة اختبار معمل الكيمياء عن التفاعلات الطاردة للحرارة", textEn: "Perform chemistry virtual experiment on exothermic reactions", checked: false, dayAr: "الإثنين", dayEn: "Mon" },
-                    { textAr: "تلخيص الفصل الرابع من تاريخ الشرق الأوسط عبر الزتونة", textEn: "Summarize Chapter 4 of Middle East History via Zatona AI", checked: false, dayAr: "الثلاثاء", dayEn: "Tue" },
-                    { textAr: "التحضير لاختبار مادة العلوم القصير والتدرب على الفلاش كارد", textEn: "Prepare for Science mock assessment and practice flashcards", checked: false, dayAr: "الأربعاء", dayEn: "Wed" }
-                  ].map((task, idx) => (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", borderRadius: "var(--border-radius-sm)", border: "1px solid rgba(0,0,0,0.03)", background: "#ffffff", transition: "all 0.15s" }}>
-                      <input
-                        type="checkbox"
-                        defaultChecked={task.checked}
-                        style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "var(--primary)" }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: "0.9rem", fontWeight: 600, color: task.checked ? "#6a7c88" : "var(--foreground)", textDecoration: task.checked ? "line-through" : "none" }}>
-                          {language === "ar" ? task.textAr : task.textEn}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(16, 107, 163, 0.06)", color: "var(--primary)", padding: "2px 8px", borderRadius: "10px" }}>
-                        {language === "ar" ? task.dayAr : task.dayEn}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Study goal statistics */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div className="panel-card" style={{ padding: "1.5rem", textAlign: "center", background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))" }}>
-                  <span style={{ fontSize: "2.5rem" }}>🏆</span>
-                  <h3 style={{ fontSize: "1rem", margin: "0.5rem 0 0.25rem 0", fontWeight: 800 }}>{language === "ar" ? "أداء الأسبوع" : "Weekly Target Metric"}</h3>
-                  <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: "0 0 1rem 0" }}>{language === "ar" ? "لقد أنجزت 2 من أصل 5 مهام دراسية مقررة." : "You have achieved 2 of 5 scheduled goals."}</p>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)" }}>40%</div>
-                </div>
-
-                <button
-                  onClick={() => alert(language === "ar" ? "جاري إنشاء خطة دراسية مخصصة بواسطة الذكاء الاصطناعي لتغطية المنهج الدراسي بالكامل..." : "Generating custom AI-designed study blueprint to cover your full curriculum...")}
-                  style={{
-                    padding: "1rem", borderRadius: "var(--border-radius-md)", border: "none", cursor: "pointer",
-                    background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff",
-                    fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem"
-                  }}
-                >
-                  <span>✨ {language === "ar" ? "توليد خطة دراسية ذكية" : "AI Custom Blueprint"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          <StudyPlanPanel
+            language={language}
+            t={t}
+          />
         ) : activeTab === "timetable" ? (
-          /* Weekly Schedule Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {renderSpaceSelectorBar("timetable")}
-            <section className="panel-card" style={{ padding: "2rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ fontSize: "1.2rem", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <FiClock style={{ color: "var(--primary)" }} />
-                  <span>{language === "ar" ? "جدول الحصص الأسبوعي الحاضر" : "Weekly Class Schedule Planner"}</span>
-                </h3>
-                <button
-                  onClick={() => {
-                    const newSub = window.prompt(language === "ar" ? "اسم الحصة والمادة:" : "Class subject:");
-                    const newDay = window.prompt(language === "ar" ? "اليوم (مثال: Monday):" : "Day of week (e.g., Monday):");
-                    const newTime = window.prompt(language === "ar" ? "الوقت (مثال: 09:00 - 10:30):" : "Time range (e.g., 09:00 - 10:30):");
-                    if (newSub && newDay && newTime) {
-                      setTimetableEvents((prev: any[]) => [
-                        ...prev,
-                        { id: Date.now(), subject: newSub, subjectAr: newSub, day: newDay, dayAr: newDay, time: newTime, room: "Virtual Room" }
-                      ]);
-                    }
-                  }}
-                  className="btn btn-primary"
-                  style={{ padding: "6px 12px", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
-                >
-                  <FiPlus />
-                  <span>{language === "ar" ? "إضافة حصة" : "Add Class"}</span>
-                </button>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
-                {timetableEvents.map((evt: any) => (
-                  <div key={evt.id} style={{ padding: "1rem", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-md)", background: "#ffffff", display: "flex", flexDirection: "column", gap: "0.5rem", position: "relative" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", background: "rgba(16, 107, 163, 0.06)", padding: "2px 8px", borderRadius: "10px" }}>
-                        {language === "ar" ? evt.dayAr : evt.day}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setTimetableEvents((prev: any[]) => prev.filter((e: any) => e.id !== evt.id));
-                        }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#d32f2f", fontSize: "0.8rem" }}
-                        title={language === "ar" ? "حذف الحصة" : "Delete class"}
-                      >
-                        <FiTrash2 />
-                      </button>
-                    </div>
-                    <h4 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                      📚 {language === "ar" ? evt.subjectAr : evt.subject}
-                    </h4>
-                    <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0 }}>⏱️ {evt.time} | 🏫 {evt.room}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-            {renderSpaceHistory()}
-          </div>
-        ) : activeTab === "quiz" ? (
-          /* Quiz Arena Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <section className="panel-card" style={{ padding: "2rem" }}>
-              {!quizFinished ? (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>
-                      {language === "ar" ? "مقياس التحصيل والأداء النهائي" : "Knowledge Assessment Workstation"}
-                    </h3>
-                    <span style={{ fontSize: "0.85rem", fontWeight: 700, background: "rgba(16, 107, 163, 0.08)", padding: "4px 10px", borderRadius: "20px", color: "var(--primary)" }}>
-                      {language === "ar" ? `السؤال ${quizQuestionIndex + 1} من 3` : `Question ${quizQuestionIndex + 1} of 3`}
-                    </span>
-                  </div>
-
-                  {/* Question Title */}
-                  <h4 style={{ fontSize: "1.1rem", color: "var(--primary)", margin: "0 0 1.25rem 0", fontWeight: 800, fontFamily: "var(--font-sans)" }}>
-                    {language === "ar" ? [
-                      "ما هي ناتج عملية تكامل السينوس (sin(x) dx)؟",
-                      "أي الكواكب التالية يلقب بالكوكب الأحمر نظراً لنسبة أكسيد الحديد العالية؟",
-                      "ما هي عاصمة جمهورية مصر العربية؟"
-                    ][quizQuestionIndex] : [
-                      "What is the integral of sin(x) dx?",
-                      "Which planet in our solar system is known as the Red Planet?",
-                      "What is the capital city of Egypt?"
-                    ][quizQuestionIndex]}
-                  </h4>
-
-                  {/* Options */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
-                    {([
-                      [
-                        { textAr: "cos(x) + C", textEn: "cos(x) + C", isCorrect: false },
-                        { textAr: "-cos(x) + C", textEn: "-cos(x) + C", isCorrect: true },
-                        { textAr: "sin(x) + C", textEn: "sin(x) + C", isCorrect: false },
-                        { textAr: "tan(x) + C", textEn: "tan(x) + C", isCorrect: false }
-                      ],
-                      [
-                        { textAr: "المشتري", textEn: "Jupiter", isCorrect: false },
-                        { textAr: "المريخ", textEn: "Mars", isCorrect: true },
-                        { textAr: "الزهرة", textEn: "Venus", isCorrect: false },
-                        { textAr: "عطارد", textEn: "Mercury", isCorrect: false }
-                      ],
-                      [
-                        { textAr: "القاهرة", textEn: "Cairo", isCorrect: true },
-                        { textAr: "الإسكندرية", textEn: "Alexandria", isCorrect: false },
-                        { textAr: "الجيزة", textEn: "Giza", isCorrect: false },
-                        { textAr: "الأقصر", textEn: "Luxor", isCorrect: false }
-                      ]
-                    ][quizQuestionIndex]).map((opt, optIdx) => {
-                      const isSelected = quizAnswers[quizQuestionIndex] === optIdx;
-                      return (
-                        <button
-                          key={optIdx}
-                          onClick={() => setQuizAnswers((prev: any) => ({ ...prev, [quizQuestionIndex]: optIdx }))}
-                          style={{
-                            padding: "0.85rem 1.25rem", borderRadius: "var(--border-radius-sm)", border: "1px solid",
-                            textAlign: language === "ar" ? "right" : "left", cursor: "pointer",
-                            fontSize: "0.9rem", fontWeight: 600, transition: "all 0.15s",
-                            borderColor: isSelected ? "var(--primary)" : "var(--card-border)",
-                            background: isSelected ? "rgba(16, 107, 163, 0.05)" : "#ffffff",
-                            color: isSelected ? "var(--primary)" : "var(--foreground)",
-                            fontFamily: "var(--font-sans)"
-                          }}
-                        >
-                          <span style={{ marginRight: language === "ar" ? "0" : "0.5rem", marginLeft: language === "ar" ? "0.5rem" : "0" }}>
-                            {["A", "B", "C", "D"][optIdx]}.
-                          </span>
-                          {language === "ar" ? opt.textAr : opt.textEn}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Navigation buttons */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <button
-                      disabled={quizQuestionIndex === 0}
-                      onClick={() => setQuizQuestionIndex((prev: number) => prev - 1)}
-                      style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#ffffff", cursor: quizQuestionIndex === 0 ? "not-allowed" : "pointer", opacity: quizQuestionIndex === 0 ? 0.5 : 1, fontWeight: 700 }}
-                    >
-                      {language === "ar" ? "السابق" : "Back"}
-                    </button>
-                    {quizQuestionIndex === 2 ? (
-                      <button
-                        onClick={() => setQuizFinished(true)}
-                        className="btn btn-primary"
-                        style={{ padding: "8px 16px", fontWeight: 700 }}
-                      >
-                        {language === "ar" ? "إنهاء وتصحيح الاختبار" : "Submit Quiz"}
-                      </button>
-                    ) : (
-                      <button
-                        disabled={quizAnswers[quizQuestionIndex] === undefined}
-                        onClick={() => setQuizQuestionIndex((prev: number) => prev + 1)}
-                        style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--primary)", background: "var(--primary)", color: "#ffffff", cursor: quizAnswers[quizQuestionIndex] === undefined ? "not-allowed" : "pointer", opacity: quizAnswers[quizQuestionIndex] === undefined ? 0.5 : 1, fontWeight: 700 }}
-                      >
-                        {language === "ar" ? "التالي" : "Next Question"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Quiz Finished Certificate Display */
-                <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center", padding: "1rem" }}>
-                  <span style={{ fontSize: "3.5rem" }}>🎉</span>
-                  <h3 style={{ fontSize: "1.4rem", margin: 0, fontWeight: 800 }}>{language === "ar" ? "اكتمل الاختبار بنجاح!" : "Assessment Complete!"}</h3>
-                  
-                  {/* Score Calculation */}
-                  {(() => {
-                    const modelAnswers = [1, 1, 0]; // Index of correct answers
-                    let score = 0;
-                    if (quizAnswers[0] === modelAnswers[0]) score += 1;
-                    if (quizAnswers[1] === modelAnswers[1]) score += 1;
-                    if (quizAnswers[2] === modelAnswers[2]) score += 1;
-
-                    return (
-                      <div>
-                        <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--primary)", margin: "0.5rem 0" }}>
-                          {score} / 3
-                        </div>
-                        <p style={{ fontSize: "0.95rem", color: "#4f6371", maxWidth: "450px", margin: "0 auto 1.5rem auto", lineHeight: "1.6" }}>
-                          {score === 3 
-                            ? (language === "ar" ? "عمل رائع ومثالي! لقد أجبت على كافة الأسئلة بشكل صحيح مذهل." : "Perfect score! Outstanding academic achievement.")
-                            : (language === "ar" ? "عمل جيد! يمكنك مراجعة الوحدات الدراسية وإعادة الاختبار لتحقيق الدرجة الكاملة." : "Good attempt! Review course materials and try again to master this subject.")}
-                        </p>
-                      </div>
-                    );
-                  })()}
-
-                  <button
-                    onClick={() => {
-                      setQuizQuestionIndex(0);
-                      setQuizAnswers({});
-                      setQuizFinished(false);
-                    }}
-                    className="btn btn-secondary"
-                    style={{ padding: "8px 16px", fontWeight: 700 }}
-                  >
-                    🔄 {language === "ar" ? "إعادة المحاولة" : "Retake Assessment"}
-                  </button>
-                </div>
-              )}
-            </section>
-          </div>
+          <TimetablePanel
+            language={language}
+            timetableEvents={timetableEvents}
+            setTimetableEvents={setTimetableEvents}
+            renderSpaceSelectorBar={renderSpaceSelectorBar}
+            renderSpaceHistory={renderSpaceHistory}
+            t={t}
+          />
         ) : activeTab === "zatona" ? (
-          /* Zatona AI Research Panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {renderSpaceSelectorBar("zatona")}
-            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
-              {/* Left Side: Summary prompt generator */}
-              <div className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800, borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem" }}>
-                  {language === "ar" ? "الزتونة: مركز التلخيص واستخراج الجوهر" : "Zatona: High-Yield AI Summary Engine"}
-                </h3>
-                <p style={{ fontSize: "0.85rem", color: "#4f6371", margin: 0, lineHeight: "1.6" }}>
-                  {language === "ar"
-                    ? "اكتب فكرة رئيسية أو الصق مقتطفاً من كتابك المدرسي، وسيقوم عميل فاهم الذكي بتحليله وإيجاز تفاصيله في تلخيص فائق التركيز يحتوي فقط على الفكرة والجوهر الدراسي المفيد."
-                    : "Type a topic or paste a textbook section. Our AI will digest, extract, and present a warm, concise report containing only the pure essence and academic value."}
-                </p>
-                <textarea
-                  value={zatonaPrompt}
-                  onChange={(e) => setZatonaPrompt(e.target.value)}
-                  placeholder={language === "ar" ? "الصق النص هنا أو اكتب الفكرة (مثال: قوانين الحركة لنيوتن)..." : "Paste textbook text or type study topic (e.g., Newton's laws of motion)..."}
-                  style={{
-                    width: "100%", height: "120px", padding: "0.75rem", borderRadius: "var(--border-radius-sm)",
-                    border: "1px solid var(--card-border)", outline: "none", fontSize: "0.85rem",
-                    fontFamily: "var(--font-sans)", resize: "none"
-                  }}
-                />
-                <button
-                  disabled={zatonaLoading || !zatonaPrompt.trim()}
-                  onClick={() => {
-                    setZatonaLoading(true);
-                    setZatonaResult("");
-                    setTimeout(() => {
-                      setZatonaLoading(false);
-                      setZatonaResult(
-                        language === "ar"
-                          ? `ملخص مخصص للـ [ ${zatonaPrompt} ]\n\n📌 الخلاصة الأولى:\nتصف قوانين نيوتن الثلاثة العلاقة بين حركة الجسم والقوى المؤثرة عليه.\n\n📌 الخلاصة الثانية (قانون القصور الذاتي):\nالجسم الساكن يظل ساكناً والجسم المتحرك يظل متحركاً ما لم تؤثر عليه قوة خارجية.\n\n📌 الخلاصة الثالثة:\nالقوة تساوي الكتلة ضرب التسارع (F = ma)، ولكل فعل رد فعل مساوٍ له في المقدار ومضاد له في الاتجاه.`
-                          : `High-Yield AI Digest for [ ${zatonaPrompt} ]\n\n📌 Core Concept 1:\nNewton's laws formulate the baseline relation between structural mass mechanics and accelerating forces.\n\n📌 Core Concept 2 (Inertia):\nAn object remains in static equilibrium or uniform velocity unless acted upon by a net external force.\n\n📌 Core Concept 3:\nForce is mathematically equal to mass times acceleration (F = ma), and every action yields an equal and opposite reaction.`
-                      );
-                    }, 1200);
-                  }}
-                  className="btn btn-primary"
-                  style={{ padding: "10px", fontWeight: 700 }}
-                >
-                  {zatonaLoading ? (
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
-                      <FiRefreshCw className="spinning-icon" />
-                      <span>{language === "ar" ? "جاري عصر واستخراج الزتونة..." : "Digesting textbook essence..."}</span>
-                    </span>
-                  ) : (
-                    <span>✨ {language === "ar" ? "عصر واستخراج الزتونة الذكية" : "Digest Textbook Essence"}</span>
-                  )}
-                </button>
-              </div>
-
-              {/* Right Side: Report Viewer */}
-              <div className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800 }}>{language === "ar" ? "تقرير التلخيص المستخرج" : "Zatona AI Presentation"}</h3>
-                <div style={{
-                  flex: 1, padding: "1rem", borderRadius: "6px", border: "1px dashed var(--primary)",
-                  background: "#ffffff", overflowY: "auto", minHeight: "150px"
-                }} className="custom-scrollbar">
-                  {zatonaResult ? (
-                    <div style={{ whiteSpace: "pre-line", fontSize: "0.85rem", lineHeight: "1.6", fontFamily: "var(--font-sans)" }}>
-                      {zatonaResult}
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", color: "#6a7c88", fontSize: "0.85rem", gap: "0.5rem" }}>
-                      <span>🍋</span>
-                      <span>{language === "ar" ? "اكتب مادة دراسية على اليسار واضغط على زر عصر الزتونة" : "Enter topic details on the left to extract the pure essence"}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {renderSpaceHistory()}
-          </div>
+          <ZatonaPanel
+            language={language as "ar" | "en"}
+            zatonaPrompt={zatonaPrompt}
+            setZatonaPrompt={setZatonaPrompt}
+            zatonaResult={zatonaResult}
+            setZatonaResult={setZatonaResult}
+            zatonaLoading={zatonaLoading}
+            setZatonaLoading={setZatonaLoading}
+            renderSpaceSelectorBar={renderSpaceSelectorBar}
+            renderSpaceHistory={renderSpaceHistory}
+            renderPremiumContent={renderPremiumContent}
+          />
         ) : activeTab === "social" ? (
-          /* Social Hub & Messenger Pane */
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-            
-            {/* Parent Control & Approvals Panel */}
-            {userProfile?.userType === "parent" && (
-              <section className="panel-card" style={{ padding: "2rem" }}>
-                <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem", fontWeight: 800 }}>
-                  <FiShield style={{ color: "var(--primary)" }} />
-                  <span>{language === "ar" ? "إدارة حسابات الأبناء والموافقات الأبوية" : "Children Panel & Parental Consents"}</span>
-                </h2>
-                <p style={{ color: "#4f6371", fontSize: "0.95rem", marginBottom: "1.5rem", lineHeight: "1.6" }}>
-                  {language === "ar" 
-                    ? "بصفتك ولي أمر، يمكنك مراقبة حسابات أبنائك الذين تقل أعمارهم عن 13 عاماً والموافقة على تفعيلها للسماح لهم بالاستفادة من خدمات المنصة والذكاء الاصطناعي تماشياً مع معايير COPPA وحماية الأطفال."
-                    : "As a parent, you have direct oversight over your children's profiles. Approve pending children below to authorize their access to Fahem AI tools under COPPA and standard protection protocols."}
-                </p>
-
-                {parentChildrenLoading ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88" }}>
-                    <FiRefreshCw className="spinning-icon" />
-                    <span>{language === "ar" ? "جاري تحميل حسابات الأبناء..." : "Fetching children records..."}</span>
-                  </div>
-                ) : parentChildren.length === 0 ? (
-                  <div style={{ padding: "1.5rem", background: "rgba(255, 255, 255, 0.4)", borderRadius: "var(--border-radius-md)", border: "1px dashed var(--card-border)", textAlign: "center", color: "#6a7c88" }}>
-                    {language === "ar" 
-                      ? "لم يتم العثور على أي حسابات أبناء مسجلة بريدك الإلكتروني كولي أمر حالياً." 
-                      : "No child profiles are registered under your parent email address yet."}
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
-                    {parentChildren.map((child: any) => (
-                      <div
-                        key={child.userId}
-                        style={{
-                          padding: "1.25rem",
-                          borderRadius: "var(--border-radius-md)",
-                          background: "rgba(255, 255, 255, 0.65)",
-                          border: "1px solid var(--card-border)",
-                          boxShadow: "var(--shadow-sm)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.85rem",
-                          position: "relative"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                          <span style={{ fontSize: "2.5rem", background: "rgba(16, 107, 163, 0.06)", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {renderAvatar(child.avatar, "2.5rem")}
-                          </span>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                            <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{child.name}</strong>
-                            <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{child.email}</span>
-                            <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 600 }}>
-                              {language === "ar" ? `العمر: ${child.age} سنة` : `Age: ${child.age} years old`}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)" }}>
-                          <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
-                            {language === "ar" ? `المسار: ${child.grade}` : `Track: ${child.grade}`}
-                          </span>
-                          {child.isApproved ? (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", padding: "4px 10px", borderRadius: "10px", background: "rgba(46, 125, 50, 0.1)", color: "var(--accent-green)", fontSize: "0.75rem", fontWeight: 700 }}>
-                              <FiUserCheck />
-                              {language === "ar" ? "مصرح ونشط" : "Approved"}
-                            </span>
-                          ) : (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", padding: "4px 10px", borderRadius: "10px", background: "rgba(211, 47, 47, 0.1)", color: "#d32f2f", fontSize: "0.75rem", fontWeight: 700 }}>
-                              <FiClock />
-                              {language === "ar" ? "قيد المراجعة" : "Pending Consent"}
-                            </span>
-                          )}
-                        </div>
-
-                        {!child.isApproved && (
-                          <button
-                            type="button"
-                            onClick={() => approveChildProfile(child.userId)}
-                            className="btn btn-primary"
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", padding: "0.6rem", fontSize: "0.85rem" }}
-                          >
-                            <FiUserPlus />
-                            <span>{language === "ar" ? "تفعيل الحساب والموافقة" : "Authorize Child Account"}</span>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Main Messenger and Directory Split Layout */}
-            <div className="grid-cols-2" style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: "2rem" }}>
-              
-              {/* Left Side: Messenger Direct DM Panel */}
-              <section className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", minHeight: "550px" }}>
-                {!chatRecipient ? (
-                  /* No chat recipient selected */
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", gap: "1rem", padding: "2rem" }}>
-                    <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "rgba(16, 107, 163, 0.05)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem", animation: "pulse 2s infinite" }}>
-                      <FiMessageSquare style={{ fontSize: "2.5rem", color: "var(--primary)" }} />
-                    </div>
-                    <h3 style={{ fontSize: "1.25rem", margin: 0 }}>{language === "ar" ? "مراسلات آمنة ومباشرة" : "Secure Direct Messenger"}</h3>
-                    <p style={{ color: "#6a7c88", fontSize: "0.9rem", maxWidth: "340px", lineHeight: "1.6", margin: 0 }}>
-                      {language === "ar"
-                        ? "اختر صديقاً من قائمتك أو ابحث عن مستخدمين في الدليل لبدء محادثة مشفرة وآمنة في الوقت الفعلي."
-                        : "Select a friend from your roster or discover users in the platform directory to exchange private messages."}
-                    </p>
-                  </div>
-                ) : (
-                  /* Chat client active */
-                  <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-                    {/* Chat Header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        {renderAvatar(chatRecipient.avatar, "2.2rem")}
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <strong style={{ fontSize: "1.1rem", color: "var(--foreground)" }}>{chatRecipient.name}</strong>
-                          <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                            {chatRecipient.userType === "student" ? (language === "ar" ? "طالب" : "Student") :
-                             chatRecipient.userType === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
-                             chatRecipient.userType === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
-                             (language === "ar" ? "مشرف" : "Admin")}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setChatRecipient(null)}
-                        style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", display: "flex", alignItems: "center", padding: "0.5rem", borderRadius: "50%", transition: "background 0.2s ease" }}
-                        className="btn-close-chat"
-                        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.05)"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                        aria-label="Close Chat"
-                      >
-                        <FiX />
-                      </button>
-                    </div>
-
-                    {/* Messages Body */}
-                    <div
-                      style={{
-                        flex: 1,
-                        maxHeight: "350px",
-                        overflowY: "auto",
-                        padding: "0.5rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.85rem",
-                        marginBottom: "1rem",
-                      }}
-                      className="custom-scrollbar"
-                    >
-                      {chatLoading ? (
-                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", gap: "0.5rem", color: "#6a7c88" }}>
-                          <FiRefreshCw className="spinning-icon" />
-                          <span>{language === "ar" ? "جاري جلب الرسائل..." : "Retrieving history..."}</span>
-                        </div>
-                      ) : chatMessages.length === 0 ? (
-                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "#8a9ca8", fontSize: "0.9rem" }}>
-                          {language === "ar" ? "ابدأ المحادثة الآن! اكتب رسالة أدناه 👇" : "No messages yet. Send a friendly hello! 👇"}
-                        </div>
-                      ) : (
-                        chatMessages.map((msg: any, index: number) => {
-                          const isMe = msg.senderId === user?.uid;
-                          let timeStr = "";
-                          try {
-                            timeStr = new Date(msg.timestamp).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
-                          } catch (_) {}
-
-                          return (
-                            <div
-                              key={index}
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: isMe ? "flex-end" : "flex-start",
-                                alignSelf: isMe ? "flex-end" : "flex-start",
-                                maxWidth: "85%"
-                              }}
-                            >
-                              <div
-                                style={{
-                                  padding: "0.75rem 1rem",
-                                  borderRadius: isMe 
-                                    ? (language === "ar" ? "16px 16px 4px 16px" : "16px 16px 16px 4px")
-                                    : (language === "ar" ? "16px 16px 16px 4px" : "16px 16px 4px 16px"),
-                                  background: isMe 
-                                    ? "linear-gradient(135deg, var(--primary), var(--secondary))" 
-                                    : "rgba(255,255,255,0.75)",
-                                  color: isMe ? "#ffffff" : "var(--foreground)",
-                                  border: isMe ? "none" : "1px solid var(--card-border)",
-                                  boxShadow: "var(--shadow-sm)",
-                                  fontSize: "0.95rem",
-                                  lineHeight: "1.5",
-                                  textAlign: language === "ar" ? "right" : "left",
-                                  wordBreak: "break-word"
-                                }}
-                              >
-                                {msg.content}
-                              </div>
-                              <span style={{ fontSize: "0.68rem", color: "#8a9ca8", marginTop: "2px", display: "inline-block", padding: "0 4px" }}>
-                                {timeStr}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-
-                    {/* Real-time Typing Indicators */}
-                    {typingUsers.length > 0 && (
-                      <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        padding: "0.5rem 0.75rem",
-                        background: "rgba(16, 107, 163, 0.04)",
-                        borderRadius: "12px",
-                        fontSize: "0.8rem",
-                        color: "var(--primary)",
-                        alignSelf: "flex-start",
-                        marginBottom: "0.5rem",
-                        border: "1px solid rgba(16, 107, 163, 0.08)",
-                        animation: "pulse-ring 2s infinite"
-                      }}>
-                        <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
-                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out" }} />
-                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out 0.2s" }} />
-                          <span className="typing-dot" style={{ width: "5px", height: "5px", background: "var(--primary)", borderRadius: "50%", display: "inline-block", animation: "typing-bounce 1.4s infinite ease-in-out 0.4s" }} />
-                        </div>
-                        <span style={{ fontWeight: 600 }}>
-                          {typingUsers.map(u => u.name).join(", ")} {language === "ar" ? "يكتب الآن..." : "is typing..."}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Messages Footer Form */}
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        sendChatMessage();
-                      }}
-                      style={{ display: "flex", gap: "0.5rem", borderTop: "1px dashed rgba(235, 220, 185, 0.4)", paddingTop: "1rem" }}
-                    >
-                      <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder={language === "ar" ? "اكتب رسالة مشفرة..." : "Type a secure message..."}
-                        style={{
-                          flex: 1,
-                          padding: "0.75rem 1rem",
-                          borderRadius: "var(--border-radius-md)",
-                          border: "1px solid var(--card-border)",
-                          outline: "none",
-                          fontFamily: "var(--font-sans)",
-                          background: "#ffffff",
-                          fontSize: "0.95rem"
-                        }}
-                      />
-                      <button
-                        type="submit"
-                        disabled={!chatInput.trim()}
-                        className="btn btn-primary"
-                        style={{ padding: "0.75rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      >
-                        <FiSend />
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </section>
-
-              {/* Right Side: Connections list & Directory */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-                
-                {/* Connections (Friends list) */}
-                <section className="panel-card" style={{ padding: "1.5rem" }}>
-                  <h2 style={{ fontSize: "1.2rem", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.3)", paddingBottom: "0.5rem", fontWeight: 800 }}>
-                    <FiUserCheck style={{ color: "var(--accent-green)" }} />
-                    <span>{language === "ar" ? "قائمة الأصدقاء" : "Your Friend Circle"}</span>
-                  </h2>
-
-                  {userProfile?.friends?.length === 0 ? (
-                    <div style={{ padding: "1rem", borderRadius: "var(--border-radius-md)", background: "rgba(255,255,255,0.4)", border: "1px dashed var(--card-border)", textAlign: "center", color: "#6a7c88", fontSize: "0.85rem" }}>
-                      {language === "ar" 
-                        ? "لم تقم بإضافة أي أصدقاء بعد. تصفح الدليل في الأسفل وأضف زملاء دراسة!" 
-                        : "No friends added to your circle yet. Add classmates below!"}
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "200px", overflowY: "auto" }} className="custom-scrollbar">
-                      {allUsers
-                        .filter((u: any) => userProfile?.friends?.includes(u.userId))
-                        .map((friend: any) => (
-                          <div
-                            key={friend.userId}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "0.6rem 0.85rem",
-                              borderRadius: "var(--border-radius-sm)",
-                              background: "rgba(255,255,255,0.6)",
-                              border: "1px solid var(--card-border)",
-                              boxShadow: "var(--shadow-sm)"
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              {renderAvatar(friend.avatar, "1.5rem")}
-                              <div style={{ display: "flex", flexDirection: "column" }}>
-                                <strong style={{ fontSize: "0.9rem", color: "var(--foreground)" }}>{friend.name}</strong>
-                                <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{friend.email}</span>
-                              </div>
-                            </div>
-                            <div style={{ display: "flex", gap: "0.4rem" }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setChatRecipient(friend);
-                                  fetchChatMessages(friend.userId);
-                                }}
-                                className="btn btn-secondary"
-                                style={{ padding: "0.35rem 0.65rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                              >
-                                <FiMessageSquare />
-                                <span>{language === "ar" ? "دردشة" : "Chat"}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleFriend(friend)}
-                                style={{ background: "rgba(211, 47, 47, 0.08)", color: "#d32f2f", border: "1px solid rgba(211, 47, 47, 0.2)", padding: "0.35rem 0.65rem", borderRadius: "var(--border-radius-sm)", fontSize: "0.75rem", cursor: "pointer", fontWeight: 700 }}
-                              >
-                                {language === "ar" ? "حذف" : "Remove"}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </section>
-
-                {/* Directory */}
-                <section className="panel-card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column" }}>
-                  <h2 style={{ fontSize: "1.2rem", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.3)", paddingBottom: "0.5rem", fontWeight: 800 }}>
-                    <FiUsers style={{ color: "var(--primary)" }} />
-                    <span>{language === "ar" ? "دليل مستخدمي المنصة" : "Discover Members & Directory"}</span>
-                  </h2>
-
-                  {/* Search bar */}
-                  <div style={{ position: "relative", marginBottom: "1rem" }}>
-                    <input
-                      type="text"
-                      value={directorySearch}
-                      onChange={(e) => setDirectorySearch(e.target.value)}
-                      placeholder={language === "ar" ? "ابحث عن مستخدمين بالاسم، البريد أو الدور..." : "Search by name, email, or role..."}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 1rem",
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid var(--card-border)",
-                        outline: "none",
-                        fontFamily: "var(--font-sans)",
-                        background: "#ffffff",
-                        fontSize: "0.85rem"
-                      }}
-                    />
-                  </div>
-
-                  {loadingAllUsers ? (
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "2rem", gap: "0.5rem", color: "#6a7c88" }}>
-                      <FiRefreshCw className="spinning-icon" />
-                      <span>{language === "ar" ? "جاري تحميل الدليل..." : "Loading directory list..."}</span>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "280px", overflowY: "auto" }} className="custom-scrollbar">
-                      {allUsers
-                        .filter((u: any) => u.userId !== user?.uid) // Exclude current user
-                        .filter((u: any) => {
-                          const s = directorySearch.toLowerCase();
-                          return (
-                            (u.name || "").toLowerCase().includes(s) ||
-                            (u.email || "").toLowerCase().includes(s) ||
-                            (u.userType || u.role || "").toLowerCase().includes(s) ||
-                            (u.country || "").toLowerCase().includes(s)
-                          );
-                        })
-                        .map((dirUser: any) => {
-                          const isFriend = userProfile?.friends?.includes(dirUser.userId);
-                          
-                          // Custom styling for role badge
-                          let badgeBg = "rgba(16, 107, 163, 0.08)";
-                          let badgeColor = "var(--primary)";
-                          let roleName = dirUser.userType || dirUser.role || "student";
-                          if (roleName === "admin") {
-                            badgeBg = "rgba(198, 40, 40, 0.08)";
-                            badgeColor = "#c62828";
-                          } else if (roleName === "teacher") {
-                            badgeBg = "rgba(245, 194, 66, 0.1)";
-                            badgeColor = "var(--secondary-hover)";
-                          } else if (roleName === "parent") {
-                            badgeBg = "rgba(46, 125, 50, 0.08)";
-                            badgeColor = "var(--accent-green)";
-                          }
-
-                          return (
-                            <div
-                              key={dirUser.userId}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "0.6rem 0.85rem",
-                                borderRadius: "var(--border-radius-sm)",
-                                background: "rgba(255,255,255,0.45)",
-                                border: "1px solid var(--card-border)",
-                                boxShadow: "var(--shadow-sm)",
-                                transition: "all 0.2s ease"
-                              }}
-                              className="directory-item"
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                                {renderAvatar(dirUser.avatar, "1.8rem")}
-                                <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                    <strong style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>{dirUser.name}</strong>
-                                    <span style={{ fontSize: "0.65rem", padding: "2px 6px", borderRadius: "8px", background: badgeBg, color: badgeColor, fontWeight: 700, textTransform: "capitalize" }}>
-                                      {roleName === "student" ? (language === "ar" ? "طالب" : "Student") :
-                                       roleName === "teacher" ? (language === "ar" ? "معلم" : "Teacher") :
-                                       roleName === "parent" ? (language === "ar" ? "ولي أمر" : "Parent") :
-                                       (language === "ar" ? "مشرف" : "Admin")}
-                                    </span>
-                                  </div>
-                                  <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{dirUser.email}</span>
-                                  {dirUser.school && (
-                                    <span style={{ fontSize: "0.68rem", color: "var(--primary)" }}>🏫 {dirUser.school}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div style={{ display: "flex", gap: "0.35rem" }}>
-                                {/* Profile Link */}
-                                <a
-                                  href={`/${language}/profile/${dirUser.username || dirUser.userId}`}
-                                  className="btn btn-secondary"
-                                  style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem", display: "flex", alignItems: "center", textDecoration: "none" }}
-                                >
-                                  <FiUser />
-                                </a>
-
-                                {/* Add/Remove Friend */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleFriend(dirUser)}
-                                  className={isFriend ? "btn btn-secondary" : "btn btn-primary"}
-                                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                                >
-                                  {isFriend ? (
-                                    <>
-                                      <FiUserMinus />
-                                      <span>{language === "ar" ? "حذف" : "Remove"}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <FiUserPlus />
-                                      <span>{language === "ar" ? "صديق" : "Add Friend"}</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </section>
-              </div>
-
-            </div>
-          </div>
+          <SocialPanel
+            language={language as "ar" | "en"}
+            user={user}
+            userProfile={userProfile}
+            parentChildrenLoading={parentChildrenLoading}
+            parentChildren={parentChildren}
+            approveChildProfile={approveChildProfile}
+            chatRecipient={chatRecipient}
+            setChatRecipient={setChatRecipient}
+            chatLoading={chatLoading}
+            chatMessages={chatMessages}
+            typingUsers={typingUsers}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            sendChatMessage={sendChatMessage}
+            fetchChatMessages={fetchChatMessages}
+            allUsers={allUsers}
+            loadingAllUsers={loadingAllUsers}
+            directorySearch={directorySearch}
+            setDirectorySearch={setDirectorySearch}
+            handleToggleFriend={handleToggleFriend}
+            renderAvatar={renderAvatar}
+          />
         ) : activeTab === "settings" ? (
-          /* Preferences & Privacy panel */
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-            <section className="panel-card" style={{ padding: "2rem" }}>
-              <h2 style={{ fontSize: "1.5rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "1rem", marginBottom: "1.5rem", fontWeight: 800 }}>
-                <FiSettings style={{ color: "var(--primary)" }} />
-                <span>{language === "ar" ? "مركز الحساب والخصوصية" : "Account & Privacy Center"}</span>
-              </h2>
-
-              {/* Profile Avatar Selection Section */}
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "1.25rem",
-                padding: "1.5rem",
-                background: "rgba(255, 255, 255, 0.5)",
-                border: "1px solid rgba(16, 107, 163, 0.08)",
-                borderRadius: "20px",
-                marginBottom: "2rem",
-                boxShadow: "0 4px 15px rgba(16, 107, 163, 0.02)"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "1rem" }}>
-                    {language === "ar" ? "🎨 الصورة الشخصية والرمز المختار:" : "🎨 Custom Avatar & Profile Photo:"}
-                  </span>
-                  <div style={{ display: "flex", gap: "0.25rem", background: "rgba(16, 107, 163, 0.06)", padding: "4px", borderRadius: "12px" }}>
-                    {(["vectors", "animals", "tech", "golden"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setSettingsAvatarTab(tab)}
-                        type="button"
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "8px",
-                          fontSize: "0.8rem",
-                          fontWeight: 700,
-                          border: "none",
-                          cursor: "pointer",
-                          background: settingsAvatarTab === tab ? "#ffffff" : "transparent",
-                          color: settingsAvatarTab === tab ? "var(--primary)" : "#6a7c88",
-                          boxShadow: settingsAvatarTab === tab ? "0 2px 8px rgba(0, 0, 0, 0.05)" : "none",
-                          transition: "all 0.2s ease"
-                        }}
-                      >
-                        {tab === "vectors" && (language === "ar" ? "متجهة" : "Vectors")}
-                        {tab === "animals" && (language === "ar" ? "حيوانات" : "Animals")}
-                        {tab === "tech" && (language === "ar" ? "تقنية" : "Tech")}
-                        {tab === "golden" && (language === "ar" ? "ذهبية" : "Premium")}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Avatar Grid */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))",
-                  gap: "0.85rem",
-                  maxHeight: "130px",
-                  overflowY: "auto",
-                  padding: "0.5rem",
-                  background: "rgba(255, 255, 255, 0.8)",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(16, 107, 163, 0.05)"
-                }} className="custom-scroll-container">
-                  {avatarCategories[settingsAvatarTab].map((item, idx) => {
-                    const isSelected = settingsAvatar === item.e;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => setSettingsAvatar(item.e)}
-                        type="button"
-                        style={{
-                          aspectRatio: "1/1",
-                          borderRadius: "14px",
-                          border: isSelected ? "2px solid var(--secondary)" : "1px solid rgba(16, 107, 163, 0.08)",
-                          background: isSelected ? "rgba(212, 175, 55, 0.08)" : "#ffffff",
-                          fontSize: "1.75rem",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: isSelected ? "0 4px 12px rgba(212, 175, 55, 0.15)" : "none",
-                          transform: isSelected ? "scale(1.05)" : "none",
-                          transition: "all 0.15s ease"
-                        }}
-                        onMouseOver={(e) => { if (!isSelected) e.currentTarget.style.borderColor = "var(--primary)"; }}
-                        onMouseOut={(e) => { if (!isSelected) e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)"; }}
-                        title={language === "ar" ? item.lAr : item.lEn}
-                      >
-                        {item.e.startsWith("/") ? (
-                          <img src={item.e} alt={item.lEn} style={{ width: "42px", height: "42px", objectFit: "contain" }} />
-                        ) : (
-                          item.e
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Avatar Action Section */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{
-                      width: "54px",
-                      height: "54px",
-                      borderRadius: "50%",
-                      background: "rgba(16, 107, 163, 0.08)",
-                      border: "2px solid var(--primary)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.8rem",
-                      overflow: "hidden"
-                    }}>
-                      {renderAvatar(settingsAvatar || "🚀", "1.8rem")}
-                    </div>
-                    <div>
-                      <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--primary)", display: "block" }}>
-                        {language === "ar" ? "الرمز المختار" : "Chosen Avatar"}
-                      </span>
-                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                        {settingsAvatar 
-                          ? (language === "ar" 
-                              ? (avatarCategories[settingsAvatarTab].find(a => a.e === settingsAvatar)?.lAr || "مخصص")
-                              : (avatarCategories[settingsAvatarTab].find(a => a.e === settingsAvatar)?.lEn || "Custom"))
-                          : (language === "ar" ? "يرجى اختيار رمز أو تحميل صورة" : "Please select an icon or upload a photo")
-                        }
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    {settingsLoading && (
-                      <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                        ⏳ {settingsStatusText}
-                      </span>
-                    )}
-                    <label style={{ padding: "0.75rem 1.15rem", fontSize: "0.85rem", fontWeight: 700, borderRadius: "12px", border: "1px solid rgba(212, 175, 55, 0.2)", background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))", color: "var(--primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }} onMouseOut={(e) => { e.currentTarget.style.transform = "none"; }}>
-                      <span>📁 {language === "ar" ? "تحميل صورة شخصية جديدة" : "Upload New Photo"}</span>
-                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 2 * 1024 * 1024) {
-                            alert(language === "ar" ? "خطأ: حجم الصورة يتجاوز الحد الأقصى (2 ميجابايت)." : "Error: Avatar image size exceeds the strict 2MB validation limit.");
-                            e.target.value = "";
-                            return;
-                          }
-                          if (!user) {
-                            alert(language === "ar" ? "يجب تسجيل الدخول أولاً." : "Please sign in first.");
-                            return;
-                          }
-                          setSettingsLoading(true);
-                          setSettingsStatusText(language === "ar" ? "جاري الرفع..." : "Uploading...");
-                          const fileExtension = file.name.split('.').pop() || 'jpg';
-                          const storageRef = ref(storage, "Profile Pictures/" + user.uid + "_" + Date.now() + "." + fileExtension);
-                          uploadBytes(storageRef, file).then((snapshot) => {
-                            getDownloadURL(snapshot.ref).then((downloadURL) => {
-                              setSettingsAvatar(downloadURL);
-                              
-                              // Immediate Firebase avatar download URL sync to /api/user/profile on upload
-                              fetch("/api/user/profile", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  userId: user.uid,
-                                  profile: {
-                                    ...(userProfile || {}),
-                                    avatar: downloadURL
-                                  }
-                                })
-                              }).then((res) => {
-                                if (res.ok) {
-                                  setUserProfile((prev: any) => ({
-                                    ...(prev || {}),
-                                    avatar: downloadURL
-                                  }));
-                                }
-                              }).catch((err) => console.error("Error syncing settings avatar to MongoDB:", err));
-
-                              setSettingsLoading(false);
-                              setSettingsStatusText("");
-                            }).catch((err) => {
-                              console.error("Error getting download URL:", err);
-                              alert(language === "ar" ? "حدث خطأ أثناء استرداد رابط الصورة." : "An error occurred while retrieving the picture link.");
-                              setSettingsLoading(false);
-                              setSettingsStatusText("");
-                            });
-                          }).catch((err) => {
-                            console.error("Error uploading file:", err);
-                            alert(language === "ar" ? "حدث خطأ أثناء رفع الصورة." : "An error occurred while uploading the picture.");
-                            setSettingsLoading(false);
-                            setSettingsStatusText("");
-                          });
-                        }
-                      }} />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }} className="grid-cols-2">
-                {/* School Preferences */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
-                    {language === "ar" ? "المدرسة أو المؤسسة التعليمية" : "School or Educational Institution"}
-                  </label>
-                  <input
-                    type="text"
-                    value={preferencesSchool}
-                    onChange={(e) => setPreferencesSchool(e.target.value)}
-                    placeholder={language === "ar" ? "أدخل اسم مدرستك" : "Enter your school name"}
-                    style={{
-                      padding: "0.85rem 1.1rem",
-                      borderRadius: "var(--border-radius-md)",
-                      border: "1px solid var(--card-border)",
-                      outline: "none",
-                      fontFamily: "var(--font-sans)",
-                      background: "#ffffff",
-                      fontSize: "0.95rem",
-                      boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
-                      transition: "border-color 0.2s ease"
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
-                    onBlur={(e) => e.target.style.borderColor = "var(--card-border)"}
-                  />
-                </div>
-
-                {/* Profile Visibility */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
-                    {language === "ar" ? "ظهور الملف الشخصي" : "Profile Visibility"}
-                  </label>
-                  <select
-                    value={privacyVisibility}
-                    onChange={(e: any) => setPrivacyVisibility(e.target.value)}
-                    style={{
-                      padding: "0.85rem 1.1rem",
-                      borderRadius: "var(--border-radius-md)",
-                      border: "1px solid var(--card-border)",
-                      outline: "none",
-                      fontFamily: "var(--font-sans)",
-                      background: "#ffffff",
-                      fontSize: "0.95rem",
-                      boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
-                      transition: "border-color 0.2s ease"
-                    }}
-                  >
-                    <option value="public">{language === "ar" ? "عام (الجميع يمكنه رؤية ملفك)" : "Public (Visible to everyone)"}</option>
-                    <option value="friends">{language === "ar" ? "الأصدقاء فقط" : "Friends Only"}</option>
-                    <option value="private">{language === "ar" ? "خاص (مخفي من الدليل)" : "Private (Hidden from directory)"}</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Toggles & Privacy Settings */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", background: "rgba(255, 255, 255, 0.4)", border: "1px solid rgba(235, 220, 185, 0.25)", borderRadius: "var(--border-radius-md)", padding: "1.5rem", marginBottom: "2rem" }}>
-                <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 700 }}>{language === "ar" ? "خيارات الخصوصية والتحكم" : "Privacy & Connection Preferences"}</h3>
-                
-                {/* Messages Switch */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{language === "ar" ? "مراسلات مباشرة" : "Allow Direct Messages"}</span>
-                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{language === "ar" ? "السماح للمستخدمين الآخرين بإرسال رسائل مباشرة إليك" : "Let other active members message you directly"}</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={privacyAllowMessages}
-                    onChange={(e) => setPrivacyAllowMessages(e.target.checked)}
-                    style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--primary)" }}
-                  />
-                </div>
-
-                <div style={{ width: "100%", height: "1px", background: "rgba(235, 220, 185, 0.3)" }}></div>
-
-                {/* Show Activity Switch */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{language === "ar" ? "عرض سجل الأنشطة" : "Show Activity Timeline"}</span>
-                    <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>{language === "ar" ? "إظهار سجل أنشطتك واستعلامات الذكاء الاصطناعي في صفحتك العامة" : "Display your study session history and AI interactions on your profile"}</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={privacyShowActivity}
-                    onChange={(e) => setPrivacyShowActivity(e.target.checked)}
-                    style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--primary)" }}
-                  />
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button
-                type="button"
-                onClick={handleUpdatePrivacySettings}
-                className="btn btn-primary"
-                style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", minWidth: "160px" }}
-              >
-                <FiCheckCircle />
-                <span>{language === "ar" ? "حفظ التغييرات" : "Save Settings"}</span>
-              </button>
-            </section>
-
-            {/* Gamification & Swarm Telemetry Section */}
-            <section className="panel-card" style={{
-              padding: "2rem",
-              background: "rgba(255, 255, 255, 0.7)",
-              backdropFilter: "blur(16px)",
-              border: "1px solid rgba(16, 107, 163, 0.1)",
-              borderRadius: "20px",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.03)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.5rem"
-            }}>
-              <h2 style={{
-                fontSize: "1.4rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.6rem",
-                borderBottom: "1px dashed rgba(16, 107, 163, 0.15)",
-                paddingBottom: "1rem",
-                marginBottom: "0.5rem",
-                fontWeight: 800,
-                color: "var(--primary)"
-              }}>
-                <FiActivity style={{ animation: "pulse 2s infinite" }} />
-                <span>{language === "ar" ? "تحليلات السرب والألعاب الأكاديمية" : "Swarm Analytics & Academic Gamification"}</span>
-              </h2>
-
-              <p style={{ fontSize: "0.9rem", color: "#5a6a75", lineHeight: "1.5", margin: 0 }}>
-                {language === "ar"
-                  ? "يستخدم وكيل التحليلات (Insights Agent) تجميعات قواعد بيانات MongoDB Atlas لتتبع الجوانب التعليمية الأربعة ومستويات الفهم لديك. يتم رصد نشاط السرب والتعلم الذاتي تلقائياً هنا."
-                  : "Our specialized Insights Agent utilizes database-side MongoDB Atlas Aggregation Pipelines to monitor your cognitive achievements, active streaks, and misconception risk matrices in real-time."}
-              </p>
-
-              {/* Stats Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
-                {/* Level & Streak Card */}
-                <div style={{
-                  padding: "1.25rem",
-                  borderRadius: "16px",
-                  background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))",
-                  border: "1px solid rgba(16, 107, 163, 0.08)",
-                  textAlign: "start"
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                    <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
-                      🏆 {language === "ar" ? "المستوى الدراسي الحالي" : "Active Academic Level"}
-                    </span>
-                    <span style={{
-                      background: "rgba(212, 175, 55, 0.15)",
-                      color: "var(--accent)",
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      padding: "4px 8px",
-                      borderRadius: "8px"
-                    }}>
-                      {language === "ar" ? "التعلم الذاتي المستقل" : "Heutagogic Sage"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
-                    {language === "ar" ? "المستوى 12" : "Level 12"}
-                  </div>
-                  <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
-                    🔥 {language === "ar" ? "سلسلة المذاكرة: 7 أيام متتالية" : "Current Daily Streak: 7 Days Active"}
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div style={{ width: "100%", height: "8px", background: "rgba(16, 107, 163, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
-                    <div style={{ width: "85%", height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px" }}></div>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
-                    <span>8,500 XP</span>
-                    <span>10,000 XP ({language === "ar" ? "المستوى التالي" : "Next Level"})</span>
-                  </div>
-                </div>
-
-                {/* Cognitive Tokens Card */}
-                <div style={{
-                  padding: "1.25rem",
-                  borderRadius: "16px",
-                  background: "linear-gradient(135deg, rgba(13, 148, 136, 0.05), rgba(16, 107, 163, 0.05))",
-                  border: "1px solid rgba(13, 148, 136, 0.08)",
-                  textAlign: "start"
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                    <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
-                      🧠 {language === "ar" ? "رصيد الرموز المعرفية (CLT)" : "Cognitive Token Credit Balance"}
-                    </span>
-                    <span style={{
-                      background: "rgba(13, 148, 136, 0.15)",
-                      color: "var(--accent-green)",
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      padding: "4px 8px",
-                      borderRadius: "8px"
-                    }}>
-                      {language === "ar" ? "متاح" : "Freemium Unlimited"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
-                    14,820 / 25,000 <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#6a7c88" }}>CLT Tokens</span>
-                  </div>
-                  <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
-                    ⚡ {language === "ar" ? "تم التحسين لحمل الذاكرة العاملة" : "Cognitive Load Optimized System"}
-                  </div>
-
-                  {/* Token progress bar */}
-                  <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
-                    <div style={{ width: "59%", height: "100%", background: "linear-gradient(90deg, var(--accent-green), var(--primary))", borderRadius: "10px" }}></div>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
-                    <span>{language === "ar" ? "مستهلك: 59%" : "Allocated: 59%"}</span>
-                    <span>10,180 {language === "ar" ? "رمز متبقي" : "Remaining CLT"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Misconception Risk Matrix */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "start" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--foreground)" }}>
-                  🎯 {language === "ar" ? "مصفوفة فجوات الفهم المعرفي وحالة المواضيع" : "Concept Misconception Risk Matrix (MongoDB Analytics)"}
-                </span>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-                  {/* Topic 1 */}
-                  <div style={{
-                    padding: "1rem",
-                    borderRadius: "14px",
-                    background: "rgba(255,255,255,0.6)",
-                    border: "1px solid rgba(16, 107, 163, 0.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>📊 {language === "ar" ? "الرياضيات والنسب" : "Math: Matrices"}</span>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a", padding: "2px 6px", borderRadius: "6px" }}>
-                        {language === "ar" ? "آمن" : "Low Risk"}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                      {language === "ar" ? "مفاهيم محددات المصفوفة ومعكوسها ممتازة." : "Mastered Singular Matrix inverse checks perfectly."}
-                    </span>
-                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 92%</span>
-                      <span>{language === "ar" ? "3 محاولات" : "3 Sessions"}</span>
-                    </div>
-                  </div>
-
-                  {/* Topic 2 */}
-                  <div style={{
-                    padding: "1rem",
-                    borderRadius: "14px",
-                    background: "rgba(255,255,255,0.6)",
-                    border: "1px solid rgba(16, 107, 163, 0.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>🧬 {language === "ar" ? "الأحياء والخلية" : "Science: Chemistry 2e"}</span>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(234, 179, 8, 0.12)", color: "#ca8a04", padding: "2px 6px", borderRadius: "6px" }}>
-                        {language === "ar" ? "متوسط" : "Moderate Risk"}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                      {language === "ar" ? "فجوة بسيطة في فهم ثابت الاتزان للتفاعلات." : "Confusion spotted around chemical equilibrium rules."}
-                    </span>
-                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 74%</span>
-                      <span>{language === "ar" ? "5 محاولات" : "5 Sessions"}</span>
-                    </div>
-                  </div>
-
-                  {/* Topic 3 */}
-                  <div style={{
-                    padding: "1rem",
-                    borderRadius: "14px",
-                    background: "rgba(255,255,255,0.6)",
-                    border: "1px solid rgba(16, 107, 163, 0.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>📖 {language === "ar" ? "اللغة العربية وقواعدها" : "Arabic: Grammar"}</span>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "2px 6px", borderRadius: "6px" }}>
-                        {language === "ar" ? "مرتفع" : "High Risk"}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
-                      {language === "ar" ? "صعوبة في تحديد مواضع إعراب جمع المذكر السالم." : "Issues parsed with complex verb modifiers rules."}
-                    </span>
-                    <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                      <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 48%</span>
-                      <span>{language === "ar" ? "4 محاولات" : "4 Sessions"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Swarm Real-Time Telemetry console */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "start" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  <span className="pulse-icon" style={{ fontSize: "0.6rem" }}>🟢</span>
-                  {language === "ar" ? "سجل تحليلات ومحاكاة السرب النشط (MongoDB Aggregate Pipe):" : "Active Swarm Network Telemetry Trace (MongoDB Aggregations):"}
-                </span>
-
-                <div style={{
-                  padding: "0.85rem 1.1rem",
-                  borderRadius: "12px",
-                  background: "rgba(15, 23, 42, 0.95)",
-                  border: "1px solid rgba(16, 107, 163, 0.2)",
-                  fontFamily: "monospace",
-                  fontSize: "0.75rem",
-                  color: "#38bdf8",
-                  maxHeight: "135px",
-                  overflowY: "auto",
-                  lineHeight: "1.4",
-                  boxShadow: "inset 0 2px 10px rgba(0,0,0,0.5)"
-                }} className="custom-scrollbar">
-                  <div>[SYSTEM] Inicitalizing MongoDB Insights aggregate client...</div>
-                  <div style={{ color: "#a7f3d0" }}>[MONGODB] pipeline: [ {`{ "$match": { "userId": "${user?.uid || "anon"}" } }`}, {`{ "$group": { "_id": "$topic_id", "accuracy": { "$avg": "$score" } } }`} ]</div>
-                  <div style={{ color: "#fef08a" }}>[INSIGHTS_AGENT] Aggregating 12 historical study session attempts from MongoDB.</div>
-                  <div>[PRACTICE_AGENT] Feedback loop grading completed: Score 0.88 over 2 text practice inputs.</div>
-                  <div style={{ color: "#38bdf8" }}>[ZATONA_AGENT] Compressed Chapter 1 'Matrices' formula context into 4 active recall bytes.</div>
-                  <div style={{ color: "#fca5a5" }}>[COMPANION] User typed command '/explain'. Handoff activated in full screen context...</div>
-                  <div>[SYSTEM] Telemetry synchronized. Metrics and Misconception Risk Matrix updated successfully.</div>
-                </div>
-              </div>
-            </section>
-
-            {/* Danger Zone */}
-            <section className="panel-card" style={{ padding: "2rem", border: "1px solid rgba(211, 47, 47, 0.25)", background: "rgba(211, 47, 47, 0.03)", borderRadius: "var(--border-radius-md)" }}>
-              <h2 style={{ fontSize: "1.3rem", display: "flex", alignItems: "center", gap: "0.6rem", color: "#c62828", margin: "0 0 1rem 0", fontWeight: 800 }}>
-                <FiAlertTriangle style={{ color: "#d32f2f" }} />
-                <span>{language === "ar" ? "منطقة الخطر: حذف الحساب والبيانات (GDPR)" : "Danger Zone: GDPR Right to be Forgotten"}</span>
-              </h2>
-              <p style={{ fontSize: "0.9rem", color: "#5a6a75", lineHeight: "1.6", marginBottom: "1.5rem" }}>
-                {language === "ar"
-                  ? "بموجب المادة 17 من اللائحة العامة لحماية البيانات (GDPR)، يحق لك طلب حذف حسابك نهائياً من النظام. الضغط على الزر أدناه سيقوم بمسح كامل لملفك الشخصي، وسجلات الدردشة والرسائل المباشرة، وسجل الأنشطة بالكامل، وإحصاءات استهلاك الرموز (Tokens) من خوادمنا بشكل نهائي وغير قابل للاسترجاع."
-                  : "Under Article 17 of the General Data Protection Regulation (GDPR), you hold the right to erasure. Triggering the process below immediately deletes your user profile, chat history, direct messages, study logs, and token telemetry from our MongoDB servers permanently. This action is absolutely irreversible."}
-              </p>
-              <button
-                type="button"
-                onClick={handleDeleteUserAccount}
-                style={{
-                  background: "#d32f2f",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "0.85rem 1.5rem",
-                  borderRadius: "var(--border-radius-md)",
-                  fontWeight: 700,
-                  fontSize: "0.95rem",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  transition: "background 0.2s ease, transform 0.1s ease"
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "#c62828"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "#d32f2f"}
-              >
-                <FiTrash2 />
-                <span>{language === "ar" ? "حذف حسابي وكافة بياناتي نهائياً" : "Permanently Erase My Account"}</span>
-              </button>
-            </section>
-          </div>
+          <SettingsPanel
+            language={language as "ar" | "en"}
+            user={user}
+            userProfile={userProfile}
+            setUserProfile={setUserProfile}
+            settingsAvatarTab={settingsAvatarTab}
+            setSettingsAvatarTab={setSettingsAvatarTab}
+            settingsAvatar={settingsAvatar}
+            setSettingsAvatar={setSettingsAvatar}
+            avatarCategories={avatarCategories}
+            settingsLoading={settingsLoading}
+            setSettingsLoading={setSettingsLoading}
+            settingsStatusText={settingsStatusText}
+            setSettingsStatusText={setSettingsStatusText}
+            preferencesSchool={preferencesSchool}
+            setPreferencesSchool={setPreferencesSchool}
+            privacyVisibility={privacyVisibility}
+            setPrivacyVisibility={setPrivacyVisibility as any}
+            privacyAllowMessages={privacyAllowMessages}
+            setPrivacyAllowMessages={setPrivacyAllowMessages}
+            privacyShowActivity={privacyShowActivity}
+            setPrivacyShowActivity={setPrivacyShowActivity}
+            handleUpdatePrivacySettings={handleUpdatePrivacySettings}
+            handleDeleteUserAccount={handleDeleteUserAccount}
+            getLevelBadgeText={getLevelBadgeText}
+            activeLevel={activeLevel}
+            activeStreak={activeStreak}
+            xpProgressPercent={xpProgressPercent}
+            activeXp={activeXp}
+            nextLevelXp={nextLevelXp}
+            consumedClt={consumedClt}
+            totalAllocatedClt={totalAllocatedClt}
+            tokenProgressPercent={tokenProgressPercent}
+            remainingClt={remainingClt}
+            renderAvatar={renderAvatar}
+          />
         ) : null}
 
         {/* Styled Interactive Footer */}

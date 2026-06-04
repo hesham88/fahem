@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
+import { checkIsAdmin, checkIsSuperadmin } from "../helper";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,36 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize } = body;
+    const { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize, requesterEmail } = body;
+
+    // Determine if requester is an admin that requires superadmin approval
+    let needsApproval = false;
+    if (requesterEmail) {
+      const isAdmin = await checkIsAdmin(requesterEmail);
+      const isSuper = await checkIsSuperadmin(requesterEmail);
+      needsApproval = isAdmin && !isSuper;
+    }
+
+    if (needsApproval) {
+      const db = getLocalDb();
+      const requestId = "req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+      const changeRequest = {
+        id: requestId,
+        requesterEmail,
+        actionType: "update_config",
+        payload: { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize },
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      db.admin_change_requests = db.admin_change_requests || [];
+      db.admin_change_requests.push(changeRequest);
+      saveLocalDb(db);
+
+      return new Response(JSON.stringify({ success: true, needsApproval: true, message: "Your request has been submitted for Superadmin approval." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
     if (isLocalEnv()) {
       const db = getLocalDb();
@@ -108,3 +138,4 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+

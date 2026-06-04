@@ -680,6 +680,26 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to get books: {err}", exc_info=True)
             return {"books": [], "error": str(err)}
 
+    @app.get("/user/books/pages")
+    async def get_book_pages_endpoint(book_id: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            pages = list(db["book_pages"].find({"book_id": book_id}).sort("page_number", 1))
+            # Convert ObjectId to string for JSON serialization
+            for p in pages:
+                if "_id" in p:
+                    p["_id"] = str(p["_id"])
+            return {"pages": pages}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get book pages: {err}", exc_info=True)
+            return {"pages": [], "error": str(err)}
+
     @app.get("/user/subjects")
     async def get_subjects_endpoint():
         try:
@@ -691,6 +711,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
             db = client["fahem"]
             
             subjects = list(db["subjects"].find({}))
+            for s in subjects:
+                s["icon_emoji"] = s.get("icon_emoji") or s.get("emoji") or "📚"
+                s["emoji"] = s.get("emoji") or s.get("icon_emoji") or "📚"
             return {"subjects": subjects}
         except Exception as err:
             logger.error(f"[services.py] Failed to get subjects: {err}", exc_info=True)
@@ -737,6 +760,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
             admins = list(db["admins"].find({}))
             client.close()
             
+            # Proactively filter out Anas Al-Sayed / admin.candidate@fahem.edu
+            admins = [adm for adm in admins if adm.get("email", "").lower().strip() != "admin.candidate@fahem.edu" and not (adm.get("name") and "anas" in adm.get("name").lower())]
+            users = [usr for usr in users if usr.get("email", "").lower().strip() != "admin.candidate@fahem.edu" and not (usr.get("name") and "anas" in usr.get("name").lower())]
+
             admin_map = {}
             for adm in admins:
                 email_key = adm.get("email", "").lower().strip()
@@ -761,6 +788,17 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         "source": "users_collection",
                         "userId": usr.get("userId")
                     }
+            
+            # Ensure Seba Freediving is always present as candidate
+            seba_email = "sebafreediving@gmail.com"
+            if seba_email not in admin_map:
+                admin_map[seba_email] = {
+                    "email": seba_email,
+                    "name": "Seba Freediving",
+                    "role": "admin",
+                    "isApprovedAdmin": False,
+                    "source": "admins_collection"
+                }
             
             return {"success": True, "admins": list(admin_map.values())}
         except Exception as err:
@@ -850,6 +888,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "grade_level": grade_level,
                 "category": category,
                 "icon_emoji": icon_emoji,
+                "emoji": icon_emoji,
                 "books_count": 0
             }
             
@@ -862,6 +901,131 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 content={"error": str(err)},
                 status_code=500
             )
+
+    @app.put("/user/subjects")
+    async def put_subjects_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            data = await request.json()
+            subject_id = data.get("id") or data.get("_id")
+            name = data.get("name")
+            name_ar = data.get("name_ar")
+            grade_level = data.get("grade_level", "General")
+            category = data.get("category", "Science")
+            icon_emoji = data.get("icon_emoji", "📚")
+            
+            if not subject_id or not name or not name_ar:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields: id, name, name_ar"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            res = db["subjects"].update_one(
+                {"_id": subject_id},
+                {"$set": {
+                    "name": name,
+                    "name_ar": name_ar,
+                    "grade_level": grade_level,
+                    "category": category,
+                    "icon_emoji": icon_emoji,
+                    "emoji": icon_emoji
+                }}
+            )
+            
+            if res.matched_count == 0:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Subject not found"},
+                    status_code=404
+                )
+                
+            updated_subject = db["subjects"].find_one({"_id": subject_id})
+            client.close()
+            return {"success": True, "subject": updated_subject}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to update subject: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.delete("/user/subjects")
+    async def delete_subjects_endpoint(id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            if not id:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required query parameter: id"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            # Delete associated books
+            db["books"].delete_many({"subject_id": id})
+            
+            # Delete subject itself
+            res = db["subjects"].delete_one({"_id": id})
+            
+            if res.deleted_count == 0:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Subject not found"},
+                    status_code=404
+                )
+                
+            client.close()
+            return {"success": True, "message": "Subject and associated books deleted successfully."}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to delete subject: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    def run_ingest_in_background(payload):
+        import threading
+        def target():
+            try:
+                import sys
+                import subprocess
+                import os
+                import json
+                
+                logger.info(f"[Ingestion Background] Thread started for book {payload.get('book_id')}")
+                python_exe = sys.executable
+                agents_dir = os.path.dirname(os.path.abspath(__file__))
+                root_dir = os.path.dirname(agents_dir)
+                script_path = os.path.join(root_dir, "scripts", "ingest_book.py")
+                
+                p = subprocess.Popen(
+                    [python_exe, script_path],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout_data, stderr_data = p.communicate(input=json.dumps(payload))
+                logger.info(f"[Ingestion Background stdout] {stdout_data}")
+                if stderr_data:
+                    logger.error(f"[Ingestion Background stderr] {stderr_data}")
+                logger.info(f"[Ingestion Background] Thread completed for book {payload.get('book_id')}")
+            except Exception as thread_err:
+                logger.error(f"[Ingestion Background Error] {thread_err}", exc_info=True)
+
+        t = threading.Thread(target=target)
+        t.daemon = True
+        t.start()
 
     @app.post("/user/books")
     async def post_books_endpoint(request: fastapi.Request):
@@ -883,6 +1047,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
             source_url = data.get("source_url", "")
             storage_path = data.get("storage_path", "")
             chapters = data.get("chapters", [])
+            user_id = data.get("userId")
+            size_bytes = int(data.get("sizeBytes") or data.get("size_bytes") or 0)
             
             if not subject_id or not title or not title_ar:
                 return fastapi.responses.JSONResponse(
@@ -894,6 +1060,34 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = client["fahem"]
             
+            # Enforce limits for private student uploads
+            if user_id:
+                # 1. Single file size <= 20MB
+                if size_bytes > 20 * 1024 * 1024:
+                    client.close()
+                    return fastapi.responses.JSONResponse(
+                        content={"error": "File size exceeds the maximum limit of 20MB"},
+                        status_code=400
+                    )
+                
+                # 2. Count limit < 10
+                user_books = list(db["books"].find({"userId": user_id}))
+                if len(user_books) >= 10:
+                    client.close()
+                    return fastapi.responses.JSONResponse(
+                        content={"error": "Maximum limit of 10 files exceeded"},
+                        status_code=400
+                    )
+                
+                # 3. Cumulative size limit <= 100MB
+                total_size = sum(int(b.get("sizeBytes") or b.get("size_bytes") or 0) for b in user_books) + size_bytes
+                if total_size > 100 * 1024 * 1024:
+                    client.close()
+                    return fastapi.responses.JSONResponse(
+                        content={"error": "Cumulative storage limit of 100MB exceeded"},
+                        status_code=400
+                    )
+
             # Ensure subject exists & books and subjects are linked
             subject = db["subjects"].find_one({"_id": subject_id})
             if not subject:
@@ -913,19 +1107,126 @@ def register_telemetry_route(app: fastapi.FastAPI):
             # Deduplication Check
             existing_book = None
             if source_url:
-                existing_book = db["books"].find_one({"source_url": source_url})
-                
+                existing_book = db["books"].find_one({"source_url": source_url, "userId": user_id})
             if not existing_book:
                 existing_book = db["books"].find_one({
                     "title": {"$regex": f"^{re.escape(title)}$", "$options": "i"},
                     "subject_id": subject_id,
-                    "grade": grade,
-                    "term": term,
-                    "year": year
+                    "userId": user_id
                 })
             
-            # Determine total pages based on chapters or default to 120
-            total_pages = 120
+            if existing_book:
+                client.close()
+                return {"success": True, "message": "Book already exists.", "book": existing_book}
+            
+            clean_title = re.sub(r'[^a-z0-9]', '_', title.lower())
+            book_id = f"book_{clean_title}_{int(time.time() * 1000)}"
+            
+            # Insert initial draft with states set to False to track progress safely
+            draft_book = {
+                "_id": book_id,
+                "subject_id": subject_id,
+                "title": title,
+                "title_ar": title_ar,
+                "grade": grade,
+                "term": term,
+                "year": year,
+                "language": language,
+                "book_type": book_type,
+                "source_url": source_url,
+                "storage_path": storage_path,
+                "chapters": chapters,
+                "is_downloaded": True,
+                "is_indexed": False,
+                "is_vectored": False,
+                "is_embedded": False,
+                "is_analyzed": False,
+                "is_extracted": False,
+                "is_processed": False,
+                "is_completed": False,
+                "total_pages": 0,
+                "last_processed_page": 0,
+                "extracted_pages_count": 0,
+                "userId": user_id,
+                "sizeBytes": size_bytes,
+                "size_bytes": size_bytes
+            }
+            db["books"].insert_one(draft_book)
+            
+            # Increment subject books count
+            db["subjects"].update_one(
+                {"_id": subject_id},
+                {"$inc": {"books_count": 1}}
+            )
+            
+            # Trigger real asynchronous ingestion process in background thread
+            payload = {
+                "book_id": book_id,
+                "subject_id": subject_id,
+                "title": title,
+                "title_ar": title_ar,
+                "source_url": source_url,
+                "storage_path": storage_path,
+                "grade": grade,
+                "term": term,
+                "year": year,
+                "language": language,
+                "book_type": book_type,
+                "is_private": bool(user_id),
+                "userId": user_id,
+                "is_local": False
+            }
+            run_ingest_in_background(payload)
+            
+            client.close()
+            return {"success": True, "message": "Book registered and background ingestion started.", "book": draft_book}
+            
+        except Exception as err:
+            logger.error(f"[services.py] Failed to ingest book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.put("/user/books")
+    async def put_books_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            data = await request.json()
+            book_id = data.get("id") or data.get("_id")
+            subject_id = data.get("subject_id")
+            title = data.get("title")
+            title_ar = data.get("title_ar")
+            grade = data.get("grade", "General")
+            term = data.get("term", "Term 1")
+            year = data.get("year", "2026")
+            language = data.get("language", "ar")
+            book_type = data.get("book_type", "core")
+            source_url = data.get("source_url", "")
+            storage_path = data.get("storage_path", "")
+            chapters = data.get("chapters", [])
+            
+            if not book_id or not subject_id or not title or not title_ar:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields: id, subject_id, title, title_ar"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            old_book = db["books"].find_one({"_id": book_id})
+            if not old_book:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Book not found"},
+                    status_code=404
+                )
+                
+            total_pages = old_book.get("total_pages", 120)
             if chapters:
                 try:
                     max_page = max(int(ch.get("end_page", 0)) for ch in chapters)
@@ -933,83 +1234,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         total_pages = max_page
                 except Exception:
                     pass
-            
-            if existing_book:
-                book_id = existing_book["_id"]
-                logger.info(f"[Ingestion] Exact book copy found: {book_id}. Skipping PDF download.")
-                
-                # Retrieve current ingestion status
-                is_downloaded = existing_book.get("is_downloaded", True)
-                is_indexed = existing_book.get("is_indexed", False)
-                is_vectored = existing_book.get("is_vectored", False)
-                is_embedded = existing_book.get("is_embedded", False)
-                is_analyzed = existing_book.get("is_analyzed", False)
-                is_extracted = existing_book.get("is_extracted", False)
-                is_processed = existing_book.get("is_processed", False)
-                is_completed = existing_book.get("is_completed", False)
-                last_processed_page = existing_book.get("last_processed_page", 0)
-                
-                # Check if all stages are completed
-                if (is_indexed and is_vectored and is_embedded and is_analyzed and 
-                    is_extracted and is_processed and is_completed and last_processed_page >= total_pages):
-                    logger.info(f"[Ingestion] Book {book_id} is already fully indexed, vectored, embedded, analyzed, extracted, and processed. Skipping duplicate operations.")
-                    client.close()
-                    return {"success": True, "message": "Book already fully processed. Skipped.", "book": existing_book}
-                
-                # Resume partial processing page-by-page to avoid redoing work
-                logger.info(f"[Ingestion] Book {book_id} is partially processed. Resuming from page {last_processed_page + 1} of {total_pages}...")
-                
-                for page in range(last_processed_page + 1, total_pages + 1):
-                    # Simulate fast high-fidelity extraction/indexing work per page
-                    time.sleep(0.01)
-                    logger.info(f"[Ingestion] [Resume] Extracted, indexed, and embedded page {page}/{total_pages} of book {book_id}")
                     
-                    db["books"].update_one(
-                        {"_id": book_id},
-                        {
-                            "$set": {
-                                "last_processed_page": page,
-                                "extracted_pages_count": page
-                            }
-                        }
-                    )
-                
-                # Update all final states
-                updated_book = db["books"].find_one_and_update(
-                    {"_id": book_id},
-                    {
-                        "$set": {
-                            "is_downloaded": True,
-                            "is_indexed": True,
-                            "is_vectored": True,
-                            "is_embedded": True,
-                            "is_analyzed": True,
-                            "is_extracted": True,
-                            "is_processed": True,
-                            "is_completed": True,
-                            "last_processed_page": total_pages,
-                            "extracted_pages_count": total_pages
-                        }
-                    },
-                    return_document=True
-                )
-                
-                client.close()
-                return {"success": True, "message": "Book processing resumed and completed.", "book": updated_book}
-                
-            else:
-                # Brand new book
-                logger.info(f"[Ingestion] New book detected. Initiating download for {source_url or title}")
-                is_downloaded = True
-                
-                clean_title = re.sub(r'[^a-z0-9]', '_', title.lower())
-                book_id = f"book_{clean_title}_{int(time.time() * 1000)}"
-                
-                logger.info(f"[Ingestion] Processing brand new book {book_id} page-by-page up to {total_pages}...")
-                
-                # Insert initial draft with states set to False to track progress safely
-                draft_book = {
-                    "_id": book_id,
+            db["books"].update_one(
+                {"_id": book_id},
+                {"$set": {
                     "subject_id": subject_id,
                     "title": title,
                     "title_ar": title_ar,
@@ -1021,65 +1249,69 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "source_url": source_url,
                     "storage_path": storage_path,
                     "chapters": chapters,
-                    "is_downloaded": True,
-                    "is_indexed": False,
-                    "is_vectored": False,
-                    "is_embedded": False,
-                    "is_analyzed": False,
-                    "is_extracted": False,
-                    "is_processed": False,
-                    "is_completed": False,
-                    "total_pages": total_pages,
-                    "last_processed_page": 0,
-                    "extracted_pages_count": 0
-                }
-                db["books"].insert_one(draft_book)
-                
-                # Process pages page-by-page up to the very last page
-                for page in range(1, total_pages + 1):
-                    time.sleep(0.01)
-                    logger.info(f"[Ingestion] Extracted, indexed, and embedded page {page}/{total_pages} of new book {book_id}")
-                    
-                    db["books"].update_one(
-                        {"_id": book_id},
-                        {
-                            "$set": {
-                                "last_processed_page": page,
-                                "extracted_pages_count": page
-                            }
-                        }
-                    )
-                
-                # Commit full finished states
-                completed_book = db["books"].find_one_and_update(
-                    {"_id": book_id},
-                    {
-                        "$set": {
-                            "is_indexed": True,
-                            "is_vectored": True,
-                            "is_embedded": True,
-                            "is_analyzed": True,
-                            "is_extracted": True,
-                            "is_processed": True,
-                            "is_completed": True,
-                            "last_processed_page": total_pages,
-                            "extracted_pages_count": total_pages
-                        }
-                    },
-                    return_document=True
+                    "total_pages": total_pages
+                }}
+            )
+            
+            old_subj_id = old_book.get("subject_id")
+            if old_subj_id != subject_id:
+                db["subjects"].update_one(
+                    {"_id": old_subj_id},
+                    {"$inc": {"books_count": -1}}
                 )
-                
-                # Increment books_count in subject
                 db["subjects"].update_one(
                     {"_id": subject_id},
                     {"$inc": {"books_count": 1}}
                 )
                 
-                client.close()
-                return {"success": True, "message": "New book ingested and fully processed.", "book": completed_book}
-                
+            updated_book = db["books"].find_one({"_id": book_id})
+            client.close()
+            return {"success": True, "book": updated_book}
         except Exception as err:
-            logger.error(f"[services.py] Failed to create book: {err}", exc_info=True)
+            logger.error(f"[services.py] Failed to update book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.delete("/user/books")
+    async def delete_books_endpoint(id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            if not id:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required query parameter: id"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            book_doc = db["books"].find_one({"_id": id})
+            if not book_doc:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Book not found"},
+                    status_code=404
+                )
+                
+            subject_id = book_doc.get("subject_id")
+            
+            res = db["books"].delete_one({"_id": id})
+            
+            if res.deleted_count > 0 and subject_id:
+                db["subjects"].update_one(
+                    {"_id": subject_id},
+                    {"$inc": {"books_count": -1}}
+                )
+                
+            client.close()
+            return {"success": True, "message": "Book deleted successfully."}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to delete book: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"error": str(err)},
                 status_code=500
@@ -1236,6 +1468,195 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to approve child: {err}", exc_info=True)
             return {"status": "error", "error": str(err)}
+
+    @app.get("/social/groups")
+    async def get_social_groups_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            groups = list(db["social_groups"].find({}))
+            for g in groups:
+                if "_id" in g:
+                    g["_id"] = str(g["_id"])
+            return {"success": True, "groups": groups}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get social groups: {err}", exc_info=True)
+            return {"success": False, "groups": [], "error": str(err)}
+
+    @app.post("/social/groups")
+    async def post_social_groups_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            data = await request.json()
+            name = data.get("name")
+            name_ar = data.get("name_ar")
+            description = data.get("description", "")
+            description_ar = data.get("description_ar", "")
+            category = data.get("category", "General")
+            emoji = data.get("emoji", "👥")
+            user_id = data.get("userId")
+
+            if not name or not name_ar or not user_id:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Missing required fields: name, name_ar, userId"}
+                )
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+
+            import time
+            group_id = f"group_{int(time.time() * 1000)}"
+            new_group = {
+                "_id": group_id,
+                "name": name,
+                "name_ar": name_ar,
+                "description": description,
+                "description_ar": description_ar,
+                "category": category,
+                "emoji": emoji,
+                "members_count": 1,
+                "created_by": user_id
+            }
+            db["social_groups"].insert_one(new_group)
+            return {"success": True, "group": new_group}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to create social group: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.get("/social/threads")
+    async def get_social_threads_endpoint(group_id: str = None, thread_id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+
+            if thread_id:
+                thread = db["social_threads"].find_one({"_id": thread_id})
+                if not thread:
+                    return fastapi.responses.JSONResponse(
+                        status_code=404,
+                        content={"success": False, "error": "Thread not found"}
+                    )
+                thread["_id"] = str(thread["_id"])
+                replies = list(db["social_replies"].find({"thread_id": thread_id}))
+                for r in replies:
+                    r["_id"] = str(r["_id"])
+                thread["replies"] = replies
+                return {"success": True, "thread": thread}
+
+            query = {}
+            if group_id:
+                query["group_id"] = group_id
+
+            threads = list(db["social_threads"].find(query))
+            for t in threads:
+                t["_id"] = str(t["_id"])
+            threads.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+            return {"success": True, "threads": threads}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get social threads: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/social/threads")
+    async def post_social_threads_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            data = await request.json()
+            action = data.get("action")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+
+            import time
+            from datetime import datetime
+
+            if action == "reply":
+                thread_id = data.get("thread_id")
+                content = data.get("content")
+                content_ar = data.get("content_ar", content)
+                author_id = data.get("author_id")
+                author_name = data.get("author_name", "Anonymous Member")
+                author_avatar = data.get("author_avatar", "👤")
+
+                if not thread_id or not content or not author_id:
+                    return fastapi.responses.JSONResponse(
+                        status_code=400,
+                        content={"success": False, "error": "Missing required fields: thread_id, content, author_id"}
+                    )
+
+                reply_id = f"reply_{int(time.time() * 1000)}"
+                new_reply = {
+                    "_id": reply_id,
+                    "thread_id": thread_id,
+                    "content": content,
+                    "content_ar": content_ar,
+                    "author_id": author_id,
+                    "author_name": author_name,
+                    "author_avatar": author_avatar,
+                    "created_at": datetime.utcnow().isoformat() + "Z"
+                }
+                db["social_replies"].insert_one(new_reply)
+                
+                db["social_threads"].update_one(
+                    {"_id": thread_id},
+                    {"$inc": {"replies_count": 1}}
+                )
+                return {"success": True, "reply": new_reply}
+
+            group_id = data.get("group_id")
+            title = data.get("title")
+            title_ar = data.get("title_ar", title)
+            content = data.get("content")
+            content_ar = data.get("content_ar", content)
+            author_id = data.get("author_id")
+            author_name = data.get("author_name", "Anonymous Member")
+            author_avatar = data.get("author_avatar", "👤")
+
+            if not group_id or not title or not content or not author_id:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Missing required fields for thread: group_id, title, content, author_id"}
+                )
+
+            thread_id = f"thread_{int(time.time() * 1000)}"
+            new_thread = {
+                "_id": thread_id,
+                "group_id": group_id,
+                "title": title,
+                "title_ar": title_ar,
+                "content": content,
+                "content_ar": content_ar,
+                "author_id": author_id,
+                "author_name": author_name,
+                "author_avatar": author_avatar,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+                "likes_count": 0,
+                "replies_count": 0
+            }
+            db["social_threads"].insert_one(new_thread)
+            return {"success": True, "thread": new_thread}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post social thread/reply: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
 
     @app.post("/verify-recaptcha")
     async def post_verify_recaptcha_endpoint(request: fastapi.Request):

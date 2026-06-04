@@ -38,6 +38,25 @@ export async function GET(req: NextRequest) {
     // 1. Local environment check
     if (isLocalEnv()) {
       const db = getLocalDb();
+      
+      // Proactively clean up Anas Al-Sayed / admin.candidate@fahem.edu
+      db.admins = (db.admins || []).filter(adm => 
+        adm.email.toLowerCase().trim() !== "admin.candidate@fahem.edu" &&
+        !(adm.name && adm.name.toLowerCase().includes("anas"))
+      );
+
+      // Seed Seba Freediving as pending admin candidate
+      const hasSeba = db.admins.some(adm => adm.email.toLowerCase().trim() === "sebafreediving@gmail.com");
+      if (!hasSeba) {
+        db.admins.push({
+          email: "sebafreediving@gmail.com",
+          name: "Seba Freediving",
+          isApprovedAdmin: false
+        });
+      }
+
+      saveLocalDb(db);
+
       // Ensure all admins have role admin
       const localAdmins = db.admins.map(adm => ({
         email: adm.email,
