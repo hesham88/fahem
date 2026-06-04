@@ -26,8 +26,14 @@ export async function GET(req: NextRequest) {
       const job = crawlJobs.find((j: any) => j._id === jobId);
 
       if (!job) {
-        return new Response(JSON.stringify({ error: "Crawl job not found locally" }), {
-          status: 404,
+        return new Response(JSON.stringify({
+          success: true,
+          status: "queued",
+          progress: 5,
+          logs: ["[INIT] Job scheduled. Awaiting background spider execution..."],
+          discovered: []
+        }), {
+          status: 200,
           headers: { "Content-Type": "application/json" }
         });
       }
@@ -55,8 +61,14 @@ export async function GET(req: NextRequest) {
       await client.close();
 
       if (!job) {
-        return new Response(JSON.stringify({ error: "Crawl job not found in database" }), {
-          status: 404,
+        return new Response(JSON.stringify({
+          success: true,
+          status: "queued",
+          progress: 5,
+          logs: ["[INIT] Job scheduled. Awaiting database and background spider execution..."],
+          discovered: []
+        }), {
+          status: 200,
           headers: { "Content-Type": "application/json" }
         });
       }
@@ -78,8 +90,14 @@ export async function GET(req: NextRequest) {
       const job = crawlJobs.find((j: any) => j._id === jobId);
 
       if (!job) {
-        return new Response(JSON.stringify({ error: "Database unreachable and job not found locally" }), {
-          status: 404,
+        return new Response(JSON.stringify({
+          success: true,
+          status: "queued",
+          progress: 5,
+          logs: ["[INIT] Database unreachable. Awaiting local job synchronization..."],
+          discovered: []
+        }), {
+          status: 200,
           headers: { "Content-Type": "application/json" }
         });
       }

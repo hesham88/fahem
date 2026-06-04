@@ -80,16 +80,23 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
       .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
+    (window as any)._activeUtterance = utterance;
     const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
-    utterance.lang = hasArabicChars ? "ar-EG" : "en-US";
+    const localeMap: Record<string, string> = {
+      en: "en-US",
+      ar: "ar-EG",
+      es: "es-ES",
+      fr: "fr-FR",
+      de: "de-DE",
+      zh: "zh-CN",
+      it: "it-IT"
+    };
+    const activeLocale = hasArabicChars ? "ar-EG" : (localeMap[language] || "en-US");
+    utterance.lang = activeLocale;
 
     const voices = window.speechSynthesis.getVoices();
-    let selectedVoice = null;
-    if (hasArabicChars) {
-      selectedVoice = voices.find(v => v.lang.startsWith("ar"));
-    } else {
-      selectedVoice = voices.find(v => v.lang.startsWith("en"));
-    }
+    const selectedVoice = voices.find(v => v.lang.toLowerCase() === activeLocale.toLowerCase()) || 
+                          voices.find(v => v.lang.toLowerCase().startsWith(activeLocale.split("-")[0].toLowerCase()));
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
@@ -126,7 +133,16 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
         const rec = new SpeechRec();
         rec.continuous = true;
         rec.interimResults = true;
-        rec.lang = language === "ar" ? "ar-EG" : "en-US";
+        const localeMap: Record<string, string> = {
+          en: "en-US",
+          ar: "ar-EG",
+          es: "es-ES",
+          fr: "fr-FR",
+          de: "de-DE",
+          zh: "zh-CN",
+          it: "it-IT"
+        };
+        rec.lang = localeMap[language] || "en-US";
 
         rec.onresult = (event: any) => {
           let interimText = "";

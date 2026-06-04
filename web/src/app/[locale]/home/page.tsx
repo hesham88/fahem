@@ -2616,6 +2616,12 @@ export default function Home() {
 
   const sendOnboardingMessage = async (msgText: string) => {
     if (!msgText.trim() || !user) return;
+    
+    if (msgText === "COMPLETE_ONBOARDING_MANUAL_CLICKED") {
+      await completeOnboardingManual();
+      return;
+    }
+    
     setOnboardingInput("");
     setOnboardingLoading(true);
     setOnboardingStatusText(language === "ar" ? "جاري الإرسال للذكاء الاصطناعي..." : "Sending to AI assistant...");
@@ -2882,6 +2888,73 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Error skipping onboarding:", err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const completeOnboardingManual = async () => {
+    if (!user) return;
+    setLoadingProfile(true);
+    
+    const emailPrefix = user.email ? user.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "") : "";
+    const usernameVal = emailPrefix.length >= 3 
+      ? `${emailPrefix}_${Math.floor(100 + Math.random() * 900)}` 
+      : `user_${user.uid.slice(0, 6)}`;
+
+    const fallbackProfile = {
+      userId: user.uid,
+      username: usernameVal,
+      email: user.email || "",
+      name: user.displayName || user.email?.split("@")[0] || "User",
+      age: 18,
+      country: "Egypt",
+      grade: "N/A",
+      avatar: "🚀",
+      school: "N/A",
+      userType: "student",
+      role: "student",
+      isApproved: true,
+      friends: [],
+      groupsJoined: [],
+      privacySettings: {
+        profileVisibility: "public",
+        allowMessages: true,
+        showActivity: true
+      }
+    };
+
+    const finalProfile = userProfile ? {
+      ...userProfile,
+      onboardingCompleted: true
+    } : {
+      ...fallbackProfile,
+      onboardingCompleted: true
+    };
+
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          profile: finalProfile
+        })
+      });
+      if (res.ok) {
+        setUserProfile(finalProfile);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("onboarding_completed_" + user.uid, "true");
+        }
+        setLocalCompleted(true);
+        await logActivity("onboarding_dismissed", "success", "Completed/Dismissed onboarding manually and synchronized profile state");
+      }
+    } catch (err) {
+      console.error("Error completing onboarding manually:", err);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("onboarding_completed_" + user.uid, "true");
+      }
+      setLocalCompleted(true);
     } finally {
       setLoadingProfile(false);
     }
@@ -3196,7 +3269,30 @@ export default function Home() {
                 setPreferencesSchool(data.profile.school || "");
                 setSettingsAvatar(data.profile.avatar || "");
 
-                if (data.profile.onboardingCompleted !== true) {
+                const isUserAdmin = data.profile.role === "admin" || data.profile.role === "super-admin" || data.profile.userType === "admin";
+                const hasLocalCompleted = typeof window !== "undefined" && localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true";
+                const hasCompletedFields = data.profile.role && data.profile.country && data.profile.username;
+
+                if (isUserAdmin || hasLocalCompleted || hasCompletedFields) {
+                  setUserProfile({
+                    ...data.profile,
+                    onboardingCompleted: true
+                  });
+                  setLocalCompleted(true);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("onboarding_completed_" + currentUser.uid, "true");
+                  }
+                  if (data.profile.onboardingCompleted !== true) {
+                    fetch("/api/user/profile", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        userId: currentUser.uid,
+                        profile: { ...data.profile, onboardingCompleted: true }
+                      })
+                    }).catch((err) => console.error("Error auto-completing onboarding for returning user:", err));
+                  }
+                } else if (data.profile.onboardingCompleted !== true) {
                   // SMS Verification Logic Guard: if the user's phone is already verified in their profile,
                   // bypass the phone verification step entirely and default to the next logical step ("role")
                   const isPhoneVerified = data.profile.phoneVerified === true || data.profile.phone_verified === true;
@@ -3788,28 +3884,55 @@ export default function Home() {
     }, intervalTime);
 
     // Actual Firebase Storage upload
-    const storageRef = ref(storage, "MOE Library/" + Date.now() + "_" + moeFile.name);
+    const path = "MOE Library/" + Date.now() + "_" + moeFile.name;
+    const storageRef = ref(storage, path);
     uploadBytes(storageRef, moeFile)
-      .then(() => {
-        clearInterval(timer);
-        setMoeProgress(100);
-        setMoeStatusText(language === "ar" ? "اكتمل الحصاد بنجاح!" : "Ingestion complete!");
-        setTimeout(() => {
-          setMoeUploading(false);
-          setMoeSuccess(true);
-          
-          const newBook = {
-            titleEn: moeFile.name.replace(/\.[^/.]+$/, ""),
-            titleAr: moeFile.name.replace(/\.[^/.]+$/, ""),
-            subject: moeSubject,
-            size: (moeFile.size / (1024 * 1024)).toFixed(1) + " MB",
-            format: "PDF",
-            downloads: "0",
-            isMoeIngested: true
-          };
-          setMoeIngestedBooks(prev => [newBook, ...prev]);
-          setMoeFile(null);
-        }, 500);
+      .then((snapshot) => {
+        getDownloadURL(snapshot.ref).then(async (downloadURL) => {
+          // Automatic Ingestion Trigger
+          try {
+            await fetch("/api/books", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                subject_id: "subj_user_uploads",
+                title: moeFile.name.replace(/\.[^/.]+$/, ""),
+                title_ar: moeFile.name.replace(/\.[^/.]+$/, ""),
+                grade: "General",
+                term: "Term 1",
+                year: new Date().getFullYear().toString(),
+                language: language || "ar",
+                book_type: "core",
+                source_url: downloadURL,
+                storage_path: path,
+                chapters: [],
+                requesterEmail: user?.email || "hesham1988@gmail.com"
+              })
+            });
+          } catch (err) {
+            console.error("Auto-ingestion trigger error:", err);
+          }
+
+          clearInterval(timer);
+          setMoeProgress(100);
+          setMoeStatusText(language === "ar" ? "اكتمل الحصاد بنجاح!" : "Ingestion complete!");
+          setTimeout(() => {
+            setMoeUploading(false);
+            setMoeSuccess(true);
+            
+            const newBook = {
+              titleEn: moeFile.name.replace(/\.[^/.]+$/, ""),
+              titleAr: moeFile.name.replace(/\.[^/.]+$/, ""),
+              subject: moeSubject,
+              size: (moeFile.size / (1024 * 1024)).toFixed(1) + " MB",
+              format: "PDF",
+              downloads: "0",
+              isMoeIngested: true
+            };
+            setMoeIngestedBooks(prev => [newBook, ...prev]);
+            setMoeFile(null);
+          }, 500);
+        });
       })
       .catch((err) => {
         clearInterval(timer);
@@ -4045,6 +4168,35 @@ export default function Home() {
     };
 
     const getQuickReplies = () => {
+      const lastMsgText = getLastFahemMessage().toLowerCase();
+      const lastMsgTextAr = getLastFahemMessage();
+      
+      const isFinishing = 
+        lastMsgText.includes("finalized") || 
+        lastMsgText.includes("happy exploring") || 
+        lastMsgText.includes("all set up") || 
+        lastMsgText.includes("onboarding is complete") ||
+        lastMsgText.includes("onboarding complete") ||
+        lastMsgTextAr.includes("جاهز") || 
+        lastMsgTextAr.includes("تم إعداد") || 
+        lastMsgTextAr.includes("عائلة فاهم") ||
+        lastMsgTextAr.includes("استكشاف");
+
+      if (isFinishing) {
+        return [
+          { 
+            label: language === "ar" ? "ابدأ التعلم الآن! 🚀" :
+                   language === "es" ? "¡Comienza a aprender ahora! 🚀" :
+                   language === "fr" ? "Commencer à apprendre maintenant ! 🚀" :
+                   language === "de" ? "Jetzt lernen starten! 🚀" :
+                   language === "zh" ? "现在开始学习！ 🚀" :
+                   language === "it" ? "Inizia a imparare ora! 🚀" :
+                   "Start Learning Now! 🚀", 
+            value: "COMPLETE_ONBOARDING_MANUAL_CLICKED" 
+          }
+        ];
+      }
+
       const step = currentOnboardingStep ? currentOnboardingStep.trim().toLowerCase() : "";
 
       switch (step) {
@@ -4255,42 +4407,81 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              background: "rgba(16, 107, 163, 0.06)",
-              border: "1px solid rgba(16, 107, 163, 0.15)",
-              padding: "6px 14px",
-              borderRadius: "20px",
-              color: "var(--primary)",
-              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.02)",
-              transition: "all 0.2s"
-            }}>
-              <FiGlobe style={{ fontSize: "0.95rem" }} />
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                background: "rgba(16, 107, 163, 0.06)",
+                border: "1px solid rgba(16, 107, 163, 0.15)",
+                padding: "6px 14px",
+                borderRadius: "20px",
+                color: "var(--primary)",
+                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.02)",
+                transition: "all 0.2s"
+              }}>
+                <FiGlobe style={{ fontSize: "0.95rem" }} />
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as any)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--primary)",
+                    fontSize: "0.82rem",
+                    fontWeight: 700,
+                    outline: "none",
+                    cursor: "pointer",
+                    paddingRight: language === "ar" ? "0" : "4px",
+                    paddingLeft: language === "ar" ? "4px" : "0",
+                  }}
+                >
+                  <option value="en" style={{ color: "#111827", background: "#ffffff" }}>English</option>
+                  <option value="ar" style={{ color: "#111827", background: "#ffffff" }}>العربية</option>
+                  <option value="es" style={{ color: "#111827", background: "#ffffff" }}>Español</option>
+                  <option value="fr" style={{ color: "#111827", background: "#ffffff" }}>Français</option>
+                  <option value="de" style={{ color: "#111827", background: "#ffffff" }}>Deutsch</option>
+                  <option value="zh" style={{ color: "#111827", background: "#ffffff" }}>中文</option>
+                  <option value="it" style={{ color: "#111827", background: "#ffffff" }}>Italiano</option>
+                </select>
+              </div>
+
+              <button
+                onClick={completeOnboardingManual}
                 style={{
-                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  background: "linear-gradient(135deg, var(--secondary), var(--secondary-hover))",
+                  color: "#ffffff",
                   border: "none",
-                  color: "var(--primary)",
-                  fontSize: "0.82rem",
+                  padding: "7px 18px",
+                  borderRadius: "20px",
+                  fontSize: "0.85rem",
                   fontWeight: 700,
-                  outline: "none",
                   cursor: "pointer",
-                  paddingRight: language === "ar" ? "0" : "4px",
-                  paddingLeft: language === "ar" ? "4px" : "0",
+                  boxShadow: "0 4px 10px rgba(212, 175, 55, 0.25)",
+                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1.5px)";
+                  e.currentTarget.style.boxShadow = "0 6px 14px rgba(212, 175, 55, 0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "0 4px 10px rgba(212, 175, 55, 0.25)";
                 }}
               >
-                <option value="en" style={{ color: "#111827", background: "#ffffff" }}>English</option>
-                <option value="ar" style={{ color: "#111827", background: "#ffffff" }}>العربية</option>
-                <option value="es" style={{ color: "#111827", background: "#ffffff" }}>Español</option>
-                <option value="fr" style={{ color: "#111827", background: "#ffffff" }}>Français</option>
-                <option value="de" style={{ color: "#111827", background: "#ffffff" }}>Deutsch</option>
-                <option value="zh" style={{ color: "#111827", background: "#ffffff" }}>中文</option>
-                <option value="it" style={{ color: "#111827", background: "#ffffff" }}>Italiano</option>
-              </select>
+                <span>
+                  {language === "ar" ? "ابدأ التعلم 🚀" :
+                   language === "es" ? "Comenzar 🚀" :
+                   language === "fr" ? "Commencer 🚀" :
+                   language === "de" ? "Starten 🚀" :
+                   language === "zh" ? "开始学习 🚀" :
+                   language === "it" ? "Inizia 🚀" :
+                   "Start Learning 🚀"}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -5039,21 +5230,31 @@ export default function Home() {
                 {/* Quick Reply Chips Container */}
                 {quickReplies.length > 0 && !onboardingLoading && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
-                    {quickReplies.map((chip, chipIdx) => (
-                      <button
-                        key={chipIdx}
-                        className="onboarding-chip"
-                        onClick={() => sendOnboardingMessage(chip.value)}
-                        type="button"
-                        style={{
-                          padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(16, 107, 163, 0.15)",
-                          background: "#ffffff", color: "var(--primary)", fontSize: "0.88rem", fontWeight: 700,
-                          cursor: "pointer", transition: "all 0.25s"
-                        }}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
+                    {quickReplies.map((chip, chipIdx) => {
+                      const isCompleteBtn = chip.value === "COMPLETE_ONBOARDING_MANUAL_CLICKED";
+                      return (
+                        <button
+                          key={chipIdx}
+                          className="onboarding-chip"
+                          onClick={() => sendOnboardingMessage(chip.value)}
+                          type="button"
+                          style={{
+                            padding: isCompleteBtn ? "10px 24px" : "8px 16px",
+                            borderRadius: "30px",
+                            border: isCompleteBtn ? "none" : "1px solid rgba(16, 107, 163, 0.15)",
+                            background: isCompleteBtn ? "linear-gradient(135deg, var(--secondary), var(--secondary-hover))" : "#ffffff",
+                            color: isCompleteBtn ? "#ffffff" : "var(--primary)",
+                            fontSize: isCompleteBtn ? "0.95rem" : "0.88rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            transition: "all 0.25s",
+                            boxShadow: isCompleteBtn ? "0 4px 12px rgba(212, 175, 55, 0.35)" : "none"
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

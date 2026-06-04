@@ -7,6 +7,65 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 
+async function translateMetadata(text: string): Promise<Record<string, string>> {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return {
+      en: text,
+      ar: text,
+      es: text,
+      fr: text,
+      de: text,
+      zh: text,
+      it: text
+    };
+  }
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+    const prompt = `You are an elite multilingual academic translation assistant.
+Translate this educational subject/book metadata string: "${text}"
+into the following 7 languages: English (en), Arabic (ar), Spanish (es), French (fr), German (de), Chinese (zh), Italian (it).
+
+Respond with a strictly formatted JSON object where the keys are the language codes (en, ar, es, fr, de, zh, it) and the values are the corresponding translations.
+Only output the JSON object, do NOT include markdown syntax (e.g. \`\`\`json) or other text.`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini Translate Error: ${response.status}`);
+    }
+
+    const resJson = await response.json();
+    const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (responseText) {
+      return JSON.parse(responseText.trim());
+    }
+  } catch (err) {
+    console.error("[translateMetadata] Error:", err);
+  }
+
+  return {
+    en: text,
+    ar: text,
+    es: text,
+    fr: text,
+    de: text,
+    zh: text,
+    it: text
+  };
+}
+
+
 // Global map to hold references to running Python processes for book ingestion.
 // This allows admins to safely terminate running ingestion jobs from the UI.
 declare global {
@@ -168,11 +227,19 @@ export async function POST(req: NextRequest) {
       `[DOWNLOAD] Queuing download from: ${resolvedSourceUrl}`
     ];
 
+    const titleTranslations = await translateMetadata(resolvedTitle || resolvedTitleAr);
+
     const draftBook: any = {
       _id: bookId,
       subject_id: resolvedSubjectId,
       title: resolvedTitle,
       title_ar: resolvedTitleAr,
+      title_en: titleTranslations.en || resolvedTitle,
+      title_es: titleTranslations.es || resolvedTitle,
+      title_fr: titleTranslations.fr || resolvedTitle,
+      title_de: titleTranslations.de || resolvedTitle,
+      title_zh: titleTranslations.zh || resolvedTitle,
+      title_it: titleTranslations.it || resolvedTitle,
       grade: grade || "General",
       term: term || "Term 1",
       year: year || new Date().getFullYear().toString(),
@@ -296,7 +363,7 @@ export async function POST(req: NextRequest) {
       // Spawn Python process
       try {
         const pythonPath = "python";
-        const scriptPath = path.join(process.cwd(), "scripts", "ingest_book.py");
+        const scriptPath = path.join(process.cwd(), "scripts", "ingestion", "job_fetch.py");
 
         const payload = {
           book_id: bookId,
@@ -363,7 +430,7 @@ export async function POST(req: NextRequest) {
     // Also trigger python process in production container
     try {
       const pythonPath = "python";
-      const scriptPath = path.join(process.cwd(), "scripts", "ingest_book.py");
+      const scriptPath = path.join(process.cwd(), "scripts", "ingestion", "job_fetch.py");
 
       const payload = {
         book_id: bookId,
@@ -443,6 +510,8 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    const titleTranslations = await translateMetadata(title || title_ar);
+
     if (isLocalEnv()) {
       const db = getLocalDb() as any;
       const idx = db.books.findIndex((b: any) => b._id === id);
@@ -467,6 +536,12 @@ export async function PUT(req: NextRequest) {
         subject_id,
         title,
         title_ar,
+        title_en: titleTranslations.en || title,
+        title_es: titleTranslations.es || title,
+        title_fr: titleTranslations.fr || title,
+        title_de: titleTranslations.de || title,
+        title_zh: titleTranslations.zh || title,
+        title_it: titleTranslations.it || title,
         grade: grade || "General",
         term: term || "Term 1",
         year: year || "2026",
@@ -486,12 +561,55 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    // Production: Update MongoDB directly
+    try {
+      const { MongoClient } = require("mongodb");
+      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
+      await client.connect();
+      const db = client.db("fahem");
+      await db.collection("books").updateOne(
+        { _id: id },
+        {
+          $set: {
+            subject_id,
+            title,
+            title_ar,
+            title_en: titleTranslations.en || title,
+            title_es: titleTranslations.es || title,
+            title_fr: titleTranslations.fr || title,
+            title_de: titleTranslations.de || title,
+            title_zh: titleTranslations.zh || title,
+            title_it: titleTranslations.it || title,
+            grade: grade || "General",
+            term: term || "Term 1",
+            year: year || "2026",
+            language: language || "ar",
+            book_type: book_type || "core",
+            source_url: source_url || "",
+            storage_path: storage_path || "",
+            chapters: chapters || [],
+            updated_at: Date.now() / 1000
+          }
+        }
+      );
+      await client.close();
+    } catch (mongoErr) {
+      console.error("[PUT Book Mongo Error]:", mongoErr);
+    }
+
     // Proxy to Cloud Run Agent
     return await proxyRequest("/user/books", "PUT", {
       id,
       subject_id,
       title,
       title_ar,
+      title_en: titleTranslations.en || title,
+      title_es: titleTranslations.es || title,
+      title_fr: titleTranslations.fr || title,
+      title_de: titleTranslations.de || title,
+      title_zh: titleTranslations.zh || title,
+      title_it: titleTranslations.it || title,
       grade,
       term,
       year,

@@ -74,7 +74,8 @@ You MUST respond with a JSON object strictly matching this schema:
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), { status: 500 });
     }
 
-    const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+    const isOral = resolvedMode === "oral";
+    const modelName = isOral ? "gemini-3.1-flash-live-preview" : (process.env.GEMINI_MODEL || "gemini-3.1-flash-lite");
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
     const response = await fetch(url, {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
@@ -78,6 +78,58 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [verifierLog, setVerifierLog] = useState<string[]>([]);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectedInfo, setRejectedInfo] = useState<any>(null);
+
+  const [translationLanguage, setTranslationLanguage] = useState("");
+  const [translatedTitle, setTranslatedTitle] = useState("");
+  const [translatedText, setTranslatedText] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  useEffect(() => {
+    setTranslationLanguage("");
+    setTranslatedTitle("");
+    setTranslatedText("");
+  }, [readerCurrentPage, selectedBookReader]);
+
+  const handlePageTranslation = async (targetLang: string, activePage: any) => {
+    if (!targetLang) {
+      setTranslationLanguage("");
+      setTranslatedTitle("");
+      setTranslatedText("");
+      return;
+    }
+
+    setTranslationLanguage(targetLang);
+    setIsTranslating(true);
+
+    const activeTitle = language === "ar" ? (activePage.titleAr || activePage.titleEn) : (activePage.titleEn || activePage.titleAr);
+    const activeContent = language === "ar" ? activePage.contentAr : activePage.contentEn;
+
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: activeTitle,
+          text: activeContent,
+          targetLanguage: targetLang
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTranslatedTitle(data.translatedTitle);
+        setTranslatedText(data.translatedText);
+      } else {
+        alert(language === "ar" ? "فشلت الترجمة، يرجى المحاولة مرة أخرى." : "Translation failed, please try again.");
+        setTranslationLanguage("");
+      }
+    } catch (err) {
+      console.error("Translation error:", err);
+      alert(language === "ar" ? "حدث خطأ أثناء الاتصال بخدمة الترجمة." : "An error occurred while connecting to the translation service.");
+      setTranslationLanguage("");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
@@ -292,15 +344,44 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   }}
                 >
                   <div>
-                    {/* Page Navigation & Chapters */}
+                    {/* Page Navigation & Chapters with integrated translation widget */}
                     <div style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
+                      flexWrap: "wrap", gap: "1rem",
                       marginBottom: "1.5rem", borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
                       paddingBottom: "0.75rem"
                     }}>
                       <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
                         📖 {language === "ar" ? "الصفحة الحالية" : "Active Section"}: {readerCurrentPage} / {totalPagesCount}
                       </span>
+
+                      {/* Premium real-time page translator widget */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <label htmlFor="page-translator-select" style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                          🌐 {language === "ar" ? "ترجمة الصفحة:" : "Translate Page:"}
+                        </label>
+                        <select
+                          id="page-translator-select"
+                          value={translationLanguage}
+                          onChange={(e) => handlePageTranslation(e.target.value, activePage)}
+                          disabled={isTranslating}
+                          style={{
+                            padding: "4px 10px", borderRadius: "12px", border: "1px solid var(--card-border)",
+                            background: "#ffffff", color: "var(--foreground)", fontSize: "0.75rem", fontWeight: 700,
+                            outline: "none", cursor: "pointer", transition: "all 0.2s"
+                          }}
+                        >
+                          <option value="">{language === "ar" ? "الأصلية" : "Original"}</option>
+                          <option value="en">🇺🇸 English</option>
+                          <option value="ar">🇸🇦 العربية</option>
+                          <option value="es">🇪🇸 Español</option>
+                          <option value="fr">🇫🇷 Français</option>
+                          <option value="de">🇩🇪 Deutsch</option>
+                          <option value="zh">🇨🇳 中文</option>
+                          <option value="it">🇮🇹 Italiano</option>
+                        </select>
+                      </div>
+
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         <button
                           disabled={readerCurrentPage <= 1}
@@ -330,12 +411,38 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       </div>
                     ) : (
                       <article style={{ lineHeight: "1.8", color: "var(--foreground)", fontFamily: "var(--font-sans)" }}>
+                        <style>{`
+                          @keyframes skeleton-loading {
+                            0% { background-position: 200% 0; }
+                            100% { background-position: -200% 0; }
+                          }
+                        `}</style>
+
                         <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--primary)", borderBottom: "1px dashed rgba(16, 107, 163, 0.1)", paddingBottom: "0.5rem", marginBottom: "1rem" }}>
-                          {language === "ar" ? (activePage.titleAr || activePage.titleEn) : (activePage.titleEn || activePage.titleAr)}
+                          {isTranslating ? (
+                            <span style={{
+                              display: "inline-block", width: "180px", height: "1.2rem", borderRadius: "4px",
+                              background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)",
+                              backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite"
+                            }} />
+                          ) : (
+                            translationLanguage && translatedTitle ? translatedTitle : (language === "ar" ? (activePage.titleAr || activePage.titleEn) : (activePage.titleEn || activePage.titleAr))
+                          )}
                         </h3>
-                        <div style={{ fontSize: "1rem", whiteSpace: "pre-line", marginBottom: "1.5rem" }}>
-                          {language === "ar" ? activePage.contentAr : activePage.contentEn}
-                        </div>
+
+                        {isTranslating ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", margin: "1.5rem 0" }}>
+                            <div style={{ height: "1.1rem", width: "100%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
+                            <div style={{ height: "1.1rem", width: "95%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
+                            <div style={{ height: "1.1rem", width: "90%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
+                            <div style={{ height: "1.1rem", width: "97%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
+                            <div style={{ height: "1.1rem", width: "85%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: "1rem", whiteSpace: "pre-line", marginBottom: "1.5rem" }}>
+                            {translationLanguage && translatedText ? translatedText : (language === "ar" ? activePage.contentAr : activePage.contentEn)}
+                          </div>
+                        )}
 
                         {/* Equations / Formulas Area if any */}
                         {activePage.formulas && activePage.formulas.length > 0 && (

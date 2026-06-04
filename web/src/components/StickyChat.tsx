@@ -5,6 +5,7 @@ import { auth, storage } from "../lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useTranslation } from "../context/LanguageContext";
+import InlineFeedbackCard from "./InlineFeedbackCard";
 import { 
   FiMessageSquare, 
   FiX, 
@@ -38,7 +39,438 @@ interface Message {
   text: string;
   timestamp: Date;
   activeAgent?: string;
+  showFeedbackCard?: boolean;
 }
+
+const chatTranslations: Record<string, Record<string, string>> = {
+  en: {
+    speech_unsupported: "Your browser does not support Speech Recognition.",
+    welcome: "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you study your books and learning resources, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject or book are we studying today?",
+    auto_explain_prompt: "Please explain this excerpt in detail and in simple terms: ",
+    welcome_back: "Welcome back to this conversation! How can I assist you further?",
+    confirm_delete_session: "Are you sure you want to delete this saved chat?",
+    new_chat_welcome: "Welcome! I am ready to start a new conversation with you.",
+    subject_desc_default: "Academic Subject",
+    math_desc: "Algebra & Statistics",
+    science_desc: "Biology, Physics, Chem",
+    arabic_desc: "Arabic Linguistics & Grammar",
+    book_desc_default: "Curriculum Book",
+    algebra_desc: "OpenStax Algebra Textbook",
+    chemistry_desc: "OpenStax Chemistry Volume",
+    arabic_grammar_desc: "Simplified Arabic Grammar Rules",
+    explain_command: "Detailed pedagogical explanation",
+    summary_command: "High-density concepts & formulas sheet",
+    practice_command: "Generate interactive question to solve",
+    quiz_command: "Generate 3-question conceptual quiz",
+    floating_trigger_title: "Talk with Fahem AI",
+    companion_title: "Fahem Companion",
+    responsible_ai: "Responsible AI Active",
+    compact_overlay: "Compact Overlay",
+    side_panel: "Side Panel",
+    full_screen: "Full Screen",
+    chat_history: "Chat History",
+    email_label: "Email:",
+    saved_chats: "Saved Chats",
+    new_chat: "New Chat",
+    loading_chats: "Loading chats...",
+    no_saved_chats: "No saved chats yet",
+    untitled_chat: "Untitled Chat",
+    messages_count: "messages",
+    active_page_context: "Active context from your books:",
+    page_label: "Page",
+    thinking_fetching: "Thinking & fetching knowledge...",
+    read_aloud: "Read Aloud",
+    speech_stop: "Stop",
+    speech_listen: "Listen",
+    ground_with_google: "Ground with Google Search",
+    logs_label: "Logs",
+    no_logs: "No runtime execution logs yet.",
+    voice_dictation: "Voice Dictation / Oral Input",
+    input_placeholder: "Ask your AI tutor companion (type @, #, or /)...",
+    preset1_label: "Matrix Practice (p.14)",
+    preset1_query: "Give me a practice question on Matrix Inversion from Algebra on page 14.",
+    preset2_label: "Calvin Cycle (Biology)",
+    preset2_query: "Explain the Calvin Cycle in Biology and what wavelengths chlorophyll absorbs least.",
+    preset3_label: "Inchoative Verbs (Grammar)",
+    preset3_query: "Explain Kaada and her Sisters and when its predicate must not be associated with 'An'.",
+    math_label: "📊 Math",
+    science_label: "🧬 Science",
+    arabic_label: "✍️ Arabic",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ Simplified Arabic Grammar",
+    explain_label: "💡 Explain Step-by-Step",
+    summary_label: "📝 Generate Summary",
+    practice_label: "✍️ Active Recall Challenge",
+    quiz_label: "⚡ Quick Mastery Quiz"
+  },
+  ar: {
+    speech_unsupported: "متصفحك لا يدعم التعرف على الصوت شفهياً.",
+    welcome: "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتبك ومصادرك الدراسية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة أو الكتاب الذي تود مذاكرته اليوم؟",
+    auto_explain_prompt: "اشرح لي هذا الجزء بالتفصيل وبأسلوب مبسط: ",
+    welcome_back: "مرحباً بك مجدداً في هذه المحادثة! كيف يمكنني مساعدتك أكثر؟",
+    confirm_delete_session: "هل أنت متأكد من حذف هذه المحادثة المحفوظة؟",
+    new_chat_welcome: "مرحباً بك! أنا جاهز لبدء محادثة جديدة معك.",
+    subject_desc_default: "مادة دراسية",
+    math_desc: "مواضيع الجبر والإحصاء",
+    science_desc: "الأحياء والفيزياء والكيمياء",
+    arabic_desc: "قواعد النحو واللغة",
+    book_desc_default: "كتاب مدرسي",
+    algebra_desc: "مرجع الجبر من OpenStax",
+    chemistry_desc: "مرجع الكيمياء العامة",
+    arabic_grammar_desc: "كتاب شرح قواعد اللغة",
+    explain_command: "شرح وافٍ ومفصل خطوة بخطوة",
+    summary_command: "تخليص عالي الكثافة (الخلاصة والزتونة)",
+    practice_command: "سؤال تفاعلي يشجع المذاكرة النشطة",
+    quiz_command: "اختبار قصير من 3 أسئلة مفاهيمية",
+    floating_trigger_title: "تحدث مع فاهم",
+    companion_title: "رفيق فاهم الذكي",
+    responsible_ai: "الذكاء الاصطناعي المسؤول نشط",
+    compact_overlay: "عائم مصغر",
+    side_panel: "لوحة جانبية",
+    full_screen: "ملء الشاشة",
+    chat_history: "سجل المحادثات",
+    email_label: "الحساب:",
+    saved_chats: "المحادثات المحفوظة",
+    new_chat: "محادثة جديدة",
+    loading_chats: "جاري تحميل المحادثات...",
+    no_saved_chats: "لا توجد محادثات محفوظة بعد",
+    untitled_chat: "محادثة بدون عنوان",
+    messages_count: "رسائل",
+    active_page_context: "سياق نشط من كتبك ومصادرك الدراسية:",
+    page_label: "الصفحة",
+    thinking_fetching: "جاري التفكير وسحب المعرفة...",
+    read_aloud: "قراءة بصوت عالٍ شفهي",
+    speech_stop: "إيقاف",
+    speech_listen: "استماع شفهي",
+    ground_with_google: "البحث في جوجل",
+    logs_label: "السجلات",
+    no_logs: "لا توجد سجلات تشغيل بعد.",
+    voice_dictation: "إدخال بالصوت شفهي",
+    input_placeholder: "اسأل رفيقك الدراسي الذكي عن محتوى الصفحة (اكتب @ أو # أو /)...",
+    preset1_label: "تدريب مصفوفات (ص١٤)",
+    preset1_query: "أعطني سؤالاً تدريبياً على معكوس المصفوفة من كتاب الجبر صفحة 14.",
+    preset2_label: "دورة كالفن (الأحياء)",
+    preset2_query: "اشرح لي دورة كالفن في الأحياء وما هي الأطوال الموجية الأقل امتصاصاً.",
+    preset3_label: "أفعال الشروع (النحو)",
+    preset3_query: "اشرح لي قاعدة كاد وأخواتها ومتى يمتنع اقتران خبرها بـ 'أن'.",
+    math_label: "➕ الرياضيات",
+    science_label: "🧪 العلوم",
+    arabic_label: "📖 اللغة العربية",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ كتاب النحو المبسط",
+    explain_label: "💡 شرح خطوة بخطوة",
+    summary_label: "📝 ملخص عالي الكثافة",
+    practice_label: "✍️ تحدي المذاكرة النشطة",
+    quiz_label: "⚡ اختبار قصير للمستويات"
+  },
+  es: {
+    speech_unsupported: "Su navegador no soporta el reconocimiento de voz.",
+    welcome: "¡Bienvenido a Fahem! 🧠 Tu enjambre de tutores de IA en tu bolsillo. Estoy listo para ayudarte a estudiar tus libros y recursos de aprendizaje, obtener respuestas con citas de páginas, crear planes de estudio inteligentes, realizar cuestionarios dinámicos y practicar oralmente. ¿Qué materia o libro te gustaría estudiar hoy?",
+    auto_explain_prompt: "Por favor, explique este fragmento en detalle y en términos sencillos: ",
+    welcome_back: "¡Bienvenido de nuevo a esta conversación! ¿Cómo puedo ayudarte más?",
+    confirm_delete_session: "¿Está seguro de que desea eliminar este chat guardado?",
+    new_chat_welcome: "¡Bienvenido! Estoy listo para comenzar una nueva conversación contigo.",
+    subject_desc_default: "Materia académica",
+    math_desc: "Álgebra y Estadística",
+    science_desc: "Biología, Física, Química",
+    arabic_desc: "Lingüística y gramática árabe",
+    book_desc_default: "Libro de texto",
+    algebra_desc: "Libro de Álgebra de OpenStax",
+    chemistry_desc: "Libro de Química de OpenStax",
+    arabic_grammar_desc: "Reglas de gramática árabe simplificadas",
+    explain_command: "Explicación detallada paso a paso",
+    summary_command: "Resumen de conceptos y fórmulas",
+    practice_command: "Generar pregunta interactiva para resolver",
+    quiz_command: "Generar cuestionario conceptual de 3 preguntas",
+    floating_trigger_title: "Hablar con Fahem AI",
+    companion_title: "Compañero Fahem",
+    responsible_ai: "IA responsable activa",
+    compact_overlay: "Superposición compacta",
+    side_panel: "Panel lateral",
+    full_screen: "Pantalla completa",
+    chat_history: "Historial de chat",
+    email_label: "Correo electrónico:",
+    saved_chats: "Chats guardados",
+    new_chat: "Nuevo chat",
+    loading_chats: "Cargando chats...",
+    no_saved_chats: "Aún no hay chats guardados",
+    untitled_chat: "Chat sin título",
+    messages_count: "mensajes",
+    active_page_context: "Contexto activo de sus libros:",
+    page_label: "Página",
+    thinking_fetching: "Pensando y recuperando conocimiento...",
+    read_aloud: "Leer en voz alta",
+    speech_stop: "Detener",
+    speech_listen: "Escuchar",
+    ground_with_google: "Buscar en Google",
+    logs_label: "Registros",
+    no_logs: "Aún no hay registros de ejecución.",
+    voice_dictation: "Dictado de voz",
+    input_placeholder: "Pregunte a su compañero tutor (escriba @, # o /)...",
+    preset1_label: "Práctica de matrices (p.14)",
+    preset1_query: "Dame una pregunta de práctica sobre la inversión de matrices de álgebra en la página 14.",
+    preset2_label: "Ciclo de Calvin (Biología)",
+    preset2_query: "Explique el ciclo de Calvin en biología y qué longitudes de onda absorbe menos la clorofila.",
+    preset3_label: "Verbos incoativos (Gramática)",
+    preset3_query: "Explique Kaada y sus hermanas y cuándo su predicado no debe asociarse con 'An'.",
+    math_label: "📊 Matemáticas",
+    science_label: "🧬 Ciencias",
+    arabic_label: "✍️ Árabe",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ Gramática árabe simplificada",
+    explain_label: "💡 Explicar paso a paso",
+    summary_label: "📝 Generar resumen",
+    practice_label: "✍️ Desafío de recuerdo activo",
+    quiz_label: "⚡ Cuestionario de dominio rápido"
+  },
+  fr: {
+    speech_unsupported: "Votre navigateur ne prend pas en charge la reconnaissance vocale.",
+    welcome: "Bienvenue sur Fahem ! 🧠 Votre essaim de tuteurs IA dans votre poche. Je suis prêt à vous aider à étudier vos livres et ressources d'apprentissage, obtenir des réponses citées par page, créer des calendriers d'étude dynamiques, passer des quiz adaptatifs et pratiquer oralement ! Quelle matière ou livre étudions-nous aujourd'hui ?",
+    auto_explain_prompt: "Veuillez expliquer cet extrait en détail et en termes simples : ",
+    welcome_back: "Ravi de vous revoir dans cette discussion ! Comment puis-je vous aider davantage ?",
+    confirm_delete_session: "Êtes-vous sûr de vouloir supprimer cette discussion enregistrée ?",
+    new_chat_welcome: "Bienvenue ! Je suis prêt à commencer une nouvelle conversation avec vous.",
+    subject_desc_default: "Matière académique",
+    math_desc: "Algèbre & Statistique",
+    science_desc: "Biologie, Physique, Chimie",
+    arabic_desc: "Linguistique & Grammaire Arabe",
+    book_desc_default: "Livre scolaire",
+    algebra_desc: "Livre d'algèbre OpenStax",
+    chemistry_desc: "Volume de chimie OpenStax",
+    arabic_grammar_desc: "Règles de grammaire arabe simplifiées",
+    explain_command: "Explication pédagogique détaillée",
+    summary_command: "Fiche de concepts & formules à haute densité",
+    practice_command: "Générer une question interactive à résoudre",
+    quiz_command: "Générer un quiz conceptuel de 3 questions",
+    floating_trigger_title: "Parler avec Fahem AI",
+    companion_title: "Compagnon Fahem",
+    responsible_ai: "IA responsable active",
+    compact_overlay: "Superposition compacte",
+    side_panel: "Panneau latéral",
+    full_screen: "Plein écran",
+    chat_history: "Historique des discussions",
+    email_label: "E-mail :",
+    saved_chats: "Discussions enregistrées",
+    new_chat: "Nouvelle discussion",
+    loading_chats: "Chargement des discussions...",
+    no_saved_chats: "Pas encore de discussions enregistrées",
+    untitled_chat: "Discussion sans titre",
+    messages_count: "messages",
+    active_page_context: "Contexte actif de vos livres :",
+    page_label: "Page",
+    thinking_fetching: "Réflexion et récupération des connaissances...",
+    read_aloud: "Lire à haute voix",
+    speech_stop: "Arrêter",
+    speech_listen: "Écouter",
+    ground_with_google: "Rechercher sur Google",
+    logs_label: "Journaux",
+    no_logs: "Pas encore de journaux d'exécution.",
+    voice_dictation: "Saisie vocale",
+    input_placeholder: "Demandez à votre compagnon tuteur (tapez @, # ou /)...",
+    preset1_label: "Pratique des matrices (p.14)",
+    preset1_query: "Donnez-moi une question d'entraînement sur l'inversion de matrice de l'algèbre à la page 14.",
+    preset2_label: "Cycle de Calvin (Biologie)",
+    preset2_query: "Expliquez le cycle de Calvin en biologie et quelles longueurs d'onde la chlorophylle absorbe le moins.",
+    preset3_label: "Verbes inchoatifs (Grammaire)",
+    preset3_query: "Expliquez Kaada et ses sœurs et quand son prédicat ne doit pas être associé à 'An'.",
+    math_label: "📊 Mathématiques",
+    science_label: "🧬 Sciences",
+    arabic_label: "✍️ Arabe",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ Grammaire arabe simplifiée",
+    explain_label: "💡 Expliquer étape par étape",
+    summary_label: "📝 Générer un résumé",
+    practice_label: "✍️ Défi de rappel actif",
+    quiz_label: "⚡ Quiz de maîtrise rapide"
+  },
+  de: {
+    speech_unsupported: "Ihr Browser unterstützt keine Spracherkennung.",
+    welcome: "Willkommen bei Fahem! 🧠 Ihr Schwarm von KI-Tutoren in Ihrer Tasche. Ich bin bereit, Ihnen beim Studium Ihrer Bücher und Lernressourcen zu helfen, zitierte Antworten zu erhalten, intelligente Studienpläne zu erstellen, adaptive Quizfragen zu lösen und mündlich zu üben! Welches Fach oder Buch lernen wir heute?",
+    auto_explain_prompt: "Bitte erklären Sie diesen Auszug ausführlich und in einfachen Worten: ",
+    welcome_back: "Willkommen zurück bei diesem Gespräch! Wie kann ich Ihnen weiterhelfen?",
+    confirm_delete_session: "Sind Sie sicher, dass Sie diesen gespeicherten Chat löschen möchten?",
+    new_chat_welcome: "Willkommen! Ich bin bereit, ein neues Gespräch mit Ihnen zu beginnen.",
+    subject_desc_default: "Akademisches Fach",
+    math_desc: "Algebra & Statistik",
+    science_desc: "Biologie, Physik, Chemie",
+    arabic_desc: "Arabische Linguistik & Grammatik",
+    book_desc_default: "Lehrbuch",
+    algebra_desc: "OpenStax Algebra-Lehrbuch",
+    chemistry_desc: "OpenStax Chemie-Lehrbuch",
+    arabic_grammar_desc: "Vereinfachte arabische Grammatikregeln",
+    explain_command: "Ausführliche pädagogische Erklärung",
+    summary_command: "Zusammenfassung von Konzepten & Formeln",
+    practice_command: "Interaktive Frage zum Lösen generieren",
+    quiz_command: "Konzeptionelles Quiz mit 3 Fragen generieren",
+    floating_trigger_title: "Mit Fahem KI sprechen",
+    companion_title: "Fahem Begleiter",
+    responsible_ai: "Verantwortungsvolle KI aktiv",
+    compact_overlay: "Kompakte Überlagerung",
+    side_panel: "Seitenleiste",
+    full_screen: "Vollbild",
+    chat_history: "Chatverlauf",
+    email_label: "E-Mail:",
+    saved_chats: "Gespeicherte Chats",
+    new_chat: "Neuer Chat",
+    loading_chats: "Chats werden geladen...",
+    no_saved_chats: "Noch keine gespeicherten Chats",
+    untitled_chat: "Unbenannter Chat",
+    messages_count: "Nachrichten",
+    active_page_context: "Aktiver Kontext aus Ihren Büchern:",
+    page_label: "Seite",
+    thinking_fetching: "Nachdenken und Wissen abrufen...",
+    read_aloud: "Vorlesen",
+    speech_stop: "Stoppen",
+    speech_listen: "Zuhören",
+    ground_with_google: "Mit Google-Suche untermauern",
+    logs_label: "Protokolle",
+    no_logs: "Noch keine Laufzeitprotokolle.",
+    voice_dictation: "Diktat / Mündliche Eingabe",
+    input_placeholder: "Fragen Sie Ihren Lernbegleiter (tippen Sie @, # oder /)...",
+    preset1_label: "Matrix-Übung (S.14)",
+    preset1_query: "Geben Sie mir eine Übungsfrage zur Matrixinversion aus der Algebra auf Seite 14.",
+    preset2_label: "Calvin-Zyklus (Biologie)",
+    preset2_query: "Erklären Sie den Calvin-Zyklus in der Biologie und welche Wellenlängen Chlorophyll am wenigsten absorbiert.",
+    preset3_label: "Inchoative Verben (Grammatik)",
+    preset3_query: "Erklären Sie Kaada und ihre Schwestern und wann ihr Prädikat nicht mit 'An' verbunden sein darf.",
+    math_label: "📊 Mathematik",
+    science_label: "🧬 Wissenschaft",
+    arabic_label: "✍️ Arabisch",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ Vereinfachte arabische Grammatik",
+    explain_label: "💡 Schritt für Schritt erklären",
+    summary_label: "📝 Zusammenfassung erstellen",
+    practice_label: "✍️ Aktiver Abruftest",
+    quiz_label: "⚡ Schnelles Meisterschafts-Quiz"
+  },
+  zh: {
+    speech_unsupported: "您的浏览器不支持语音识别。",
+    welcome: "欢迎来到 Fahem！🧠 您的口袋 AI 导师集群。我随时准备帮助您学习书籍和学习资源、获取带有页码引用的解答、制定智能学习计划、进行自适应测验并进行口语练习！我们今天学习哪门学科或哪本书？",
+    auto_explain_prompt: "请详细且通俗地解释这段摘录：",
+    welcome_back: "欢迎回到本次对话！我该如何进一步帮助您？",
+    confirm_delete_session: "您确定要删除此保存的聊天吗？",
+    new_chat_welcome: "欢迎！我已准备好与您开始新对话。",
+    subject_desc_default: "学术学科",
+    math_desc: "代数与统计",
+    science_desc: "生物、物理、化学",
+    arabic_desc: "阿拉伯语语言学与语法",
+    book_desc_default: "教科书",
+    algebra_desc: "OpenStax 代数教科书",
+    chemistry_desc: "OpenStax 化学教科书",
+    arabic_grammar_desc: "简明阿拉伯语语法规则",
+    explain_command: "详细的步骤解释",
+    summary_command: "高密度概念与公式摘要",
+    practice_command: "生成互动式问题以解决",
+    quiz_command: "生成包含3个概念问题的测验",
+    floating_trigger_title: "与 Fahem AI 交流",
+    companion_title: "Fahem 伴学助手",
+    responsible_ai: "负责任的人工智能已激活",
+    compact_overlay: "紧凑悬浮窗",
+    side_panel: "侧边栏",
+    full_screen: "全屏",
+    chat_history: "聊天历史记录",
+    email_label: "电子邮件：",
+    saved_chats: "已保存的聊天",
+    new_chat: "新聊天",
+    loading_chats: "正在加载聊天...",
+    no_saved_chats: "暂无已保存的聊天",
+    untitled_chat: "无标题聊天",
+    messages_count: "条消息",
+    active_page_context: "书籍中的活动上下文：",
+    page_label: "页",
+    thinking_fetching: "正在思考并获取知识...",
+    read_aloud: "朗读",
+    speech_stop: "停止",
+    speech_listen: "倾听",
+    ground_with_google: "使用谷歌搜索作为依据",
+    logs_label: "日志",
+    no_logs: "暂无运行时执行日志。",
+    voice_dictation: "语音输入",
+    input_placeholder: "咨询您的伴学助手（输入 @、# 或 /）...",
+    preset1_label: "矩阵练习（第14页）",
+    preset1_query: "给我一个关于第14页代数中矩阵求逆的练习题。",
+    preset2_label: "卡尔文循环（生物学）",
+    preset2_query: "解释生物学中的卡尔文循环，以及叶绿素吸收最少的波长。",
+    preset3_label: "起始动词（语法）",
+    preset3_query: "解释 Kaada 及其姐妹词，以及什么时候它的谓语不能与 'An' 连用。",
+    math_label: "📊 数学",
+    science_label: "🧬 科学",
+    arabic_label: "✍️ 阿拉伯语",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ 简明阿拉伯语语法",
+    explain_label: "💡 逐步解释",
+    summary_label: "📝 生成摘要",
+    practice_label: "✍️ 主动回忆挑战",
+    quiz_label: "⚡ 快速掌握测验"
+  },
+  it: {
+    speech_unsupported: "Il tuo browser non supporta il riconoscimento vocale.",
+    welcome: "Benvenuto in Fahem! 🧠 Il tuo sciame di tutor IA in tasca. Sono pronto ad aiutarti a studiare i tuoi libri e le tue risorse di apprendimento, ottenere risposte citate dalle pagine, creare programmi di studio dinamici, fare quiz adattivi e fare pratica orale! Quale materia o libro studiamo oggi?",
+    auto_explain_prompt: "Per favore, spiega questo estratto in dettaglio e in termini semplici: ",
+    welcome_back: "Bentornato in questa conversazione! Come posso aiutarti ulteriormente?",
+    confirm_delete_session: "Sei sicuro di voler eliminare questa chat salvata?",
+    new_chat_welcome: "Benvenuto! Sono pronto per iniziare una nuova conversazione con te.",
+    subject_desc_default: "Materia accademica",
+    math_desc: "Algebra e Statistica",
+    science_desc: "Biologia, Fisica, Chimica",
+    arabic_desc: "Linguistica e grammatica araba",
+    book_desc_default: "Libro di testo",
+    algebra_desc: "Libro di testo di algebra OpenStax",
+    chemistry_desc: "Volume di chimica OpenStax",
+    arabic_grammar_desc: "Regole di grammatica araba semplificate",
+    explain_command: "Spiegazione pedagogica dettagliata",
+    summary_command: "Scheda di concetti e formule ad alta densità",
+    practice_command: "Genera una domanda interattiva da risolvere",
+    quiz_command: "Genera un quiz concettuale di 3 domande",
+    floating_trigger_title: "Parla con Fahem AI",
+    companion_title: "Compagno Fahem",
+    responsible_ai: "IA responsabile attiva",
+    compact_overlay: "Finestra compatta",
+    side_panel: "Pannello laterale",
+    full_screen: "Schermo intero",
+    chat_history: "Cronologia chat",
+    email_label: "E-mail:",
+    saved_chats: "Chat salvate",
+    new_chat: "Nuova chat",
+    loading_chats: "Caricamento chat...",
+    no_saved_chats: "Nessuna chat salvata",
+    untitled_chat: "Chat senza titolo",
+    messages_count: "messaggi",
+    active_page_context: "Contesto attivo dai tuoi libri:",
+    page_label: "Pagina",
+    thinking_fetching: "Riflessione e recupero della conoscenza...",
+    read_aloud: "Leggi ad alta voce",
+    speech_stop: "Ferma",
+    speech_listen: "Ascolta",
+    ground_with_google: "Verifica con Google Search",
+    logs_label: "Log",
+    no_logs: "Nessun log di esecuzione.",
+    voice_dictation: "Dettatura vocale",
+    input_placeholder: "Chiedi al tuo compagno tutor (digita @, # o /)...",
+    preset1_label: "Pratica con le matrici (p.14)",
+    preset1_query: "Dammi una domanda pratica sull'inversione di matrici dall'algebra a pagina 14.",
+    preset2_label: "Ciclo di Calvin (Biologia)",
+    preset2_query: "Spiega il ciclo di Calvin in biologia e quali lunghezze d'onda la clorofilla assorbe meno.",
+    preset3_label: "Verbi incoativi (Grammatica)",
+    preset3_query: "Spiega Kaada e le sue sorelle e quando il suo predicato non deve essere associato a 'An'.",
+    math_label: "📊 Matematica",
+    science_label: "🧬 Scienze",
+    arabic_label: "✍️ Arabo",
+    algebra_label: "📚 College Algebra 2e",
+    chemistry_label: "🧪 Chemistry 2e",
+    arabic_grammar_label: "✍️ Grammatica araba semplificata",
+    explain_label: "💡 Spiega passo dopo passo",
+    summary_label: "📝 Genera riassunto",
+    practice_label: "✍️ Sfida di richiamo attivo",
+    quiz_label: "⚡ Quiz di padronanza rapida"
+  }
+};
 
 export default function StickyChat() {
   const [user, setUser] = useState<User | null>(null);
@@ -71,14 +503,14 @@ export default function StickyChat() {
   const startSpeechRecognition = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(language === "ar" ? "متصفحك لا يدعم التعرف على الصوت شفهياً." : "Your browser does not support Speech Recognition.");
+      alert(ct("speech_unsupported"));
       return;
     }
 
     const rec = new SpeechRecognition();
     rec.continuous = false;
     rec.interimResults = false;
-    rec.lang = language === "ar" ? "ar-EG" : "en-US";
+    rec.lang = language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US";
 
     rec.onstart = () => {
       setIsListeningChat(true);
@@ -138,14 +570,22 @@ export default function StickyChat() {
       .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
+    (window as any)._activeUtterance = utterance;
     const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
-    utterance.lang = hasArabicChars ? "ar-EG" : "en-US";
+    
+    let speechLang = "en-US";
+    if (hasArabicChars) {
+      speechLang = "ar-EG";
+    } else {
+      speechLang = language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US";
+    }
+    utterance.lang = speechLang;
 
     const voices = window.speechSynthesis.getVoices();
     let selectedVoice = null;
-    if (hasArabicChars) {
-      selectedVoice = voices.find(v => v.lang.startsWith("ar"));
-    } else {
+    const langPrefix = speechLang.split("-")[0];
+    selectedVoice = voices.find(v => v.lang.startsWith(langPrefix));
+    if (!selectedVoice) {
       selectedVoice = voices.find(v => v.lang.startsWith("en"));
     }
     if (selectedVoice) {
@@ -184,6 +624,10 @@ export default function StickyChat() {
   const [showHistory, setShowHistory] = useState(false);
 
   const { language, dir, t } = useTranslation();
+
+  const ct = (key: string): string => {
+    return chatTranslations[language]?.[key] || chatTranslations["en"]?.[key] || key;
+  };
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatLogsEndRef = useRef<HTMLDivElement>(null);
@@ -196,9 +640,7 @@ export default function StickyChat() {
         {
           id: "welcome",
           role: "assistant",
-          text: language === "ar" 
-            ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتبك ومصادرك الدراسية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة أو الكتاب الذي تود مذاكرته اليوم؟" 
-            : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you study your books and learning resources, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject or book are we studying today?",
+          text: ct("welcome"),
           timestamp: new Date()
         }
       ]);
@@ -230,9 +672,7 @@ export default function StickyChat() {
         setLayoutMode("side"); // Auto-expand to premium side-by-side mode!
         
         if (detail.autoExplainText) {
-          const autoExplainPrompt = language === "ar"
-            ? `اشرح لي هذا الجزء بالتفصيل وبأسلوب مبسط: "${detail.autoExplainText}"`
-            : `Please explain this excerpt in detail and in simple terms: "${detail.autoExplainText}"`;
+          const autoExplainPrompt = `${ct("auto_explain_prompt")}"${detail.autoExplainText}"`;
           setTimeout(() => {
             if (sendMessageRef.current) {
               sendMessageRef.current(autoExplainPrompt);
@@ -340,9 +780,7 @@ export default function StickyChat() {
             {
               id: "welcome",
               role: "assistant",
-              text: language === "ar"
-                ? "مرحباً بك مجدداً في هذه المحادثة! كيف يمكنني مساعدتك أكثر؟"
-                : "Welcome back to this conversation! How can I assist you further?",
+              text: ct("welcome_back"),
               timestamp: new Date()
             }
           ]);
@@ -359,9 +797,7 @@ export default function StickyChat() {
   async function deleteSession(sessionIdVal: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!sessionIdVal) return;
-    const confirmMsg = language === "ar" 
-      ? "هل أنت متأكد من حذف هذه المحادثة؟" 
-      : "Are you sure you want to delete this chat session?";
+    const confirmMsg = ct("confirm_delete_session");
     if (!confirm(confirmMsg)) {
       return;
     }
@@ -386,9 +822,7 @@ export default function StickyChat() {
       {
         id: "welcome",
         role: "assistant",
-        text: language === "ar" 
-          ? "مرحباً بك في فاهم! 🧠 شبكة معلميك الخبراء بالذكاء الاصطناعي في جيبك. أنا جاهز لمساعدتك في مذاكرة كتبك ومصادرك الدراسية، الإجابة عن أسئلتك مع توثيق الصفحة الدقيقة، وضع جداول دراسية ذكية، خوض اختبارات تفاعلية، والممارسة الشفهية! ما المادة أو الكتاب الذي تود مذاكرته اليوم؟" 
-          : "Welcome to Fahem! 🧠 Your Swarm of AI Tutors, in your pocket. I am ready to help you study your books and learning resources, get page-cited answers, build dynamic study schedules, take adaptive quizzes, and practice orally! Which subject or book are we studying today?",
+        text: ct("welcome"),
         timestamp: new Date()
       }
     ]);
@@ -401,13 +835,13 @@ export default function StickyChat() {
       const opts = dbSubjects.map(sub => ({
         id: `@${sub._id || sub.id}`,
         label: `${sub.emoji || sub.icon_emoji || "📚"} ${language === "ar" ? sub.name_ar || sub.name : sub.name}`,
-        desc: sub.category || (language === "ar" ? "مادة دراسية" : "Academic Subject")
+        desc: sub.category || ct("subject_desc_default")
       }));
       if (opts.length === 0) {
         opts.push(
-          { id: "@math", label: language === "ar" ? "➕ الرياضيات" : "📊 Math", desc: language === "ar" ? "مواضيع الجبر والإحصاء" : "Algebra & Statistics" },
-          { id: "@science", label: language === "ar" ? "🧪 العلوم" : "🧬 Science", desc: language === "ar" ? "الأحياء والفيزياء والكيمياء" : "Biology, Physics, Chem" },
-          { id: "@arabic", label: language === "ar" ? "📖 اللغة العربية" : "✍️ Arabic", desc: language === "ar" ? "قواعد النحو واللغة" : "Arabic Linguistics & Grammar" }
+          { id: "@math", label: ct("math_label"), desc: ct("math_desc") },
+          { id: "@science", label: ct("science_label"), desc: ct("science_desc") },
+          { id: "@arabic", label: ct("arabic_label"), desc: ct("arabic_desc") }
         );
       }
       return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
@@ -416,23 +850,23 @@ export default function StickyChat() {
       const opts = dbBooks.map(b => ({
         id: `#${b._id || b.id}`,
         label: `📚 ${language === "ar" ? b.title_ar || b.title : b.title}`,
-        desc: b.grade || (language === "ar" ? "كتاب مدرسي" : "Curriculum Book")
+        desc: b.grade || ct("book_desc_default")
       }));
       if (opts.length === 0) {
         opts.push(
-          { id: "#college-algebra", label: "📚 College Algebra 2e", desc: language === "ar" ? "مرجع الجبر من OpenStax" : "OpenStax Algebra Textbook" },
-          { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: language === "ar" ? "مرجع الكيمياء العامة" : "OpenStax Chemistry Volume" },
-          { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: language === "ar" ? "كتاب شرح قواعد اللغة" : "Simplified Arabic Grammar Rules" }
+          { id: "#college-algebra", label: "📚 College Algebra 2e", desc: ct("algebra_desc") },
+          { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: ct("chemistry_desc") },
+          { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: ct("arabic_grammar_desc") }
         );
       }
       return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
     }
     if (mentionType === "command") {
       const opts = [
-        { id: "/explain", label: "💡 Explain Step-by-Step", desc: language === "ar" ? "شرح وافٍ ومفصل خطوة بخطوة" : "Detailed pedagogical explanation" },
-        { id: "/summary", label: "📝 Generate Summary", desc: language === "ar" ? "تخليص عالي الكثافة (الخلاصة والزتونة)" : "High-density concepts & formulas sheet" },
-        { id: "/practice", label: "✍️ Active Recall Challenge", desc: language === "ar" ? "سؤال تفاعلي يشجع المذاكرة النشطة" : "Generate interactive question to solve" },
-        { id: "/quiz", label: "⚡ Quick Mastery Quiz", desc: language === "ar" ? "اختبار قصير من 3 أسئلة مفاهيمية" : "Generate 3-question conceptual quiz" }
+        { id: "/explain", label: ct("explain_label"), desc: ct("explain_command") },
+        { id: "/summary", label: ct("summary_label"), desc: ct("summary_command") },
+        { id: "/practice", label: ct("practice_label"), desc: ct("practice_command") },
+        { id: "/quiz", label: ct("quiz_label"), desc: ct("quiz_command") }
       ];
       return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
     }
@@ -465,57 +899,193 @@ export default function StickyChat() {
     if (!txt) return "";
     
     const lines = txt.split("\n");
-    return lines.map((line, lineIdx) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        return <div key={lineIdx} style={{ height: "0.5rem" }} />;
-      }
-
-      if (trimmed.startsWith("###")) {
-        return <h4 key={lineIdx} style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.5rem", marginBottom: "0.25rem", textAlign: "start" }}>{trimmed.slice(3).trim()}</h4>;
-      }
-      if (trimmed.startsWith("##")) {
-        return <h3 key={lineIdx} style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.75rem", marginBottom: "0.35rem", textAlign: "start" }}>{trimmed.slice(2).trim()}</h3>;
-      }
-
-      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
-        const rest = trimmed.substring(2);
-        return (
-          <ul key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "disc", textAlign: "start" }}>
-            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
-              {parseInlineMarkdown(rest)}
-            </li>
-          </ul>
-        );
-      }
-
-      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
-      if (numMatch) {
-        const rest = numMatch[2];
-        return (
-          <ol key={lineIdx} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "decimal", textAlign: "start" }}>
-            <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
-              {parseInlineMarkdown(rest)}
-            </li>
-          </ol>
-        );
-      }
-
-      if (trimmed.startsWith("`") && trimmed.endsWith("`")) {
-        const rest = trimmed.slice(1, -1);
-        return (
-          <div key={lineIdx} style={{ margin: "0.4rem 0", padding: "0.4rem 0.6rem", borderRadius: "8px", background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.05)", fontFamily: "monospace", fontSize: "0.8rem", color: "var(--primary)", overflowX: "auto", textAlign: "start" }}>
-            {rest}
+    const formattedElements: React.ReactNode[] = [];
+    
+    let currentLogBlock: string[] = [];
+    
+    const flushLogBlock = (keyIndex: number) => {
+      if (currentLogBlock.length === 0) return;
+      
+      const logText = currentLogBlock.join("\n");
+      
+      formattedElements.push(
+        <div 
+          key={`log-${keyIndex}`} 
+          className="terminal-console"
+          style={{
+            margin: "0.75rem 0",
+            padding: "0.85rem 1rem",
+            borderRadius: "12px",
+            background: "rgba(10, 15, 12, 0.95)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid var(--accent, #d4af37)",
+            fontFamily: "monospace",
+            fontSize: "0.8rem",
+            color: "#e6e6e6",
+            overflowX: "auto",
+            textAlign: "start",
+            position: "relative",
+            boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.3)",
+          }}
+        >
+          <style>{`
+            @keyframes terminal-pulse {
+              0% { opacity: 0.4; box-shadow: 0 0 2px #00ff66; }
+              100% { opacity: 1; box-shadow: 0 0 10px #00ff66; }
+            }
+          `}</style>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            paddingBottom: "0.4rem",
+            marginBottom: "0.6rem",
+            userSelect: "none"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#00ff66",
+                display: "inline-block",
+                boxShadow: "0 0 8px #00ff66",
+                animation: "terminal-pulse 1.5s infinite alternate"
+              }} />
+              <span style={{ fontWeight: 600, color: "var(--accent, #d4af37)", fontSize: "0.75rem", letterSpacing: "1px" }}>
+                SUPERADMIN CONSOLE
+              </span>
+            </div>
+            <button
+              onClick={(e) => {
+                try {
+                  navigator.clipboard.writeText(logText);
+                  const btn = e.currentTarget;
+                  btn.innerText = "COPIED ✅";
+                  btn.style.color = "#5dfd8a";
+                  setTimeout(() => { 
+                    btn.innerText = "COPY"; 
+                    btn.style.color = "#ccc";
+                  }, 1500);
+                } catch (err) {
+                  console.error("Clipboard copy failed:", err);
+                }
+              }}
+              title="Copy logs to clipboard"
+              style={{
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: "4px",
+                color: "#ccc",
+                fontSize: "0.7rem",
+                padding: "2px 8px",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.color = "#fff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                if (e.currentTarget.innerText !== "COPIED ✅") {
+                  e.currentTarget.style.color = "#ccc";
+                }
+              }}
+            >
+              COPY
+            </button>
           </div>
+          <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.4", maxHeight: "300px", overflowY: "auto" }}>
+            {currentLogBlock.map((logLine, lIdx) => {
+              let lineStyle = { color: "#e6e6e6" };
+              if (logLine.includes("[COMPLETE]") || logLine.includes("✅") || logLine.includes("100%")) {
+                lineStyle = { color: "#5dfd8a" };
+              } else if (logLine.includes("[WARNING]") || logLine.includes("⚠️")) {
+                lineStyle = { color: "#ffb86c" };
+              } else if (logLine.includes("[CRITICAL]") || logLine.includes("[SYSTEM_ERROR]") || logLine.includes("❌")) {
+                lineStyle = { color: "#ff5555" };
+              } else if (logLine.includes("[INIT]") || logLine.includes("[SYSTEM]")) {
+                lineStyle = { color: "#8be9fd" };
+              } else if (logLine.includes("[PARSER]") || logLine.includes("[VECTOR_INDEX]")) {
+                lineStyle = { color: "#bd93f9" };
+              }
+              return (
+                <div key={lIdx} style={{ ...lineStyle, padding: "2px 0" }}>
+                  {logLine}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      currentLogBlock = [];
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      
+      if (trimmed.startsWith("`") && trimmed.endsWith("`") && trimmed.length > 2) {
+        currentLogBlock.push(trimmed.slice(1, -1));
+      } else {
+        if (currentLogBlock.length > 0) {
+          flushLogBlock(i);
+        }
+        
+        if (!trimmed) {
+          formattedElements.push(<div key={`empty-${i}`} style={{ height: "0.5rem" }} />);
+          continue;
+        }
+
+        if (trimmed.startsWith("###")) {
+          formattedElements.push(<h4 key={`h4-${i}`} style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.5rem", marginBottom: "0.25rem", textAlign: "start" }}>{trimmed.slice(3).trim()}</h4>);
+          continue;
+        }
+        if (trimmed.startsWith("##")) {
+          formattedElements.push(<h3 key={`h3-${i}`} style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.75rem", marginBottom: "0.35rem", textAlign: "start" }}>{trimmed.slice(2).trim()}</h3>);
+          continue;
+        }
+
+        if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+          const rest = trimmed.substring(2);
+          formattedElements.push(
+            <ul key={`ul-${i}`} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "disc", textAlign: "start" }}>
+              <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+                {parseInlineMarkdown(rest)}
+              </li>
+            </ul>
+          );
+          continue;
+        }
+
+        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+        if (numMatch) {
+          const rest = numMatch[2];
+          formattedElements.push(
+            <ol key={`ol-${i}`} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "decimal", textAlign: "start" }}>
+              <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
+                {parseInlineMarkdown(rest)}
+              </li>
+            </ol>
+          );
+          continue;
+        }
+
+        formattedElements.push(
+          <p key={`p-${i}`} style={{ margin: "0.25rem 0", fontSize: "0.85rem", lineHeight: "1.5", textAlign: "start" }}>
+            {parseInlineMarkdown(trimmed)}
+          </p>
         );
       }
-
-      return (
-        <p key={lineIdx} style={{ margin: "0.25rem 0", fontSize: "0.85rem", lineHeight: "1.5", textAlign: "start" }}>
-          {parseInlineMarkdown(trimmed)}
-        </p>
-      );
-    });
+    }
+    
+    if (currentLogBlock.length > 0) {
+      flushLogBlock(lines.length);
+    }
+    
+    return formattedElements;
   };
 
   useEffect(() => {
@@ -532,6 +1102,25 @@ export default function StickyChat() {
 
     if (!textToSend) {
       setInputValue("");
+    }
+
+    const isFeedbackTrigger = /feedback|report\s+a\s+problem|complaint|bug|issue|complaints|شکوى|تقرير\s+مشكلة|ملاحظات/i.test(queryText);
+    if (isFeedbackTrigger) {
+      const userMsgId = `msg-${Date.now()}-user`;
+      const assistantMsgId = `msg-${Date.now()}-assistant`;
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user", text: queryText, timestamp: new Date() }
+      ]);
+      setIsSending(true);
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          { id: assistantMsgId, role: "assistant", text: "", timestamp: new Date(), showFeedbackCard: true }
+        ]);
+        setIsSending(false);
+      }, 600);
+      return;
     }
 
     const userMsgId = `msg-${Date.now()}-user`;
@@ -748,22 +1337,16 @@ User Question: ${queryText}`;
 
   const presetQueries = [
     { 
-      label: language === "ar" ? "تدريب مصفوفات (ص١٤)" : "Matrix Practice (p.14)", 
-      query: language === "ar" 
-        ? "أعطني سؤالاً تدريبياً على معكوس المصفوفة من كتاب الجبر صفحة 14." 
-        : "Give me a practice question on Matrix Inversion from Algebra on page 14." 
+      label: ct("preset1_label"), 
+      query: ct("preset1_query") 
     },
     { 
-      label: language === "ar" ? "دورة كالفن (الأحياء)" : "Calvin Cycle (Biology)", 
-      query: language === "ar" 
-        ? "اشرح لي دورة كالفن في الأحياء وما هي الأطوال الموجية الأقل امتصاصاً." 
-        : "Explain the Calvin Cycle in Biology and what wavelengths chlorophyll absorbs least." 
+      label: ct("preset2_label"), 
+      query: ct("preset2_query") 
     },
     { 
-      label: language === "ar" ? "أفعال الشروع (النحو)" : "Inchoative Verbs (Grammar)", 
-      query: language === "ar" 
-        ? "اشرح لي قاعدة كاد وأخواتها ومتى يمتنع اقتران خبرها بـ 'أن'." 
-        : "Explain Kaada and her Sisters and when its predicate must not be associated with 'An'." 
+      label: ct("preset3_label"), 
+      query: ct("preset3_query") 
     }
   ];
 
@@ -792,7 +1375,7 @@ User Question: ${queryText}`;
           outline: "none"
         }}
         className="floating-chat-trigger"
-        title={language === "ar" ? "تحدث مع فاهم" : "Talk with Fahem AI"}
+        title={ct("floating_trigger_title")}
       >
         {isOpen ? (
           <FiX style={{ fontSize: "1.5rem", transition: "transform 0.3s ease" }} />
@@ -844,7 +1427,18 @@ User Question: ${queryText}`;
         }}
         dir={dir}
       >
-        {/* Header Design */}
+        <div style={{
+          width: "100%",
+          maxWidth: layoutMode === "fullscreen" ? "850px" : "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          height: "100%",
+          overflow: "hidden",
+          position: "relative"
+        }}>
+          {/* Header Design */}
         <div
           style={{
             padding: "1.25rem",
@@ -872,11 +1466,11 @@ User Question: ${queryText}`;
             </div>
             <div>
               <h3 style={{ fontSize: "1.1rem", margin: 0, fontFamily: "var(--font-display)", fontWeight: 700 }}>
-                {language === "ar" ? "رفيق فاهم الذكي" : "Fahem Companion"}
+                {ct("companion_title")}
               </h3>
               <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", color: "var(--accent-green)" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--accent-green)" }}></span>
-                <span>{language === "ar" ? "الذكاء الاصطناعي المسؤول نشط" : "Responsible AI Active"}</span>
+                <span>{ct("responsible_ai")}</span>
               </div>
             </div>
           </div>
@@ -897,7 +1491,7 @@ User Question: ${queryText}`;
                   display: "flex",
                   alignItems: "center"
                 }}
-                title={language === "ar" ? "عائم مصغر" : "Compact Overlay"}
+                title={ct("compact_overlay")}
               >
                 <FiMinimize2 />
               </button>
@@ -914,7 +1508,7 @@ User Question: ${queryText}`;
                   display: "flex",
                   alignItems: "center"
                 }}
-                title={language === "ar" ? "لوحة جانبية" : "Side Panel"}
+                title={ct("side_panel")}
               >
                 <FiSidebar />
               </button>
@@ -931,7 +1525,7 @@ User Question: ${queryText}`;
                   display: "flex",
                   alignItems: "center"
                 }}
-                title={language === "ar" ? "ملء الشاشة" : "Full Screen"}
+                title={ct("full_screen")}
               >
                 <FiMaximize2 />
               </button>
@@ -951,7 +1545,7 @@ User Question: ${queryText}`;
                 gap: "0.25rem",
                 transition: "all 0.2s"
               }}
-              title={language === "ar" ? "سجل المحادثات" : "Chat History"}
+              title={ct("chat_history")}
             >
               <FiClock style={{ fontSize: "1.2rem" }} />
             </button>
@@ -989,7 +1583,7 @@ User Question: ${queryText}`;
             <span>ID: <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem" }}>{user.uid.substring(0, 8)}...</code></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span>{language === "ar" ? "الحساب:" : "Email:"} <strong style={{ color: "var(--foreground)" }}>{user.email}</strong></span>
+            <span>{ct("email_label")} <strong style={{ color: "var(--foreground)" }}>{user.email}</strong></span>
             {credits !== null && (
               <span style={{
                 background: credits > 20 ? "rgba(46, 125, 50, 0.15)" : "rgba(198, 40, 40, 0.15)",
@@ -1043,7 +1637,7 @@ User Question: ${queryText}`;
               color: "var(--primary)",
               fontFamily: "var(--font-display)"
             }}>
-              {language === "ar" ? "المحادثات المحفوظة" : "Saved Chats"}
+              {ct("saved_chats")}
             </h4>
             <span style={{
               fontSize: "0.75rem",
@@ -1080,7 +1674,7 @@ User Question: ${queryText}`;
             }}
           >
             <FiPlus style={{ fontSize: "1rem" }} />
-            <span>{language === "ar" ? "محادثة جديدة" : "New Chat"}</span>
+            <span>{ct("new_chat")}</span>
           </button>
 
           {/* Scrollable Saved Sessions */}
@@ -1098,12 +1692,12 @@ User Question: ${queryText}`;
             {isSessionsLoading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", color: "#8a9ca8" }}>
                 <FiRefreshCw className="spin-icon" style={{ marginRight: "0.5rem", animation: "spin 2s linear infinite" }} />
-                <span style={{ fontSize: "0.8rem" }}>{language === "ar" ? "جاري تحميل المحادثات..." : "Loading chats..."}</span>
+                <span style={{ fontSize: "0.8rem" }}>{ct("loading_chats")}</span>
               </div>
             ) : sessions.length === 0 ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", color: "#8a9ca8", textAlign: "center" }}>
                 <FiFileText style={{ fontSize: "2rem", opacity: 0.3, marginBottom: "0.5rem" }} />
-                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{language === "ar" ? "لا توجد محادثات محفوظة بعد" : "No saved chats yet"}</span>
+                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{ct("no_saved_chats")}</span>
               </div>
             ) : (
               sessions.map((sess) => {
@@ -1137,10 +1731,10 @@ User Question: ${queryText}`;
                           textOverflow: "ellipsis",
                           overflow: "hidden"
                         }} title={sess.title || "Untitled Chat"}>
-                          {sess.title || (language === "ar" ? "محادثة بدون عنوان" : "Untitled Chat")}
+                          {sess.title || ct("untitled_chat")}
                         </span>
                         <span style={{ fontSize: "0.72rem", color: "#8a9ca8" }}>
-                          {sess.messageCount} {language === "ar" ? "رسائل" : "messages"}
+                          {sess.messageCount} {ct("messages_count")}
                         </span>
                       </div>
                     </div>
@@ -1192,7 +1786,7 @@ User Question: ${queryText}`;
               </strong>
             </div>
             <span>
-              {language === "ar" ? `الصفحة ${bookContext.currentPage}` : `Page ${bookContext.currentPage}`}
+              {`${ct("page_label")} ${bookContext.currentPage}`}
             </span>
           </div>
         )}
@@ -1245,12 +1839,14 @@ User Question: ${queryText}`;
               >
                 {msg.role === "user" ? (
                   <p style={{ margin: 0 }}>{msg.text}</p>
+                ) : msg.showFeedbackCard ? (
+                  <InlineFeedbackCard language={language} dir={dir} />
                 ) : (
                   msg.text ? formatMessageText(msg.text) : (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                       <span className="dot-typing"></span>
                       <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
-                        {language === "ar" ? "جاري التفكير وسحب المعرفة..." : "Thinking & fetching knowledge..."}
+                        {ct("thinking_fetching")}
                       </span>
                     </div>
                   )
@@ -1289,13 +1885,13 @@ User Question: ${queryText}`;
                         gap: "4px",
                         transition: "all 0.2s"
                       }}
-                      title={language === "ar" ? "قراءة بصوت عالٍ شفهي" : "Read Aloud"}
+                      title={ct("read_aloud")}
                     >
                       {speakingMsgId === msg.id ? <FiVolumeX style={{ animation: "pulse-kf 1s infinite" }} /> : <FiVolume2 />}
                       <span style={{ fontSize: "0.7rem", fontWeight: 700 }}>
                         {speakingMsgId === msg.id 
-                          ? (language === "ar" ? "إيقاف" : "Stop") 
-                          : (language === "ar" ? "استماع شفهي" : "Listen")}
+                          ? ct("speech_stop") 
+                          : ct("speech_listen")}
                       </span>
                     </button>
                   </>
@@ -1379,7 +1975,7 @@ User Question: ${queryText}`;
             />
             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: useGrounded ? "var(--primary)" : "#5a6e7c", fontWeight: useGrounded ? 600 : 400 }}>
               <FiGlobe />
-              <span>{language === "ar" ? "البحث في جوجل" : "Ground with Google Search"}</span>
+              <span>{ct("ground_with_google")}</span>
             </div>
           </label>
 
@@ -1398,7 +1994,7 @@ User Question: ${queryText}`;
             }}
           >
             <FiTerminal />
-            <span>{language === "ar" ? "السجلات" : "Logs"} ({sessionLogs.length})</span>
+            <span>{ct("logs_label")} ({sessionLogs.length})</span>
           </button>
         </div>
 
@@ -1418,7 +2014,7 @@ User Question: ${queryText}`;
           >
             {sessionLogs.length === 0 ? (
               <div style={{ color: "#6a7c88", fontStyle: "italic" }}>
-                {language === "ar" ? "لا توجد سجلات تشغيل بعد." : "No runtime execution logs yet."}
+                {ct("no_logs")}
               </div>
             ) : (
               sessionLogs.map((log, i) => (
@@ -1511,7 +2107,7 @@ User Question: ${queryText}`;
               transition: "all 0.2s",
               boxShadow: isListeningChat ? "0 0 12px rgba(239, 68, 68, 0.4)" : "none",
             }}
-            title={language === "ar" ? "إدخال بالصوت شفهي" : "Voice Dictation / Oral Input"}
+            title={ct("voice_dictation")}
             className={isListeningChat ? "pulse-icon" : ""}
           >
             {isListeningChat ? <FiMicOff style={{ fontSize: "1.1rem" }} /> : <FiMic style={{ fontSize: "1.1rem" }} />}
@@ -1544,7 +2140,7 @@ User Question: ${queryText}`;
               }
             }}
             disabled={isSending}
-            placeholder={language === "ar" ? "اسأل رفيقك الدراسي الذكي عن محتوى الصفحة (اكتب @ أو # أو /)..." : "Ask your AI tutor companion (type @, #, or /)..."}
+            placeholder={ct("input_placeholder")}
             style={{
               flex: 1,
               padding: "0.75rem 1rem",
@@ -1577,6 +2173,7 @@ User Question: ${queryText}`;
             <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />
           </button>
         </form>
+        </div>
       </div>
 
       <style jsx global>{`

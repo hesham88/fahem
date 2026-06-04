@@ -5,6 +5,65 @@ import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
+async function translateMetadata(text: string): Promise<Record<string, string>> {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return {
+      en: text,
+      ar: text,
+      es: text,
+      fr: text,
+      de: text,
+      zh: text,
+      it: text
+    };
+  }
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+    const prompt = `You are an elite multilingual academic translation assistant.
+Translate this educational subject/book metadata string: "${text}"
+into the following 7 languages: English (en), Arabic (ar), Spanish (es), French (fr), German (de), Chinese (zh), Italian (it).
+
+Respond with a strictly formatted JSON object where the keys are the language codes (en, ar, es, fr, de, zh, it) and the values are the corresponding translations.
+Only output the JSON object, do NOT include markdown syntax (e.g. \`\`\`json) or other text.`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini Translate Error: ${response.status}`);
+    }
+
+    const resJson = await response.json();
+    const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (responseText) {
+      return JSON.parse(responseText.trim());
+    }
+  } catch (err) {
+    console.error("[translateMetadata] Error:", err);
+  }
+
+  return {
+    en: text,
+    ar: text,
+    es: text,
+    fr: text,
+    de: text,
+    zh: text,
+    it: text
+  };
+}
+
+
 export async function GET(req: NextRequest) {
   try {
     if (isLocalEnv()) {
@@ -73,6 +132,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const nameTranslations = await translateMetadata(name || name_ar);
+
     // 1. Local environment check
     if (isLocalEnv()) {
       const db = getLocalDb();
@@ -81,6 +142,12 @@ export async function POST(req: NextRequest) {
         _id: subjectId,
         name,
         name_ar,
+        name_en: nameTranslations.en || name,
+        name_es: nameTranslations.es || name,
+        name_fr: nameTranslations.fr || name,
+        name_de: nameTranslations.de || name,
+        name_zh: nameTranslations.zh || name,
+        name_it: nameTranslations.it || name,
         grade_level: grade_level || "General",
         category: category || "Science",
         icon_emoji: icon_emoji || "📚",
@@ -99,6 +166,12 @@ export async function POST(req: NextRequest) {
     return await proxyRequest("/user/subjects", "POST", {
       name,
       name_ar,
+      name_en: nameTranslations.en || name,
+      name_es: nameTranslations.es || name,
+      name_fr: nameTranslations.fr || name,
+      name_de: nameTranslations.de || name,
+      name_zh: nameTranslations.zh || name,
+      name_it: nameTranslations.it || name,
       grade_level,
       category,
       icon_emoji
@@ -157,6 +230,8 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    const nameTranslations = await translateMetadata(name || name_ar);
+
     if (isLocalEnv()) {
       const db = getLocalDb();
       const idx = db.subjects.findIndex(s => s._id === id);
@@ -170,6 +245,12 @@ export async function PUT(req: NextRequest) {
         ...db.subjects[idx],
         name,
         name_ar,
+        name_en: nameTranslations.en || name,
+        name_es: nameTranslations.es || name,
+        name_fr: nameTranslations.fr || name,
+        name_de: nameTranslations.de || name,
+        name_zh: nameTranslations.zh || name,
+        name_it: nameTranslations.it || name,
         grade_level: grade_level || "General",
         category: category || "Science",
         icon_emoji: icon_emoji || db.subjects[idx].icon_emoji || db.subjects[idx].emoji || "📚",
@@ -187,6 +268,12 @@ export async function PUT(req: NextRequest) {
       id,
       name,
       name_ar,
+      name_en: nameTranslations.en || name,
+      name_es: nameTranslations.es || name,
+      name_fr: nameTranslations.fr || name,
+      name_de: nameTranslations.de || name,
+      name_zh: nameTranslations.zh || name,
+      name_it: nameTranslations.it || name,
       grade_level,
       category,
       icon_emoji
