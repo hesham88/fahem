@@ -116,20 +116,7 @@ const DEFAULT_DB: LocalDb = {
 };
 
 export function isLocalEnv(): boolean {
-  if (process.env.FORCE_REAL_DB === "true" || process.env.NEXT_PUBLIC_STAGING === "true" || process.env.STAGING === "true") {
-    return false; // Force staging/delivery database config, bypassing local fallbacks
-  }
-  if (process.env.NODE_ENV === "production") {
-    return false; // Staging & production are NEVER local envs
-  }
-  const isCloudRun = !!process.env.K_SERVICE;
-  if (isCloudRun) {
-    return false; // Production/Cloud Run is NEVER local
-  }
-  // If running locally, check if MONGODB_URI is not set or contains -pri (meaning it's private and unreachable locally)
-  const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
-  const noUri = !process.env.MONGODB_URI;
-  return noUri || hasPri || process.env.NODE_ENV === "development";
+  return false; // Force staging/delivery database config globally, bypassing and eliminating all local offline fallbacks
 }
 
 export function shouldSkipDirectMongo(): boolean {

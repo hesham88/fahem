@@ -608,8 +608,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     process = subprocess.Popen(
                         [python_path, script_path],
                         stdin=subprocess.PIPE,
-                        stdout=None,
-                        stderr=None,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                         text=True
                     )
                     process.stdin.write(json.dumps(payload))
