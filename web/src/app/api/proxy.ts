@@ -126,7 +126,7 @@ export async function proxyRequest(
     const options: RequestInit = {
       method,
       headers,
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(60000),
       cache: "no-store",
     };
 
