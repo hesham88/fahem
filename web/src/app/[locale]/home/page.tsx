@@ -692,17 +692,7 @@ export default function Home() {
 
   // Premium split-screen interactive reader states
   const [selectedBookReader, setSelectedBookReader] = useState<any>(null);
-  const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([
-    {
-      titleEn: "My Biology Summary Notes - Chapter 2",
-      titleAr: "ملخصاتي الشخصية في علم الأحياء - الفصل الثاني",
-      subject: "Science",
-      size: "1.2 MB",
-      format: "PDF",
-      downloads: "1",
-      isUserUpload: true
-    }
-  ]);
+  const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);

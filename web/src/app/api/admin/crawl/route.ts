@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     const initialLogs = [
       `[INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...`,
       `[INIT] 🌐 Target domain: ${targetUrl}`,
-      `[INIT] ⚙️ Parameters: Max Depth = ${maxDepth}`,
+      `[INIT] ⚙️ Parameters: Deep Recursive Search (No Depth Caps)`,
       `[INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution...`
     ];
 

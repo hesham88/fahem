@@ -116,6 +116,9 @@ const DEFAULT_DB: LocalDb = {
 };
 
 export function isLocalEnv(): boolean {
+  if (process.env.FORCE_REAL_DB === "true" || process.env.NEXT_PUBLIC_STAGING === "true" || process.env.STAGING === "true") {
+    return false; // Force staging/delivery database config, bypassing local fallbacks
+  }
   if (process.env.NODE_ENV === "production") {
     return false; // Staging & production are NEVER local envs
   }

@@ -559,7 +559,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             initial_logs = [
                 f"[INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...",
                 f"[INIT] 🌐 Target domain: {target_url}",
-                f"[INIT] ⚙️ Parameters: Max Depth = {max_depth}",
+                f"[INIT] ⚙️ Parameters: Deep Recursive Search (No Depth Caps)",
                 f"[INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution..."
             ]
             
@@ -608,8 +608,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     process = subprocess.Popen(
                         [python_path, script_path],
                         stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stdout=None,
+                        stderr=None,
                         text=True
                     )
                     process.stdin.write(json.dumps(payload))
