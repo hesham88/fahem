@@ -62,8 +62,9 @@ def get_gemini_embedding(text, api_key):
 def call_gemini_generate(prompt, api_key):
     if not api_key:
         return ""
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]
@@ -72,7 +73,7 @@ def call_gemini_generate(prompt, api_key):
                 "responseMimeType": "application/json" if "json" in prompt.lower() else "text/plain"
             }
         }
-        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=55)
         if res.status_code == 200:
             data = res.json()
             return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -142,40 +143,86 @@ Text sample to analyze:
 def format_page_with_gemini(raw_text, api_key):
     if not api_key:
         return {
-            "formatted_content": raw_text,
-            "title_en": "Page Content",
-            "title_ar": "محتوى الصفحة",
-            "concepts": [],
+            "contentAr": raw_text,
+            "contentEn": raw_text,
+            "formulas": [],
             "rules": [],
-            "formulas": []
+            "tipAr": "تلميح: راجع المفاهيم المذكورة في هذه الصفحة لترسيخ فهمك.",
+            "tipEn": "Tip: Review the concepts on this page to reinforce your understanding.",
+            "pageTopicAr": "الصفحة الحالية",
+            "pageTopicEn": "Active Page",
+            "chapterTitleAr": "عام",
+            "chapterTitleEn": "General"
         }
     prompt = f"""
-Analyze the following textbook page raw OCR/extracted text. Formulate it into a high-fidelity, elegant, and beautifully styled page using the rules below.
-1. Restructure the raw text into elegant markdown format. Keep the meaning and wording of the textbook exactly correct, but make the styling premium.
-2. Tag headers/footers if present using [HEADER: header content] and [FOOTER: footer content] at the very beginning and end of the output.
-3. Detect any key definitions, laws, or laws of physics/theorems, and wrap them in custom block tags:
-   - Rules/Laws/Definitions: Wrap inside markdown blockquotes or standard headings.
-   - Equations/Formulas: Keep them on separate lines and format clearly.
-4. Highlight extremely critical terms, keywords, or main takeaways using double equals sign: ==text to highlight==.
-5. If there is a table or raw list representing structured data, format it as a beautiful Markdown table.
-6. If there are illustrations, diagrams, charts, or diagrams mentioned in text, write a brief, high-fidelity visual description of what the visual represents and wrap it in [VISUAL: brief detailed description of the illustration].
-7. Provide a concise, clear title for this specific page in English (title_en) and Arabic (title_ar), representing the main subtopic of the page.
-8. Provide a list of 1 to 5 core concept keywords (concepts) discussed on this page.
-9. Extract a list of any distinct rule/definition texts (rules) and formulas/equations (formulas) found.
+You are an expert textbook structuring and academic layout engine. Your job is to convert raw, unformatted PDF page text into a beautiful, structurally annotated Markdown format that will look stunning when rendered on the client side.
 
-Output the result strictly as a JSON object, with no markdown wrapping or extra text.
-JSON structure:
+Input raw page text:
+\"\"\"
+{raw_text}
+\"\"\"
+
+Follow these requirements strictly to produce professional-grade, unified academic output:
+1. PARAGRAPH FLOW & LINE WRAPPING:
+   - PDFs extract text with artificial, broken line breaks inside sentences. You MUST clean up these line breaks and join the sentences so they flow continuously and read naturally. Reconstruct paragraphs cleanly.
+   - Do NOT keep raw PDF layout wraps. Join chopped sentences!
+
+2. MULTI-LINGUAL UNIFICATION:
+   - Identify the language of the input.
+   - If the input is English:
+     - "contentEn": Fully styled, layout-reconstructed Markdown in English.
+     - "contentAr": A professional, high-fidelity academic translation of the exact same content into Arabic.
+   - If the input is Arabic:
+     - "contentAr": Fully styled, layout-reconstructed Arabic Markdown.
+     - "contentEn": A professional, high-fidelity academic translation of the exact same content into English.
+   - IMPORTANT: Both "contentEn" and "contentAr" MUST have identical layout structure, heading hierarchies, lists, tables, and special card markers (mirrored in their respective languages). Translate all content inside, but preserve all structural tags!
+
+3. CARD AND BOX MARKERS (USE STRICT PREFIXES):
+   - Rules, Definitions, Laws, Theorems, or Principles: Put on their own line prefixed by its name and a colon, e.g., "Definition: content..." or "تعريف: محتوى..." or "Law: content..." or "قانون: محتوى...". The client-side renders these with beautiful golden borders and cards.
+   - Questions / Exercises / Practice Problems: Prefix them exactly as "Question: content..." or "سؤال: محتوى..." or "تمرين: محتوى...". The client-side renders these as active-recall question cards.
+   - Formulas / Equations: Prefix them exactly on their own line starting with "Equation: equation..." or "معادلة: معادلة...". E.g., "Equation: E = m * c^2" or "معادلة: y = m * x + b". Make sure mathematical expressions are well-spaced, highly readable, and on their own separate line.
+   - Code Blocks: If there is programming code (such as Python), format it inside clean Markdown code blocks with language specifiers and correct indentation:
+     ```python
+     # Python code here
+     ```
+     Ensure code blocks are completely clean and do not mix prose inside them.
+
+4. PAGE LAYOUT META-TAGS (HEADER, FOOTER, VISUALS):
+   - Headers: Add `[HEADER: Header content]` (such as Chapter or Subtopic Title) at the very beginning of both outputs.
+   - Footers: Add `[FOOTER: Footer content]` (such as "Curriculum Standards" or page notes) at the very end of both outputs.
+   - Visuals/Illustrations: If the raw text mentions diagrams, charts, graphs, figures, or illustrations, describe the visual content vividly and educationally inside a `[VISUAL: Detailed, premium description of the visual element]` block.
+
+5. RICH TEXT STYLING:
+   - Bold headers: Use `#`, `##`, `###`, `####` cleanly for outline hierarchies. Enforce standard, highly-organized markdown heading structures.
+   - Highlight keywords: Wrap critical academic terms, definitions, formulas, or concepts in double equals sign: ==highlighted term== (e.g., ==dynamic typing== or ==مفسر بايثون==). This highlights them beautifully in the page viewer.
+   - Lists: Use `-` or `*` or numbered lists for clean bullet points.
+   - Tables: Format tables or raw data grids as beautiful Markdown tables with headers (e.g. `| Header 1 | Header 2 |`).
+
+6. EXTRACTED DATA FIELDS:
+   - "formulas": An array of standalone math/physics equations or programming formulas found on this page (each formula as a clean string).
+   - "rules": An array of standalone theorems, definitions, concepts, or laws found on this page.
+   - "tipAr": A helpful, short Arabic study tip or active-recall cue for this page (1-2 sentences).
+   - "tipEn": A helpful, short English study tip or active-recall cue for this page (1-2 sentences).
+   - "pageTopicAr": A highly descriptive title or topic for THIS specific page in Arabic (e.g., "7.1 أساسيات الوحدات" or "مفهوم المصفوفات"). Do NOT repeat the general chapter title if a page-specific sub-topic is present. Max 5-7 words.
+   - "pageTopicEn": A highly descriptive title or topic for THIS specific page in English (e.g., "7.1 Module Basics" or "Concept of Matrices"). Do NOT repeat the general chapter title if a page-specific sub-topic is present. Max 5-7 words.
+   - "chapterTitleAr": The unit or chapter title this page belongs to (in Arabic). If not found, use a reasonable general title.
+   - "chapterTitleEn": The unit or chapter title this page belongs to (in English). If not found, use a reasonable general title.
+
+Output a strictly formatted JSON object with the following fields:
 {{
-  "formatted_content": "the fully styled markdown content of the page",
-  "title_en": "English Subtopic Title of this page",
-  "title_ar": "عنوان الفرعي للصفحة بالعربية",
-  "concepts": ["concept1", "concept2"],
-  "rules": ["extracted rule text 1", "extracted rule text 2"],
-  "formulas": ["extracted formula 1", "extracted formula 2"]
+  "contentAr": "string",
+  "contentEn": "string",
+  "formulas": ["string"],
+  "rules": ["string"],
+  "tipAr": "string",
+  "tipEn": "string",
+  "pageTopicAr": "string",
+  "pageTopicEn": "string",
+  "chapterTitleAr": "string",
+  "chapterTitleEn": "string"
 }}
 
-Raw text page content to process:
-{raw_text}
+Respond with the JSON object ONLY. Do NOT wrap it in any markdown backticks. Ensure it is completely valid JSON, escaping all quotes and backslashes properly inside string values.
 """
     try:
         response_text = call_gemini_generate(prompt, api_key)
@@ -192,22 +239,30 @@ Raw text page content to process:
         
         parsed = json.loads(cleaned_text)
         return {
-            "formatted_content": parsed.get("formatted_content", raw_text),
-            "title_en": parsed.get("title_en", "Page Content"),
-            "title_ar": parsed.get("title_ar", "محتوى الصفحة"),
-            "concepts": parsed.get("concepts", []),
+            "contentAr": parsed.get("contentAr", raw_text),
+            "contentEn": parsed.get("contentEn", raw_text),
+            "formulas": parsed.get("formulas", []),
             "rules": parsed.get("rules", []),
-            "formulas": parsed.get("formulas", [])
+            "tipAr": parsed.get("tipAr", "تلميح: راجع المفاهيم المذكورة في هذه الصفحة لترسيخ فهمك."),
+            "tipEn": parsed.get("tipEn", "Tip: Review the concepts on this page to reinforce your understanding."),
+            "pageTopicAr": parsed.get("pageTopicAr", ""),
+            "pageTopicEn": parsed.get("pageTopicEn", ""),
+            "chapterTitleAr": parsed.get("chapterTitleAr", ""),
+            "chapterTitleEn": parsed.get("chapterTitleEn", "")
         }
     except Exception as e:
         print(f"[format_page_with_gemini Exception] {e}. Falling back to default format.", file=sys.stderr)
         return {
-            "formatted_content": raw_text,
-            "title_en": "Page Content",
-            "title_ar": "محتوى الصفحة",
-            "concepts": [],
+            "contentAr": raw_text,
+            "contentEn": raw_text,
+            "formulas": [],
             "rules": [],
-            "formulas": []
+            "tipAr": "تلميح: راجع المفاهيم المذكورة في هذه الصفحة لترسيخ فهمك.",
+            "tipEn": "Tip: Review the concepts on this page to reinforce your understanding.",
+            "pageTopicAr": "",
+            "pageTopicEn": "",
+            "chapterTitleAr": "",
+            "chapterTitleEn": ""
         }
 
 def get_fallback_embedding(text):
@@ -692,15 +747,28 @@ def main():
             title_en = f"Topic of Page {page_num}"
             title_ar = f"موضوع الصفحة {page_num}"
             concepts_found = []
-            formatted_text = text
+            content_ar = text
+            content_en = text
+            tip_ar = "تلميح: راجع المفاهيم المذكورة في هذه الصفحة لترسيخ فهمك."
+            tip_en = "Tip: Review the concepts on this page to reinforce your understanding."
             
             if api_key:
                 try:
                     formatted_res = format_page_with_gemini(text, api_key)
-                    formatted_text = formatted_res.get("formatted_content", text)
-                    title_en = formatted_res.get("title_en", title_en)
-                    title_ar = formatted_res.get("title_ar", title_ar)
-                    concepts_found = formatted_res.get("concepts", [])
+                    content_ar = formatted_res.get("contentAr", text)
+                    content_en = formatted_res.get("contentEn", text)
+                    tip_ar = formatted_res.get("tipAr", tip_ar)
+                    tip_en = formatted_res.get("tipEn", tip_en)
+                    
+                    if formatted_res.get("pageTopicEn"):
+                        title_en = formatted_res["pageTopicEn"]
+                    elif formatted_res.get("chapterTitleEn"):
+                        title_en = formatted_res["chapterTitleEn"]
+                        
+                    if formatted_res.get("pageTopicAr"):
+                        title_ar = formatted_res["pageTopicAr"]
+                    elif formatted_res.get("chapterTitleAr"):
+                        title_ar = formatted_res["chapterTitleAr"]
                     
                     # Merge rules & formulas
                     if formatted_res.get("rules"):
@@ -722,13 +790,15 @@ def main():
                     break
 
             # Embed content
-            embedding = get_gemini_embedding(formatted_text, api_key)
+            embedding = get_gemini_embedding(content_ar if language == "ar" else content_en, api_key)
             
             page_doc = {
                 "_id": f"page_{book_id}_{page_num}",
                 "book_id": book_id,
                 "page_number": page_num,
-                "content": formatted_text,
+                "content": text,
+                "contentAr": content_ar,
+                "contentEn": content_en,
                 "embedding": embedding,
                 "rules": rules_found,
                 "formulas": formulas_found,
@@ -738,7 +808,9 @@ def main():
                 "chapterId": page_ch_id,
                 "titleEn": title_en,
                 "titleAr": title_ar,
-                "concepts": concepts_found
+                "concepts": concepts_found,
+                "tipAr": tip_ar,
+                "tipEn": tip_en
             }
 
             # Increment progress smoothly

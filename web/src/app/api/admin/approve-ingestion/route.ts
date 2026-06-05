@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
             is_local: true
           };
 
-          const child = spawn(pythonPath, [scriptPath]);
+          const child = spawn(pythonPath, [scriptPath], { env: process.env });
           child.stdin.write(JSON.stringify(payload));
           child.stdin.end();
 

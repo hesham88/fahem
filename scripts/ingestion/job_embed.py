@@ -89,28 +89,49 @@ Input raw page text:
 {text}
 \"\"\"
 
-Follow these requirements strictly:
-1. Identify the language of the input. If it is English, output both:
-   - "contentEn": Elegant, layout-preserved Markdown text in English.
-   - "contentAr": A professional academic translation of the page into Arabic.
-   If the input is Arabic, output both:
-   - "contentAr": Elegant, layout-preserved Arabic Markdown text.
-   - "contentEn": A professional academic translation of the page into English.
-   
-2. Format the "contentAr" and "contentEn" using these Markdown-based formatting patterns:
-   - Headings: Use `#`, `##`, `###`, `####` for headings.
-   - Rules, Definitions, Laws, Theorems, or Principles: Put each on its own line prefixed by its name and a colon, e.g., "Definition: content..." or "تعريف : محتوى..." or "Law: content..." or "قانون : محتوى...". The client-side renders these with beautiful golden borders and cards.
-   - Questions / Exercises: Prefix them like "Question: content..." or "Q: content..." or "سؤال : محتوى..." or "تمرين : محتوى...". The client-side renders these as active-recall question cards.
-   - Formulas / Equations: Format mathematical or physics equations on their own line starting with variables and '='. E.g. "E = m * c^2" or "y = m * x + b". Keep them on a single clean line.
-   - Bullet lists: Use `-` or `*` for clean lists.
-   - Subtitles: Short lines ending with a colon `:` or wrapped in bold `**bold**`.
-   - Code Blocks: If there is programming code (such as Python), make sure to format it as a code block. Keep correct indentation.
+Follow these requirements strictly to produce professional-grade, unified academic output:
+1. PARAGRAPH FLOW & LINE WRAPPING:
+   - PDFs extract text with artificial, broken line breaks inside sentences. You MUST clean up these line breaks and join the sentences so they flow continuously and read naturally. Reconstruct paragraphs cleanly.
+   - Do NOT keep raw PDF layout wraps. Join chopped sentences!
 
-3. Extract:
-   - "formulas": An array of standalone strings containing math/physics equations or programming formulas found on this page.
-   - "rules": An array of standalone string rules, concepts, theorems, or laws found on this page.
-   - "tipAr": A helpful, short Arabic active-recall study tip for this page (1-2 sentences).
-   - "tipEn": A helpful, short English active-recall study tip for this page (1-2 sentences).
+2. MULTI-LINGUAL UNIFICATION:
+   - Identify the language of the input.
+   - If the input is English:
+     - "contentEn": Fully styled, layout-reconstructed Markdown in English.
+     - "contentAr": A professional, high-fidelity academic translation of the exact same content into Arabic.
+   - If the input is Arabic:
+     - "contentAr": Fully styled, layout-reconstructed Arabic Markdown.
+     - "contentEn": A professional, high-fidelity academic translation of the exact same content into English.
+   - IMPORTANT: Both "contentEn" and "contentAr" MUST have identical layout structure, heading hierarchies, lists, tables, and special card markers (mirrored in their respective languages). Translate all content inside, but preserve all structural tags!
+
+3. CARD AND BOX MARKERS (USE STRICT PREFIXES):
+   - Rules, Definitions, Laws, Theorems, or Principles: Put on their own line prefixed by its name and a colon, e.g., "Definition: content..." or "تعريف: محتوى..." or "Law: content..." or "قانون: محتوى...". The client-side renders these with beautiful golden borders and cards.
+   - Questions / Exercises / Practice Problems: Prefix them exactly as "Question: content..." or "سؤال: محتوى..." or "تمرين: محتوى...". The client-side renders these as active-recall question cards.
+   - Formulas / Equations: Prefix them exactly on their own line starting with "Equation: equation..." or "معادلة: معادلة...". E.g., "Equation: E = m * c^2" or "معادلة: y = m * x + b". Make sure mathematical expressions are well-spaced, highly readable, and on their own separate line.
+   - Code Blocks: If there is programming code (such as Python), format it inside clean Markdown code blocks with language specifiers and correct indentation:
+     ```python
+     # Python code here
+     ```
+     Ensure code blocks are completely clean and do not mix prose inside them.
+
+4. PAGE LAYOUT META-TAGS (HEADER, FOOTER, VISUALS):
+   - Headers: Add `[HEADER: Header content]` (such as Chapter or Subtopic Title) at the very beginning of both outputs.
+   - Footers: Add `[FOOTER: Footer content]` (such as "Curriculum Standards" or page notes) at the very end of both outputs.
+   - Visuals/Illustrations: If the raw text mentions diagrams, charts, graphs, figures, or illustrations, describe the visual content vividly and educationally inside a `[VISUAL: Detailed, premium description of the visual element]` block.
+
+5. RICH TEXT STYLING:
+   - Bold headers: Use `#`, `##`, `###`, `####` cleanly for outline hierarchies. Enforce standard, highly-organized markdown heading structures.
+   - Highlight keywords: Wrap critical academic terms, definitions, formulas, or concepts in double equals sign: ==highlighted term== (e.g., ==dynamic typing== or ==مفسر بايثون==). This highlights them beautifully in the page viewer.
+   - Lists: Use `-` or `*` or numbered lists for clean bullet points.
+   - Tables: Format tables or raw data grids as beautiful Markdown tables with headers (e.g. `| Header 1 | Header 2 |`).
+
+6. EXTRACTED DATA FIELDS:
+   - "formulas": An array of standalone math/physics equations or programming formulas found on this page (each formula as a clean string).
+   - "rules": An array of standalone theorems, definitions, concepts, or laws found on this page.
+   - "tipAr": A helpful, short Arabic study tip or active-recall cue for this page (1-2 sentences).
+   - "tipEn": A helpful, short English study tip or active-recall cue for this page (1-2 sentences).
+   - "pageTopicAr": A highly descriptive title or topic for THIS specific page in Arabic (e.g., "7.1 أساسيات الوحدات" or "مفهوم المصفوفات"). Do NOT repeat the general chapter title if a page-specific sub-topic is present. Max 5-7 words.
+   - "pageTopicEn": A highly descriptive title or topic for THIS specific page in English (e.g., "7.1 Module Basics" or "Concept of Matrices"). Do NOT repeat the general chapter title if a page-specific sub-topic is present. Max 5-7 words.
    - "chapterTitleAr": The unit or chapter title this page belongs to (in Arabic). If not found, use a reasonable general title.
    - "chapterTitleEn": The unit or chapter title this page belongs to (in English). If not found, use a reasonable general title.
 
@@ -122,11 +143,13 @@ Output a strictly formatted JSON object with the following fields:
   "rules": ["string"],
   "tipAr": "string",
   "tipEn": "string",
+  "pageTopicAr": "string",
+  "pageTopicEn": "string",
   "chapterTitleAr": "string",
   "chapterTitleEn": "string"
 }}
 
-Respond with the JSON object ONLY. Do NOT wrap it in any markdown backticks (such as ```json). Ensure it is completely valid JSON.
+Respond with the JSON object ONLY. Do NOT wrap it in any markdown backticks. Ensure it is completely valid JSON, escaping all quotes and backslashes properly inside string values.
 """
 
         payload = {
@@ -254,6 +277,8 @@ def process_single_page(chunk, idx, book_id, api_key, model, payload, is_book_ar
         "tipEn": annotation.get("tipEn", ""),
         "chapterTitleAr": annotation.get("chapterTitleAr", "عام"),
         "chapterTitleEn": annotation.get("chapterTitleEn", "General"),
+        "titleEn": annotation.get("pageTopicEn") or annotation.get("chapterTitleEn") or f"Topic of Page {page_num}",
+        "titleAr": annotation.get("pageTopicAr") or annotation.get("chapterTitleAr") or f"موضوع الصفحة {page_num}",
         "embedding": embedding,
         "userId": payload.get("userId")
     }

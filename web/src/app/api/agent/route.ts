@@ -454,7 +454,7 @@ export async function POST(req: NextRequest) {
                 is_local: isLocalEnv()
               };
 
-              const child = spawn(pythonPath, [scriptPath]);
+              const child = spawn(pythonPath, [scriptPath], { env: process.env });
               global.activeBookJobs?.set(bookId, child);
 
               child.stdin.write(JSON.stringify(payload));

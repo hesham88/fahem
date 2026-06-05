@@ -821,8 +821,8 @@ export default function Home() {
         return {
           pageNum: pageNum,
           page_number: pageNum,
-          titleEn: p.titleEn || `Page ${pageNum}`,
-          titleAr: p.titleAr || `الصفحة ${pageNum}`,
+          titleEn: p.titleEn || p.pageTopicEn || p.pageTopicAr || p.chapterTitleEn || `Page ${pageNum}`,
+          titleAr: p.titleAr || p.pageTopicAr || p.pageTopicEn || p.chapterTitleAr || `القسم ${pageNum}`,
           contentEn: p.contentEn || (isAr ? "" : p.content) || p.content || "",
           contentAr: p.contentAr || (isAr ? p.content : "") || p.content || "",
           formulas: p.formulas || [],

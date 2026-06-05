@@ -148,147 +148,28 @@ const getSubjectNameLabel = (subject: string, language: string) => {
   return isAr ? "مادة عامة" : "General Subject";
 };
 
-const isLineMathFormula = (line: string): boolean => {
-  const mathIndicators = ["=", "≠", "≈", "≤", "≥", "±", "×", "÷", "√", "∫", "∑", "matrix", "det", "sin", "cos", "tan", "θ", "π", "λ", "α", "β", "γ"];
-  if (line.length > 120) return false;
-  
-  const indicatorCount = mathIndicators.filter(ind => line.includes(ind)).length;
-  if (indicatorCount >= 2) return true;
-  return false;
+const preprocessRawText = (text: string, isAr: boolean): string => {
+  return text || "";
 };
 
-const preprocessRawText = (text: string, isAr: boolean): string => {
-  if (!text) return "";
+const isLineMathFormula = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
   
-  const hasMarkup = text.includes("[HEADER:") || text.includes("```") || text.includes("# ") || text.includes("[VISUAL:") || text.includes("[FOOTER:");
-  if (hasMarkup) return text; // Already formatted, no need to touch it!
+  // If it starts with math formula indicators or LaTeX wrappers
+  if (trimmed.startsWith("$$") || trimmed.endsWith("$$")) return true;
+  if (trimmed.includes("\\") && (trimmed.includes("frac") || trimmed.includes("sqrt") || trimmed.includes("sum") || trimmed.includes("int") || trimmed.includes("alpha") || trimmed.includes("beta") || trimmed.includes("theta") || trimmed.includes("pi"))) return true;
   
-  const lines = text.split("\n");
-  const processedLines: string[] = [];
-  
-  let inCodeBlock = false;
-  let codeBlockLines: string[] = [];
-  
-  // Helper to check if line looks like code
-  const isCodeLine = (line: string): boolean => {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
-    
-    // Python repl prompts
-    if (trimmed.startsWith(">>>") || trimmed.startsWith("...")) return true;
-    
-    // Keywords at start
-    if (/^(def|class|import|from|print|assert|return|pass|break|continue|if|elif|else|while|for|try|except|finally|with|as|lambda|global|nonlocal|yield)\b/.test(trimmed)) {
-      return true;
-    }
-    
-    // Indented line (starts with 4+ spaces) and is preceded/succeeded by code
-    if (line.startsWith("    ") || line.startsWith("\t")) {
-      // Avoid falsely tagging list items or ordinary text paragraphs
-      if (trimmed.length > 0 && !trimmed.startsWith("-") && !trimmed.startsWith("*") && !trimmed.startsWith("•") && !/^\d+[\.\-\)]/.test(trimmed)) {
-        return true;
-      }
-    }
-    
-    // Variable assignments or function calls with python patterns
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^=]/.test(trimmed) && (trimmed.includes("(") || trimmed.includes("[") || trimmed.includes("{") || trimmed.includes("\"") || trimmed.includes("'") || /^[0-9\s]+$/.test(trimmed.split("=")[1].trim()))) {
-      return true;
-    }
-    
-    // Common Python method calls or object creations
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\(/.test(trimmed)) {
-      return true;
-    }
-    
-    return false;
-  };
-
-  const isMathFormula = (line: string): boolean => {
-    const mathIndicators = ["=", "≠", "≈", "≤", "≥", "±", "×", "÷", "√", "∫", "∑", "matrix", "det", "sin", "cos", "tan", "θ", "π", "λ", "α", "β", "γ"];
-    if (line.length > 120) return false;
-    const indicatorCount = mathIndicators.filter(ind => line.includes(ind)).length;
-    // Don't classify code lines or list items or urls as math formulas
-    if (isCodeLine(line) || line.trim().startsWith("-") || line.trim().startsWith("*") || line.trim().includes("http") || line.trim().startsWith("•")) {
-      return false;
-    }
-    return indicatorCount >= 2;
-  };
-
-  for (let idx = 0; idx < lines.length; idx++) {
-    const line = lines[idx];
-    const trimmed = line.trim();
-    
-    if (isCodeLine(line)) {
-      if (!inCodeBlock) {
-        inCodeBlock = true;
-        codeBlockLines = [];
-      }
-      // Remove >>> prompt for cleaner execution look
-      let codeVal = line;
-      if (trimmed.startsWith(">>> ")) {
-        codeVal = line.replace(">>> ", "");
-      } else if (trimmed.startsWith(">>>")) {
-        codeVal = line.replace(">>>", "");
-      }
-      codeBlockLines.push(codeVal);
-    } else {
-      if (inCodeBlock) {
-        inCodeBlock = false;
-        processedLines.push("```python");
-        processedLines.push(...codeBlockLines);
-        processedLines.push("```");
-        codeBlockLines = [];
-      }
-      
-      if (!trimmed) {
-        processedLines.push("");
-        continue;
-      }
-      
-      // 1. Detect section headers, e.g. "9.1 Modifying lists" or "Chapter 9 Lists"
-      const chHeaderMatchEn = trimmed.match(/^Chapter\s+(\d+)\s*[:-]?\s*(.+)$/i) || trimmed.match(/^(\d+)\s*•\s*([A-Za-z ]{3,})/);
-      const secHeaderMatchEn = trimmed.match(/^(\d+)\.(\d+)\s+([A-Za-z ]{3,})/);
-      const chHeaderMatchAr = trimmed.match(/^(الفصل|القسم)\s+(\d+)\s*[:-]?\s*(.+)$/i);
-      
-      if (chHeaderMatchEn) {
-        const num = chHeaderMatchEn[1];
-        const title = chHeaderMatchEn[2];
-        processedLines.push(`# Chapter ${num}: ${title}`);
-      } else if (secHeaderMatchEn) {
-        processedLines.push(`## ${trimmed}`);
-      } else if (chHeaderMatchAr) {
-        const type = chHeaderMatchAr[1];
-        const num = chHeaderMatchAr[2];
-        const title = chHeaderMatchAr[3];
-        processedLines.push(`# ${type} ${num}: ${title}`);
-      }
-      // 2. Detect definitions
-      // For example, if a line starts with "An append() operation is used to..." or "A list is a sequence..."
-      // Or in Arabic: "يستخدم التابع ... لـ" or "القائمة هي عبارة عن..."
-      else if (/^(A|An|The)\s+([a-zA-Z0-9_\(\)]+)\s+is\s+(defined as|used to|a method|an operation|an object|a data structure|a sequence)\b/i.test(trimmed)) {
-        processedLines.push(`Definition: ${trimmed}`);
-      }
-      else if (/^(عبارة عن|تُعرف|يُعرف|يستخدم|التابع)\s+([\u0600-\u06FF]+)/i.test(trimmed)) {
-        processedLines.push(`Definition: ${trimmed}`);
-      }
-      // 3. Detect mathematical equations
-      else if (isMathFormula(line)) {
-        processedLines.push(`Equation: ${trimmed}`);
-      }
-      // Otherwise, keep as ordinary line
-      else {
-        processedLines.push(line);
-      }
-    }
+  // If it's short and contains an equals sign and some math operators/digits
+  if (trimmed.length < 60 && (trimmed.includes("=") || trimmed.includes("≠") || trimmed.includes("≈") || trimmed.includes("≤") || trimmed.includes("≥"))) {
+    const mathRegex = /[=+\-*/^\\(){}[\]_]|\d+/g;
+    const lettersRegex = /[a-zA-Z\u0620-\u064A]/g;
+    const mathCount = (trimmed.match(mathRegex) || []).length;
+    const letterCount = (trimmed.match(lettersRegex) || []).length;
+    if (mathCount > letterCount && mathCount > 0) return true;
   }
   
-  if (inCodeBlock) {
-    processedLines.push("```python");
-    processedLines.push(...codeBlockLines);
-    processedLines.push("```");
-  }
-  
-  return processedLines.join("\n");
+  return false;
 };
 
 const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | null => {
@@ -984,16 +865,12 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [rejectedInfo, setRejectedInfo] = useState<any>(null);
   const [activeLibraryTab, setActiveLibraryTab] = useState<"curriculum" | "private">("curriculum");
 
-  const [translationLanguage, setTranslationLanguage] = useState("");
-  const [translatedTitle, setTranslatedTitle] = useState("");
-  const [translatedText, setTranslatedText] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationLanguage, setTranslationLanguage] = useState(language || "en");
 
   const [showReaderSidebar, setShowReaderSidebar] = useState(true);
   const [sidebarPageSearch, setSidebarPageSearch] = useState("");
 
   // New states for hierarchical menu, library selection, and Swarm SVG Mind Map
-  const [showMindMap, setShowMindMap] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "hierarchy">("pages");
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
   const [hoveredNode, setHoveredNode] = useState<any | null>(null);
@@ -1014,77 +891,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     return "general";
   };
 
-  const buildBookMindMapData = (allPages: any[]) => {
-    const chaptersMap: Record<string, { titleEn: string; titleAr: string; pages: any[] }> = {};
-    
-    allPages.forEach((p) => {
-      const chEn = p.chapterTitleEn || p.chapterTitleAr || "Chapter";
-      const chAr = p.chapterTitleAr || p.chapterTitleEn || "الفصل";
-      const key = chEn + "___" + chAr;
-      
-      if (!chaptersMap[key]) {
-        chaptersMap[key] = {
-          titleEn: chEn,
-          titleAr: chAr,
-          pages: []
-        };
-      }
-      chaptersMap[key].pages.push(p);
-    });
-    
-    return Object.values(chaptersMap);
-  };
 
   const getLocalizedSubject = (subject: string | undefined, lang: string) => {
     return getSubjectNameLabel(subject || "", lang);
   };
 
   useEffect(() => {
-    setTranslationLanguage("");
-    setTranslatedTitle("");
-    setTranslatedText("");
-  }, [readerCurrentPage, selectedBookReader]);
-
-  const handlePageTranslation = async (targetLang: string, activePage: any) => {
-    if (!targetLang) {
-      setTranslationLanguage("");
-      setTranslatedTitle("");
-      setTranslatedText("");
-      return;
-    }
-
-    setTranslationLanguage(targetLang);
-    setIsTranslating(true);
-
-    const activeTitle = language === "ar" ? (activePage.titleAr || activePage.titleEn) : (activePage.titleEn || activePage.titleAr);
-    const activeContent = language === "ar" ? activePage.contentAr : activePage.contentEn;
-
-    try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: activeTitle,
-          text: activeContent,
-          targetLanguage: targetLang
-        })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setTranslatedTitle(data.translatedTitle);
-        setTranslatedText(data.translatedText);
-      } else {
-        alert(language === "ar" ? "فشلت الترجمة، يرجى المحاولة مرة أخرى." : "Translation failed, please try again.");
-        setTranslationLanguage("");
-      }
-    } catch (err) {
-      console.error("Translation error:", err);
-      alert(language === "ar" ? "حدث خطأ أثناء الاتصال بخدمة الترجمة." : "An error occurred while connecting to the translation service.");
-      setTranslationLanguage("");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
+    setTranslationLanguage(language || "en");
+  }, [readerCurrentPage, selectedBookReader, language]);
 
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
@@ -1296,22 +1110,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   📖 {language === "ar" ? "فهرس الكتاب" : "Table of Contents"}
                 </button>
 
-                {/* Book Conceptual Outline Toggle */}
-                <button
-                  onClick={() => setShowMindMap(!showMindMap)}
-                  style={{
-                    padding: "6px 14px", borderRadius: "20px",
-                    border: "1px solid rgba(212, 175, 55, 0.25)",
-                    background: showMindMap ? "linear-gradient(135deg, #d4af37, #b45309)" : "#ffffff",
-                    color: showMindMap ? "#ffffff" : "#b45309",
-                    fontWeight: 800, fontSize: "0.8rem",
-                    cursor: "pointer", transition: "all 0.2s",
-                    boxShadow: showMindMap ? "0 4px 12px rgba(212, 175, 55, 0.15)" : "none"
-                  }}
-                >
-                  🧠 {language === "ar" ? "خريطة المفاهيم" : "Mind Map"}
-                </button>
-
                 {/* Localized Subject Badge */}
                 {(() => {
                   const rTheme = getSubjectTheme(selectedBookReader.subject || "");
@@ -1335,9 +1133,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {/* Reader Split Panels */}
             <div style={{
               display: "grid",
-              gridTemplateColumns: showReaderSidebar 
-                ? (showMindMap ? "300px 380px 1fr" : "280px 1fr") 
-                : (showMindMap ? "380px 1fr" : "1fr"),
+              gridTemplateColumns: showReaderSidebar ? "280px 1fr" : "1fr",
               gap: "1.5rem",
               alignItems: "start"
             }} className="reader-split-panels">
@@ -1412,9 +1208,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                           {filteredPages.map((p) => {
                             const isActive = p.pageNum === readerCurrentPage;
-                            const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                            const pAr = isTextArabic(pTitle);
-                            const pContent = language === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
+                            const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
+                            const pAr = translationLanguage === "ar";
+                            const pContent = translationLanguage === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
                             const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
 
                             return (
@@ -1489,360 +1285,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 </div>
               )}
 
-              {/* Expandable Conceptual Outline List Panel */}
-              {showMindMap && (
-                <div style={{
-                  background: "rgba(255, 255, 255, 0.8)",
-                  backdropFilter: "blur(14px)",
-                  border: "1px solid rgba(16, 107, 163, 0.12)",
-                  borderRadius: "20px",
-                  padding: "1.5rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.25rem",
-                  maxHeight: "650px",
-                  boxShadow: "0 12px 40px rgba(16, 107, 163, 0.04)",
-                  overflowY: "auto",
-                  position: "relative"
-                }}>
-                  {(() => {
-                    const chapters = buildBookMindMapData(allPages);
 
-                    // Helper to resolve concepts for a page
-                    const getPageConcepts = (p: any): string[] => {
-                      if (p.concepts && Array.isArray(p.concepts) && p.concepts.length > 0) {
-                        return p.concepts;
-                      }
-                      if (p.originalPage?.concepts && Array.isArray(p.originalPage.concepts) && p.originalPage.concepts.length > 0) {
-                        return p.originalPage.concepts;
-                      }
-                      
-                      if (selectedBookReader && Array.isArray(selectedBookReader.chapters)) {
-                        const ch = selectedBookReader.chapters.find((c: any) => {
-                          const cTitleEn = (c.title || "").toLowerCase();
-                          const cTitleAr = (c.title_ar || c.titleAr || "").toLowerCase();
-                          const pChEn = (p.chapterTitleEn || "").toLowerCase();
-                          const pChAr = (p.chapterTitleAr || "").toLowerCase();
-                          
-                          return (
-                            (cTitleEn && pChEn && cTitleEn === pChEn) ||
-                            (cTitleAr && pChAr && cTitleAr === pChAr) ||
-                            (cTitleEn && pChAr && cTitleEn === pChAr) ||
-                            (cTitleAr && pChEn && cTitleAr === pChEn) ||
-                            (p.pageNum >= c.page_start && p.pageNum <= c.page_end)
-                          );
-                        });
-                        if (ch && ch.concepts) {
-                          if (Array.isArray(ch.concepts)) return ch.concepts;
-                          if (typeof ch.concepts === "string") {
-                            return (ch.concepts as string).split(",").map(s => s.trim()).filter(Boolean);
-                          }
-                        }
-                      }
-
-                      const fallbackConcepts: string[] = [];
-                      if (p.formulas && p.formulas.length > 0) {
-                        p.formulas.forEach((f: string) => {
-                          const parts = f.split(":");
-                          const label = parts[0]?.trim();
-                          if (label && label.length < 25) {
-                            fallbackConcepts.push(label);
-                          }
-                        });
-                      }
-
-                      if (fallbackConcepts.length === 0) {
-                        const title = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                        if (title && !title.startsWith("Page") && !title.startsWith("الصفحة")) {
-                          fallbackConcepts.push(title);
-                        } else {
-                          fallbackConcepts.push(language === "ar" ? "شرح وتطبيق" : "Detailed Concept");
-                          fallbackConcepts.push(language === "ar" ? "مراجعة وأسئلة" : "Interactive Review");
-                        }
-                      }
-
-                      return fallbackConcepts;
-                    };
-
-                    return (
-                      <>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed rgba(16, 107, 163, 0.1)", paddingBottom: "0.75rem", marginBottom: "0.25rem" }}>
-                          <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            🧠 {language === "ar" ? "خريطة المفاهيم" : "Mind Map"}
-                          </h3>
-                          <span style={{ fontSize: "0.75rem", background: "rgba(16, 107, 163, 0.08)", color: "var(--primary)", padding: "3px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                            {language === "ar" ? `${chapters.length} فصول` : `${chapters.length} Chapters`}
-                          </span>
-                        </div>
-
-                        <p style={{ margin: 0, fontSize: "0.78rem", color: "#6a7c88", fontStyle: "italic", lineHeight: "1.4" }}>
-                          {language === "ar" 
-                            ? "اضغط على فصول الكتاب لتوسيعها، واكتشف المفاهيم والموضوعات الرئيسية المربوطة بكل صفحة. اضغط على أي صفحة للانتقال السريع لها." 
-                            : "Click chapters to expand and view pages. Explore high-density concept tags assigned to each page, and click any card to navigate instantly."}
-                        </p>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                          {chapters.map((ch, idx) => {
-                            const chTitle = language === "ar" ? (ch.titleAr || ch.titleEn) : (ch.titleEn || ch.titleAr);
-                            const isExpanded = expandedChapters[ch.titleEn] !== false; // expanded by default
-                            const isAr = isTextArabic(chTitle);
-                            
-                            return (
-                              <div key={idx} style={{
-                                background: "rgba(255, 255, 255, 0.45)",
-                                border: "1px solid rgba(16, 107, 163, 0.08)",
-                                borderRadius: "14px",
-                                padding: "0.4rem",
-                                transition: "all 0.3s ease",
-                                boxShadow: "0 4px 12px rgba(16, 107, 163, 0.01)"
-                              }}>
-                                {/* Chapter Row Header */}
-                                <button
-                                  onClick={() => setExpandedChapters(prev => ({ ...prev, [ch.titleEn]: !isExpanded }))}
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    width: "100%",
-                                    padding: "10px 14px",
-                                    borderRadius: "10px",
-                                    border: "none",
-                                    background: "rgba(16, 107, 163, 0.03)",
-                                    cursor: "pointer",
-                                    textAlign: isAr ? "right" : "left",
-                                    direction: isAr ? "rtl" : "ltr",
-                                    transition: "all 0.2s"
-                                  }}
-                                  onMouseOver={(e) => {
-                                    e.currentTarget.style.background = "rgba(16, 107, 163, 0.06)";
-                                  }}
-                                  onMouseOut={(e) => {
-                                    e.currentTarget.style.background = "rgba(16, 107, 163, 0.03)";
-                                  }}
-                                >
-                                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <span style={{ fontSize: "1.05rem" }}>📁</span>
-                                    <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                                      {chTitle}
-                                    </span>
-                                  </div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <span style={{
-                                      fontSize: "0.68rem",
-                                      background: "rgba(16, 107, 163, 0.06)",
-                                      color: "var(--primary)",
-                                      padding: "1px 6px",
-                                      borderRadius: "8px",
-                                      fontWeight: 700
-                                    }}>
-                                      {ch.pages.length} {language === "ar" ? "صفحات" : "Pages"}
-                                    </span>
-                                    <span style={{ fontSize: "0.7rem", color: "var(--primary)", opacity: 0.7 }}>
-                                      {isExpanded ? "▼" : "◀"}
-                                    </span>
-                                  </div>
-                                </button>
-
-                                {/* Multi-level outline: Chapters -> Titles Inside Chapter -> Concepts under Title -> Pages */}
-                                {isExpanded && (
-                                  <div style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "0.8rem",
-                                    marginTop: "0.6rem",
-                                    padding: "0.4rem 0.6rem",
-                                    borderLeft: isAr ? "none" : "2px dashed rgba(16, 107, 163, 0.08)",
-                                    borderRight: isAr ? "2px dashed rgba(16, 107, 163, 0.08)" : "none"
-                                  }}>
-                                    {(() => {
-                                      const subTopicsMap: Record<string, { title: string; pages: any[]; concepts: string[] }> = {};
-                                      ch.pages.forEach((p: any) => {
-                                        let cleanTitle = "";
-                                        const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                                        
-                                        // Detect if a title is generic (e.g., purely Page X or purely numbers)
-                                        const isGeneric = !pTitle || 
-                                           !!pTitle.match(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\s*\d+$/i) ||
-                                          !!pTitle.match(/^[\d\.\-\s]+$/) ||
-                                          pTitle.length < 3;
-
-                                        // 1. If page has a real descriptive title (not Page X, Section X etc.) and is not generic
-                                        if (pTitle && !isGeneric) {
-                                          cleanTitle = pTitle.replace(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\s+[\d\.]+\s*[:\-]?\s*/i, "").trim();
-                                        }
-                                        
-                                        // 2. Fallback: use first concept tag as the topic title
-                                        if (!cleanTitle) {
-                                          const pConcepts = getPageConcepts(p);
-                                          if (pConcepts && pConcepts.length > 0) {
-                                            cleanTitle = pConcepts[0];
-                                          }
-                                        }
-                                        
-                                        // 3. Fallback: use first formula label as the topic title
-                                        if (!cleanTitle && p.formulas && p.formulas.length > 0) {
-                                          const firstForm = p.formulas[0];
-                                          const parts = firstForm.split(":");
-                                          if (parts[0] && parts[0].length < 30) {
-                                            cleanTitle = parts[0].trim();
-                                          }
-                                        }
-                                        
-                                        // 4. Ultimate fallback
-                                        if (!cleanTitle) {
-                                          cleanTitle = language === "ar" ? `موضوع الصفحة ${p.pageNum}` : `Topic of Page ${p.pageNum}`;
-                                        }
-
-                                        if (!subTopicsMap[cleanTitle]) {
-                                          subTopicsMap[cleanTitle] = {
-                                            title: cleanTitle,
-                                            pages: [],
-                                            concepts: []
-                                          };
-                                        }
-                                        subTopicsMap[cleanTitle].pages.push(p);
-                                        
-                                        const pConcepts = getPageConcepts(p);
-                                        pConcepts.forEach((c: string) => {
-                                          if (!subTopicsMap[cleanTitle].concepts.includes(c)) {
-                                            subTopicsMap[cleanTitle].concepts.push(c);
-                                          }
-                                        });
-                                      });
-                                      
-                                      const subTopics = Object.values(subTopicsMap);
-                                      
-                                      return subTopics.map((sub, sIdx) => {
-                                        return (
-                                          <div key={sIdx} style={{
-                                            padding: "10px",
-                                            marginLeft: isAr ? "0" : "0.5rem",
-                                            marginRight: isAr ? "0.5rem" : "0",
-                                            borderLeft: isAr ? "none" : "2px solid rgba(16, 107, 163, 0.12)",
-                                            borderRight: isAr ? "2px solid rgba(16, 107, 163, 0.12)" : "none",
-                                            background: "rgba(255, 255, 255, 0.45)",
-                                            borderRadius: "12px",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: "0.5rem",
-                                            boxShadow: "0 1px 3px rgba(0,0,0,0.01)"
-                                          }}>
-                                            {/* Sub-Topic Title */}
-                                            <div style={{
-                                              display: "flex",
-                                              alignItems: "center",
-                                              gap: "0.4rem",
-                                              fontSize: "0.82rem",
-                                              fontWeight: 800,
-                                              color: "var(--primary)"
-                                            }}>
-                                              <span>📌</span>
-                                              <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                                                {sub.title}
-                                              </span>
-                                            </div>
-
-                                            {/* Concepts inside Sub-Topic */}
-                                            {sub.concepts.length > 0 && (
-                                              <div style={{
-                                                display: "flex",
-                                                flexWrap: "wrap",
-                                                gap: "4px",
-                                                paddingLeft: isAr ? "0" : "1.2rem",
-                                                paddingRight: isAr ? "1.2rem" : "0"
-                                              }}>
-                                                {sub.concepts.map((concept, cIdx) => {
-                                                  const hash = concept.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                                                  const hue = hash % 360;
-                                                  return (
-                                                    <span
-                                                      key={cIdx}
-                                                      style={{
-                                                        fontSize: "0.65rem",
-                                                        fontWeight: 700,
-                                                        background: `hsla(${hue}, 80%, 96%, 1)`,
-                                                        border: `1px solid hsla(${hue}, 60%, 86%, 1)`,
-                                                        color: `hsla(${hue}, 80%, 20%, 1)`,
-                                                        padding: "2px 6px",
-                                                        borderRadius: "6px",
-                                                        display: "inline-flex",
-                                                        alignItems: "center",
-                                                        gap: "2px"
-                                                      }}
-                                                    >
-                                                      🏷️ {concept}
-                                                    </span>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-
-                                            {/* Pages inside Sub-Topic */}
-                                            <div style={{
-                                              display: "flex",
-                                              flexWrap: "wrap",
-                                              gap: "6px",
-                                              paddingLeft: isAr ? "0" : "1.2rem",
-                                              paddingRight: isAr ? "1.2rem" : "0"
-                                            }}>
-                                              {sub.pages.map((p) => {
-                                                const isActive = p.pageNum === readerCurrentPage;
-                                                return (
-                                                  <button
-                                                    key={p.pageNum}
-                                                    onClick={() => setReaderCurrentPage(p.pageNum)}
-                                                    style={{
-                                                      fontSize: "0.7rem",
-                                                      fontWeight: 800,
-                                                      cursor: "pointer",
-                                                      padding: "4px 10px",
-                                                      borderRadius: "20px",
-                                                      transition: "all 0.2s ease",
-                                                      border: isActive ? "2px solid #d4af37" : "1px solid rgba(16, 107, 163, 0.15)",
-                                                      background: isActive 
-                                                        ? "linear-gradient(135deg, #d4af37, #b45309)" 
-                                                        : "rgba(255, 255, 255, 0.9)",
-                                                      color: isActive ? "#ffffff" : "var(--foreground)",
-                                                      boxShadow: isActive ? "0 3px 8px rgba(212, 175, 55, 0.2)" : "0 1px 2px rgba(0,0,0,0.02)"
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                      if (!isActive) {
-                                                        e.currentTarget.style.borderColor = "var(--primary)";
-                                                        e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
-                                                      }
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                      if (!isActive) {
-                                                        e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)";
-                                                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
-                                                      }
-                                                    }}
-                                                  >
-                                                    📄 {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                                    {isActive && (
-                                                      <span style={{ fontSize: "0.6rem", marginLeft: "4px", marginRight: "4px" }}>
-                                                        📍
-                                                      </span>
-                                                    )}
-                                                  </button>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        );
-                                      });
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
 
               {/* Textbook Viewer Panel */}
               <div 
@@ -1883,34 +1326,66 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     paddingBottom: "0.75rem"
                   }}>
                     <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                      📖 {language === "ar" ? "الصفحة الحالية" : "Active Section"}: {readerCurrentPage} / {totalPagesCount}
+                      📖 {translationLanguage === "ar" ? "محتوى الصفحة" : "Page Content"}: {readerCurrentPage} / {totalPagesCount}
                     </span>
 
-                    {/* Premium real-time page translator widget */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <label htmlFor="page-translator-select" style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
-                        🌐 {language === "ar" ? "ترجمة الصفحة:" : "Translate Page:"}
-                      </label>
-                      <select
-                        id="page-translator-select"
-                        value={translationLanguage}
-                        onChange={(e) => handlePageTranslation(e.target.value, activePage)}
-                        disabled={isTranslating}
-                        style={{
-                          padding: "4px 10px", borderRadius: "12px", border: "1px solid var(--card-border)",
-                          background: "#ffffff", color: "var(--foreground)", fontSize: "0.75rem", fontWeight: 700,
-                          outline: "none", cursor: "pointer", transition: "all 0.2s"
-                        }}
-                      >
-                        <option value="">{language === "ar" ? "الأصلية" : "Original"}</option>
-                        <option value="en">🇺🇸 English</option>
-                        <option value="ar">🇸🇦 العربية</option>
-                        <option value="es">🇪🇸 Español</option>
-                        <option value="fr">🇫🇷 Français</option>
-                        <option value="de">🇩🇪 Deutsch</option>
-                        <option value="zh">🇨🇳 中文</option>
-                        <option value="it">🇮🇹 Italiano</option>
-                      </select>
+                    {/* Premium Pre-computed Page Language Selector */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                        🌐 {language === "ar" ? "لغة الصفحة:" : "Page Language:"}
+                      </span>
+                      <div style={{
+                        display: "inline-flex",
+                        background: "rgba(16, 107, 163, 0.04)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(16, 107, 163, 0.12)",
+                        borderRadius: "20px",
+                        padding: "3px",
+                        gap: "2px"
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setTranslationLanguage("en")}
+                          style={{
+                            padding: "4px 14px",
+                            borderRadius: "18px",
+                            border: "none",
+                            background: translationLanguage === "en" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+                            color: translationLanguage === "en" ? "#ffffff" : "var(--foreground)",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            boxShadow: translationLanguage === "en" ? "0 2px 8px rgba(16, 107, 163, 0.25)" : "none"
+                          }}
+                        >
+                          🇺🇸 EN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTranslationLanguage("ar")}
+                          style={{
+                            padding: "4px 14px",
+                            borderRadius: "18px",
+                            border: "none",
+                            background: translationLanguage === "ar" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+                            color: translationLanguage === "ar" ? "#ffffff" : "var(--foreground)",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            boxShadow: translationLanguage === "ar" ? "0 2px 8px rgba(16, 107, 163, 0.25)" : "none"
+                          }}
+                        >
+                          🇸🇦 AR
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ display: "flex", gap: "0.4rem" }}>
@@ -1942,19 +1417,15 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     </div>
                   ) : (
                     (() => {
-                      const isBookArabic = selectedBookReader 
-                        ? isTextArabic(selectedBookReader.titleAr || selectedBookReader.title || selectedBookReader.titleEn || "")
-                        : false;
+                      const isAr = translationLanguage === "ar";
 
-                      const activeContent = translationLanguage && translatedText 
-                        ? translatedText 
-                        : (isBookArabic 
-                            ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
-                            : (activePage.contentEn || activePage.contentAr || activePage.content || ""));
-                      
-                      const isAr = translationLanguage 
-                        ? translationLanguage === "ar" 
-                        : isBookArabic;
+                      const activeContent = isAr 
+                        ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
+                        : (activePage.contentEn || activePage.contentAr || activePage.content || "");
+
+                      const activeTitle = isAr
+                        ? (activePage.titleAr || activePage.titleEn || activePage.chapterTitleAr || "")
+                        : (activePage.titleEn || activePage.titleAr || activePage.chapterTitleEn || "");
 
                       return (
                         <article 
@@ -1966,13 +1437,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             textAlign: isAr ? "right" : "left",
                           }}
                         >
-                          <style>{`
-                            @keyframes skeleton-loading {
-                              0% { background-position: 200% 0; }
-                              100% { background-position: -200% 0; }
-                            }
-                          `}</style>
-
                           <h3 style={{ 
                             fontSize: "1.4rem", 
                             fontWeight: 800, 
@@ -1986,38 +1450,15 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             alignItems: "center",
                             gap: "0.6rem"
                           }}>
-                            {isTranslating ? (
-                              <span style={{
-                                display: "inline-block", width: "180px", height: "1.4rem", borderRadius: "4px",
-                                background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)",
-                                backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite"
-                              }} />
-                            ) : (
-                              <>
-                                <span style={{ fontSize: "1.3rem" }}>📖</span>
-                                <span style={{ flex: 1 }}>
-                                  {translationLanguage && translatedTitle ? translatedTitle : (isBookArabic ? (activePage.titleAr || activePage.titleEn) : (activePage.titleEn || activePage.titleAr))}
-                                </span>
-                              </>
-                            )}
+                            <span style={{ fontSize: "1.3rem" }}>📖</span>
+                            <span style={{ flex: 1 }}>
+                              {activeTitle || (translationLanguage === "ar" ? "محتوى الصفحة" : "Page Content")}
+                            </span>
                           </h3>
 
-                          {isTranslating ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", margin: "1.5rem 0" }}>
-                              <div style={{ height: "1.1rem", width: "100%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
-                              <div style={{ height: "1.1rem", width: "95%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
-                              <div style={{ height: "1.1rem", width: "90%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
-                              <div style={{ height: "1.1rem", width: "97%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
-                              <div style={{ height: "1.1rem", width: "85%", borderRadius: "4px", background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)", backgroundSize: "200% 100%", animation: "skeleton-loading 1.5s infinite" }} />
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: "1.05rem", marginBottom: "2rem" }}>
-                              {renderPremiumContent(
-                                translationLanguage && translatedText ? translatedText : (language === "ar" ? (activePage.contentAr || activePage.contentEn || activePage.content) : (activePage.contentEn || activePage.contentAr || activePage.content)),
-                                isAr
-                              )}
-                            </div>
-                          )}
+                          <div style={{ fontSize: "1.05rem", marginBottom: "2rem" }}>
+                            {renderPremiumContent(activeContent, isAr)}
+                          </div>
 
                           {/* Equations / Formulas Area if any */}
                           {activePage.formulas && activePage.formulas.length > 0 && (

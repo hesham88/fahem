@@ -47,8 +47,8 @@ export async function GET(req: NextRequest) {
               bookTitleEn: book ? (book.titleEn || book.title) : "Unknown Book",
               bookTitleAr: book ? (book.titleAr || book.title) : "Unknown Book",
               pageNumber: p.page_number || p.pageNum || 1,
-              titleEn: p.titleEn || `Page ${p.page_number}`,
-              titleAr: p.titleAr || `الصفحة ${p.page_number}`,
+              titleEn: p.titleEn || p.pageTopicEn || p.pageTopicAr || p.chapterTitleEn || `Page ${p.page_number || p.pageNum || 1}`,
+              titleAr: p.titleAr || p.pageTopicAr || p.pageTopicEn || p.chapterTitleAr || `القسم ${p.page_number || p.pageNum || 1}`,
               chapterTitleEn: p.chapterTitleEn || p.chapter_title_en || "",
               chapterTitleAr: p.chapterTitleAr || p.chapter_title_ar || "",
               snippet: p.content ? (p.content.substring(0, 150) + "...") : ""
@@ -391,12 +391,20 @@ export async function GET(req: NextRequest) {
           }
           (db as any).book_pages.push(...generatedPages);
           saveLocalDb(db);
-          
           bookPages = generatedPages;
         }
       }
 
-      return new Response(JSON.stringify({ success: true, pages: bookPages }), {
+      const mappedBookPages = bookPages.map((p: any) => {
+        const pageNum = p.page_number || p.pageNum || 1;
+        return {
+          ...p,
+          titleEn: p.titleEn || p.pageTopicEn || p.pageTopicAr || p.chapterTitleEn || `Page ${pageNum}`,
+          titleAr: p.titleAr || p.pageTopicAr || p.pageTopicEn || p.chapterTitleAr || `القسم ${pageNum}`
+        };
+      });
+
+      return new Response(JSON.stringify({ success: true, pages: mappedBookPages }), {
         status: 200,
         headers: { 
           "Content-Type": "application/json",
