@@ -59,6 +59,157 @@ def get_gemini_embedding(text, api_key):
         print(f"[Embedding Error] {e}. Falling back to pseudo-random hash embedding.", file=sys.stderr)
     return get_fallback_embedding(text)
 
+def call_gemini_generate(prompt, api_key):
+    if not api_key:
+        return ""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json" if "json" in prompt.lower() else "text/plain"
+            }
+        }
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+        if res.status_code == 200:
+            data = res.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            print(f"[Gemini Generate Error] HTTP {res.status_code}: {res.text}", file=sys.stderr)
+    except Exception as e:
+        print(f"[Gemini Generate Exception] {e}", file=sys.stderr)
+    return ""
+
+def extract_toc_with_gemini(text_sample, api_key):
+    if not api_key:
+        return []
+    prompt = f"""
+Analyze the following textbook Table of Contents or outline text. Extract the main chapters, their start/end pages, and key subtopics/concepts discussed under each chapter.
+For each chapter, provide:
+1. title (in English)
+2. title_ar (in Arabic - translate if the input is English, or keep as Arabic if input is Arabic)
+3. page_start (integer)
+4. page_end (integer)
+5. concepts (list of strings representing subtopics or titles inside this chapter)
+
+Output the result strictly as a valid JSON list of chapter objects, with no markdown formatting or extra text.
+JSON structure:
+[
+  {{
+    "id": "chap_1",
+    "title": "Chapter Title En",
+    "title_ar": "عنوان الفصل بالعربية",
+    "page_start": 1,
+    "page_end": 15,
+    "concepts": ["Concept A", "Concept B"]
+  }}
+]
+
+Text sample to analyze:
+{text_sample}
+"""
+    try:
+        response_text = call_gemini_generate(prompt, api_key)
+        if not response_text:
+            return []
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+        
+        chapters = json.loads(cleaned_text)
+        for idx, ch in enumerate(chapters):
+            ch["id"] = f"chap_{idx + 1}"
+            ch["page_start"] = int(ch.get("page_start", 1))
+            ch["page_end"] = int(ch.get("page_end", 1))
+            ch["start_page"] = ch["page_start"]
+            ch["end_page"] = ch["page_end"]
+            if "concepts" not in ch:
+                ch["concepts"] = []
+            elif not isinstance(ch["concepts"], list):
+                ch["concepts"] = [str(ch["concepts"])]
+        return chapters
+    except Exception as e:
+        print(f"[extract_toc_with_gemini Exception] {e}", file=sys.stderr)
+    return []
+
+def format_page_with_gemini(raw_text, api_key):
+    if not api_key:
+        return {
+            "formatted_content": raw_text,
+            "title_en": "Page Content",
+            "title_ar": "محتوى الصفحة",
+            "concepts": [],
+            "rules": [],
+            "formulas": []
+        }
+    prompt = f"""
+Analyze the following textbook page raw OCR/extracted text. Formulate it into a high-fidelity, elegant, and beautifully styled page using the rules below.
+1. Restructure the raw text into elegant markdown format. Keep the meaning and wording of the textbook exactly correct, but make the styling premium.
+2. Tag headers/footers if present using [HEADER: header content] and [FOOTER: footer content] at the very beginning and end of the output.
+3. Detect any key definitions, laws, or laws of physics/theorems, and wrap them in custom block tags:
+   - Rules/Laws/Definitions: Wrap inside markdown blockquotes or standard headings.
+   - Equations/Formulas: Keep them on separate lines and format clearly.
+4. Highlight extremely critical terms, keywords, or main takeaways using double equals sign: ==text to highlight==.
+5. If there is a table or raw list representing structured data, format it as a beautiful Markdown table.
+6. If there are illustrations, diagrams, charts, or diagrams mentioned in text, write a brief, high-fidelity visual description of what the visual represents and wrap it in [VISUAL: brief detailed description of the illustration].
+7. Provide a concise, clear title for this specific page in English (title_en) and Arabic (title_ar), representing the main subtopic of the page.
+8. Provide a list of 1 to 5 core concept keywords (concepts) discussed on this page.
+9. Extract a list of any distinct rule/definition texts (rules) and formulas/equations (formulas) found.
+
+Output the result strictly as a JSON object, with no markdown wrapping or extra text.
+JSON structure:
+{{
+  "formatted_content": "the fully styled markdown content of the page",
+  "title_en": "English Subtopic Title of this page",
+  "title_ar": "عنوان الفرعي للصفحة بالعربية",
+  "concepts": ["concept1", "concept2"],
+  "rules": ["extracted rule text 1", "extracted rule text 2"],
+  "formulas": ["extracted formula 1", "extracted formula 2"]
+}}
+
+Raw text page content to process:
+{raw_text}
+"""
+    try:
+        response_text = call_gemini_generate(prompt, api_key)
+        if not response_text:
+            raise Exception("Empty response from Gemini")
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+        
+        parsed = json.loads(cleaned_text)
+        return {
+            "formatted_content": parsed.get("formatted_content", raw_text),
+            "title_en": parsed.get("title_en", "Page Content"),
+            "title_ar": parsed.get("title_ar", "محتوى الصفحة"),
+            "concepts": parsed.get("concepts", []),
+            "rules": parsed.get("rules", []),
+            "formulas": parsed.get("formulas", [])
+        }
+    except Exception as e:
+        print(f"[format_page_with_gemini Exception] {e}. Falling back to default format.", file=sys.stderr)
+        return {
+            "formatted_content": raw_text,
+            "title_en": "Page Content",
+            "title_ar": "محتوى الصفحة",
+            "concepts": [],
+            "rules": [],
+            "formulas": []
+        }
+
 def get_fallback_embedding(text):
     h = hashlib.sha256(text.encode("utf-8")).hexdigest()
     seed = int(h[:8], 16)
@@ -424,6 +575,20 @@ def main():
             for i in range(1, num_pages + 1):
                 pages_data.append((i, f"This is synthesized textbook material for page {i} of {title} in the subject of {subject_id}."))
                 
+        # 2.5 Try to extract structured TOC using Gemini if api_key is available
+        if api_key and not chapters_meta:
+            try:
+                add_system_log("PARSER", "Attempting smart Table of Contents extraction using Gemini...")
+                toc_sample = ""
+                for p_num, p_text in pages_data[:12]:
+                    toc_sample += f"\n--- PAGE {p_num} ---\n{p_text}\n"
+                gemini_toc = extract_toc_with_gemini(toc_sample[:12000], api_key)
+                if gemini_toc:
+                    chapters_meta = gemini_toc
+                    add_system_log("PARSER", f"Successfully extracted {len(chapters_meta)} chapters with Table of Contents from Gemini!")
+            except Exception as e:
+                add_system_log("PARSER", f"⚠️ Gemini TOC extraction failed: {e}. Falling back to default heuristics.")
+
         # 3. Create high-quality default Table of Contents if empty
         if not chapters_meta:
             add_system_log("PARSER", "Creating default structured Table of Contents metadata...")
@@ -523,6 +688,28 @@ def main():
             if formulas_found:
                 add_system_log("INDEX", f"Page {page_num} Formula Extracted: {formulas_found[0]}")
 
+            # If Gemini is available, format the page content beautifully
+            title_en = f"Topic of Page {page_num}"
+            title_ar = f"موضوع الصفحة {page_num}"
+            concepts_found = []
+            formatted_text = text
+            
+            if api_key:
+                try:
+                    formatted_res = format_page_with_gemini(text, api_key)
+                    formatted_text = formatted_res.get("formatted_content", text)
+                    title_en = formatted_res.get("title_en", title_en)
+                    title_ar = formatted_res.get("title_ar", title_ar)
+                    concepts_found = formatted_res.get("concepts", [])
+                    
+                    # Merge rules & formulas
+                    if formatted_res.get("rules"):
+                        rules_found = list(set(rules_found + formatted_res["rules"]))
+                    if formatted_res.get("formulas"):
+                        formulas_found = list(set(formulas_found + formatted_res["formulas"]))
+                except Exception as format_err:
+                    add_system_log("INDEX", f"⚠️ Gemini formatting failed for page {page_num}: {format_err}")
+
             # Map this page to its chapter
             page_ch_en = "Chapter"
             page_ch_ar = "الفصل"
@@ -535,20 +722,23 @@ def main():
                     break
 
             # Embed content
-            embedding = get_gemini_embedding(text, api_key)
+            embedding = get_gemini_embedding(formatted_text, api_key)
             
             page_doc = {
                 "_id": f"page_{book_id}_{page_num}",
                 "book_id": book_id,
                 "page_number": page_num,
-                "content": text,
+                "content": formatted_text,
                 "embedding": embedding,
                 "rules": rules_found,
                 "formulas": formulas_found,
                 "userId": user_id,
                 "chapterTitleEn": page_ch_en,
                 "chapterTitleAr": page_ch_ar,
-                "chapterId": page_ch_id
+                "chapterId": page_ch_id,
+                "titleEn": title_en,
+                "titleAr": title_ar,
+                "concepts": concepts_found
             }
 
             # Increment progress smoothly

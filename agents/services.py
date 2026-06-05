@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 import fastapi
+import json
 
 logger = logging.getLogger("google_adk." + __name__)
 
@@ -585,7 +586,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client.close()
             
             import subprocess
-            import json
             
             def run_crawler_background(j_id: str, u_str: str, depth: int, email: str):
                 import threading
@@ -704,7 +704,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             cl.close()
                             
                             # Also update local db
-                            import json
                             local_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "src", "app", "api", "local_db.json")
                             if os.path.exists(local_db_path):
                                 with open(local_db_path, "r", encoding="utf-8") as f:

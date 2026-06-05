@@ -116,7 +116,21 @@ const DEFAULT_DB: LocalDb = {
 };
 
 export function isLocalEnv(): boolean {
-  return false; // Force staging/delivery database config globally, bypassing and eliminating all local offline fallbacks
+  // Automatically detect if running in a local offline/dev environment or GCP Cloud Run production
+  const isCloudRun = !!process.env.K_SERVICE || !!process.env.GOOGLE_CLOUD_PROJECT;
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasPriMongo = (process.env.MONGODB_URI || "").includes("-pri");
+  
+  if (isCloudRun && isProduction && !hasPriMongo) {
+    return false;
+  }
+  
+  // If we are developing locally, or if Mongo URI is unreachable, fallback to local DB for a freeze-free experience
+  if (!isCloudRun || hasPriMongo || process.env.LOCAL_DEV === "true") {
+    return true;
+  }
+  
+  return false;
 }
 
 export function shouldSkipDirectMongo(): boolean {

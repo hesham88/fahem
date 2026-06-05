@@ -171,14 +171,221 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   
+  // Helper to parse ==highlights== inside text
+  const parseInlineElements = (textStr: string): React.ReactNode => {
+    if (!textStr) return "";
+    const parts = textStr.split("==");
+    if (parts.length === 1) return textStr;
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return (
+          <span key={index} style={{
+            background: "linear-gradient(120deg, rgba(253, 224, 71, 0.35) 0%, rgba(253, 224, 71, 0.55) 100%)",
+            borderBottom: "2px solid #eab308",
+            padding: "1px 4px",
+            borderRadius: "4px",
+            fontWeight: 700,
+            color: "var(--foreground)"
+          }}>{part}</span>
+        );
+      }
+      return part;
+    });
+  };
+
   let i = 0;
   while (i < lines.length) {
     const line = lines[i].trim();
     if (!line) {
-      // Add small spacing for empty lines to separate paragraphs elegantly
       elements.push(<div key={`space-${i}`} style={{ height: "0.75rem" }} />);
       i++;
       continue;
+    }
+
+    // A. Detect [HEADER: ...]
+    const headerMatch = line.match(/^\[HEADER:\s*(.*)\]$/i);
+    if (headerMatch) {
+      const content = headerMatch[1];
+      elements.push(
+        <div key={`header-${i}`} style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: "#94a3b8",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
+          paddingBottom: "0.5rem",
+          marginBottom: "1.5rem",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <span>{parseInlineElements(content)}</span>
+          <span>📖 {isAr ? "كتاب منهجي معتمد" : "Official Curriculum"}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // B. Detect [FOOTER: ...]
+    const footerMatch = line.match(/^\[FOOTER:\s*(.*)\]$/i);
+    if (footerMatch) {
+      const content = footerMatch[1];
+      elements.push(
+        <div key={`footer-${i}`} style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: "#94a3b8",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          borderTop: "1px solid rgba(16, 107, 163, 0.08)",
+          paddingTop: "0.5rem",
+          marginTop: "1.5rem",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <span>Fahem Ingestion Studio</span>
+          <span>{parseInlineElements(content)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // C. Detect [VISUAL: ...]
+    const visualMatch = line.match(/^\[VISUAL:\s*(.*)\]$/i);
+    if (visualMatch) {
+      const content = visualMatch[1];
+      elements.push(
+        <div key={`visual-${i}`} style={{
+          margin: "1.5rem 0",
+          padding: "1.25rem",
+          borderRadius: "16px",
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)",
+          border: "1px dashed rgba(16, 185, 129, 0.3)",
+          boxShadow: "0 4px 15px rgba(16, 185, 129, 0.02)",
+          fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+          textAlign: isAr ? "right" : "left",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <div style={{
+            fontSize: "0.82rem",
+            fontWeight: 800,
+            color: "#047857",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            marginBottom: "0.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem"
+          }}>
+            <span>🖼️ {isAr ? "وصف مرئي / توضيحي" : "Visual Description / Illustration"}</span>
+          </div>
+          <div style={{
+            fontSize: "0.92rem",
+            lineHeight: "1.6",
+            color: "#065f46",
+            fontStyle: "italic",
+            fontWeight: 600
+          }}>{parseInlineElements(content)}</div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // D. Detect Code Blocks (```)
+    if (line.startsWith("```")) {
+      const lang = line.replace("```", "").trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++; // skip closing ```
+      const codeContent = codeLines.join("\n");
+      elements.push(
+        <div key={`code-${i}`} style={{
+          background: "#1e1e2e",
+          color: "#f8f8f2",
+          borderRadius: "12px",
+          padding: "1rem",
+          margin: "1.25rem 0",
+          fontFamily: "monospace, monospace",
+          fontSize: "0.85rem",
+          overflowX: "auto",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          position: "relative",
+          direction: "ltr",
+          textAlign: "left"
+        }}>
+          <div style={{
+            position: "absolute",
+            top: "0.5rem",
+            right: "0.5rem",
+            fontSize: "0.7rem",
+            color: "#6c7086",
+            textTransform: "uppercase",
+            fontWeight: "bold"
+          }}>{lang || "code"}</div>
+          <pre style={{ margin: 0 }}><code style={{ whiteSpace: "pre-wrap", display: "block" }}>{codeContent}</code></pre>
+        </div>
+      );
+      continue;
+    }
+
+    // E. Detect Tables (| col1 | col2 |)
+    if (line.startsWith("|")) {
+      const tableLines: string[][] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const rawCells = lines[i].split("|").map(c => c.trim());
+        if (rawCells[0] === "") rawCells.shift();
+        if (rawCells[rawCells.length - 1] === "") rawCells.pop();
+        tableLines.push(rawCells);
+        i++;
+      }
+
+      if (tableLines.length > 0) {
+        const headers = tableLines[0];
+        let dataRows = tableLines.slice(1);
+        if (dataRows.length > 0 && dataRows[0].every(cell => /^:?-+:?$/.test(cell))) {
+          dataRows = dataRows.slice(1);
+        }
+
+        elements.push(
+          <div key={`table-${i}`} style={{ overflowX: "auto", margin: "1.5rem 0", borderRadius: "14px", border: "1px solid rgba(16, 107, 163, 0.12)", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "inherit", textAlign: isAr ? "right" : "left", direction: isAr ? "rtl" : "ltr" }}>
+              <thead>
+                <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05) 0%, rgba(16, 107, 163, 0.08) 100%)", borderBottom: "2px solid rgba(16, 107, 163, 0.15)" }}>
+                  {headers.map((h, hIdx) => (
+                    <th key={hIdx} style={{ padding: "0.85rem 1.1rem", fontSize: "0.88rem", fontWeight: 800, color: "var(--primary)" }}>
+                      {parseInlineElements(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, rIdx) => (
+                  <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.06)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
+                    {row.map((cell, cIdx) => (
+                      <td key={cIdx} style={{ padding: "0.8rem 1.1rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
+                        {parseInlineElements(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
     }
 
     // 1. Detect Markdown headings
@@ -200,7 +407,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
           textAlign: isAr ? "right" : "left",
           lineHeight: "1.4"
         }}>
-          {cleanText}
+          {parseInlineElements(cleanText)}
         </h4>
       );
       i++;
@@ -244,7 +451,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
             color: "var(--foreground)",
             fontWeight: 600,
             fontStyle: isAr ? "normal" : "italic"
-          }}>{content}</div>
+          }}>{parseInlineElements(content)}</div>
         </div>
       );
       i++;
@@ -287,7 +494,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
             lineHeight: "1.7",
             color: "var(--foreground)",
             fontWeight: 600
-          }}>{content}</div>
+          }}>{parseInlineElements(content)}</div>
         </div>
       );
       i++;
@@ -328,7 +535,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
             display: "inline-block",
             minWidth: "60%",
             direction: "ltr"
-          }}>{line}</div>
+          }}>{parseInlineElements(line)}</div>
         </div>
       );
       i++;
@@ -372,7 +579,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
                 textAlign: isAr ? "right" : "left"
               }}>
                 <span style={{ color: "var(--primary)", fontWeight: 800 }}>{prefix}</span>
-                <span style={{ flex: 1 }}>{cleanItem}</span>
+                <span style={{ flex: 1 }}>{parseInlineElements(cleanItem)}</span>
               </li>
             );
           })}
@@ -398,7 +605,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left"
         }}>
-          {cleanText}
+          {parseInlineElements(cleanText)}
         </h5>
       );
       i++;
@@ -418,7 +625,7 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
         fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
         opacity: 0.95
       }}>
-        {line}
+        {parseInlineElements(line)}
       </p>
     );
     i++;
