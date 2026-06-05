@@ -1,5 +1,28 @@
 import os
 import json
+import urllib.request
+import urllib.parse
+
+def resolve_via_doh(name: str, rtype: str) -> list:
+    """Helper to query DNS-over-HTTPS JSON API as a secure port 443 fallback when standard DNS is blocked."""
+    endpoints = [
+        f"https://dns.google/resolve?name={urllib.parse.quote(name)}&type={urllib.parse.quote(rtype)}",
+        f"https://cloudflare-dns.com/dns-query?name={urllib.parse.quote(name)}&type={urllib.parse.quote(rtype)}"
+    ]
+    for url in endpoints:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"Accept": "application/dns-json", "User-Agent": "FahemDoHResolver/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                answers = data.get("Answer", [])
+                if answers:
+                    return answers
+        except Exception:
+            continue
+    return []
 
 def resolve_srv_to_mongodb_uri(uri: str) -> str:
     """Converts a mongodb+srv:// connection string to a standard mongodb:// string by resolving SRV records using public DNS."""
@@ -30,39 +53,67 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
 
         host = host.strip()
 
-        import dns.resolver
-        try:
-            resolver = dns.resolver.Resolver()
-            srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
-        except Exception:
-            resolver = dns.resolver.Resolver(configure=False)
-            resolver.nameservers = ["8.8.8.8", "8.8.4.4"]
-            srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
-
         targets = []
-        for rec in srv_records:
-            target = str(rec.target)
-            if target.endswith("."):
-                target = target[:-1]
-            targets.append(f"{target}:{rec.port}")
+        txt_options = {}
+
+        # 1. Attempt DNS-over-HTTPS (DoH) first (extremely reliable and safe from blocking/hanging in GCP Cloud Run sandbox)
+        try:
+            srv_answers = resolve_via_doh(f"_mongodb._tcp.{host}", "SRV")
+            for ans in srv_answers:
+                data = ans.get("data", "").strip()
+                # Format: "Priority Weight Port Target" e.g., "0 0 27017 cluster0.mongodb.net."
+                parts = data.split()
+                if len(parts) >= 4:
+                    port = parts[2]
+                    target = parts[3]
+                    if target.endswith("."):
+                        target = target[:-1]
+                    targets.append(f"{target}:{port}")
+
+            if targets:
+                # Also pull TXT options via DoH
+                txt_answers = resolve_via_doh(host, "TXT")
+                for ans in txt_answers:
+                    data = ans.get("data", "").strip().strip('"')
+                    for param in data.split("&"):
+                        if "=" in param:
+                            k, v = param.split("=", 1)
+                            txt_options[k.strip()] = v.strip()
+        except Exception:
+            pass
+
+        # 2. Fallback to standard DNS library resolution if DoH did not find any targets (e.g. in offline local environment)
+        if not targets:
+            try:
+                import dns.resolver
+                resolver = dns.resolver.Resolver()
+                resolver.timeout = 1.5
+                resolver.lifetime = 1.5
+                srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+                for rec in srv_records:
+                    target = str(rec.target)
+                    if target.endswith("."):
+                        target = target[:-1]
+                    targets.append(f"{target}:{rec.port}")
+
+                try:
+                    txt_records = resolver.resolve(host, "TXT")
+                    for txt in txt_records:
+                        rec_str = "".join([s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in txt.strings])
+                        for param in rec_str.split("&"):
+                            if "=" in param:
+                                k, v = param.split("=", 1)
+                                txt_options[k.strip()] = v.strip()
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
         if not targets:
+            # If both resolutions fail completely, return original to avoid loss of detail
             return uri
 
         resolved_hosts = ",".join(targets)
-
-        # Resolve TXT records to dynamically get connection options (like replicaSet and authSource)
-        txt_options = {}
-        try:
-            txt_records = resolver.resolve(host, "TXT")
-            for txt in txt_records:
-                rec_str = "".join([s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in txt.strings])
-                for param in rec_str.split("&"):
-                    if "=" in param:
-                        k, v = param.split("=", 1)
-                        txt_options[k.strip()] = v.strip()
-        except Exception:
-            pass
 
         # Split path and query from db_part
         if "?" in db_part:
@@ -99,21 +150,32 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
         # Fallback to original URI if resolution fails
         return uri
 
+_cached_mongodb_uris = {}
+
 def get_mongodb_uri(read_only: bool = False) -> str:
     """Resolves the MongoDB connection string from environment or local configurations.
     
     If read_only=True, it prioritizes a read-only credential to enforce the Principle of Least Privilege.
     """
+    global _cached_mongodb_uris
+    cache_key = "readonly" if read_only else "write"
+    if cache_key in _cached_mongodb_uris:
+        return _cached_mongodb_uris[cache_key]
+
     # 1. Prioritize read-only environment variables if requested
     if read_only:
         uri = os.environ.get("MONGODB_READONLY_URI") or os.environ.get("MONGODB_URI_READONLY")
         if uri:
-            return resolve_srv_to_mongodb_uri(uri.strip())
+            res = resolve_srv_to_mongodb_uri(uri.strip())
+            _cached_mongodb_uris[cache_key] = res
+            return res
 
     # 2. Standard full-privilege environment variable (or fallback read-only)
     uri = os.environ.get("MONGODB_URI")
     if uri:
-        return resolve_srv_to_mongodb_uri(uri.strip())
+        res = resolve_srv_to_mongodb_uri(uri.strip())
+        _cached_mongodb_uris[cache_key] = res
+        return res
     
     # 3. Local ignored secrets file
     try:
@@ -129,10 +191,14 @@ def get_mongodb_uri(read_only: bool = False) -> str:
                 if read_only:
                     val = data.get("MONGODB_READONLY_URI") or data.get("MONGODB_URI_READONLY")
                     if val:
-                        return resolve_srv_to_mongodb_uri(val.strip())
+                        res = resolve_srv_to_mongodb_uri(val.strip())
+                        _cached_mongodb_uris[cache_key] = res
+                        return res
                 val = data.get("MONGODB_URI", "")
                 if val:
-                    return resolve_srv_to_mongodb_uri(val.strip())
+                    res = resolve_srv_to_mongodb_uri(val.strip())
+                    _cached_mongodb_uris[cache_key] = res
+                    return res
     except Exception:
         pass
     
@@ -149,13 +215,19 @@ def get_mongodb_uri(read_only: bool = False) -> str:
                     if read_only and (line.startswith("MONGODB_READONLY_URI=") or line.startswith("MONGODB_URI_READONLY=")):
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
-                            return resolve_srv_to_mongodb_uri(val)
+                            res = resolve_srv_to_mongodb_uri(val)
+                            _cached_mongodb_uris[cache_key] = res
+                            return res
                     if line.startswith("MONGODB_URI="):
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
-                            return resolve_srv_to_mongodb_uri(val)
+                            res = resolve_srv_to_mongodb_uri(val)
+                            _cached_mongodb_uris[cache_key] = res
+                            return res
     except Exception:
         pass
         
-    return "mongodb://localhost:27017"
+    res = "mongodb://localhost:27017"
+    _cached_mongodb_uris[cache_key] = res
+    return res
 

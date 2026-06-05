@@ -34,16 +34,40 @@ if os.path.exists(AGENT_DIR) and AGENT_DIR not in sys.path:
     sys.path.insert(0, AGENT_DIR)
 
 def get_mongodb_uri():
+    # 1. Prioritize a pre-resolved, cached URI passed via the environment (completely bypasses SRV/DNS)
+    resolved_env = os.environ.get("RESOLVED_MONGODB_URI")
+    if resolved_env and resolved_env.startswith("mongodb://") and not resolved_env.startswith("mongodb+srv://"):
+        return resolved_env
+
+    # 2. Check standard MONGODB_URI. If it's already fully resolved, use it directly
+    uri = os.environ.get("MONGODB_URI")
+    if uri and uri.startswith("mongodb://") and not uri.startswith("mongodb+srv://"):
+        return uri
+
+    # 3. Dynamic resolution via tools helper
     try:
-        from tools import get_mongodb_uri as resolve_uri
-        return resolve_uri()
-    except ImportError:
+        from tools import resolve_srv_to_mongodb_uri
+        to_resolve = resolved_env or uri
+        if to_resolve and to_resolve.startswith("mongodb+srv://"):
+            res = resolve_srv_to_mongodb_uri(to_resolve)
+            if res and not res.startswith("mongodb+srv://"):
+                return res
+    except Exception:
         pass
 
-    # Fallback to local resolver if tools import fails
-    uri = os.environ.get("MONGODB_URI")
+    try:
+        from tools import get_mongodb_uri as resolve_uri
+        res = resolve_uri()
+        if res and not res.startswith("mongodb+srv://"):
+            return res
+    except Exception:  # Catch all exceptions (ImportError, NameError, etc.) to ensure absolute robustness
+        pass
+
+    # 4. Fallback to standard MONGODB_URI if any (if already resolved or as a last resort)
     if uri:
         return uri
+
+    # 5. Local secrets file fallback
     try:
         secrets_path = os.path.join(ROOT_DIR, "ignore", "mongodb_secrets.json")
         if os.path.exists(secrets_path):
@@ -51,7 +75,9 @@ def get_mongodb_uri():
                 data = json.load(f)
                 val = data.get("MONGODB_URI")
                 if val:
-                    return val
+                    from tools import resolve_srv_to_mongodb_uri
+                    res = resolve_srv_to_mongodb_uri(val)
+                    return res
     except Exception:
         pass
     return "mongodb://localhost:27017"
@@ -101,9 +127,15 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
 
     # 2. Update MongoDB
     try:
+        # If running in local dev (K_SERVICE is not set), bypass remote MongoDB updates entirely
+        # to guarantee 100% fast, freeze-free local operation and rely solely on local_db.json
+        if not os.environ.get("K_SERVICE"):
+            return
         uri = get_mongodb_uri()
-        if "-pri" in uri.lower() and not os.environ.get("K_SERVICE"):
-            # Private endpoint: bypass local Mongo connection attempt entirely to prevent DNS hangs
+        if not uri:
+            return
+        if "-pri" in uri.lower():
+            # Private endpoint: bypass Mongo connection attempt entirely to prevent DNS hangs
             return
         from pymongo import MongoClient
         client = MongoClient(uri, serverSelectionTimeoutMS=1500)
@@ -123,8 +155,6 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
         client.close()
     except Exception as mongo_err:
         print(f"[CRAWL JOB MONGO ERROR] Failed to update MongoDB: {mongo_err}", file=sys.stderr)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
 
 def clean_and_normalize_url(url, base_url):
     try:

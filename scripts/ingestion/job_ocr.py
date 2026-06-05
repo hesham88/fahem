@@ -120,6 +120,19 @@ def main():
                 import fitz # PyMuPDF
                 doc = fitz.open(temp_pdf_path)
                 num_pages = len(doc)
+                
+                # Smart TOC extraction using PyMuPDF bookmarks
+                pdf_toc = None
+                try:
+                    pdf_toc = doc.get_toc()
+                    if pdf_toc:
+                        logs.append(f"[{time.strftime('%H:%M:%S')}] [PARSER] Smart TOC Extracted: Discovered {len(pdf_toc)} outline bookmarks.")
+                    else:
+                        logs.append(f"[{time.strftime('%H:%M:%S')}] [PARSER] Smart TOC Warning: No native outline bookmarks found in PDF.")
+                except Exception as toc_err:
+                    print(f"[Smart TOC Warning] Failed to get PDF outline: {toc_err}", file=sys.stderr)
+                    pdf_toc = None
+                
                 t_str_pdf = time.strftime("%H:%M:%S")
                 logs.append(f"[{t_str_pdf}] [PARSER] PDF loaded with PyMuPDF. Discovered {num_pages} document pages. Commencing layout-preserving text scans...")
                 update_job_status(job_id, "processing", "ocr", 35, logs, 0, num_pages, False, is_local, **metadata)
@@ -172,6 +185,7 @@ def main():
             
             payload["total_pages"] = num_pages
             payload["ingestion_logs"] = logs
+            payload["pdf_toc"] = pdf_toc
             
             proc = subprocess.Popen(
                 [python_path, embed_script],

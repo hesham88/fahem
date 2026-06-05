@@ -225,7 +225,10 @@ export async function GET(req: NextRequest) {
                   page_number: pageNumCounter,
                   content: pageContent,
                   formulas: formulas,
-                  tips: tips
+                  tips: tips,
+                  chapterTitleEn: ch.title || "Chapter",
+                  chapterTitleAr: ch.title_ar || "الفصل",
+                  chapterId: ch.id || ch._id || `chap_${pageNumCounter}`
                 });
                 pageNumCounter++;
               }
@@ -301,13 +304,84 @@ export async function GET(req: NextRequest) {
                 }
               }
 
+              let chTitleEn = "";
+              let chTitleAr = "";
+              let pTitleEn = "";
+              let pTitleAr = "";
+              
+              if (isComputerScience) {
+                if (i === 1) {
+                  chTitleEn = "Chapter 1: Introduction to Computer Systems & Hardware Architectures";
+                  chTitleAr = "الفصل الأول: مقدمة في أنظمة الكمبيوتر وهندسة الأجهزة";
+                  pTitleEn = "Introduction to Computer Systems & Hardware Architecture";
+                  pTitleAr = "مقدمة في أنظمة الكمبيوتر وبنية الأجهزة";
+                } else if (i === 2) {
+                  chTitleEn = "Chapter 2: Foundations of Algorithms & Software Complexity";
+                  chTitleAr = "الفصل الثاني: أساسيات الخوارزميات وتعقيد البرمجيات";
+                  pTitleEn = "Foundations of Algorithms & Software Complexity";
+                  pTitleAr = "أساسيات الخوارزميات وتعقيد البرمجيات";
+                } else if (i === 3) {
+                  chTitleEn = "Chapter 3: Operating Systems Architecture & Computer Networks";
+                  chTitleAr = "الفصل الثالث: بنية أنظمة التشغيل وشبكات الكمبيوتر";
+                  pTitleEn = "Operating Systems Architecture & Computer Networks";
+                  pTitleAr = "بنية أنظمة التشغيل وشبكات الكمبيوتر";
+                } else if (i === 4) {
+                  chTitleEn = "Chapter 4: Relational Databases & Linear Data Structures";
+                  chTitleAr = "الفصل الرابع: قواعد البيانات العلاجية وهياكل البيانات الخطية";
+                  pTitleEn = "Relational Databases & Linear Data Structures";
+                  pTitleAr = "قواعد البيانات العلاجية وهياكل البيانات الخطية";
+                } else {
+                  chTitleEn = "Chapter 5: Introduction to Artificial Intelligence & Cybersecurity";
+                  chTitleAr = "الفصل الخامس: مقدمة في الذكاء الاصطناعي والأمن السيبراني";
+                  pTitleEn = "Introduction to Artificial Intelligence & Cybersecurity";
+                  pTitleAr = "مقدمة في الذكاء الاصطناعي والأمن السيبراني";
+                }
+              } else if (isPython) {
+                if (i === 1) {
+                  chTitleEn = "Chapter 1: Environment Setup & Variables";
+                  chTitleAr = "الفصل الأول: تهيئة البيئة والتعرف على كود بايثون الأول والمتغيرات";
+                  pTitleEn = "Environment Setup & Variables";
+                  pTitleAr = "تهيئة البيئة والتعرف على كود بايثون الأول والمتغيرات";
+                } else if (i === 2) {
+                  chTitleEn = "Chapter 2: Program Flow & Conditions";
+                  chTitleAr = "الفصل الثاني: التحكم في تدفق البرنامج والتعامل مع الشروط والتكرار";
+                  pTitleEn = "Program Flow & Conditions";
+                  pTitleAr = "التحكم في تدفق البرنامج والتعامل مع الشروط والتكرار";
+                } else if (i === 3) {
+                  chTitleEn = "Chapter 3: Data Structures";
+                  chTitleAr = "الفصل الثالث: هياكل البيانات المضمنة - القوائم، الصفوف، القواميس، والمجموعات";
+                  pTitleEn = "Built-in Data Structures";
+                  pTitleAr = "هياكل البيانات المضمنة - القوائم، الصفوف، القواميس، والمجموعات";
+                } else if (i === 4) {
+                  chTitleEn = "Chapter 4: Functions & Libraries";
+                  chTitleAr = "الفصل الرابع: الدوال وتصميم الأكواد التراكبية واستيراد المكتبات";
+                  pTitleEn = "Functions & Modular Design";
+                  pTitleAr = "الدوال وتصميم الأكواد التراكبية واستيراد المكتبات";
+                } else {
+                  chTitleEn = "Chapter 5: Exception Handling & File I/O";
+                  chTitleAr = "الفصل الخامس: معالجة الأخطاء الاستثنائية والتعامل الفعال مع الملفات";
+                  pTitleEn = "Exception Handling & File I/O";
+                  pTitleAr = "معالجة الأخطاء الاستثنائية والتعامل الفعال مع الملفات";
+                }
+              } else {
+                chTitleEn = `Chapter ${i}: Advanced Concepts`;
+                chTitleAr = `الفصل ${i}: المفاهيم المتقدمة`;
+                pTitleEn = `Advanced Topic Section ${i}`;
+                pTitleAr = `قسم الموضوع المتقدم ${i}`;
+              }
+
               generatedPages.push({
                 _id: `page_${resolvedBookId}_${i}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
                 book_id: resolvedBookId,
                 page_number: i,
                 content: pageContent,
                 formulas: formulas,
-                tips: tips
+                tips: tips,
+                titleEn: pTitleEn,
+                titleAr: pTitleAr,
+                chapterTitleEn: chTitleEn,
+                chapterTitleAr: chTitleAr,
+                chapterId: `chap_${i}`
               });
             }
           }

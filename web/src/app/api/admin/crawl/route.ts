@@ -191,7 +191,12 @@ export async function POST(req: NextRequest) {
         requesterEmail
       };
 
-      const child = spawn(pythonPath, [scriptPath]);
+      const env = {
+        ...process.env,
+        RESOLVED_MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017"
+      };
+
+      const child = spawn(pythonPath, [scriptPath], { env });
       const pid = child.pid;
 
       if (pid) {

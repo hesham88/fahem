@@ -588,6 +588,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
             import json
             
             def run_crawler_background(j_id: str, u_str: str, depth: int, email: str):
+                import threading
+                import traceback
+                
                 try:
                     python_path = sys.executable or "python"
                     script_path = "/app/scripts/async_crawler.py"
@@ -605,31 +608,136 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         "requesterEmail": email
                     }
                     
+                    # Inherit current environment and inject pre-resolved MongoDB URI to prevent subprocess DNS freeze
+                    env = os.environ.copy()
+                    try:
+                        from tools import get_mongodb_uri
+                        env["RESOLVED_MONGODB_URI"] = get_mongodb_uri()
+                    except Exception:
+                        pass
+                    
                     process = subprocess.Popen(
                         [python_path, script_path],
                         stdin=subprocess.PIPE,
-                        stdout=None,
-                        stderr=None,
-                        text=True
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        bufsize=1,
+                        env=env
                     )
+                    
                     process.stdin.write(json.dumps(payload))
                     process.stdin.close()
                     
-                    time.sleep(1.0)
                     p_id = process.pid
+                    logger.info(f"[run_crawler_background] Started crawler PID {p_id} for jobId {j_id}. Monitoring streams...")
                     
-                    from pymongo import MongoClient
-                    from tools import get_mongodb_uri
-                    cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
-                    mongodb = cl["fahem"]
-                    mongodb["crawl_jobs"].update_one(
-                        {"_id": j_id},
-                        {"$set": {"active_pid": p_id}}
-                    )
-                    cl.close()
-                    logger.info(f"[run_crawler_background] Successfully started crawler PID {p_id} for jobId {j_id}")
+                    # Update active PID
+                    try:
+                        from pymongo import MongoClient
+                        from tools import get_mongodb_uri
+                        cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
+                        mongodb = cl["fahem"]
+                        mongodb["crawl_jobs"].update_one(
+                            {"_id": j_id},
+                            {"$set": {"active_pid": p_id}}
+                        )
+                        cl.close()
+                    except Exception as e:
+                        logger.error(f"[run_crawler_background] Failed to update PID in DB: {e}")
+                        
+                    stdout_lines = []
+                    stderr_lines = []
+                    
+                    def read_stdout(proc_stdout):
+                        for line in iter(proc_stdout.readline, ''):
+                            stripped = line.strip()
+                            if stripped:
+                                stdout_lines.append(stripped)
+                                logger.info(f"[CRAWLER-STDOUT] {stripped}")
+                        proc_stdout.close()
+                        
+                    def read_stderr(proc_stderr):
+                        for line in iter(proc_stderr.readline, ''):
+                            stripped = line.strip()
+                            if stripped:
+                                stderr_lines.append(stripped)
+                                logger.error(f"[CRAWLER-STDERR] {stripped}")
+                        proc_stderr.close()
+                        
+                    t1 = threading.Thread(target=read_stdout, args=(process.stdout,), daemon=True)
+                    t2 = threading.Thread(target=read_stderr, args=(process.stderr,), daemon=True)
+                    t1.start()
+                    t2.start()
+                    
+                    # Wait for subprocess completion
+                    exit_code = process.wait()
+                    t1.join(timeout=5.0)
+                    t2.join(timeout=5.0)
+                    
+                    logger.info(f"[run_crawler_background] Crawler PID {p_id} exited with code {exit_code}")
+                    
+                    if exit_code != 0:
+                        logger.error(f"[run_crawler_background] Crawler exited with error code {exit_code}. Marking job {j_id} as failed.")
+                        try:
+                            from pymongo import MongoClient
+                            from tools import get_mongodb_uri
+                            cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
+                            mongodb = cl["fahem"]
+                            
+                            job = mongodb["crawl_jobs"].find_one({"_id": j_id})
+                            existing_logs = job.get("logs", []) if job else []
+                            
+                            err_msg = f"[CRITICAL ERROR] Harvester exited with code {exit_code}."
+                            error_logs = existing_logs + [err_msg]
+                            for line in stderr_lines[-30:]: # append last 30 lines of stderr
+                                error_logs.append(f"[STDERR] {line}")
+                                
+                            mongodb["crawl_jobs"].update_one(
+                                {"_id": j_id},
+                                {"$set": {
+                                    "status": "failed",
+                                    "logs": error_logs,
+                                    "updated_at": time.time()
+                                }}
+                            )
+                            cl.close()
+                            
+                            # Also update local db
+                            import json
+                            local_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "src", "app", "api", "local_db.json")
+                            if os.path.exists(local_db_path):
+                                with open(local_db_path, "r", encoding="utf-8") as f:
+                                    db_data = json.load(f)
+                                if "crawl_jobs" in db_data:
+                                    for j in db_data["crawl_jobs"]:
+                                        if j.get("_id") == j_id:
+                                            j["status"] = "failed"
+                                            j["logs"] = error_logs
+                                            j["updated_at"] = time.time()
+                                            break
+                                with open(local_db_path, "w", encoding="utf-8") as f:
+                                    json.dump(db_data, f, indent=2, ensure_ascii=False)
+                        except Exception as mongo_ex:
+                            logger.error(f"[run_crawler_background] Failed to write failure status to DB: {mongo_ex}")
                 except Exception as b_err:
                     logger.error(f"[run_crawler_background] Failed for job {j_id}: {b_err}", exc_info=True)
+                    try:
+                        from pymongo import MongoClient
+                        from tools import get_mongodb_uri
+                        cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
+                        mongodb = cl["fahem"]
+                        mongodb["crawl_jobs"].update_one(
+                            {"_id": j_id},
+                            {"$set": {
+                                "status": "failed",
+                                "logs": [f"[CRITICAL ERROR] Failed to spawn/monitor crawler: {b_err}"],
+                                "updated_at": time.time()
+                            }}
+                        )
+                        cl.close()
+                    except Exception:
+                        pass
                     
             background_tasks.add_task(run_crawler_background, job_id, target_url, max_depth, requester_email)
             

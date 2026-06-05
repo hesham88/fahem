@@ -1147,146 +1147,198 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                   </div>
                                 </button>
 
-                                {/* Pages List inside Chapter */}
+                                {/* Multi-level outline: Chapters -> Titles Inside Chapter -> Concepts under Title -> Pages */}
                                 {isExpanded && (
                                   <div style={{
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: "0.6rem",
-                                    marginTop: "0.4rem",
+                                    gap: "0.8rem",
+                                    marginTop: "0.6rem",
                                     padding: "0.4rem 0.6rem",
                                     borderLeft: isAr ? "none" : "2px dashed rgba(16, 107, 163, 0.08)",
                                     borderRight: isAr ? "2px dashed rgba(16, 107, 163, 0.08)" : "none"
                                   }}>
-                                    {ch.pages.map((p) => {
-                                      const isActive = p.pageNum === readerCurrentPage;
-                                      const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                                      const pAr = isTextArabic(pTitle);
-                                      const concepts = getPageConcepts(p);
-                                      
-                                      return (
-                                        <div
-                                          key={p.pageNum}
-                                          onClick={() => setReaderCurrentPage(p.pageNum)}
-                                          style={{
-                                            padding: "10px 12px",
-                                            borderRadius: "10px",
-                                            border: isActive 
-                                              ? "2px solid #d4af37" 
-                                              : "1px solid rgba(16, 107, 163, 0.08)",
-                                            background: isActive 
-                                              ? "linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(180, 83, 9, 0.04))" 
-                                              : "#ffffff",
-                                            boxShadow: isActive 
-                                              ? "0 4px 14px rgba(212, 175, 55, 0.1)" 
-                                              : "0 2px 4px rgba(0, 0, 0, 0.01)",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s ease",
-                                            textAlign: pAr ? "right" : "left",
-                                            direction: pAr ? "rtl" : "ltr"
-                                          }}
-                                          onMouseOver={(e) => {
-                                            if (!isActive) {
-                                              e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.2)";
-                                              e.currentTarget.style.background = "rgba(16, 107, 163, 0.02)";
-                                            }
-                                          }}
-                                          onMouseOut={(e) => {
-                                            if (!isActive) {
-                                              e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)";
-                                              e.currentTarget.style.background = "#ffffff";
-                                            }
-                                          }}
-                                        >
-                                          <div style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            flexWrap: "wrap",
-                                            gap: "0.4rem"
-                                          }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: 1, minWidth: 0 }}>
-                                              <span style={{ fontSize: "0.85rem" }}>📄</span>
-                                              <span style={{
-                                                fontSize: "0.78rem",
-                                                fontWeight: isActive ? 800 : 700,
-                                                color: isActive ? "#b45309" : "var(--foreground)",
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis"
-                                              }}>
-                                                {pTitle}
-                                              </span>
-                                              {isActive && (
-                                                <span style={{
-                                                  fontSize: "0.62rem",
-                                                  background: "linear-gradient(135deg, #d4af37, #b45309)",
-                                                  color: "#ffffff",
-                                                  padding: "1px 5px",
-                                                  borderRadius: "6px",
-                                                  fontWeight: 800,
-                                                  display: "inline-flex",
-                                                  alignItems: "center",
-                                                  gap: "1px",
-                                                  flexShrink: 0
-                                                }}>
-                                                  ✨ {language === "ar" ? "أنت هنا" : "You are here"}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <span style={{
-                                              fontSize: "0.7rem",
-                                              color: isActive ? "#b45309" : "#6a7c88",
-                                              fontWeight: 800,
-                                              background: isActive ? "rgba(212, 175, 55, 0.15)" : "rgba(16, 107, 163, 0.05)",
-                                              padding: "1px 6px",
-                                              borderRadius: "6px",
-                                              flexShrink: 0
-                                            }}>
-                                              {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                            </span>
-                                          </div>
+                                    {(() => {
+                                      const subTopicsMap: Record<string, { title: string; pages: any[]; concepts: string[] }> = {};
+                                      ch.pages.forEach((p: any) => {
+                                        let cleanTitle = "";
+                                        const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
+                                        
+                                        // Detect if a title is generic (e.g., contains "Page X" or "Section X", is missing/empty, or is too short)
+                                        const isGeneric = !pTitle || 
+                                          pTitle.match(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\b/i) ||
+                                          pTitle.toLowerCase().includes("section") ||
+                                          pTitle.toLowerCase().includes("page") ||
+                                          pTitle.includes("الصفحة") ||
+                                          pTitle.includes("قسم") ||
+                                          pTitle.length < 3;
 
-                                          {/* Concept Tags */}
-                                          {concepts.length > 0 && (
+                                        // 1. If page has a real descriptive title (not Page X, Section X etc.) and is not generic
+                                        if (pTitle && !isGeneric) {
+                                          cleanTitle = pTitle.replace(/^(Page|الصفحة|Section|قسم)\s+\d+[:\-]?\s*/i, "").trim();
+                                        }
+                                        
+                                        // 2. Fallback: use first concept tag as the topic title
+                                        if (!cleanTitle) {
+                                          const pConcepts = getPageConcepts(p);
+                                          if (pConcepts && pConcepts.length > 0) {
+                                            cleanTitle = pConcepts[0];
+                                          }
+                                        }
+                                        
+                                        // 3. Fallback: use first formula label as the topic title
+                                        if (!cleanTitle && p.formulas && p.formulas.length > 0) {
+                                          const firstForm = p.formulas[0];
+                                          const parts = firstForm.split(":");
+                                          if (parts[0] && parts[0].length < 30) {
+                                            cleanTitle = parts[0].trim();
+                                          }
+                                        }
+                                        
+                                        // 4. Ultimate fallback
+                                        if (!cleanTitle) {
+                                          cleanTitle = language === "ar" ? `موضوع الصفحة ${p.pageNum}` : `Topic of Page ${p.pageNum}`;
+                                        }
+
+                                        if (!subTopicsMap[cleanTitle]) {
+                                          subTopicsMap[cleanTitle] = {
+                                            title: cleanTitle,
+                                            pages: [],
+                                            concepts: []
+                                          };
+                                        }
+                                        subTopicsMap[cleanTitle].pages.push(p);
+                                        
+                                        const pConcepts = getPageConcepts(p);
+                                        pConcepts.forEach((c: string) => {
+                                          if (!subTopicsMap[cleanTitle].concepts.includes(c)) {
+                                            subTopicsMap[cleanTitle].concepts.push(c);
+                                          }
+                                        });
+                                      });
+                                      
+                                      const subTopics = Object.values(subTopicsMap);
+                                      
+                                      return subTopics.map((sub, sIdx) => {
+                                        return (
+                                          <div key={sIdx} style={{
+                                            padding: "10px",
+                                            marginLeft: isAr ? "0" : "0.5rem",
+                                            marginRight: isAr ? "0.5rem" : "0",
+                                            borderLeft: isAr ? "none" : "2px solid rgba(16, 107, 163, 0.12)",
+                                            borderRight: isAr ? "2px solid rgba(16, 107, 163, 0.12)" : "none",
+                                            background: "rgba(255, 255, 255, 0.45)",
+                                            borderRadius: "12px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "0.5rem",
+                                            boxShadow: "0 1px 3px rgba(0,0,0,0.01)"
+                                          }}>
+                                            {/* Sub-Topic Title */}
+                                            <div style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "0.4rem",
+                                              fontSize: "0.82rem",
+                                              fontWeight: 800,
+                                              color: "var(--primary)"
+                                            }}>
+                                              <span>📌</span>
+                                              <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                                                {sub.title}
+                                              </span>
+                                            </div>
+
+                                            {/* Concepts inside Sub-Topic */}
+                                            {sub.concepts.length > 0 && (
+                                              <div style={{
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: "4px",
+                                                paddingLeft: isAr ? "0" : "1.2rem",
+                                                paddingRight: isAr ? "1.2rem" : "0"
+                                              }}>
+                                                {sub.concepts.map((concept, cIdx) => {
+                                                  const hash = concept.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                                                  const hue = hash % 360;
+                                                  return (
+                                                    <span
+                                                      key={cIdx}
+                                                      style={{
+                                                        fontSize: "0.65rem",
+                                                        fontWeight: 700,
+                                                        background: `hsla(${hue}, 80%, 96%, 1)`,
+                                                        border: `1px solid hsla(${hue}, 60%, 86%, 1)`,
+                                                        color: `hsla(${hue}, 80%, 20%, 1)`,
+                                                        padding: "2px 6px",
+                                                        borderRadius: "6px",
+                                                        display: "inline-flex",
+                                                        alignItems: "center",
+                                                        gap: "2px"
+                                                      }}
+                                                    >
+                                                      🏷️ {concept}
+                                                    </span>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+
+                                            {/* Pages inside Sub-Topic */}
                                             <div style={{
                                               display: "flex",
                                               flexWrap: "wrap",
-                                              gap: "4px",
-                                              marginTop: "6px"
+                                              gap: "6px",
+                                              paddingLeft: isAr ? "0" : "1.2rem",
+                                              paddingRight: isAr ? "1.2rem" : "0"
                                             }}>
-                                              {concepts.map((concept, cIdx) => {
-                                                // Generate stable color based on string characters
-                                                const hash = concept.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                                                const hue = hash % 360;
-                                                const bg = `hsla(${hue}, 75%, 97%, 1)`;
-                                                const border = `hsla(${hue}, 50%, 88%, 1)`;
-                                                const text = `hsla(${hue}, 70%, 25%, 1)`;
-
+                                              {sub.pages.map((p) => {
+                                                const isActive = p.pageNum === readerCurrentPage;
                                                 return (
-                                                  <span
-                                                    key={cIdx}
+                                                  <button
+                                                    key={p.pageNum}
+                                                    onClick={() => setReaderCurrentPage(p.pageNum)}
                                                     style={{
-                                                      fontSize: "0.65rem",
-                                                      fontWeight: 700,
-                                                      background: bg,
-                                                      border: `1px solid ${border}`,
-                                                      color: text,
-                                                      padding: "1px 6px",
-                                                      borderRadius: "5px",
-                                                      display: "inline-block",
-                                                      boxShadow: "0 1px 2px rgba(0,0,0,0.01)"
+                                                      fontSize: "0.7rem",
+                                                      fontWeight: 800,
+                                                      cursor: "pointer",
+                                                      padding: "4px 10px",
+                                                      borderRadius: "20px",
+                                                      transition: "all 0.2s ease",
+                                                      border: isActive ? "2px solid #d4af37" : "1px solid rgba(16, 107, 163, 0.15)",
+                                                      background: isActive 
+                                                        ? "linear-gradient(135deg, #d4af37, #b45309)" 
+                                                        : "rgba(255, 255, 255, 0.9)",
+                                                      color: isActive ? "#ffffff" : "var(--foreground)",
+                                                      boxShadow: isActive ? "0 3px 8px rgba(212, 175, 55, 0.2)" : "0 1px 2px rgba(0,0,0,0.02)"
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                      if (!isActive) {
+                                                        e.currentTarget.style.borderColor = "var(--primary)";
+                                                        e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
+                                                      }
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                      if (!isActive) {
+                                                        e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)";
+                                                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                                                      }
                                                     }}
                                                   >
-                                                    🏷️ {concept}
-                                                  </span>
+                                                    📄 {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
+                                                    {isActive && (
+                                                      <span style={{ fontSize: "0.6rem", marginLeft: "4px", marginRight: "4px" }}>
+                                                        📍
+                                                      </span>
+                                                    )}
+                                                  </button>
                                                 );
                                               })}
                                             </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
+                                          </div>
+                                        );
+                                      });
+                                    })()}
                                   </div>
                                 )}
                               </div>
