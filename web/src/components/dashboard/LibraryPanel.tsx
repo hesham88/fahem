@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 
@@ -176,9 +176,11 @@ const isLineMathFormula = (line: string): boolean => {
   return false;
 };
 
-const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | null => {
+
+const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactNode[] | null => {
   if (!text) return null;
-  const processedText = preprocessRawText(text, isAr);
+  const isAr = isTextArabic(text);
+  const processedText = preprocessRawText(text, originalIsAr);
   const lines = processedText.split("\n");
   const elements: React.ReactNode[] = [];
   
@@ -315,6 +317,67 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
     if (!line) {
       elements.push(<div key={`space-${i}`} style={{ height: "0.75rem" }} />);
       i++;
+      continue;
+    }
+
+    // Detect triple-backtick code blocks
+    if (line.startsWith("```")) {
+      const lang = line.replace(/^```/, "").trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) {
+        i++; // Skip closing ```
+      }
+      const codeText = codeLines.join("\n");
+      elements.push(
+        <div key={`code-${i}`} style={{
+          margin: "1.75rem 0",
+          borderRadius: "14px",
+          background: "#1e1e2e",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
+          overflow: "hidden",
+          fontFamily: "var(--font-mono, monospace)",
+          direction: "ltr"
+        }}>
+          <div style={{
+            background: "rgba(255, 255, 255, 0.05)",
+            padding: "0.5rem 1rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
+          }}>
+            <span style={{ fontSize: "0.75rem", color: "#a6adc8", fontWeight: 700 }}>💻 {lang || "CODE"}</span>
+            <button 
+              onClick={() => navigator.clipboard.writeText(codeText)}
+              style={{
+                fontSize: "0.7rem",
+                color: "#cdd6f4",
+                background: "rgba(255, 255, 255, 0.1)",
+                border: "none",
+                borderRadius: "4px",
+                padding: "0.25rem 0.5rem",
+                cursor: "pointer"
+              }}
+            >
+              Copy
+            </button>
+          </div>
+          <pre style={{
+            margin: 0,
+            padding: "1rem",
+            fontSize: "0.9rem",
+            overflowX: "auto",
+            color: "#cdd6f4",
+            lineHeight: "1.5"
+          }}><code>{codeText}</code></pre>
+        </div>
+      );
       continue;
     }
 
@@ -961,6 +1024,44 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
   const [translationLanguage, setTranslationLanguage] = useState(language || "en");
 
+  // Premium On-the-fly Translation Agent States
+  const [translatedPages, setTranslatedPages] = useState<Record<string, string>>({});
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isPageTranslated, setIsPageTranslated] = useState<Record<string, boolean>>({});
+
+  const handleTranslatePage = async (text: string, pageKey: string, targetLang: "ar" | "en") => {
+    if (translatedPages[pageKey]) {
+      setIsPageTranslated(prev => ({ ...prev, [pageKey]: !prev[pageKey] }));
+      return;
+    }
+
+    try {
+      setIsTranslating(true);
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, targetLanguage: targetLang })
+      });
+
+      if (!res.ok) {
+        throw new Error("Translation failed");
+      }
+
+      const data = await res.json();
+      if (data.success && data.translatedText) {
+        setTranslatedPages(prev => ({ ...prev, [pageKey]: data.translatedText }));
+        setIsPageTranslated(prev => ({ ...prev, [pageKey]: true }));
+      } else {
+        alert(language === "ar" ? "فشلت الترجمة، يرجى المحاولة مرة أخرى." : "Translation failed, please try again.");
+      }
+    } catch (error) {
+      console.error("Translation agent error:", error);
+      alert(language === "ar" ? "حدث خطأ أثناء الاتصال بوكيل الترجمة." : "An error occurred while contacting the translation agent.");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const [showReaderSidebar, setShowReaderSidebar] = useState(true);
   const [sidebarPageSearch, setSidebarPageSearch] = useState("");
 
@@ -968,6 +1069,22 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [isContinuousListening, setIsContinuousListening] = useState(false);
   const [isNextPageGlow, setIsNextPageGlow] = useState(false);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const v = localStorage.getItem("fahem_tts_voice");
+      if (v) setSelectedVoice(v);
+    }
+  }, []);
+
+  const handleVoiceChange = (voice: string) => {
+    setSelectedVoice(voice);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fahem_tts_voice", voice);
+    }
+  };
 
   // New states for hierarchical menu, library selection, and Swarm SVG Mind Map
   const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "mindmap">("pages");
@@ -1017,7 +1134,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       setIsReadingPage(true);
       const hasArabicChars = /[\u0600-\u06FF]/.test(cleanedText);
       const reqLang = hasArabicChars ? "ar" : (translationLanguage || "en");
-      const selectedVoice = getStoredTtsVoice();
 
       const res = await fetch("/api/audio/tts", {
         method: "POST",
@@ -1041,7 +1157,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           audio.onended = () => {
             activeAudioRef.current = null;
             if (isContinuousListening && readerCurrentPage < totalPages) {
-              setReaderCurrentPage(prev => prev + 1);
+              setReaderCurrentPage(readerCurrentPage + 1);
             } else {
               setIsReadingPage(false);
               setIsNextPageGlow(true);
@@ -1189,6 +1305,12 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (!selectedBookReader) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore key events if the user is typing in an input, textarea, or contenteditable
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.getAttribute("contenteditable") === "true")) {
+        return;
+      }
+
       const allPages = getAllPages(selectedBookReader, loadedBookPages);
       const hasCover = !!selectedBookReader.coverUrl;
       const totalPages = hasCover ? allPages.length + 1 : allPages.length;
@@ -1198,24 +1320,24 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         if (isAr) {
           // RTL: ArrowRight goes to Previous Page
           if (readerCurrentPage > 1) {
-            setReaderCurrentPage(prev => prev - 1);
+            setReaderCurrentPage(readerCurrentPage - 1);
           }
         } else {
           // LTR: ArrowRight goes to Next Page
           if (readerCurrentPage < totalPages) {
-            setReaderCurrentPage(prev => prev + 1);
+            setReaderCurrentPage(readerCurrentPage + 1);
           }
         }
       } else if (e.key === "ArrowLeft") {
         if (isAr) {
           // RTL: ArrowLeft goes to Next Page
           if (readerCurrentPage < totalPages) {
-            setReaderCurrentPage(prev => prev + 1);
+            setReaderCurrentPage(readerCurrentPage + 1);
           }
         } else {
           // LTR: ArrowLeft goes to Previous Page
           if (readerCurrentPage > 1) {
-            setReaderCurrentPage(prev => prev - 1);
+            setReaderCurrentPage(readerCurrentPage - 1);
           }
         }
       }
@@ -1243,16 +1365,16 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       if (diffX > 0) {
         // Swipe Left (forward in LTR, backward in RTL)
         if (isAr) {
-          if (readerCurrentPage > 1) setReaderCurrentPage(prev => prev - 1);
+          if (readerCurrentPage > 1) setReaderCurrentPage(readerCurrentPage - 1);
         } else {
-          if (readerCurrentPage < totalPages) setReaderCurrentPage(prev => prev + 1);
+          if (readerCurrentPage < totalPages) setReaderCurrentPage(readerCurrentPage + 1);
         }
       } else {
         // Swipe Right (backward in LTR, forward in RTL)
         if (isAr) {
-          if (readerCurrentPage < totalPages) setReaderCurrentPage(prev => prev + 1);
+          if (readerCurrentPage < totalPages) setReaderCurrentPage(readerCurrentPage + 1);
         } else {
-          if (readerCurrentPage > 1) setReaderCurrentPage(prev => prev - 1);
+          if (readerCurrentPage > 1) setReaderCurrentPage(readerCurrentPage - 1);
         }
       }
     }
@@ -1406,6 +1528,62 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <style>{`
+        @keyframes activePulse {
+          0% {
+            r: 5px;
+            stroke-width: 1px;
+            stroke-opacity: 1;
+          }
+          50% {
+            r: 10px;
+            stroke-width: 4px;
+            stroke-opacity: 0.5;
+          }
+          100% {
+            r: 5px;
+            stroke-width: 1px;
+            stroke-opacity: 0;
+          }
+        }
+        @keyframes pulseGlowNext {
+          0% {
+            box-shadow: 0 0 0 0 rgba(16, 107, 163, 0.45);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(16, 107, 163, 0);
+            transform: scale(1.05);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(16, 107, 163, 0);
+            transform: scale(1);
+          }
+        }
+        @keyframes waveMotion {
+          0%, 100% { transform: scaleY(0.3); }
+          50% { transform: scaleY(1); }
+        }
+        .pulse-glow-next {
+          animation: pulseGlowNext 1.5s infinite !important;
+          border: 1px solid var(--primary) !important;
+          background: rgba(16, 107, 163, 0.08) !important;
+        }
+        .active-node-pulse {
+          transform-origin: center;
+        }
+        .hover-lift-cover {
+          transform: translateY(0);
+        }
+        .hover-lift-cover:hover {
+          transform: translateY(-8px) scale(1.02);
+          box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.3) !important;
+        }
+        .btn-start-reading:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(16, 107, 163, 0.5) !important;
+        }
+      `}</style>
       {selectedBookReader ? (() => {
         const allPages = getAllPages(selectedBookReader, loadedBookPages);
         const hasCover = !!selectedBookReader.coverUrl;
@@ -1450,13 +1628,30 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 >
                   ⬅️ {language === "ar" ? "المكتبة" : "Library"}
                 </button>
-                <div>
-                  <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
-                    {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
-                  </h2>
-                  <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>
-                    {language === "ar" ? "جلسة دراسة تفاعلية نشطة مع رفيق فهم" : "Active chapter-linked study companion session"}
-                  </p>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  {(selectedBookReader.coverThumbUrl || selectedBookReader.coverUrl) && (
+                    <img
+                      src={selectedBookReader.coverThumbUrl || selectedBookReader.coverUrl}
+                      alt="Textbook Cover"
+                      style={{
+                        width: "36px",
+                        height: "54px",
+                        borderRadius: "6px",
+                        objectFit: "cover",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+                        border: "1px solid rgba(16, 107, 163, 0.12)",
+                        flexShrink: 0
+                      }}
+                    />
+                  )}
+                  <div>
+                    <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
+                      {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
+                    </h2>
+                    <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>
+                      {language === "ar" ? "جلسة دراسة تفاعلية نشطة مع رفيق فهم" : "Active chapter-linked study companion session"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1519,136 +1714,414 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   overflowY: "auto",
                   boxShadow: "0 10px 30px rgba(16, 107, 163, 0.02)"
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ fontSize: "1rem", fontWeight: 800, margin: 0, color: "var(--primary)" }}>
-                      📖 {language === "ar" ? "فهرس الصفحات" : "Book Pages"}
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", background: "rgba(16, 107, 163, 0.08)", color: "var(--primary)", padding: "3px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                      {allPages.length} {language === "ar" ? "صفحة" : "Pages"}
-                    </span>
+                  {/* Tab Switcher */}
+                  <div style={{
+                    display: "flex",
+                    background: "rgba(16, 107, 163, 0.04)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(16, 107, 163, 0.12)",
+                    borderRadius: "12px",
+                    padding: "3px",
+                    gap: "4px"
+                  }}>
+                    <button
+                      onClick={() => setActiveSidebarTab("pages")}
+                      style={{
+                        flex: 1,
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: activeSidebarTab === "pages" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+                        color: activeSidebarTab === "pages" ? "#ffffff" : "var(--foreground)",
+                        fontSize: "0.75rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      📄 {language === "ar" ? "الصفحات" : "Pages"}
+                    </button>
+                    <button
+                      onClick={() => setActiveSidebarTab("mindmap")}
+                      style={{
+                        flex: 1,
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: activeSidebarTab === "mindmap" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+                        color: activeSidebarTab === "mindmap" ? "#ffffff" : "var(--foreground)",
+                        fontSize: "0.75rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      🧠 {language === "ar" ? "الخريطة الذهنية" : "Mind Map"}
+                    </button>
                   </div>
 
-                  {/* Sidebar Search */}
-                  <input
-                    type="text"
-                    placeholder={language === "ar" ? "ابحث عن عنوان أو محتوى..." : "Search title or text..."}
-                    value={sidebarPageSearch}
-                    onChange={(e) => setSidebarPageSearch(e.target.value)}
-                    style={{
-                      padding: "0.45rem 0.75rem",
-                      borderRadius: "10px",
-                      border: "1px solid rgba(16, 107, 163, 0.15)",
-                      fontSize: "0.8rem",
-                      outline: "none",
-                      background: "#ffffff",
-                      fontFamily: "var(--font-sans)",
-                      width: "100%",
-                      boxSizing: "border-box"
-                    }}
-                  />
+                  {activeSidebarTab === "pages" ? (
+                    <>
+                      {/* Sidebar Search */}
+                      <input
+                        type="text"
+                        placeholder={language === "ar" ? "ابحث عن عنوان أو محتوى..." : "Search title or text..."}
+                        value={sidebarPageSearch}
+                        onChange={(e) => setSidebarPageSearch(e.target.value)}
+                        style={{
+                          padding: "0.45rem 0.75rem",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                          fontSize: "0.8rem",
+                          outline: "none",
+                          background: "#ffffff",
+                          fontFamily: "var(--font-sans)",
+                          width: "100%",
+                          boxSizing: "border-box"
+                        }}
+                      />
 
-                  {/* Pages List */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflowY: "auto", flex: 1, paddingRight: "4px" }}>
-                    {(() => {
+                      {/* Pages List */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflowY: "auto", flex: 1, paddingRight: "4px" }}>
+                        {(() => {
+                          const search = sidebarPageSearch.toLowerCase();
+                          const filteredPages = allPages.filter((p) => {
+                            const tEn = (p.titleEn || "").toLowerCase();
+                            const tAr = (p.titleAr || "").toLowerCase();
+                            const cEn = (p.contentEn || "").toLowerCase();
+                            const cAr = (p.contentAr || "").toLowerCase();
+                            const chEn = (p.chapterTitleEn || "").toLowerCase();
+                            const chAr = (p.chapterTitleAr || "").toLowerCase();
+                            return tEn.includes(search) || tAr.includes(search) || cEn.includes(search) || cAr.includes(search) || chEn.includes(search) || chAr.includes(search);
+                          });
 
-                      // Default simple list of pages grouped by chapter name
-                      const search = sidebarPageSearch.toLowerCase();
-                      const filteredPages = allPages.filter((p) => {
-                        const tEn = (p.titleEn || "").toLowerCase();
-                        const tAr = (p.titleAr || "").toLowerCase();
-                        const cEn = (p.contentEn || "").toLowerCase();
-                        const cAr = (p.contentAr || "").toLowerCase();
-                        const chEn = (p.chapterTitleEn || "").toLowerCase();
-                        const chAr = (p.chapterTitleAr || "").toLowerCase();
-                        return tEn.includes(search) || tAr.includes(search) || cEn.includes(search) || cAr.includes(search) || chEn.includes(search) || chAr.includes(search);
-                      });
+                          if (filteredPages.length === 0) {
+                            return (
+                              <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
+                                🔍 {language === "ar" ? "لا توجد نتائج مطابقة" : "No matching pages found"}
+                              </div>
+                            );
+                          }
 
-                      if (filteredPages.length === 0) {
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                              {filteredPages.map((p) => {
+                                const isActive = p.pageNum === readerCurrentPage;
+                                const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
+                                const pAr = translationLanguage === "ar";
+                                const pContent = translationLanguage === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
+                                const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
+
+                                return (
+                                  <button
+                                    key={p.pageNum}
+                                    onClick={() => setReaderCurrentPage(p.pageNum)}
+                                    style={{
+                                      textAlign: pAr ? "right" : "left",
+                                      direction: pAr ? "rtl" : "ltr",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "0.25rem",
+                                      padding: "8px 12px",
+                                      borderRadius: "10px",
+                                      border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "1px solid transparent",
+                                      background: isActive ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03))" : "rgba(255, 255, 255, 0.5)",
+                                      cursor: "pointer",
+                                      transition: "all 0.2s ease",
+                                      width: "100%",
+                                      boxSizing: "border-box"
+                                    }}
+                                    onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
+                                    onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)"; }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "0.5rem" }}>
+                                      <span style={{
+                                        fontSize: "0.8rem",
+                                        fontWeight: isActive ? 800 : 700,
+                                        color: isActive ? "var(--primary)" : "var(--foreground)",
+                                        textOverflow: "ellipsis",
+                                        overflow: "hidden",
+                                        whiteSpace: "nowrap",
+                                        flex: 1,
+                                        textAlign: pAr ? "right" : "left"
+                                      }}>
+                                        {pTitle}
+                                      </span>
+                                      <span style={{
+                                        fontSize: "0.7rem",
+                                        fontWeight: 800,
+                                        color: isActive ? "var(--primary)" : "#6a7c88",
+                                        background: isActive ? "rgba(16, 107, 163, 0.12)" : "rgba(16, 107, 163, 0.05)",
+                                        padding: "2px 6px",
+                                        borderRadius: "6px",
+                                        whiteSpace: "nowrap"
+                                      }}>
+                                        {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
+                                      </span>
+                                    </div>
+                                    {pSnippet && (
+                                      <p style={{
+                                        margin: 0,
+                                        fontSize: "0.7rem",
+                                        color: "#6a7c88",
+                                        lineHeight: "1.3",
+                                        textAlign: pAr ? "right" : "left",
+                                        textOverflow: "ellipsis",
+                                        overflow: "hidden",
+                                        whiteSpace: "nowrap",
+                                        width: "100%"
+                                      }}>
+                                        {pSnippet}
+                                      </p>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </>
+                  ) : (
+                    /* Premium Interactive SVG Mind Map Tab */
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, position: "relative" }}>
+                      {(() => {
+                        const chaptersMap: Record<string, { title: string; titleAr: string; pages: any[] }> = {};
+                        allPages.forEach(p => {
+                          const chTitleEn = p.chapterTitleEn || "General";
+                          const chTitleAr = p.chapterTitleAr || "عام";
+                          const key = chTitleEn;
+                          if (!chaptersMap[key]) {
+                            chaptersMap[key] = { title: chTitleEn, titleAr: chTitleAr, pages: [] };
+                          }
+                          chaptersMap[key].pages.push(p);
+                        });
+
+                        const nodes: any[] = [];
+                        const links: any[] = [];
+
+                        let currentY = 75;
+                        const rootNode = { id: "root", type: "root", label: language === "ar" ? "الفهرس" : "Contents", x: 130, y: 30 };
+                        nodes.push(rootNode);
+
+                        const chaptersList = Object.values(chaptersMap);
+                        chaptersList.forEach((ch, chIdx) => {
+                          const chId = `ch-${chIdx}`;
+                          const chIsExpanded = expandedChapters[chId] !== false; // default to expanded
+                          
+                          const chNode = {
+                            id: chId,
+                            type: "chapter",
+                            label: translationLanguage === "ar" ? ch.titleAr : ch.title,
+                            fullLabelEn: ch.title,
+                            fullLabelAr: ch.titleAr,
+                            x: 60,
+                            y: currentY,
+                            pagesCount: ch.pages.length,
+                            isExpanded: chIsExpanded
+                          };
+                          nodes.push(chNode);
+                          
+                          links.push({
+                            from: rootNode,
+                            to: chNode,
+                            type: "root-to-chapter"
+                          });
+                          
+                          if (chIsExpanded) {
+                            ch.pages.forEach((p) => {
+                              const pNodeId = `p-${p.pageNum}`;
+                              const pActive = p.pageNum === readerCurrentPage;
+                              const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
+                              
+                              const pNode = {
+                                id: pNodeId,
+                                type: "page",
+                                pageNum: p.pageNum,
+                                label: `${p.pageNum}`,
+                                fullLabel: pTitle,
+                                snippet: (translationLanguage === "ar" ? (p.contentAr || p.contentEn) : (p.contentEn || p.contentAr))?.slice(0, 80) + "...",
+                                active: pActive,
+                                x: 190,
+                                y: currentY
+                              };
+                              nodes.push(pNode);
+                              
+                              links.push({
+                                from: chNode,
+                                to: pNode,
+                                type: "chapter-to-page",
+                                active: pActive
+                              });
+                              
+                              currentY += 44; // Spacing between page nodes
+                            });
+                          } else {
+                            currentY += 54; // Spacing if chapter collapsed
+                          }
+                        });
+
+                        const svgHeight = Math.max(300, currentY + 30);
+
                         return (
-                          <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
-                            🔍 {language === "ar" ? "لا توجد نتائج مطابقة" : "No matching pages found"}
+                          <div style={{ position: "relative", width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "hidden", borderRadius: "12px", border: "1px solid rgba(16, 107, 163, 0.08)", background: "rgba(16, 107, 163, 0.01)" }}>
+                            <svg width="240" height={svgHeight} style={{ overflow: "visible" }}>
+                              <defs>
+                                <linearGradient id="grad-active-link" x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.4" />
+                                  <stop offset="100%" stopColor="var(--secondary)" stopOpacity="1" />
+                                </linearGradient>
+                                <linearGradient id="grad-inactive-link" x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset="0%" stopColor="rgba(16, 107, 163, 0.15)" />
+                                  <stop offset="100%" stopColor="rgba(16, 107, 163, 0.05)" />
+                                </linearGradient>
+                                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                                  <feGaussianBlur stdDeviation="3" result="blur" />
+                                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                </filter>
+                              </defs>
+
+                              {/* Render Bezier Curves */}
+                              {links.map((link, idx) => {
+                                const dx = link.to.x - link.from.x;
+                                const cx1 = link.from.x + dx * 0.5;
+                                const cy1 = link.from.y;
+                                const cx2 = link.from.x + dx * 0.5;
+                                const cy2 = link.to.y;
+                                const d = `M ${link.from.x} ${link.from.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${link.to.x} ${link.to.y}`;
+
+                                return (
+                                  <path
+                                    key={idx}
+                                    d={d}
+                                    fill="none"
+                                    stroke={link.active ? "url(#grad-active-link)" : "url(#grad-inactive-link)"}
+                                    strokeWidth={link.active ? 3 : 1.5}
+                                    strokeDasharray={link.type === "chapter-to-page" ? (link.active ? "none" : "3,3") : "none"}
+                                    style={{ transition: "all 0.3s ease" }}
+                                    filter={link.active ? "url(#glow)" : undefined}
+                                  />
+                                );
+                              })}
+
+                              {/* Render Nodes */}
+                              {nodes.map((node) => {
+                                const isRoot = node.type === "root";
+                                const isChapter = node.type === "chapter";
+                                const isPage = node.type === "page";
+
+                                return (
+                                  <g
+                                    key={node.id}
+                                    style={{ cursor: "pointer" }}
+                                    onClick={() => {
+                                      if (isPage) {
+                                        setReaderCurrentPage(node.pageNum);
+                                      } else if (isChapter) {
+                                        setExpandedChapters(prev => ({
+                                          ...prev,
+                                          [node.id]: !node.isExpanded
+                                        }));
+                                      }
+                                    }}
+                                    onMouseOver={() => setHoveredNode(node)}
+                                    onMouseOut={() => setHoveredNode(null)}
+                                  >
+                                    {isRoot && (
+                                      <>
+                                        <circle cx={node.x} cy={node.y} r="14" fill="var(--primary)" stroke="#ffffff" strokeWidth="2" filter="url(#glow)" />
+                                        <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900">🧠</text>
+                                      </>
+                                    )}
+
+                                    {isChapter && (
+                                      <>
+                                        <circle cx={node.x} cy={node.y} r="10" fill={node.isExpanded ? "var(--primary)" : "#6a7c88"} stroke="#ffffff" strokeWidth="1.5" />
+                                        <text x={node.x} y={node.y + 3} textAnchor="middle" fill="#ffffff" fontSize="8" fontWeight="800">
+                                          {node.isExpanded ? "−" : "+"}
+                                        </text>
+                                        <text x={node.x - 14} y={node.y + 3} textAnchor="end" fill="var(--foreground)" fontSize="9" fontWeight="700" style={{ maxWidth: "60px" }}>
+                                          {node.label.length > 8 ? node.label.slice(0, 7) + "..." : node.label}
+                                        </text>
+                                      </>
+                                    )}
+
+                                    {isPage && (
+                                      <>
+                                        {/* Active Pulse Glow circle */}
+                                        {node.active && (
+                                          <circle cx={node.x} cy={node.y} r="10" fill="none" stroke="var(--primary)" strokeWidth="1" className="active-node-pulse" style={{ animation: "activePulse 1.5s infinite" }} />
+                                        )}
+                                        <circle cx={node.x} cy={node.y} r="8" fill={node.active ? "var(--primary)" : "#ffffff"} stroke={node.active ? "var(--secondary)" : "rgba(16, 107, 163, 0.3)"} strokeWidth={node.active ? 2 : 1} />
+                                        <text x={node.x} y={node.y + 3} textAnchor="middle" fill={node.active ? "#ffffff" : "var(--primary)"} fontSize="8" fontWeight="900">
+                                          {node.label}
+                                        </text>
+                                      </>
+                                    )}
+                                  </g>
+                                );
+                              })}
+                            </svg>
+
+                            {/* Floating glassmorphic tooltip card inside Mind Map panel */}
+                            {hoveredNode && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: "8px",
+                                left: "8px",
+                                right: "8px",
+                                background: "rgba(255, 255, 255, 0.95)",
+                                backdropFilter: "blur(12px)",
+                                border: "1px solid rgba(16, 107, 163, 0.15)",
+                                borderRadius: "10px",
+                                padding: "8px 12px",
+                                pointerEvents: "none",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                                transition: "all 0.2s ease-in-out",
+                                zIndex: 10
+                              }}>
+                                {hoveredNode.type === "root" && (
+                                  <div>
+                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📖 {selectedBookReader.title}</div>
+                                    <div style={{ fontSize: "0.65rem", color: "#6a7c88", marginTop: "2px" }}>
+                                      {language === "ar" ? "الهيكل التنظيمي الكامل للفصول والمحتوى" : "Full structured course syllabus tree"}
+                                    </div>
+                                  </div>
+                                )}
+                                {hoveredNode.type === "chapter" && (
+                                  <div>
+                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📂 {hoveredNode.fullLabelEn || hoveredNode.fullLabelAr}</div>
+                                    <div style={{ fontSize: "0.65rem", color: "#6a7c88", marginTop: "2px" }}>
+                                      {language === "ar" ? `يحتوي على ${hoveredNode.pagesCount} صفحات تفاعلية` : `Contains ${hoveredNode.pagesCount} interactive pages`}
+                                    </div>
+                                  </div>
+                                )}
+                                {hoveredNode.type === "page" && (
+                                  <div>
+                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📄 {language === "ar" ? `صفحة ${hoveredNode.pageNum}` : `Page ${hoveredNode.pageNum}`}</div>
+                                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--foreground)", marginTop: "1px" }}>{hoveredNode.fullLabel}</div>
+                                    {hoveredNode.snippet && (
+                                      <div style={{ fontSize: "0.6rem", color: "#6a7c88", marginTop: "3px", fontStyle: "italic", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                                        "{hoveredNode.snippet}"
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
-                      }
-
-                      return (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                          {filteredPages.map((p) => {
-                            const isActive = p.pageNum === readerCurrentPage;
-                            const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                            const pAr = translationLanguage === "ar";
-                            const pContent = translationLanguage === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
-                            const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
-
-                            return (
-                              <button
-                                key={p.pageNum}
-                                onClick={() => setReaderCurrentPage(p.pageNum)}
-                                style={{
-                                  textAlign: pAr ? "right" : "left",
-                                  direction: pAr ? "rtl" : "ltr",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "0.25rem",
-                                  padding: "8px 12px",
-                                  borderRadius: "10px",
-                                  border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "1px solid transparent",
-                                  background: isActive ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03))" : "rgba(255, 255, 255, 0.5)",
-                                  cursor: "pointer",
-                                  transition: "all 0.2s ease",
-                                  width: "100%",
-                                  boxSizing: "border-box"
-                                }}
-                                onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
-                                onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)"; }}
-                              >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "0.5rem" }}>
-                                  <span style={{
-                                    fontSize: "0.8rem",
-                                    fontWeight: isActive ? 800 : 700,
-                                    color: isActive ? "var(--primary)" : "var(--foreground)",
-                                    textOverflow: "ellipsis",
-                                    overflow: "hidden",
-                                    whiteSpace: "nowrap",
-                                    flex: 1,
-                                    textAlign: pAr ? "right" : "left"
-                                  }}>
-                                    {pTitle}
-                                  </span>
-                                  <span style={{
-                                    fontSize: "0.7rem",
-                                    fontWeight: 800,
-                                    color: isActive ? "var(--primary)" : "#6a7c88",
-                                    background: isActive ? "rgba(16, 107, 163, 0.12)" : "rgba(16, 107, 163, 0.05)",
-                                    padding: "2px 6px",
-                                    borderRadius: "6px",
-                                    whiteSpace: "nowrap"
-                                  }}>
-                                    {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                  </span>
-                                </div>
-                                {pSnippet && (
-                                  <p style={{
-                                    margin: 0,
-                                    fontSize: "0.7rem",
-                                    color: "#6a7c88",
-                                    lineHeight: "1.3",
-                                    textAlign: pAr ? "right" : "left",
-                                    textOverflow: "ellipsis",
-                                    overflow: "hidden",
-                                    whiteSpace: "nowrap",
-                                    width: "100%"
-                                  }}>
-                                    {pSnippet}
-                                  </p>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1657,6 +2130,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               {/* Textbook Viewer Panel */}
               <div 
                 className="panel-card" 
+                onTouchStart={handleTouchStart}
+                onTouchEnd={(e) => handleTouchEnd(e, totalPagesCount)}
                 onMouseUp={() => {
                   const selection = window.getSelection();
                   if (!selection) return;
@@ -1693,67 +2168,105 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     paddingBottom: "0.75rem"
                   }}>
                     <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--primary)" }}>
-                      📖 {translationLanguage === "ar" ? "محتوى الصفحة" : "Page Content"}: {readerCurrentPage} / {totalPagesCount}
+                      {isCoverPage 
+                        ? (translationLanguage === "ar" ? "📖 غلاف الكتاب" : "📖 Book Cover")
+                        : (translationLanguage === "ar" 
+                            ? `📖 ${activePage?.chapterTitleAr || "الفصل"} — صفحة ${readerCurrentPage}` 
+                            : `📖 ${activePage?.chapterTitleEn || "Chapter"} — Page ${readerCurrentPage}`)}
                     </span>
 
-                    {/* Premium Pre-computed Page Language Selector */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
-                        🌐 {language === "ar" ? "لغة الصفحة:" : "Page Language:"}
-                      </span>
-                      <div style={{
-                        display: "inline-flex",
-                        background: "rgba(16, 107, 163, 0.04)",
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(16, 107, 163, 0.12)",
-                        borderRadius: "20px",
-                        padding: "3px",
-                        gap: "2px"
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => setTranslationLanguage("en")}
-                          style={{
-                            padding: "4px 14px",
-                            borderRadius: "18px",
-                            border: "none",
-                            background: translationLanguage === "en" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
-                            color: translationLanguage === "en" ? "#ffffff" : "var(--foreground)",
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.25rem",
-                            boxShadow: translationLanguage === "en" ? "0 2px 8px rgba(16, 107, 163, 0.25)" : "none"
-                          }}
-                        >
-                          🇺🇸 EN
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTranslationLanguage("ar")}
-                          style={{
-                            padding: "4px 14px",
-                            borderRadius: "18px",
-                            border: "none",
-                            background: translationLanguage === "ar" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
-                            color: translationLanguage === "ar" ? "#ffffff" : "var(--foreground)",
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.25rem",
-                            boxShadow: translationLanguage === "ar" ? "0 2px 8px rgba(16, 107, 163, 0.25)" : "none"
-                          }}
-                        >
-                          🇸🇦 AR
-                        </button>
-                      </div>
-                    </div>
+                    {/* Premium AI Translation Agent Widget */}
+                    {(() => {
+                      const pageKey = `${selectedBookReader._id || selectedBookReader.id || "default"}_${readerCurrentPage}`;
+                      const isArPageContent = isTextArabic(activePage?.content || activePage?.contentEn || activePage?.contentAr || "");
+                      const targetLang = isArPageContent ? "en" : "ar";
+                      const isTranslated = !!isPageTranslated[pageKey];
+                      const hasTranslation = !!translatedPages[pageKey];
+
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                            🌐 {language === "ar" ? "وكيل الترجمة:" : "Translation Agent:"}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isTranslating}
+                            onClick={() => {
+                              if (isTranslated) {
+                                setIsPageTranslated(prev => ({ ...prev, [pageKey]: false }));
+                              } else if (hasTranslation) {
+                                setIsPageTranslated(prev => ({ ...prev, [pageKey]: true }));
+                              } else {
+                                const originalText = activePage?.content || activePage?.contentEn || activePage?.contentAr || "";
+                                handleTranslatePage(originalText, pageKey, targetLang);
+                              }
+                            }}
+                            style={{
+                              padding: "4px 14px",
+                              borderRadius: "18px",
+                              border: "none",
+                              background: isTranslated 
+                                ? "linear-gradient(135deg, #1b5e20, #2e7d32)" // Rich Forest Green
+                                : "linear-gradient(135deg, var(--primary), var(--secondary))",
+                              color: "#ffffff",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.35rem",
+                              boxShadow: isTranslated 
+                                ? "0 2px 8px rgba(27, 94, 32, 0.3)" 
+                                : "0 2px 8px rgba(16, 107, 163, 0.25)"
+                            }}
+                            onMouseOver={(e) => {
+                              if (!isTranslating) {
+                                e.currentTarget.style.transform = "translateY(-1px)";
+                                e.currentTarget.style.boxShadow = isTranslated 
+                                  ? "0 4px 12px rgba(27, 94, 32, 0.4)" 
+                                  : "0 4px 12px rgba(16, 107, 163, 0.35)";
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = isTranslated 
+                                ? "0 2px 8px rgba(27, 94, 32, 0.3)" 
+                                : "0 2px 8px rgba(16, 107, 163, 0.25)";
+                            }}
+                          >
+                            {isTranslating ? (
+                              <>
+                                <span style={{
+                                  display: "inline-block",
+                                  width: "10px",
+                                  height: "10px",
+                                  border: "2px solid rgba(255,255,255,0.3)",
+                                  borderTopColor: "#fff",
+                                  borderRadius: "50%",
+                                  animation: "spin 0.8s linear infinite"
+                                }}></span>
+                                <span>{language === "ar" ? "جاري الترجمة..." : "Translating..."}</span>
+                              </>
+                            ) : isTranslated ? (
+                              <>
+                                <span>↩️</span>
+                                <span>{language === "ar" ? "عرض النص الأصلي" : "Show Original"}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>✨</span>
+                                <span>
+                                  {language === "ar" 
+                                    ? `ترجمة إلى ${targetLang === "ar" ? "العربية" : "الإنجليزية"}`
+                                    : `Translate to ${targetLang === "ar" ? "Arabic" : "English"}`}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     <div style={{ display: "flex", gap: "0.4rem" }}>
                       <button
@@ -1767,7 +2280,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       <button
                         disabled={readerCurrentPage >= totalPagesCount}
                         onClick={() => setReaderCurrentPage(Math.min(totalPagesCount, readerCurrentPage + 1))}
-                        className="btn btn-secondary"
+                        className={`btn btn-secondary ${isNextPageGlow ? "pulse-glow-next" : ""}`}
                         style={{ padding: "4px 10px", fontSize: "0.75rem" }}
                       >
                         {language === "ar" ? "التالي" : "Next"}
@@ -1782,44 +2295,351 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         {language === "ar" ? "جاري استرجاع وفهرسة صفحات الكتاب دراسياً..." : "Retrieving and indexing book pages..."}
                       </p>
                     </div>
+                  ) : isCoverPage ? (
+                    /* Beautiful full-size cover poster with stage and grade metadata, and CTA */
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                      gap: "2.5rem",
+                      padding: "1.5rem",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "linear-gradient(135deg, rgba(255,255,255,0.4), rgba(255,255,255,0.1))",
+                      borderRadius: "24px",
+                      border: "1px solid rgba(16, 107, 163, 0.08)",
+                      boxShadow: "0 20px 50px rgba(0,0,0,0.03)"
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        position: "relative"
+                      }}>
+                        <img 
+                          src={selectedBookReader.coverUrl}
+                          alt={selectedBookReader.title}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "420px",
+                            borderRadius: "16px",
+                            boxShadow: "0 15px 35px rgba(0, 0, 0, 0.15), 0 5px 15px rgba(16, 107, 163, 0.1)",
+                            border: "1px solid rgba(16, 107, 163, 0.15)",
+                            objectFit: "contain",
+                            transition: "transform 0.3s ease"
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.02)"; }}
+                          onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                        />
+                      </div>
+
+                      <div style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "1.25rem",
+                        textAlign: language === "ar" ? "right" : "left",
+                        alignItems: language === "ar" ? "flex-start" : "flex-start"
+                      }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                          {(() => {
+                            const rTheme = getSubjectTheme(selectedBookReader.subject || "");
+                            return (
+                              <span style={{
+                                padding: "6px 14px", borderRadius: "20px", 
+                                background: rTheme.badgeBg,
+                                color: rTheme.badgeText, 
+                                fontWeight: 800, fontSize: "0.8rem",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.25rem"
+                              }}>
+                                {rTheme.emoji} {getLocalizedSubject(selectedBookReader.subject, language)}
+                              </span>
+                            );
+                          })()}
+
+                          <span style={{
+                            padding: "6px 14px", borderRadius: "20px",
+                            background: "rgba(16, 107, 163, 0.05)",
+                            color: "var(--primary)",
+                            fontWeight: 800, fontSize: "0.8rem",
+                            border: "1px solid rgba(16, 107, 163, 0.1)"
+                          }}>
+                            🏫 {selectedBookReader.isMoeIngested 
+                              ? (language === "ar" ? "وزارة التربية والتعليم" : "MOE curriculum")
+                              : (language === "ar" ? "المكتبة الأكاديمية" : "Academic Library")}
+                          </span>
+                        </div>
+
+                        <h1 style={{
+                          fontSize: "1.8rem",
+                          fontWeight: 900,
+                          margin: 0,
+                          color: "var(--foreground)",
+                          lineHeight: "1.3",
+                          fontFamily: language === "ar" ? "Cairo, sans-serif" : "var(--font-display)"
+                        }}>
+                          {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
+                        </h1>
+
+                        <div style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "1rem",
+                          fontSize: "0.9rem",
+                          color: "#6a7c88",
+                          borderTop: "1px solid rgba(16, 107, 163, 0.08)",
+                          borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
+                          padding: "0.75rem 0",
+                          width: "100%"
+                        }}>
+                          <div>
+                            <strong>{language === "ar" ? "المرحلة الدراسية:" : "Education Stage:"}</strong>{" "}
+                            <span>{(selectedBookReader as any).stage || (selectedBookReader.isMoeIngested ? (language === "ar" ? "المرحلة الثانوية" : "Secondary Stage") : (language === "ar" ? "المرحلة الأكاديمية" : "Academic Stage"))}</span>
+                          </div>
+                          <div style={{ height: "1.2rem", width: "1px", background: "rgba(16, 107, 163, 0.15)" }}></div>
+                          <div>
+                            <strong>{language === "ar" ? "الصف الدراسي:" : "Grade Level:"}</strong>{" "}
+                            <span>{(selectedBookReader as any).grade || (language === "ar" ? "الصف العاشر" : "Grade 10")}</span>
+                          </div>
+                          <div style={{ height: "1.2rem", width: "1px", background: "rgba(16, 107, 163, 0.15)" }}></div>
+                          <div>
+                            <strong>{language === "ar" ? "الصفحات:" : "Total Pages:"}</strong>{" "}
+                            <span>{totalPagesCount}</span>
+                          </div>
+                        </div>
+
+                        <p style={{
+                          fontSize: "0.95rem",
+                          color: "#4a5d68",
+                          lineHeight: "1.6",
+                          margin: 0,
+                          fontFamily: language === "ar" ? "Cairo, sans-serif" : "var(--font-sans)"
+                        }}>
+                          {language === "ar" 
+                            ? "مرحباً بك في جلسة القراءة التفاعلية المخصصة لهذا الكتاب الدراسي. تم تجهيز هذا الإصدار بمخططات خرائط ذهنية تفاعلية ذكية، بالإضافة إلى ميزة القارئ الصوتي المستمر الذكي لدعم التحصيل الدراسي الأقصى ونمو الذاكرة البصرية والسمعية."
+                            : "Welcome to the interactive digital study session for this textbook. This premium edition is equipped with dendritic AI mind maps and continuous text-to-speech companion rendering for optimal retention and multisensory learning."}
+                        </p>
+
+                        <button
+                          onClick={() => setReaderCurrentPage(2)}
+                          style={{
+                            padding: "12px 28px",
+                            borderRadius: "30px",
+                            border: "none",
+                            background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                            color: "#ffffff",
+                            fontWeight: 800,
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            boxShadow: "0 8px 24px rgba(16, 107, 163, 0.25)",
+                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            marginTop: "1rem"
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 12px 30px rgba(16, 107, 163, 0.35)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "0 8px 24px rgba(16, 107, 163, 0.25)";
+                          }}
+                        >
+                          <span>📖 {language === "ar" ? "ابدأ القراءة الآن" : "Start Reading Now"}</span>
+                          <span style={{ fontSize: "1.1rem" }}>{language === "ar" ? "⬅️" : "➡️"}</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     (() => {
                       const isAr = translationLanguage === "ar";
+                      const pageKey = `${selectedBookReader._id || selectedBookReader.id || "default"}_${readerCurrentPage}`;
+                      const isPageTranslatedActive = !!isPageTranslated[pageKey];
+                      const translatedTextVal = translatedPages[pageKey];
 
-                      const activeContent = isAr 
-                        ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
-                        : (activePage.contentEn || activePage.contentAr || activePage.content || "");
+                      const activeContent = isPageTranslatedActive && translatedTextVal
+                        ? translatedTextVal
+                        : (isAr 
+                            ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
+                            : (activePage.contentEn || activePage.contentAr || activePage.content || ""));
 
-                      const activeTitle = isAr
-                        ? (activePage.titleAr || activePage.titleEn || activePage.chapterTitleAr || "")
-                        : (activePage.titleEn || activePage.titleAr || activePage.chapterTitleEn || "");
+                      const actualIsAr = isTextArabic(activeContent);
+
+                      const isGeneric = (str: string) => {
+                        const s = (str || "").trim().toLowerCase();
+                        return !s || s === "page content" || s === "محتوى الصفحة" || s === "untitled section" || s === "قسم غير معنون";
+                      };
+
+                      let activeTitle = "";
+                      if (actualIsAr) {
+                        const rawTitle = activePage.titleAr || activePage.titleEn || "";
+                        if (isGeneric(rawTitle)) {
+                          const chTitle = activePage.chapterTitleAr || activePage.chapterTitleEn || "";
+                          activeTitle = chTitle ? `${chTitle} — صفحة ${activePage.pageNum}` : `صفحة ${activePage.pageNum}`;
+                        } else {
+                          activeTitle = rawTitle;
+                        }
+                      } else {
+                        const rawTitle = activePage.titleEn || activePage.titleAr || "";
+                        if (isGeneric(rawTitle)) {
+                          const chTitle = activePage.chapterTitleEn || activePage.chapterTitleAr || "";
+                          activeTitle = chTitle ? `${chTitle} — Page ${activePage.pageNum}` : `Page ${activePage.pageNum}`;
+                        } else {
+                          activeTitle = rawTitle;
+                        }
+                      }
 
                       return (
-                        <article 
-                          dir={isAr ? "rtl" : "ltr"}
-                          style={{ 
-                            lineHeight: "1.8", 
-                            color: "var(--foreground)", 
-                            fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
-                            textAlign: isAr ? "right" : "left",
-                          }}
-                        >
-                          <h3 style={{ 
-                            fontSize: "1.4rem", 
-                            fontWeight: 800, 
-                            color: "var(--primary)", 
-                            borderBottom: "2px solid rgba(16, 107, 163, 0.12)", 
-                            paddingBottom: "0.75rem", 
-                            marginBottom: "1.5rem",
-                            fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-display)",
-                            textAlign: isAr ? "right" : "left",
+                        <>
+                          {/* Premium TTS Control Panel */}
+                          <div style={{
+                            background: "rgba(16, 107, 163, 0.04)",
+                            backdropFilter: "blur(12px)",
+                            borderRadius: "16px",
+                            padding: "0.75rem 1.25rem",
+                            border: "1px solid rgba(16, 107, 163, 0.1)",
                             display: "flex",
                             alignItems: "center",
-                            gap: "0.6rem"
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: "1rem",
+                            marginBottom: "1.5rem",
+                            boxShadow: "0 8px 32px rgba(16, 107, 163, 0.02)"
                           }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                              <button
+                                onClick={() => handleReadPage(activeContent, totalPagesCount)}
+                                style={{
+                                  background: isReadingPage 
+                                    ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                                    : "linear-gradient(135deg, var(--primary), var(--secondary))",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  padding: "8px 18px",
+                                  borderRadius: "20px",
+                                  fontWeight: 800,
+                                  fontSize: "0.85rem",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.5rem",
+                                  boxShadow: isReadingPage 
+                                    ? "0 4px 15px rgba(239, 68, 68, 0.3)" 
+                                    : "0 4px 15px rgba(16, 107, 163, 0.2)",
+                                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.transform = "translateY(-1px)";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.transform = "translateY(0)";
+                                }}
+                              >
+                                {isReadingPage ? (
+                                  <>
+                                    <span style={{ display: "inline-block", animation: "waveMotion 1s infinite" }}>🛑</span>
+                                    <span>{language === "ar" ? "إيقاف القراءة" : "Stop Reading"}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>🔊</span>
+                                    <span>{language === "ar" ? "قراءة الصفحة" : "Read Page"}</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {isReadingPage && (
+                                <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
+                                  <div style={{ width: "3px", height: "12px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.1s" }}></div>
+                                  <div style={{ width: "3px", height: "18px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.2s" }}></div>
+                                  <div style={{ width: "3px", height: "14px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.3s" }}></div>
+                                  <div style={{ width: "3px", height: "8px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.4s" }}></div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                                  🎙️ {language === "ar" ? "المتحدث:" : "Speaker:"}
+                                </span>
+                                <select
+                                  value={selectedVoice}
+                                  onChange={(e) => handleVoiceChange(e.target.value)}
+                                  style={{
+                                    padding: "4px 10px",
+                                    borderRadius: "10px",
+                                    border: "1px solid rgba(16, 107, 163, 0.15)",
+                                    background: "#ffffff",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 700,
+                                    color: "var(--foreground)",
+                                    cursor: "pointer",
+                                    outline: "none",
+                                    boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
+                                  }}
+                                >
+                                  {["Aoede", "Puck", "Charon", "Kore", "Fenrir"].map((voiceName) => (
+                                    <option key={voiceName} value={voiceName}>
+                                      {voiceName} ({voiceName === "Aoede" ? "Premium Female" : voiceName === "Fenrir" ? "Deep Bass" : "Advanced"})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <label style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                color: "#4a5d68",
+                                cursor: "pointer",
+                                userSelect: "none"
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isContinuousListening}
+                                  onChange={(e) => setIsContinuousListening(e.target.checked)}
+                                  style={{
+                                    width: "14px",
+                                    height: "14px",
+                                    accentColor: "var(--primary)",
+                                    cursor: "pointer"
+                                  }}
+                                />
+                                <span>🔁 {language === "ar" ? "قراءة تلقائية مستمرة" : "Auto Continuous Play"}</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          <article 
+                            dir={actualIsAr ? "rtl" : "ltr"}
+                            style={{ 
+                              lineHeight: "1.8", 
+                              color: "var(--foreground)", 
+                              fontFamily: actualIsAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+                              textAlign: actualIsAr ? "right" : "left",
+                            }}
+                          >
+                            <h3 style={{ 
+                              fontSize: "1.4rem", 
+                              fontWeight: 800, 
+                              color: "var(--primary)", 
+                              borderBottom: "2px solid rgba(16, 107, 163, 0.12)", 
+                              paddingBottom: "0.75rem", 
+                              marginBottom: "1.5rem",
+                              fontFamily: actualIsAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-display)",
+                              textAlign: actualIsAr ? "right" : "left",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.6rem"
+                            }}>
                             <span style={{ fontSize: "1.3rem" }}>📖</span>
                             <span style={{ flex: 1 }}>
-                              {activeTitle || (translationLanguage === "ar" ? "محتوى الصفحة" : "Page Content")}
+                              {activeTitle || (translationLanguage === "ar" ? `صفحة ${readerCurrentPage}` : `Page ${readerCurrentPage}`)}
                             </span>
                           </h3>
 
@@ -1899,7 +2719,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             </div>
                           )}
                         </article>
-                      );
+                      </>
+                    );
                     })()
                   )}
                 </div>
@@ -2551,9 +3372,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         </div>
 
                         <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-                          {item.coverThumbUrl && (
+                          {(item.coverThumbUrl || item.coverUrl) && (
                             <img 
-                              src={item.coverThumbUrl} 
+                              src={item.coverThumbUrl || item.coverUrl} 
                               alt="book thumbnail" 
                               style={{ 
                                 width: "64px", 
