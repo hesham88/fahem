@@ -2187,7 +2187,9 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
               <div style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))",
-                gap: "1rem"
+                gap: "1rem",
+                width: "100%",
+                minWidth: 0
               }}>
                 {activeProcessingJobs.map((job) => {
                   const stage = getSubStageBadge(job.progress, job.status);
@@ -2204,7 +2206,8 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                         flexDirection: "column",
                         gap: "0.75rem",
                         boxShadow: "0 4px 16px rgba(0, 0, 0, 0.02)",
-                        position: "relative"
+                        position: "relative",
+                        minWidth: 0
                       }}
                     >
                       {/* Top Row: Info & Badges */}

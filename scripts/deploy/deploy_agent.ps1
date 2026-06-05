@@ -36,7 +36,15 @@ if ($project -ne 'fahem-88d40') {
     }
 }
 
-# 3. Deploy to Cloud Run
+# 3. Copy scripts folder temporarily to agents/scripts so it is packaged in the deployment
+Write-Host 'Copying scripts folder to agents/scripts temporarily...' -ForegroundColor Yellow
+$TempScriptsDir = Join-Path $AgentsDir 'scripts'
+if (Test-Path $TempScriptsDir) {
+    Remove-Item -Recurse -Force $TempScriptsDir
+}
+Copy-Item -Recurse -Force (Join-Path $RootDir 'scripts') $TempScriptsDir
+
+# 4. Deploy to Cloud Run
 Write-Host 'Deploying agent microservice to Cloud Run...' -ForegroundColor Yellow
 Write-Host "Source directory: $AgentsDir" -ForegroundColor Gray
 
@@ -55,5 +63,16 @@ try {
     Write-Host '==========================================================' -ForegroundColor Green
 } catch {
     Write-Error 'Cloud Run deployment failed. Please check the error log above.'
+    # Ensure cleanup is run on failure
+    if (Test-Path $TempScriptsDir) {
+        Remove-Item -Recurse -Force $TempScriptsDir
+    }
     Exit 1
 }
+
+# 5. Clean up temporary scripts folder in agents
+if (Test-Path $TempScriptsDir) {
+    Write-Host 'Cleaning up temporary scripts folder...' -ForegroundColor Gray
+    Remove-Item -Recurse -Force $TempScriptsDir
+}
+

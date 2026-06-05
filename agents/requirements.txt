@@ -3,3 +3,5 @@ pymongo
 mcp
 dnspython
 google-cloud-recaptcha-enterprise
+requests
+pymupdf
