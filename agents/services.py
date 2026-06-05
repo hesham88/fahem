@@ -608,8 +608,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     process = subprocess.Popen(
                         [python_path, script_path],
                         stdin=subprocess.PIPE,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
+                        stdout=None,
+                        stderr=None,
                         text=True
                     )
                     process.stdin.write(json.dumps(payload))
@@ -929,10 +929,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
             for p in pages:
                 if "_id" in p:
                     p["_id"] = str(p["_id"])
-            return {"pages": pages}
+            return {"success": True, "pages": pages}
         except Exception as err:
             logger.error(f"[services.py] Failed to get book pages: {err}", exc_info=True)
-            return {"pages": [], "error": str(err)}
+            return {"success": False, "pages": [], "error": str(err)}
 
     @app.get("/user/subjects")
     async def get_subjects_endpoint():

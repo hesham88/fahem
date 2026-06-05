@@ -25,7 +25,22 @@ LOCAL_DB_PATH = os.path.join(ROOT_DIR, "web", "src", "app", "api", "local_db.jso
 if not os.path.exists(LOCAL_DB_PATH):
     LOCAL_DB_PATH = os.path.join(ROOT_DIR, "src", "app", "api", "local_db.json")
 
+# Ensure parent directories are on PATH to resolve tools
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+# Also add agent's directory if called from elsewhere
+AGENT_DIR = os.path.join(ROOT_DIR, "agents")
+if os.path.exists(AGENT_DIR) and AGENT_DIR not in sys.path:
+    sys.path.insert(0, AGENT_DIR)
+
 def get_mongodb_uri():
+    try:
+        from tools import get_mongodb_uri as resolve_uri
+        return resolve_uri()
+    except ImportError:
+        pass
+
+    # Fallback to local resolver if tools import fails
     uri = os.environ.get("MONGODB_URI")
     if uri:
         return uri
@@ -106,8 +121,10 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
             upsert=True
         )
         client.close()
-    except Exception:
-        pass
+    except Exception as mongo_err:
+        print(f"[CRAWL JOB MONGO ERROR] Failed to update MongoDB: {mongo_err}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
 def clean_and_normalize_url(url, base_url):
     try:
