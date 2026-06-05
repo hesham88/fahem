@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'agents/**'
+      - 'scripts/**'
 
 jobs:
   deploy:
@@ -33,7 +34,9 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          cp -r scripts agents/
           gcloud run deploy fahem-agent \
             --source agents \
             --region us-east4 \
             --set-secrets="GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest"
+

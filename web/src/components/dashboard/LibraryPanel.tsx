@@ -157,9 +157,144 @@ const isLineMathFormula = (line: string): boolean => {
   return false;
 };
 
+const preprocessRawText = (text: string, isAr: boolean): string => {
+  if (!text) return "";
+  
+  const hasMarkup = text.includes("[HEADER:") || text.includes("```") || text.includes("# ") || text.includes("[VISUAL:") || text.includes("[FOOTER:");
+  if (hasMarkup) return text; // Already formatted, no need to touch it!
+  
+  const lines = text.split("\n");
+  const processedLines: string[] = [];
+  
+  let inCodeBlock = false;
+  let codeBlockLines: string[] = [];
+  
+  // Helper to check if line looks like code
+  const isCodeLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    
+    // Python repl prompts
+    if (trimmed.startsWith(">>>") || trimmed.startsWith("...")) return true;
+    
+    // Keywords at start
+    if (/^(def|class|import|from|print|assert|return|pass|break|continue|if|elif|else|while|for|try|except|finally|with|as|lambda|global|nonlocal|yield)\b/.test(trimmed)) {
+      return true;
+    }
+    
+    // Indented line (starts with 4+ spaces) and is preceded/succeeded by code
+    if (line.startsWith("    ") || line.startsWith("\t")) {
+      // Avoid falsely tagging list items or ordinary text paragraphs
+      if (trimmed.length > 0 && !trimmed.startsWith("-") && !trimmed.startsWith("*") && !trimmed.startsWith("•") && !/^\d+[\.\-\)]/.test(trimmed)) {
+        return true;
+      }
+    }
+    
+    // Variable assignments or function calls with python patterns
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^=]/.test(trimmed) && (trimmed.includes("(") || trimmed.includes("[") || trimmed.includes("{") || trimmed.includes("\"") || trimmed.includes("'") || /^[0-9\s]+$/.test(trimmed.split("=")[1].trim()))) {
+      return true;
+    }
+    
+    // Common Python method calls or object creations
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\(/.test(trimmed)) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const isMathFormula = (line: string): boolean => {
+    const mathIndicators = ["=", "≠", "≈", "≤", "≥", "±", "×", "÷", "√", "∫", "∑", "matrix", "det", "sin", "cos", "tan", "θ", "π", "λ", "α", "β", "γ"];
+    if (line.length > 120) return false;
+    const indicatorCount = mathIndicators.filter(ind => line.includes(ind)).length;
+    // Don't classify code lines or list items or urls as math formulas
+    if (isCodeLine(line) || line.trim().startsWith("-") || line.trim().startsWith("*") || line.trim().includes("http") || line.trim().startsWith("•")) {
+      return false;
+    }
+    return indicatorCount >= 2;
+  };
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    const trimmed = line.trim();
+    
+    if (isCodeLine(line)) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLines = [];
+      }
+      // Remove >>> prompt for cleaner execution look
+      let codeVal = line;
+      if (trimmed.startsWith(">>> ")) {
+        codeVal = line.replace(">>> ", "");
+      } else if (trimmed.startsWith(">>>")) {
+        codeVal = line.replace(">>>", "");
+      }
+      codeBlockLines.push(codeVal);
+    } else {
+      if (inCodeBlock) {
+        inCodeBlock = false;
+        processedLines.push("```python");
+        processedLines.push(...codeBlockLines);
+        processedLines.push("```");
+        codeBlockLines = [];
+      }
+      
+      if (!trimmed) {
+        processedLines.push("");
+        continue;
+      }
+      
+      // 1. Detect section headers, e.g. "9.1 Modifying lists" or "Chapter 9 Lists"
+      const chHeaderMatchEn = trimmed.match(/^Chapter\s+(\d+)\s*[:-]?\s*(.+)$/i) || trimmed.match(/^(\d+)\s*•\s*([A-Za-z ]{3,})/);
+      const secHeaderMatchEn = trimmed.match(/^(\d+)\.(\d+)\s+([A-Za-z ]{3,})/);
+      const chHeaderMatchAr = trimmed.match(/^(الفصل|القسم)\s+(\d+)\s*[:-]?\s*(.+)$/i);
+      
+      if (chHeaderMatchEn) {
+        const num = chHeaderMatchEn[1];
+        const title = chHeaderMatchEn[2];
+        processedLines.push(`# Chapter ${num}: ${title}`);
+      } else if (secHeaderMatchEn) {
+        processedLines.push(`## ${trimmed}`);
+      } else if (chHeaderMatchAr) {
+        const type = chHeaderMatchAr[1];
+        const num = chHeaderMatchAr[2];
+        const title = chHeaderMatchAr[3];
+        processedLines.push(`# ${type} ${num}: ${title}`);
+      }
+      // 2. Detect definitions
+      // For example, if a line starts with "An append() operation is used to..." or "A list is a sequence..."
+      // Or in Arabic: "يستخدم التابع ... لـ" or "القائمة هي عبارة عن..."
+      else if (/^(A|An|The)\s+([a-zA-Z0-9_\(\)]+)\s+is\s+(defined as|used to|a method|an operation|an object|a data structure|a sequence)\b/i.test(trimmed)) {
+        processedLines.push(`Definition: ${trimmed}`);
+      }
+      else if (/^(عبارة عن|تُعرف|يُعرف|يستخدم|التابع)\s+([\u0600-\u06FF]+)/i.test(trimmed)) {
+        processedLines.push(`Definition: ${trimmed}`);
+      }
+      // 3. Detect mathematical equations
+      else if (isMathFormula(line)) {
+        processedLines.push(`Equation: ${trimmed}`);
+      }
+      // Otherwise, keep as ordinary line
+      else {
+        processedLines.push(line);
+      }
+    }
+  }
+  
+  if (inCodeBlock) {
+    processedLines.push("```python");
+    processedLines.push(...codeBlockLines);
+    processedLines.push("```");
+  }
+  
+  return processedLines.join("\n");
+};
+
 const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | null => {
   if (!text) return null;
-  const lines = text.split("\n");
+  const processedText = preprocessRawText(text, isAr);
+  const lines = processedText.split("\n");
   const elements: React.ReactNode[] = [];
   
   // Helper to parse inline styles: ==highlights==, **bold**, __underline__, *italic*

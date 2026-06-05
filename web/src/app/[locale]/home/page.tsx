@@ -717,16 +717,75 @@ export default function Home() {
       });
     
     if (realPages.length > 0) {
+      // Pre-scan if book.chapters is empty to cluster pages dynamically
+      const pageToChapterMap: Record<number, number> = {};
+      const discoveredTitles: Record<number, string> = {};
+
+      const hasDefinedChapters = book.chapters && Array.isArray(book.chapters) && book.chapters.length > 0;
+
+      // Default common Computer Science / Python chapters if we can't find running header titles
+      const fallbackChapterTitlesEn: Record<number, string> = {
+        1: "Statements & Programming", 2: "Expressions & Variables", 3: "Objects & Values",
+        4: "Decisions & Conditions", 5: "Loops & Iterations", 6: "Functions & Abstraction",
+        7: "Modules & Libraries", 8: "Strings & Processing", 9: "Lists & Collections",
+        10: "Dictionaries & Structs", 11: "Classes & Objects", 12: "Recursion & Algorithms",
+        13: "Inheritance & OOP", 14: "Files and Exceptions", 15: "Data Science"
+      };
+
+      const fallbackChapterTitlesAr: Record<number, string> = {
+        1: "الجمل البرمجية والبرمجة", 2: "التعبيرات والمتغيرات", 3: "الكائنات والقيم البرمجية",
+        4: "اتخاذ القرارات والشرطيات", 5: "التكرار والحلقات", 6: "الدوال والتجريد",
+        7: "الوحدات والمكتبات البرمجية", 8: "النصوص وسلاسل الحروف", 9: "القوائم والمجموعات",
+        10: "القواميس والتراكيب", 11: "الفئات والبرمجة الكائنية", 12: "الاستدعاء الذاتي والخوارزميات",
+        13: "الوراثة والتعدد الشكلي", 14: "الملفات والاستثناءات والمعالجة", 15: "علم البيانات والتحليل"
+      };
+
+      if (!hasDefinedChapters) {
+        let currentChapterNum = 1;
+        realPages.forEach((p: any) => {
+          const pageNum = Number(p.page_number || p.pageNum || 1);
+          const content = p.content || "";
+          const lines = content.split("\n");
+          for (let line of lines) {
+            line = line.trim();
+            // Match Chapter headings like "9 • Lists" or "9. Lists" or "Chapter 9"
+            const chMatch = line.match(/^(\d+)\s*•\s*([A-Za-z ]{3,})/i) || 
+                            line.match(/^([A-Za-z ]{3,})\s*•\s*(\d+)$/i) ||
+                            line.match(/^Chapter\s+(\d+)\s*[:-]?\s*(.+)$/i);
+            if (chMatch) {
+              const num = parseInt(chMatch[1] || chMatch[2] || chMatch[1], 10);
+              const title = (chMatch[2] || chMatch[1] || chMatch[2] || "").trim();
+              if (num >= 1 && num <= 30 && title && !/^\d+$/.test(title)) {
+                discoveredTitles[num] = title;
+                currentChapterNum = num;
+              }
+            }
+            // Match section numbers like "9.1 Modifying lists" to assign correct chapter
+            const secMatch = line.match(/^(\d+)\.(\d+)\s+([A-Za-z ]{3,})/);
+            if (secMatch) {
+              const num = parseInt(secMatch[1], 10);
+              if (num >= 1 && num <= 30) {
+                currentChapterNum = num;
+              }
+            }
+          }
+          pageToChapterMap[pageNum] = currentChapterNum;
+        });
+      }
+
       return realPages.map((p: any) => {
-        const pageNum = p.page_number || p.pageNum || 1;
+        const pageNum = Number(p.page_number || p.pageNum || 1);
         
         // Detect language of the content, or use book's language
         const isAr = book.language === "ar" || /[\u0600-\u06FF]/.test(p.content || "");
         
-        // Find matching chapter inside the book's chapters array dynamically
-        let matchedChapter: any = null;
         let matchedIndex = 0;
-        if (book.chapters && Array.isArray(book.chapters)) {
+        let fallbackChapterTitleEn = "";
+        let fallbackChapterTitleAr = "";
+
+        if (hasDefinedChapters) {
+          // Find matching chapter inside the book's chapters array dynamically
+          let matchedChapter: any = null;
           matchedIndex = book.chapters.findIndex((ch: any) => {
             const start = ch.page_start ?? ch.start_page ?? 1;
             const end = ch.page_end ?? ch.end_page ?? 99999;
@@ -737,10 +796,26 @@ export default function Home() {
           } else {
             matchedIndex = 0;
           }
+          fallbackChapterTitleEn = matchedChapter ? (matchedChapter.title || matchedChapter.title_en || matchedChapter.title_ar || matchedChapter.titleAr || `Chapter ${matchedIndex + 1}`) : `Section ${pageNum}`;
+          fallbackChapterTitleAr = matchedChapter ? (matchedChapter.title_ar || matchedChapter.titleAr || matchedChapter.title || matchedChapter.title_en || `القسم ${matchedIndex + 1}`) : `القسم ${pageNum}`;
+        } else {
+          // Dynamic chapter clustering
+          const chNum = pageToChapterMap[pageNum] || 1;
+          matchedIndex = chNum - 1;
+          const discTitle = discoveredTitles[chNum];
+          
+          fallbackChapterTitleEn = discTitle 
+            ? `Chapter ${chNum}: ${discTitle}` 
+            : (fallbackChapterTitlesEn[chNum] 
+                ? `Chapter ${chNum}: ${fallbackChapterTitlesEn[chNum]}` 
+                : `Chapter ${chNum}`);
+                
+          fallbackChapterTitleAr = discTitle 
+            ? `الفصل ${chNum}: ${discTitle}` 
+            : (fallbackChapterTitlesAr[chNum] 
+                ? `الفصل ${chNum}: ${fallbackChapterTitlesAr[chNum]}` 
+                : `الفصل ${chNum}`);
         }
-        
-        const fallbackChapterTitleEn = matchedChapter ? (matchedChapter.title || matchedChapter.title_en || matchedChapter.title_ar || matchedChapter.titleAr || `Chapter ${matchedIndex + 1}`) : `Section ${pageNum}`;
-        const fallbackChapterTitleAr = matchedChapter ? (matchedChapter.title_ar || matchedChapter.titleAr || matchedChapter.title || matchedChapter.title_en || `القسم ${matchedIndex + 1}`) : `القسم ${pageNum}`;
 
         // Map fields to match what the viewer expects
         return {
