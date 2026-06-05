@@ -888,136 +888,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     }}
                   />
 
-                  {/* Sidebar Navigation Mode Tabs */}
-                  <div style={{
-                    display: "flex", gap: "0.3rem", padding: "4px", borderRadius: "10px",
-                    background: "rgba(16, 107, 163, 0.04)", border: "1px solid rgba(16, 107, 163, 0.05)"
-                  }}>
-                    <button
-                      onClick={() => setActiveSidebarTab("pages")}
-                      style={{
-                        flex: 1, padding: "5px 10px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 700,
-                        cursor: "pointer", border: "none",
-                        background: activeSidebarTab === "pages" ? "#ffffff" : "transparent",
-                        color: activeSidebarTab === "pages" ? "var(--primary)" : "#6a7c88",
-                        boxShadow: activeSidebarTab === "pages" ? "0 2px 8px rgba(16, 107, 163, 0.08)" : "none",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      📖 {language === "ar" ? "قائمة الصفحات" : "Page List"}
-                    </button>
-                    <button
-                      onClick={() => setActiveSidebarTab("hierarchy")}
-                      style={{
-                        flex: 1, padding: "5px 10px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 700,
-                        cursor: "pointer", border: "none",
-                        background: activeSidebarTab === "hierarchy" ? "#ffffff" : "transparent",
-                        color: activeSidebarTab === "hierarchy" ? "var(--primary)" : "#6a7c88",
-                        boxShadow: activeSidebarTab === "hierarchy" ? "0 2px 8px rgba(16, 107, 163, 0.08)" : "none",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      🌳 {language === "ar" ? "الفصول والوحدات" : "Chapters & Units"}
-                    </button>
-                  </div>
-
                   {/* Pages List */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflowY: "auto", flex: 1, paddingRight: "4px" }}>
                     {(() => {
-                      if (activeSidebarTab === "hierarchy") {
-                        const chapters = buildBookMindMapData(allPages);
-                        const search = sidebarPageSearch.toLowerCase();
-
-                        // Apply search filter if query exists
-                        const filteredChapters = chapters.map(ch => {
-                          const matchingPages = ch.pages.filter(p => {
-                            const pTitle = (language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr) || "").toLowerCase();
-                            const pContent = (language === "ar" ? (p.contentAr || p.contentEn) : (p.contentEn || p.contentAr) || "").toLowerCase();
-                            return pTitle.includes(search) || pContent.includes(search);
-                          });
-                          return { ...ch, pages: matchingPages };
-                        }).filter(ch => ch.pages.length > 0 || (language === "ar" ? ch.titleAr : ch.titleEn).toLowerCase().includes(search));
-
-                        if (filteredChapters.length === 0) {
-                          return (
-                            <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
-                              🔍 {language === "ar" ? "لا توجد نتائج مطابقة" : "No matching chapters found"}
-                            </div>
-                          );
-                        }
-
-                        return filteredChapters.map((ch, idx) => {
-                          const chTitle = language === "ar" ? (ch.titleAr || ch.titleEn) : (ch.titleEn || ch.titleAr);
-                          const isExpanded = expandedChapters[ch.titleEn] !== false; // expanded by default
-                          const isAr = isTextArabic(chTitle);
-                          
-                          return (
-                            <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                              {/* Chapter Header Link */}
-                              <button
-                                onClick={() => setExpandedChapters(prev => ({ ...prev, [ch.titleEn]: !isExpanded }))}
-                                style={{
-                                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                                  padding: "8px 12px", borderRadius: "10px", border: "none",
-                                  background: "rgba(16, 107, 163, 0.04)", cursor: "pointer",
-                                  width: "100%", textAlign: isAr ? "right" : "left", direction: isAr ? "rtl" : "ltr",
-                                  transition: "all 0.2s"
-                                }}
-                                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
-                                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
-                              >
-                                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                  <span>📁</span>
-                                  <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{chTitle}</span>
-                                </span>
-                                <span style={{ fontSize: "0.75rem", color: "var(--primary)" }}>{isExpanded ? "➖" : "➕"}</span>
-                              </button>
-
-                              {/* Chapter Pages List */}
-                              {isExpanded && (
-                                <div style={{
-                                  display: "flex", flexDirection: "column", gap: "0.3rem",
-                                  paddingLeft: isAr ? "0" : "1.25rem", paddingRight: isAr ? "1.25rem" : "0",
-                                  borderLeft: isAr ? "none" : "1px dashed rgba(16, 107, 163, 0.15)",
-                                  borderRight: isAr ? "1px dashed rgba(16, 107, 163, 0.15)" : "none",
-                                  marginTop: "2px", marginBottom: "4px"
-                                }}>
-                                  {ch.pages.map((p) => {
-                                    const isActive = p.pageNum === readerCurrentPage;
-                                    const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                                    const pAr = isTextArabic(pTitle);
-                                    return (
-                                      <button
-                                        key={p.pageNum}
-                                        onClick={() => setReaderCurrentPage(p.pageNum)}
-                                        style={{
-                                          padding: "6px 10px", borderRadius: "8px", border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "none",
-                                          background: isActive ? "rgba(16, 107, 163, 0.08)" : "transparent",
-                                          cursor: "pointer", textAlign: pAr ? "right" : "left", direction: pAr ? "rtl" : "ltr",
-                                          fontSize: "0.78rem", fontWeight: isActive ? 700 : 600,
-                                          color: isActive ? "var(--primary)" : "var(--foreground)",
-                                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                                          width: "100%", gap: "0.5rem"
-                                        }}
-                                        onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.03)"; }}
-                                        onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
-                                      >
-                                        <span style={{ display: "flex", alignItems: "center", gap: "0.4rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          <span>📄</span>
-                                          <span>{pTitle}</span>
-                                        </span>
-                                        <span style={{ fontSize: "0.68rem", color: "#6a7c88", opacity: 0.8 }}>
-                                          {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      }
 
                       // Default simple list of pages grouped by chapter name
                       const search = sidebarPageSearch.toLowerCase();
@@ -1039,110 +912,82 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         );
                       }
 
-                      const chapters: { title: string; pages: any[] }[] = [];
-                      filteredPages.forEach((p) => {
-                        const chTitle = language === "ar" ? (p.chapterTitleAr || p.chapterTitleEn || "الفصل") : (p.chapterTitleEn || p.chapterTitleAr || "Chapter");
-                        let existing = chapters.find(c => c.title === chTitle);
-                        if (!existing) {
-                          existing = { title: chTitle, pages: [] };
-                          chapters.push(existing);
-                        }
-                        existing.pages.push(p);
-                      });
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                          {filteredPages.map((p) => {
+                            const isActive = p.pageNum === readerCurrentPage;
+                            const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
+                            const pAr = isTextArabic(pTitle);
+                            const pContent = language === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
+                            const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
 
-                      return chapters.map((ch, chIdx) => {
-                        const isAr = isTextArabic(ch.title);
-                        return (
-                          <div key={chIdx} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                            <div style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 800,
-                              color: "#6a7c88",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginTop: chIdx > 0 ? "0.5rem" : "0",
-                              borderBottom: "1px solid rgba(16, 107, 163, 0.05)",
-                              paddingBottom: "3px",
-                              textAlign: isAr ? "right" : "left",
-                              direction: isAr ? "rtl" : "ltr"
-                            }}>
-                              {ch.title}
-                            </div>
-                            {ch.pages.map((p) => {
-                              const isActive = p.pageNum === readerCurrentPage;
-                              const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                              const pAr = isTextArabic(pTitle);
-                              const pContent = language === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
-                              const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
-
-                              return (
-                                <button
-                                  key={p.pageNum}
-                                  onClick={() => setReaderCurrentPage(p.pageNum)}
-                                  style={{
+                            return (
+                              <button
+                                key={p.pageNum}
+                                onClick={() => setReaderCurrentPage(p.pageNum)}
+                                style={{
+                                  textAlign: pAr ? "right" : "left",
+                                  direction: pAr ? "rtl" : "ltr",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.25rem",
+                                  padding: "8px 12px",
+                                  borderRadius: "10px",
+                                  border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "1px solid transparent",
+                                  background: isActive ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03))" : "rgba(255, 255, 255, 0.5)",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                                  width: "100%",
+                                  boxSizing: "border-box"
+                                }}
+                                onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
+                                onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)"; }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "0.5rem" }}>
+                                  <span style={{
+                                    fontSize: "0.8rem",
+                                    fontWeight: isActive ? 800 : 700,
+                                    color: isActive ? "var(--primary)" : "var(--foreground)",
+                                    textOverflow: "ellipsis",
+                                    overflow: "hidden",
+                                    whiteSpace: "nowrap",
+                                    flex: 1,
+                                    textAlign: pAr ? "right" : "left"
+                                  }}>
+                                    {pTitle}
+                                  </span>
+                                  <span style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 800,
+                                    color: isActive ? "var(--primary)" : "#6a7c88",
+                                    background: isActive ? "rgba(16, 107, 163, 0.12)" : "rgba(16, 107, 163, 0.05)",
+                                    padding: "2px 6px",
+                                    borderRadius: "6px",
+                                    whiteSpace: "nowrap"
+                                  }}>
+                                    {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
+                                  </span>
+                                </div>
+                                {pSnippet && (
+                                  <p style={{
+                                    margin: 0,
+                                    fontSize: "0.7rem",
+                                    color: "#6a7c88",
+                                    lineHeight: "1.3",
                                     textAlign: pAr ? "right" : "left",
-                                    direction: pAr ? "rtl" : "ltr",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "0.25rem",
-                                    padding: "8px 12px",
-                                    borderRadius: "10px",
-                                    border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "1px solid transparent",
-                                    background: isActive ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03))" : "rgba(255, 255, 255, 0.5)",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                    width: "100%",
-                                    boxSizing: "border-box"
-                                  }}
-                                  onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
-                                  onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)"; }}
-                                >
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "0.5rem" }}>
-                                    <span style={{
-                                      fontSize: "0.8rem",
-                                      fontWeight: isActive ? 800 : 700,
-                                      color: isActive ? "var(--primary)" : "var(--foreground)",
-                                      textOverflow: "ellipsis",
-                                      overflow: "hidden",
-                                      whiteSpace: "nowrap",
-                                      flex: 1,
-                                      textAlign: pAr ? "right" : "left"
-                                    }}>
-                                      {pTitle}
-                                    </span>
-                                    <span style={{
-                                      fontSize: "0.7rem",
-                                      fontWeight: 800,
-                                      color: isActive ? "var(--primary)" : "#6a7c88",
-                                      background: isActive ? "rgba(16, 107, 163, 0.12)" : "rgba(16, 107, 163, 0.05)",
-                                      padding: "2px 6px",
-                                      borderRadius: "6px",
-                                      whiteSpace: "nowrap"
-                                    }}>
-                                      {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                    </span>
-                                  </div>
-                                  {pSnippet && (
-                                    <p style={{
-                                      margin: 0,
-                                      fontSize: "0.7rem",
-                                      color: "#6a7c88",
-                                      lineHeight: "1.3",
-                                      textAlign: pAr ? "right" : "left",
-                                      textOverflow: "ellipsis",
-                                      overflow: "hidden",
-                                      whiteSpace: "nowrap",
-                                      width: "100%"
-                                    }}>
-                                      {pSnippet}
-                                    </p>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      });
+                                    textOverflow: "ellipsis",
+                                    overflow: "hidden",
+                                    whiteSpace: "nowrap",
+                                    width: "100%"
+                                  }}>
+                                    {pSnippet}
+                                  </p>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
                     })()}
                   </div>
                 </div>

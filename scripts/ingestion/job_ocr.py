@@ -117,18 +117,19 @@ def main():
 
         if os.path.exists(temp_pdf_path):
             try:
-                import pypdf
-                reader = pypdf.PdfReader(temp_pdf_path)
-                num_pages = len(reader.pages)
+                import fitz # PyMuPDF
+                doc = fitz.open(temp_pdf_path)
+                num_pages = len(doc)
                 t_str_pdf = time.strftime("%H:%M:%S")
-                logs.append(f"[{t_str_pdf}] [PARSER] PDF loaded. Discovered {num_pages} document pages. Commencing text scans...")
+                logs.append(f"[{t_str_pdf}] [PARSER] PDF loaded with PyMuPDF. Discovered {num_pages} document pages. Commencing layout-preserving text scans...")
                 update_job_status(job_id, "processing", "ocr", 35, logs, 0, num_pages, False, is_local, **metadata)
 
-                for i, page in enumerate(reader.pages):
+                for i in range(num_pages):
                     # cooperative pause check at page level
                     check_cooperative_control(job_id, is_local, logs)
                     
-                    text = page.extract_text() or ""
+                    page = doc[i]
+                    text = page.get_text() or ""
                     text = text.strip()
                     if not text:
                         text = f"Empty page or image-only page {i+1}."
@@ -181,7 +182,8 @@ def main():
             )
             proc.stdin.write(json.dumps(payload))
             proc.stdin.close()
-            print(f"[JOB 2: OCR] Successfully triggered Job 3 (Embed) with PID {proc.pid}", flush=True)
+            print(f"[JOB 2: OCR] Successfully triggered Job 3 (Embed) with PID {proc.pid}. Waiting for completion...", flush=True)
+            proc.wait()
 
         except Exception as trigger_err:
             logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] Failed to trigger Job 3: {trigger_err}")

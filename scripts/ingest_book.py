@@ -283,19 +283,20 @@ def main():
 
         pages_data = []
         try:
-            import pypdf
-            reader = pypdf.PdfReader(temp_pdf_path)
-            num_pages = len(reader.pages)
-            add_system_log("PARSER", f"PDF parsed successfully. Discovered {num_pages} document pages.")
+            import fitz # PyMuPDF
+            doc = fitz.open(temp_pdf_path)
+            num_pages = len(doc)
+            add_system_log("PARSER", f"PDF parsed successfully with PyMuPDF. Discovered {num_pages} document pages.")
             
-            for i, page in enumerate(reader.pages):
-                text = page.extract_text() or ""
+            for i in range(num_pages):
+                page = doc[i]
+                text = page.get_text() or ""
                 text = text.strip()
                 if not text:
                     text = f"Empty page or image-only page {i+1}."
                 pages_data.append((i + 1, text))
         except Exception as pdf_err:
-            add_system_log("PARSER", f"⚠️ PyPDF extraction failure: {pdf_err}. Initializing OCR/text synthesis fallback.")
+            add_system_log("PARSER", f"⚠️ PyMuPDF extraction failure: {pdf_err}. Initializing OCR/text synthesis fallback.")
             num_pages = 25  # Give a healthy textbook page count
             for i in range(1, num_pages + 1):
                 pages_data.append((i, f"This is synthesized textbook material for page {i} of {title} in the subject of {subject_id}."))

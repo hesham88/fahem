@@ -1618,7 +1618,7 @@ export default function StickyChat() {
         );
       } finally {
         setIsSending(false);
-        setActiveAgent(undefined);
+        setActiveAgent("");
       }
       return;
     }

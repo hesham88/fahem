@@ -1,0 +1,1169 @@
+two things first push your commit so I can see and test, second instead of magnetizim we want to
+  introduce mentions in the chat where the user can type special chars like @ # / for subject, books,
+  concepts commands for our ai compainion , and please continue what you were doing here https://fahem--
+  fahem-88d40.us-east4.hosted.app/ Review current implementation and let's run compliance report, ris
+  analysis report, why file uploading is not working, why current system is still showing fake sample
+  data, why current implementation stored fake data in the mongodb database, review ingestion process
+  and its integration with the subject book anaylsis phase and using mongodb mcp tools for that if
+  possible, review plan, introduce allowed whitelist for special user and admin approval cycle by
+  superadmins, why the code didn't create google cloud ai application site search with ai mode, we want
+  to make our ingestion arch to be generic, the input is the library url and target is the whole process
+  of ingestion for pdfs and anlysis and using mongodb and the wholeprocess discussed in the previous
+  implementation plan for the swarm, also we need to make sure we apply those two concepts CLT and CT
+  balanced approach and  heutogogy learning approach bounded autodidactivites, adavnced agent swarm with
+  deep memory, revamped ingestiion process, manual upload as well triggers the ingestioin process, while
+  profile pictures are not saving, the current implementation is not complete, so we need to create a
+  plan to complete in the next few days, our ingestion source can vary from one to different library
+  where admin enter the library url and ingestion and analysis asyn jobs and process and workflow get's
+  started an  triggered auto, allowing the autoembeding to work on both the vertex ai and the monogod
+  embdeding to allow our agenst to work efficiebtly later, we can change our library to use
+  https://openstax.org/ open source as moe egypt library would have caused us licesnse issue  in the
+  compettion, make sure that we don't sync jobs that could jam the system, show more of our system
+  powers and education and digital approaches in the landing page inclduing CTL strategy, heutoggogy
+  learning approach, boundrful autodidactive approach, constructive, collabrative, interactive,
+  refelective, inquriy based learning through our amazing swarm network of agents that do and state
+  every agents capabilities and powers and collective workflows achieved and so on and all the security
+  powers and benefits, being fremimum  at the moment, empowerinf education via our advanced ai companion
+  and different tools available in the app in the acacdemic space and a little glimpse about the admi
+  powers,make sure that all logging is async, cosnider accessibilty barrieer for the judges using our
+  new whitelist strategy or admin approvals, history of libraries immported into our platform, list o
+  libary to reimport, always there https://openstax.org/  (available) and https://ellibrary.moe.gov.eg/
+  (dimmed) and/or the userr can use the ingestion and analyszer to enter library url and our system d
+  the rest, vector search end embeding in mnogdb needs to be applied, all  book info, metdata, content,
+  analysis, chunks, pages, chapters, titles, questions, conecpts, important code,rules, laws,  need t
+  be chunked and analyzed and presented acoodring to our developed CTL and heutogogoy and swarm agent
+  startegies to support the student, fahem companion can be expanded to full screen and can minized t
+  the side like now, let's rewrite our new plan considering all the  above so that first it our
+  odumentation for this new phase and second for other antigravity agents to start to work, make sure to
+  build policies and codiing agents workflows and memory needed before building to build effecitively
+  and considering all the current prolicies as well .. yalla .. let's do it
+
+
+  we need to have  library exploration process in this workflow where it understand subject, book, grade (if any), book
+  type, author and all this metadata depancicies and hirechy and store it correcty in our firebase
+  storage in hirerachal order I mean and every library has its own path although our system is
+  intelligent to understnd author, subject, grade, book metadata, disrtubter, souce link, and so, user
+  uploads , profile picture and only get's triggered only user uploaded pdfs or pdfs imported
+  automaitcally in thisprocess, also we need to make sure that the coding agent crete the necessary ai
+  application site   search with ai mode for that and triggers the right async jobs for that, now repri
+  we only use gemini-3.1-flash-lite  only .. reprint the whole plan combining previous plan
+  fahem_swarm_adk_ultimate_master_plan and the attached ones and the new poposed finalized one, one th
+  consider all the requirments and doesn't miss any fix or update or design or data model or analysis
+  implemntation plan .. one that is comprehensive and detailed
+
+  remove page magnetism feature from the current implementation, it just look aweful and reprint plan
+  document
+
+  add the insights, dashbaord, statics, analysits for different activities agents that uses aggregatio
+  tools from mongodb mcp tools to implement insights in user profile and gamifications accoridically a
+  present it visuallauly beautiful and again , plan need to be super detailed and comprehensive and
+  considering all the ascpets disucssed in this conversation so far, diagrams should be more detailed
+  and only use gemini-3.1-flash, reprint plan
+
+  memory and chat formatting and styling feels robotic, reporting and unnatural, needs to be like
+  talking to human, explaining to human but in structured way, full screen for the fahem companion also
+
+the ingestion studion should show the progress of each part of the progress plus allow for pre
+  anaylysis after crawling and understanding the basics while showing th eprogress for each and every
+  step of the ingestion from crawling, harvesting, exploring, ai app site search with ai mode or
+  upload file, file added to firebase storage, sync job triggered, extracting nd anaysing and
+  ingeting our mongodb using  mongodb mcp tools, also I don't see gamification panelk or aggregarions
+  done using mongodb mcp tool for aggregation , alsow where is the usage of verctor and embeding when
+  ingesting into mongodb the new books
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-03 214323.png the sticky floaiing button and
+  the send message button has be both visible obviously sticky floating button doesn't move rather
+  the send message button should align it self accordingly
+  let's start testing unit by unit, phase by phase, I guess upload file ingestion flow and books and
+  book ppages ingested viewing is the highest priority
+  then url ingestion workflow
+  then the agents in action with web app, interactivity phase
+  also you haven't recordeed any of our turns or memory or workspace or project protocols since a
+  while, please follow all our rules stricktly
+  before you start working on stuff again, autodeploy and commit for me test as well you do smoke
+  test as well
+  memory for conversation is very important when chatting to an agent
+  companion should be able to keep track of its memory effieciently
+  Cognitive Token Controls & Allocations is broken and doesn't update system configuration
+  
+
+Also File Upload & Size Limit Configurations is broken and doesn't update system confugration
+  remove Superadmin Operational Logs & Security Audit Console from admin panel
+  emebed its details into the Global Operational Activity Trail unders system operations
+  make Global Operational Activity Trail compact and scrolllable and searchable with filters and sort
+  remove Superadmin Database MCP Specialist Toolset section from admin panel also remove MOE
+  Ingestion Harvester seection from admin panel, Sourcing Engine, Active Ingestion Feeds, Grounded
+  Multi-Agent Test Bench, Grounded Execution Console & Output remove all those sections from the
+  admin panel
+  improve our social network capabilities
+
+C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-03 225157.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-03 225216.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-03 225239.png something like this for the
+  ingestion studio and make it as new tab under admin controls, but ours is different, in the input,
+  in the configuration, in the steps to log and monitor, this is just a feel of how it could be, I am
+  sure you can make incredible beautiful and fucntional studio for our ingestion process
+  for the logging I mean
+  but the crawling and explortion you can improvise and let's see
+  or mayve youu implemented smmething better for the studio progress, if you did skip this
+  just move studio to sepratee tab
+  in the progress it is important to know which book is being processsed, how many left, what iss the
+  speed of the progress and waht is the estimated eta
+  all jobs async
+  studio I thik will need different cloud run job other than our agent to avoid disterping our agents
+  when we are ingestoing .. right?
+
+ Active Security & Guardrail Configurations and Interactive Multi-Agent Pipeline & DAG Workflow need
+  to be transformed into very small card like cards inside Why Choose Fahem? and put inside with them to
+  have 8 cards total in Why Choose Fahem? .. and remove the big sections for the current implemntatio
+  no details should be provideed in the new small cards, only brief,also remove Real-time Firewall &
+  Compliance Audit section from landing page
+
+but we said we gonn use https://openstax.org/ instead  https://ellibrary.moe.gov.eg due to
+  copyrights and we said books ingested and url looks like this pdf https://assets.openstax.org/oscms
+  prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf extracting all book and subject
+  metadata .. does our studio support that
+
+when adding new book system check and search that book is new and we don't have exact copy like thi
+  pdf on our system but if we found exact one we skip download and we check if indexed, vectored,
+  emebeded and analyzed and extracted and processed and if so we skip if not we do these operations o
+  the pdf it is important to avoid redoing the work, while also not generating duplicates and make sure
+  that all our books and subjects linked and every page in the book is processed, extracted, indexed
+  correctly till the last page of the book
+
+
+when I give URL like https://openstax.org/ and I want you crawl all website and get all library
+  inside in depth to reach all pdfs under https://assets.openstax.org/oscms-prodcms/media/documents
+  and to know all the book details which subject, is the core book or supporting book for student or
+  supporting book for instructor based on the link hirerchy which lead from https://openstax.org/ to
+  https://assets.openstax.org/oscms-prodcms/media/documents , make the explorer feels like directory
+  explorer with the bility to select few or select all to import at once with visual statics from the
+  crawiling and exploring ste
+
+admin user issue -> can you explain to me how this happened and who is this user and where to remove and how to protect
+  our system C:\Users\hesh1\Desktop\Screenshot 2026-06-04 021932.png also why curriculum studio is
+  deling with fake data, let's implement it properly let's make it functional
+
+in currculum studiio we need to simplyfy it even more remove all unnecessary and unmentioned stuff,
+  the currculim studio keeps running fakely every time you open the tab, we the app working and
+  functional, remove Recursion Depth and Format Filter config make it to the max by default to reach
+  the pdf as wexplained, currucilim studio have subjects books relationship and allow user to edit,
+  add, ammend or delete instead of Add New Subject Schema, Igestion can be for one book or for many
+  selected,or all crawled and explored, also I can see no usage for ai app
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 022747.png , also Grade Level and
+  Category feels limiting in adding subject we need to allow to edit those list somewhere as well and
+  to have defualt grade, subject Icon Emoji is not working is fixed and unchangable, also Term,
+  language
+
+this is a very big issue, no hardcoded sample data should be used by our system anymore
+ all sample data need to be schemed and data modeled and sampled in our database for new or existing
+  collections and dcouments
+it worth mention that currucilium studio is not working no books gets ingested all fake we need to
+  test one book for real complete end to end to to make the ai aware of it
+ book pages needs to be stored
+ book info extracted all we discussed earlier, need to be stored in database as well
+ also it is critical to say nothing got stored in our firebase storage :(
+ seems like you might haven't understood the arch and design yet, did you?
+we need functional working app
+having data and data models and everything working for real .. we need to stop this portotyping
+  attitude of bombarding the app with hardcoded sample data, want sample data, create data models,
+  append collections and documents needed and use our mcp tool and read sample data no hardcoded
+  stuff, all should be completely functional
+NO FAKING NO HARD CODING
+ REAL FUNCTIONS REAL JOBS
+ Why firebase storage empty!!!!
+we have to understand that admin ingestions thrpugh url or file upload are public for every user
+  however user file uploads are private to him/her self
+users need to be able to upload their own files and same extraction and anlaysis process runs on
+  the user uploaded file and get's  indexded and vector, semantic embeding in mongodb using mongodb
+  mcp tools and user can upload one or many files up to ten max 100mb total, max for one file 20mb
+the configuration for the admin panel are not working, fix
+ we need to introduce groups and threads in the social network and fix the push messaging between
+  users
+ also Swarm Analytics & Academic Gamification needs to be real and functional
+avoid fake data by all means
+ remove fake admin approval Anas Al-Sayed
+  admin.candidate@fahem.edu
+  Pending Approval    local_db    Approve Admin
+it also mention that I created admin user
+  Seba Freediving
+  sebafreediving@gmail.com but this one didn't appear in the approval list however the one I told you
+  to delete is the one appeared
+ fix the private ingestion here C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030620.png
+ C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030828.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030817.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030804.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030750.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030733.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030716.png those pge are also not
+  fucntionl and need to be workign as intended
+practice needs to feel like a video game, resume or start new and select type of practice or redo
+  orld practive, user choose practice type , practice umbrella subject or specific document, to do
+  MCQ, text questions, oral and it is infinite untill user stop unlike quizes which have scope, and
+  type weither number of questions, or time based, quizes scope iinlcude all subject material and
+  provide exam like experience with vairety of questions from the original source material
+ zatona needs to comprhensive detailed research report regarding subject, book, topic, title,
+  concept, chpter, unit, ..etc
+ we need to test ingestions process completely from your side
+ try real links with real pdf and real pages and real out come
+book pages needs to ingested and ocred and stored as well,  one book page view is not working all
+  .. only proividing fake data, please fix
+
+
+
+
+ C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030828.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030817.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030804.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030750.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030733.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 030716.png those pge are also not
+  fucntionl and need to be workign as intended
+  practice needs to feel like a video game, resume or start new and select type of practice or redo
+  orld practive, user choose practice type , practice umbrella subject or specific document, to do
+  MCQ, text questions, oral and it is infinite untill user stop unlike quizes which have scope, and
+  type weither number of questions, or time based, quizes scope iinlcude all subject material and
+  provide exam like experience with vairety of questions from the original source material
+  zatona needs to comprhensive detailed research report regarding subject, book, topic, title,
+  concept, chpter, unit, ..etc
+  we need to test ingestions process completely from your side
+  try real links with real pdf and real pages and real out come
+  book pages needs to ingested and ocred and stored as well,  one book page view is not working all
+  .. only proividing fake data, please fix
+
+remove Active Security & Guardrail Configurations and Interactive Multi-Agent Pipeline & DAG Workflow and Superadmin Operational Logs & Security Audit Console and Superadmin Database MCP Specialist Toolset sections from the admin panel tab
+
+make Global Operational Activity Trail section compact and scrollable
+
+nothing relfects in the database
+  I added new subject and I can see now on the UI local but nothing on the stored in the database
+  also no page got anlyzed, scrapped, explored or imported
+
+ code reusabity is not effiecient please refactor for code reusabulity and high maintinbility and
+  add comments and and make it readable and easy to track instead of lins of code
+
+Oral pracice
+Live rubric
+assessment.agent
+Overall
+0%
+🗣️
+Pronunciation
+0
+💪
+Confidence
+0
+🎯
+Accuracy
+0
+🏗️
+Structure
+0
+
+Session
+Topic
+Gases & thermo
+Difficulty
+MOE-level
+Accent
+Egyptian Arabic
+Length
+5 minutes
+
+C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 043040.png the new crawler and exploer
+  looks nice but fake and is not working at all .. again this is a project protocols, no fake process
+  or fake data,all features needs to be fully functional and working properly as intended
+
+ code reusabity is not effiecient please refactor for code reusabulity and high maintinbility and
+  add comments and and make it readable and easy to track instead of lins of code and readability
+
+superadmin approval before final ingestion if crawl and explore is done by admin not super admin
+
+admins can see all the admin controls tabs incuding amdin panel, users and a ctivity trail,
+  currucliam studio, but they can't take any action or change any value where every action they do go
+  superdmin audit and super admin can approve or deny request, before system can take or do anything
+  and that is only for admins, superaadmmins can do and take any action and can approve both admin
+  user requests and admin changes requests, except that admins can crawel and explore but when it
+  comes to ingestion this is sent for superadmin apporval
+  🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] Starting real crawler on: https://openstax.org (Max Depth: 3)
+  [CRAWL] Fetching depth 1: https://openstax.org
+  [INFO] Found 0 raw links on page.
+  [COMPLETE] Crawled 1 pages. Discovered 0 PDFs.
+  🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] Starting real crawler on: https://ellibrary.moe.gov.eg/books/ (Max Depth: 3)
+  [CRAWL] Fetching depth 1: https://ellibrary.moe.gov.eg/books/
+  [INFO] Found 3 raw links on page.
+  [DISCOVERED PDF] Intro ->
+  https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/StudentBook2025_2026/intro.p
+  df
+  [COMPLETE] Crawled 1 pages. Discovered 1 PDFs.
+  the crawler is very shallow
+
+ blend in Assessment & Quiz Arena inside Practice Worstation and where is the new MCP, text, oral UI
+  and UX in the practice station quizes can be be with time or number of questions
+
+remove the quiz assessment tap
+
+ the crawler and explorer should get as deep as possible
+  why crawler is not crawling deep into site  rootes and hireradchis to get to subjects and get books
+
+
+
+  under subjects and get instructor and strucdent books as supporting books form undr subject and
+  collect metadata along the way allow different viewing and sorting styles and search in the crawled
+  files, also while crawiling is async logging for it should be async and the appearanc eand
+  construction of the crawled structures and files found should be async, so I could see the file by
+  file not in the logs but also as appeearng cards and building the explore tree and nodes and so on
+
+
+ error when uploading file from the curruclium studio 17x37o.673ree.js:10
+   POST https://firebasestorage.googleapis.com/v0/b/fahem-
+  88d40.firebasestorage.app…?name=Textbooks%2F1780547933674_Introduction_to_Python_Programming-WEB.pd
+  403 (Forbidden)
+  send    @    17x37o.673ree.js:10
+  e    @    17x37o.673ree.js:10
+  (anonymous)    @    17x37o.673ree.js:10
+  setTimeout
+  h    @    17x37o.673ree.js:10
+  (anonymous)    @    17x37o.673ree.js:10
+  start_    @    17x37o.673ree.js:10
+  (anonymous)    @    17x37o.673ree.js:10
+  rq    @    17x37o.673ree.js:10
+  (anonymous)    @    17x37o.673ree.js:10
+  _makeRequest    @    17x37o.673ree.js:10
+  makeRequestWithTokens    @    17x37o.673ree.js:10
+  await in makeRequestWithTokens
+  (anonymous)    @    17x37o.673ree.js:10
+  onChange    @    0la549n86_z1g.js:1
+  sJ    @    0m_p1bxtorv5i.js:1
+  (anonymous)    @    0m_p1bxtorv5i.js:1
+  tI    @    0m_p1bxtorv5i.js:1
+  s4    @    0m_p1bxtorv5i.js:1
+  fz    @    0m_p1bxtorv5i.js:1
+  fT    @    0m_p1bxtorv5i.js:1
+
+  installHook.js:1 Admin upload failed: FirebaseError: Firebase Storage: User does not have permissio
+  to access 'Textbooks/1780547933674_Introduction_to_Python_Programming-WEB.pdf'. (storage/unauthorized)
+  overrideMethod    @    installHook.js:1
+  (anonymous)    @    0la549n86_z1g.js:1
+  Promise.catch
+  onChange    @    0la549n86_z1g.js:1
+  sJ    @    0m_p1bxtorv5i.js:1
+  (anonymous)    @    0m_p1bxtorv5i.js:1
+  tI    @    0m_p1bxtorv5i.js:1
+  s4    @    0m_p1bxtorv5i.js:1
+  fz    @    0m_p1bxtorv5i.js:1
+  fT    @    0m_p1bxtorv5i.js:1
+
+  ﻿
+  Why 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] Starting real crawler on: https://openstax.org (Max Depth: 3)
+  [CRAWL] Fetching depth 1: https://openstax.org
+  [INFO] Found 0 raw links on page.
+  [COMPLETE] Crawled 1 pages. Discovered 0 PDFs. results is wrong
+  make the audio work, STT and TTS multimodal
+  special agents that can be used by other agents I guess
+  also upload to library can be pdf, docx, or any photo and we have verifier for academic related
+  material and that is an agent too I guess
+
+
+
+
+create a python forecast analysis report about subjects and books related and total books crawled
+  from https://openstax.org/
+  why don't you use python job/agent for crawling and harvesting
+  crawling, exploring and harvesting job needs not be aggressive on library server
+
+#### 📊 Catalog Analysis Summary:
+
+  • Total Crawled Books: 108 Titles
+  • Active Subjects: 8 Academic Disciplines
+  • Primary Categories: Math (25 titles), Science (25 titles), Social Sciences (21 titles), Business
+  (20 titles).
+  • Estimated Storage Requirement: 1.58 GB (assuming 15.0 MB average PDF size)
+  • Estimated Total Index Scope: 48,600 textbook pages yielding ~145,800 grounding nodes.
+
+
+
+
+the harvester needs to be part of the currecclum studio and needs to be triggered naturaly from ui
+  and not only related to openstax but can be any url, and most import it is asyn, cloud run and can  be
+  tracked for progress, harverster, crawler, and all the rest involved in the ingestion worflow for the
+  curruclim studio engine
+
+
+make all the currculum studio engine for ingestion via URL python jobs and mcp tools and effective
+  results and progress tracking, avoiding OEM and handling job crashes if possible avoiding them in the
+  design and implemnntation as we need to data source all of these today   • Total Crawled Books: 108
+  Titles
+    • Active Subjects: 8 Academic Disciplines
+    • Primary Categories: Math (25 titles), Science (25 titles), Social Sciences (21 titles), Busines
+    (20 titles).
+    • Estimated Storage Requirement: 1.58 GB (assuming 15.0 MB average PDF size)
+    • Estimated Total Index Scope: 48,600 textbook pages yielding ~145,800 grounding nodes.
+  follow our arch  originally discussed just use python more for effieciency
+
+
+
+and make sure you use mongodb mcp tools always inthe ingestion, embesing , vector and semantic stuf
+  and of course regressions
+  all parts of the ingestion workflow needs to be seperated into different jobs for effieciency, better
+  tracking and logging , they can trigger each other when one is finished or can hav a flow for example
+  between them, all good most important things in this workflowfor currculium studio url ingestions
+  needs to moontitered with less dependacya voiding OEM while having effiecient multitaskers to the jobs
+  and of course the ability to pasue/resume start/stop and kill and see the logs of the jobs, things
+  needs to be clear, visible and effiecient avoid any sync operation
+  also this needs to include the uploads, not only url
+  url I guess only for crawl and harvest while after harvet url and upload files share the same after
+  file being ssaved in the firebase storage
+  make the mostof agent temokates to use those as agentic part of the app, where later ony superadmin
+  can command companion to ingest uploaded pdf via chat or start ingestion from url via chat in
+  companion
+  and update superadmin with progress, but companion doesn't tell anyone about this skill , only
+  superadmin knows and ask for it and compainion checks for authoerization and superadmin role and then
+
+
+
+ finally make sure internalization is working over the langueages for our platform for every text,
+  label and every part of the app, including companion and chat, our platform should be working in 7
+  language complete not missing a single word and of course meanful translations, while having a feature
+  to translate the viewing page of a book into one of the seven lnagueges as well
+  approved admins can upload and ingest via companion as well but not url ingestion, url ingestion is
+  only for superadmins
+  admin can upload files but not url
+  jobs need to be triggered automaticlly once files arives to our firebase storage
+  Speech Synthesis Error: SpeechSynthesisErrorEvent {isTrusted: true, error: 'interrupted', utterance
+  SpeechSynthesisUtterance, charIndex: 0, charLength: 0, …}
+  overrideMethod @ installHook.js:1
+  r.onerror @ 0byc_mjlf6qz4.js:8Understand this error
+  07cdrizr1spgm.js:10  POST https://firebasestorage.googleapis.com/v0/b/fahem-
+  88d40.firebasestorage.app/o?name=MOE%20Library%2F1780552389574_Introduction_to_Python_Programming-
+  WEB.pdf 403 (Forbidden)
+  send @ 07cdrizr1spgm.js:10
+  e @ 07cdrizr1spgm.js:10
+  (anonymous) @ 07cdrizr1spgm.js:10
+  setTimeout
+  h @ 07cdrizr1spgm.js:10
+  (anonymous) @ 07cdrizr1spgm.js:10
+  start_ @ 07cdrizr1spgm.js:10
+  (anonymous) @ 07cdrizr1spgm.js:10
+  rq @ 07cdrizr1spgm.js:10
+  (anonymous) @ 07cdrizr1spgm.js:10
+  _makeRequest @ 07cdrizr1spgm.js:10
+  makeRequestWithTokens @ 07cdrizr1spgm.js:10
+  await in makeRequestWithTokens
+  (anonymous) @ 07cdrizr1spgm.js:10
+  onChange @ 06njrbcg_10j5.js:1
+  sJ @ 0m_p1bxtorv5i.js:1
+  (anonymous) @ 0m_p1bxtorv5i.js:1
+  tI @ 0m_p1bxtorv5i.js:1
+  s4 @ 0m_p1bxtorv5i.js:1
+  fz @ 0m_p1bxtorv5i.js:1
+  fT @ 0m_p1bxtorv5i.js:1Understand this error
+  installHook.js:1 Admin upload failed: FirebaseError: Firebase Storage: User does not have permissio
+  to access 'MOE Library/1780552389574_Introduction_to_Python_Programming-WEB.pdf'.
+  (storage/unauthorized)
+  overrideMethod @ installHook.js:1
+  (anonymous) @ 06njrbcg_10j5.js:1
+  Promise.catch
+  onChange @ 06njrbcg_10j5.js:1
+  sJ @ 0m_p1bxtorv5i.js:1
+  (anonymous) @ 0m_p1bxtorv5i.js:1
+  tI @ 0m_p1bxtorv5i.js:1
+  s4 @ 0m_p1bxtorv5i.js:1
+  fz @ 0m_p1bxtorv5i.js:1
+  fT @ 0m_p1bxtorv5i.js:1Understand this error
+  06njrbcg_10j5.js:1
+   GET https://fahem--fahem-88d40.us-east4.hosted.app/api/admin/crawl?jobId=crawl_1780552567646_f27ny
+  404 (Not Found)
+  (anonymous)    @    06njrbcg_10j5.js:1
+  setInterval
+  tg    @    06njrbcg_10j5.js:1
+  await in tg
+  sJ    @    0m_p1bxtorv5i.js:1
+  (anonymous)    @    0m_p1bxtorv5i.js:1
+  tI    @    0m_p1bxtorv5i.js:1
+  s4    @    0m_p1bxtorv5i.js:1
+  fz    @    0m_p1bxtorv5i.js:1
+  fT    @    0m_p1bxtorv5i.js:1
+
+  installHook.js:1 Crawl job polling failed
+  overrideMethod    @    installHook.js:1
+  (anonymous)    @    06njrbcg_10j5.js:1
+  setInterval
+  tg    @    06njrbcg_10j5.js:1
+  await in tg
+  sJ    @    0m_p1bxtorv5i.js:1
+  (anonymous)    @    0m_p1bxtorv5i.js:1
+  tI    @    0m_p1bxtorv5i.js:1
+  s4    @    0m_p1bxtorv5i.js:1
+  fz    @    0m_p1bxtorv5i.js:1
+  fT    @    0m_p1bxtorv5i.js:1
+  approve all and only report when all is done
+
+
+  also changing language change stt nd tts with locale and language changes and also another thing
+  when the compainion is in full screen the chat should be in the reading are od the eyes instead
+  having to extend vision tothe left and right to read chat, please fix and adjust, and please make
+  sure to follow project memory and workspace protocols , commit and autodeploy, smoke test every
+  feauture on production end to end including ingestion with upload and ingestion using url
+  let's use gemini-3.1-flash-tts-preview for audio model
+  and for the live oral we use gemini-3.1-flash-live-preview for oral stream model
+  and we use deep-research-preview-04-2026 model for zatoona deep research, we will need seprate
+  agents for those new advanced model to manage and then insert into our flows
+
+
+ make sure you are using the latest tool to scrap pdf and photos and get layout context and store
+  formated using monogodb mcp tools
+  books and  subject metadta should be auto translated once entered in one lnaguage into the other 6
+  ones for effiecient previewing
+  companion should be able to take feedback and submit compaints on behalf of user after user asking
+  to give feedback or report problem, companion shows in chat form to fill and send to our system
+  mondodb mcp tool after user finish filling it and click submit inside chat
+
+ make you maintain the rtl in arabic while ltr in all others languages
+
+Was new errors while trying to run the oral practice which is broken and not working, please investige
+  and fix
+
+ it is showing server connection failure when trying to launch active recall quest
+  user need to view his practice sessions history and what questions and his/her answers the
+  communicated expplanations and so on at the moment no history is recorded, also pracicte acitvity and
+  audit log is not working so we need to make it work, please investigate and fix
+
+practice should also  be available on a specific subject or book  chapters, titles and/or  concepts
+  (multiple selection allowed)
+  practice history is very important to keep track of covered areas and repeetions per area and weak
+  areas in student studying
+
+ craweling and exploring and ingesting is not working and need to be investigated no async job found
+  , the job is freeze at 5% also there is a test book hanging at 49%
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 152754.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 152807.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 152827.png
+
+ C:\Users\hesh1\Desktop\Screenshot 2026-06-04 154333.png companion suggestion here need to be smart
+  and updating depening on user history, last actiities, interest, session memory, conversation memor
+  and seqeuence of discussion to predict what can the user ask next and what do the user want to do next
+  in our academic space
+
+
+ the subject identification in our crawler and explorer is broken 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] 🚀 Starting async Cloud Run Harvester Job ID: crawl_1780579557588_8avgl
+  [INIT] 🕸️ Crawler targeting: https://openstax.org (Max Depth: 3)
+  [INIT] 📧 Triggered by administrator: hesham1988@gmail.com
+  [CRAWLER] 🕸️ Dynamic Single Page Application (SPA) detected: https://openstax.org
+  [CRAWLER] ⚡ Activating direct OpenStax CMS API Integration...
+  [CRAWLER] 📚 Successfully connected to OpenStax CMS API. Found 108 raw textbook nodes.
+  [DISCOVERED PDF] 📖 "Additive Manufacturing Essentials" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Additive_Manufacturing_Essentials_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Algebra 1" -> https://assets.openstax.org/oscms-prodcms/media/documents/algebra-
+  1_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Algebra and Trigonometry" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/AlgebraAndTrigonometry-OP_1tE6R5r.pdf
+  [DISCOVERED PDF] 📖 "Algebra and Trigonometry 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/algebra-and-trigonometry-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "American Government" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/AmericanGovernment-OP.pdf
+  [DISCOVERED PDF] 📖 "American Government 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/american-government-2e-6.11.pdf
+  [DISCOVERED PDF] 📖 "American Government 3e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/AmericanGovernment3e-WEB.pdf
+  [DISCOVERED PDF] 📖 "American Government 4e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/American_Government_4e_-_WEB_eM2Tuqh.pdf
+  [DISCOVERED PDF] 📖 "Anatomy and Physiology" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/AnatomyandPhysiology-OP.pdf
+  [DISCOVERED PDF] 📖 "Anatomy and Physiology 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/anatomy-and-physiology-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Astronomy" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Astronomy-OP_zItt6LJ.pdf
+  [DISCOVERED PDF] 📖 "Astronomy 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/astronomy-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Biology" -> https://assets.openstax.org/oscms-prodcms/media/documents/Biology-
+  OP_xQoZM8Z.pdf
+  [DISCOVERED PDF] 📖 "Biology 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Biology2e-WEB.pdf
+  [DISCOVERED PDF] 📖 "Biology for AP® Courses" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/APBiology-OP_5meoFaG.pdf
+  [DISCOVERED PDF] 📖 "Business Ethics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/business-ethics_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Business Law I Essentials" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/business-law-i-essentials-WEB.pdf
+  [DISCOVERED PDF] 📖 "Calculus Volume 1" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/calculus-volume-1_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Calculus Volume 2" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/calculus-volume-2_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Calculus Volume 3" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/calculus-volume-3_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Chemistry" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Chemistry-OP_XdqVZpQ.pdf
+  [DISCOVERED PDF] 📖 "Chemistry 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/chemistry-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Chemistry: Atoms First" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/ChemistryAtomsFirst-OP_1D7uBNB.pdf
+  [DISCOVERED PDF] 📖 "Chemistry: Atoms First 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/chemistry-atoms-first-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Clinical Nursing Skills" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Clinical-Nursing-Skills-WEB.pdf
+  [DISCOVERED PDF] 📖 "College Algebra" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/CollegeAlgebra-OP.pdf
+  [DISCOVERED PDF] 📖 "College Algebra 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/college-algebra-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "College Algebra 2e with Corequisite Support" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/college-algebra-corequisite-support-2e_-
+  _WEB.pdf
+  [DISCOVERED PDF] 📖 "College Algebra with Corequisite Support" -> https://assets.openstax.org/oscms
+  prodcms/media/documents/CollegeAlgCoreq-WEB.pdf
+  [DISCOVERED PDF] 📖 "College Physics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/College_Physics-WEB_2s5sHvR.pdf
+  [DISCOVERED PDF] 📖 "College Physics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/college-physics-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "College Physics For AP® Courses 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/college-physics-ap-courses-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "College Success" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/college-success_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "College Success Concise" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/college-success-concise_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Concepts of Biology" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/ConceptsofBiology-WEB.pdf
+  [DISCOVERED PDF] 📖 "Contemporary Mathematics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/contemporary-mathematics_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Elementary Algebra" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/ElementaryAlgebra-OP_Ft8T0ij.pdf
+  [DISCOVERED PDF] 📖 "Elementary Algebra 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/elementary-algebra-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Entrepreneurship" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Entrepreneurship-WEB.pdf
+  [DISCOVERED PDF] 📖 "Foundations of Information Systems" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Foundations_of_Information_Systems_-_WEB_oNlbGYl.pdf
+  [DISCOVERED PDF] 📖 "Fundamentals of Nursing" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Fundamentals_of_Nursing_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Intermediate Algebra" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntermediateAlgebra-OP_TyKO63g.pdf
+  [DISCOVERED PDF] 📖 "Intermediate Algebra 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/intermediate-algebra-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Anthropology" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntroductiontoAnthropology-WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Behavioral Neuroscience" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_to_Behavioral_Neuroscience-WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Business" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntroductionToBusiness-OP_8D04gAa.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Business 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_to_Business_2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Computer Science" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_To_Computer_Science_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Intellectual Property" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/introduction-intellectual-property_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Philosophy" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_to_Philosophy-WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Political Science" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_to_Political_Science_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Python Programming" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Sociology 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntroductionToSociology2e-OP_tbTLqMj.pdf
+  [DISCOVERED PDF] 📖 "Introduction to Sociology 3e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/introduction-sociology-3e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introductory Business Statistics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntroductoryBusinessStatistics-OP.pdf
+  [DISCOVERED PDF] 📖 "Introductory Business Statistics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/introductory-business-statistics-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Introductory Statistics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/IntroductoryStatistics-OP_i6tAI7e.pdf
+  [DISCOVERED PDF] 📖 "Introductory Statistics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/introductory-statistics-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Lifespan Development" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Lifespan_Development_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Maternal-Newborn Nursing" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Maternal-Newborn_Nursing-WEB.pdf
+  [DISCOVERED PDF] 📖 "Medical-Surgical Nursing" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Medical-Surgical_Nursing-WEB.pdf
+  [DISCOVERED PDF] 📖 "Microbiology" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/microbiology_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Nutrition for Nurses" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Nutrition_for_Nurses-WEB.pdf
+  [DISCOVERED PDF] 📖 "Organic Chemistry: A Tenth Edition" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/organic-chemistry_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Organizational Behavior" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/organizational-behavior_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Pharmacology for Nurses" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Pharmacology-WEB.pdf
+  [DISCOVERED PDF] 📖 "Physics" -> https://assets.openstax.org/oscms-prodcms/media/documents/Physics-
+  WEB_Sab7RrQ.pdf
+  [DISCOVERED PDF] 📖 "Population Health for Nurses" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Population_Health_for_Nurses_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Prealgebra" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Prealgebra-OP_oYhyXVE.pdf
+  [DISCOVERED PDF] 📖 "Prealgebra 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/prealgebra-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Precalculus" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Precalculus-OP_9wwF7YT.pdf
+  [DISCOVERED PDF] 📖 "Precalculus 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/precalculus-2e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Preparing for College Success" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/preparing-for-college-success_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Accounting, Volume 1: Financial Accounting" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/principles-financial-accounting_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Accounting, Volume 2: Managerial Accounting" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/principles-managerial-accounting_-_WEB.pd
+  [DISCOVERED PDF] 📖 "Principles of Data Science" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Principles-of-Data-Science-WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Economics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/PrinciplesofEconomics-OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Economics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Economics2e-OP_s2jF42u.pdf
+  [DISCOVERED PDF] 📖 "Principles of Economics 3e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-economics-3e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Finance" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-finance_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Macroeconomics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/PrinciplesofMacroeconomics-OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Macroeconomics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Macroeconomics2e-OP_WRQqkIv.pdf
+  [DISCOVERED PDF] 📖 "Principles of Macroeconomics 3e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-macroeconomics-3e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Macroeconomics for AP® Courses" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/PrinciplesofMacroeconomicsforAPCourses-
+  OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Macroeconomics for AP® Courses 2e" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/APMacroeconomics2e-OP_7sE2Bz3.pdf
+  [DISCOVERED PDF] 📖 "Principles of Management" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-management_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Marketing" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-marketing_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Microeconomics" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/PrinciplesofMicroeconomics-OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Microeconomics 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Microeconomics2e-OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Microeconomics 3e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/principles-microeconomics-3e_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Principles of Microeconomics for AP® Courses" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/PrinciplesofMicroeconomicsforAPCourses-
+  OP.pdf
+  [DISCOVERED PDF] 📖 "Principles of Microeconomics for AP® Courses 2e" ->
+  https://assets.openstax.org/oscms-prodcms/media/documents/APMicroeconomics2e-OP_0CGY3xk.pdf
+  [DISCOVERED PDF] 📖 "Psychiatric-Mental Health Nursing" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Psychiatric-Mental_Health_Nursing-WEB.pdf
+  [DISCOVERED PDF] 📖 "Psychology" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Psychology-OP.pdf
+  [DISCOVERED PDF] 📖 "Psychology 2e" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Psychology2e_WEB.pdf
+  [DISCOVERED PDF] 📖 "Statistics" -> https://assets.openstax.org/oscms-prodcms/media/documents/high-
+  school-statistics_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "The AP Physics Collection" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/APCollegePhysics-OP_js6ZFp7.pdf
+  [DISCOVERED PDF] 📖 "University Physics Volume 1" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/university-physics-volume-1_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "University Physics Volume 2" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/university-physics-volume-2_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "University Physics Volume 3" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/university-physics-volume-3_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "U.S. History" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/US_History_-_WEB.pdf
+  [DISCOVERED PDF] 📖 "Workplace Software and Skills" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/Workplace_Software_and_Skills_-_WEB_IlfJtcP.pdf
+  [DISCOVERED PDF] 📖 "World History, Volume 1: to 1500" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/World_History_Volume_1-WEB.pdf
+  [DISCOVERED PDF] 📖 "World History, Volume 2: from 1400" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/World_History_Volume_2-WEB.pdf
+  [DISCOVERED PDF] 📖 "Writing Guide with Handbook" -> https://assets.openstax.org/oscms-
+  prodcms/media/documents/WritingGuide-WEB.pdf
+  [COMPLETE] ✅ OpenStax API Crawler finished politely! Discovered 105 textbook documents. 📊 Crawled
+  Subject Distribution Metrics
+  Pure Mathematics
+  102 (97%)
+  Physics & Chemistry
+  2 (2%)
+  Computer Science
+  1 (1%) although from previous forecasting it was #### 📊 Catalog Analysis Summary:
+
+    • Total Crawled Books: 108 Titles
+    • Active Subjects: 8 Academic Disciplines
+    • Primary Categories: Math (25 titles), Science (25 titles), Social Sciences (21 titles), Busines
+    (20 titles).
+    • Estimated Storage Requirement: 1.58 GB (assuming 15.0 MB average PDF size)
+    • Estimated Total Index Scope: 48,600 textbook pages yielding ~145,800 grounding nodes.
+  this one failed 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] 🚀 Starting async Cloud Run Harvester Job ID: crawl_1780579806006_hrwz4
+  [INIT] 🕸️ Crawler targeting: https://ellibrary.moe.gov.eg/ (Max Depth: 3)
+  [INIT] 📧 Triggered by administrator: hesham1988@gmail.com
+  [CRAWLER] Initiating recursive multi-depth crawling engine...
+  [CRAWL] Fetching page (1/20) depth 1: https://ellibrary.moe.gov.eg/
+  [INFO] Parsed 4 links from page.
+  [CRAWL] Fetching page (2/20) depth 2: https://ellibrary.moe.gov.eg/${card.link}
+  [WARN] Failed to fetch https://ellibrary.moe.gov.eg/${card.link}: status 403
+  [COMPLETE] ✅ Web crawl job completed! Successfully fetched 2 pages and discovered 0 PDF documents.
+  why are you trying to upload uploaded pdf into moe library Console FirebaseError
+
+
+
+  Firebase Storage: User does not have permission to access 'MOE
+  Library/1780579991857_Introduction_to_Python_Programming-WEB.pdf'. (storage/unauthorized) , each
+  ingestion url create spcific library depndigng on the url of ingestion major library name and for
+  uploads it goes under user uploads, fix name convemstions of folder names in firebase storage so you
+  are not confused and you have a system for that
+  books in the knowledge library tab is orgaized by library which library are you exploring, from whic
+  url or admin uploads or private user uploads, and book card needs revamp to become  beautiful and
+  informative and interactive books cards
+  make sure you use mongodb mcp tool for embedings, vector and semantic tools for ingestion and
+  aggregation pipelines
+  for showing case student vulnrability heatmap, or visuals for our gamifications process and user
+  progress, animated and using the power of our agents and mongodb mcp tools for aggeegation pipeline
+  why the max [INIT] ⚙️ Parameters: Max Depth = 3 is only 3 is that enough to work generic on any
+  library like https://ellibrary.moe.gov.eg/books/ library
+
+ no download available on our system for the books, we expose the souce url though
+  Interactive Knowledge Library needs to have library categorization for ingested libraries and admin
+  uploads and private user uploaads
+  so obciously you shoudn't mention download or file size here in this context
+
+
+ no download available on our system for the books, we expose the souce url though
+  Interactive Knowledge Library needs to have library categorization for ingested libraries and admin
+  uploads and private user uploaads
+  so obciously you shoudn't mention download or file size here in this context
+  let's use https://docs.cloud.google.com/generative-ai-app-builder/docs as originally planned I've
+  alot of credit for this app and let's implement the mongodb stitching technique as well, you
+  remember the original plan, https://cloud.google.com/generative-ai-app-builder/pricing , Trial
+  credit for GenAI App Builder
+   Available
+  100%
+  $1,000.00
+  can you do do it from here if yes proceed if no stick to what we are implementing now
+  🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...
+  [INIT] 🌐 Target domain: https://openstax.org
+  [INIT] ⚙️ Parameters: Max Depth = 3
+  [INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution...
+  [SYSTEM] Background crawler process failed to initialize or was terminated unexpectedly.🕷️
+  we can make this process async pythons and node.js serverless jobs , think about it and let's move
+  forward we haven't ingested one book correctly yet, so please hurry up dn move on , this is way too
+  much for this ready made solution that if we can n programitacly use it instead of no code with
+  admin steps to be fully customized to meet and serve our solution
+  [ Ingestion Workstation ] ───(Upload / Automated Discovery Sweep)───> [ Managed Firebase Storage
+  Bucket ]
+                                                                                   │
+                                                                                     ▼ (Object
+  Finalized Payload Event)
+                                                                         [ Eventarc Trigger Router ]
+                                                                                     │
+                                                                                     ▼ (Injects
+  target URI pointer string)
+                                                                       [ Cloud Run Async Job Worker ]
+                                                                                     │
+                                                                                     ▼ (Zero Local
+  Footprint Process Loop)
+                                                                       [ gemini-3.1-flash-lite
+  Ingestion Core ]
+                                                                                     │
+
+  ├───────────────────────────────────┐
+                                                                                     ▼ (Text Segment
+  Grounding)          ▼ (Structured Metadata)
+                                                                       [ Vertex AI Search Datastore ]
+ [ MongoDB Atlas DB/MCP Tools ]
+  remember this arch???????????
+  Console Error
+
+
+
+  Encountered two children with the same key, `user_super_1`. Keys should be unique so that
+  components maintain their identity across updates. Non-unique keys may cause children to be
+  duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+  src/components/dashboard/SocialPanel.tsx (743:23) @ <unknown>
+
+
+    741 |
+    742 |                     return (
+  > 743 |                       <div
+        |                       ^
+    744 |                         key={dirUser.userId}
+    745 |                         style={{
+    746 |                           display: "flex",
+  Call Stack
+  24
+ Show 19 ignore-listed frame(s)
+  div
+  <anonymous>
+  <unknown>
+  src/components/dashboard/SocialPanel.tsx (743:23)
+  Array.map
+  <anonymous>
+  SocialPanel
+  src/components/dashboard/SocialPanel.tsx (724:20)
+  Home
+  src/app/[locale]/home/page.tsx (5797:11)
+  1
+  2
+  I don't understand what is compaction task and you felt stuck and not responding so I canceled but
+  if there something that you were doing importnt pleas continue as well
+  I deleted all folders in firebase storage and cleared datbase from fake data and fake records, make
+  sure UI doesn't have any fake data not reading from our verified datasources as well what re you
+  compacting
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!! don't ever put me in the dark room answer please
+
+
+ as you can see C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 190104.png crawler
+  classified almost all books under mathemetics, there should be no max depth, try to find all possible
+  pdfs in this library in hirarechal way, all localdb stuff need to be reflected on production database,
+  collections and docuemnts , we need to have the data collected in the oral practice to be presented in
+  the report as well after practice, visuals are great but with fake and hardcoded stuff that's just
+  fuck up honestly, I said and i'll say again datamodels and data samples and smoke test are crucial to
+  our procress, where did you get the data in the
+  Student Vulnerability Heatmap is it real with aggregation pipeline from mongodb using mcp tools
+
+
+ practice session history adn challenges should be persisted in the datbase as well
+  Firebase Storage: User does not have permission to access
+  'user_uploads/GLzPguiY29eSHKj0jLPa8FwB4em2/1780590206119_Introduction_to_Python_Programming-WEB.pdf'.
+  (storage/unauthorized)
+  error while using private upload
+  admin upload also failed same error Firebase Storage: User does not have permission to access
+  'user_uploads/GLzPguiY29eSHKj0jLPa8FwB4em2/1780590206119_Introduction_to_Python_Programming-WEB.pdf'.
+  (storage/unauthorized)
+  we need to revise firbase storage rules for that
+  our firbase storage bucket here is still emptyy gs://fahem-88d40.firebasestorage.app
+  max depth is untill finding the last pdf from this website, remove limitations on ma depth
+  craweling https://ellibrary.moe.gov.eg returns nothing, https://ellibrary.moe.gov.eg/books/ returns
+  into book only
+  which is wrong plese forecast moe egypt library and print anlysis report here for reference
+  https://ellibrary.moe.gov.eg
+  fix admin upload and user upload and distinguesh between them in storage and data and paths
+
+
+INGESTION VELOCITY, ESTIMATED TIME OF ARRIVAL (ETA, QUEUE REMAINING ITEMS are not working properly
+  please investiagte and fix
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 195641.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 195559.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 195540.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 195511.png subject and subject cetgorizati
+  is not mactching the origial library hirerachy, plese investigate and fix as you can see many books
+  went under the wrong subjects, hirerrachy needs to be met exactly as is in the library structure
+  let's commit and autodeploy to test on app hosting staging for all our new features and agensts swar
+  capabilities
+  smoke test as well on staging please
+  also fix TTS is not working
+
+
+
+ how come 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] 🚀 Starting async Cloud Run Harvester Job ID: crawl_1780593271546_o7fn8
+  [INIT] 🕸️ Crawler targeting: https://ellibrary.moe.gov.eg/books (No Max Depth, full hierarchical
+  search)
+  [INIT] 📧 Triggered by administrator: hesham1988@gmail.com
+  [CRAWLER] Initiating recursive multi-depth crawling engine...
+  [CRAWL] Fetching page 1 at depth 1: https://ellibrary.moe.gov.eg/books
+  [INFO] Parsed 3 links from page.
+  [DISCOVERED PDF] ✨ Discovered active asset: "Intro" ->
+  https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/StudentBook2025_2026/intro.p
+  df
+  [COMPLETE] ✅ Web crawl job completed! Successfully fetched 1 pages and discovered 1 PDF documents.
+  returned one book  although website contains loads of links to different books depending on the
+  dropdown selection here C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 201547.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 201541.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 201534.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 201529.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-04 201522.png
+  the crawler and explorer need to be smart to understand where to get the books, the subject and
+  books metadata
+  ESTIMATED TIME OF ARRIVAL (ETA) should rotate seconds , mintues and hours not only seconds
+  file name corrupted the currculim studio view C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-
+  06-04 203056.png and tracking progress for files is quite inconvient and doesn't provide the
+  overall or the one book details and can see progress of each also and the collective progress
+
+
+ THIS IS CRITICAL not a single book is showing the book pages correctly like how it is in the
+  original pdf/book , all is providing fake data for fake page and with history subject, please fix book
+  pages browsing view and make it beuatiful functional and real
+
+Premium Audio playback error, falling back to Web Speech: {}
+  src/components/StickyChat.tsx (704:21) @ audio.onerror
+
+
+    702 |
+    703 |           audio.onerror = (e) => {
+  > 704 |             console.error("Premium Audio playback error, falling back to Web Speech:", e);
+        |                     ^
+    705 |             runWebSpeechFallback(cleanText);
+    706 |           };
+    707 |
+  Call Stack
+  4
+
+  Show 3 ignore-listed frame(s)
+  audio.onerror
+  src/components/StickyChat.tsx (704:21)
+  1
+  2
+  Failed to load because no supported source was found.
+  1
+  2
+  the TTS is broken and delayed and plays very late and cuts while speaking and keep repeating twice
+  while its voice also feels very robotic are you sure we are using the latest models for our TTS
+
+the voice is super robotic and by the way  gemini-2.5-flash is older than gemini-3.1-flash-
+        tts-preview
+
+the voice also can skip emoticons easy
+
+make sure you re using gemini-3.1-flash-tts-preview in the oral as well
+  Real-Time Speech-to-Speech: Live API
+
+in the oral test voice start automaitically unless user close this feauture and when onve finished
+  reading the equestion, the recording for the user answer starts also question TTS can be interupted if
+  user chsose to record his/her answer by clivking on the mic button, otherwiswe the voice will continue
+  till it read text and open mic automatically for the user
+
+ the companion voice selection position for the dropdown is not good it moved the original controls
+  exising before for screen control and history and so on .. please fix that find a goood spot for this
+  option, also for the arabic use only egyptian arabic please
+
+allow user to rename chat conversations
+
+when user listen to voice we need to log and audit all acitivities related to audio and count token
+  for all used llms
+  why crawler is failing https://ellibrary.moe.gov.eg/ 🕷️ CRAWLER_EXPLORER_CONSOLE_OUTPUT
+  [INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...
+  [INIT] 🌐 Target domain: https://ellibrary.moe.gov.eg/
+  [INIT] ⚙️ Parameters: Max Depth = 3
+  [INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution...
+  [SYSTEM] Background crawler process failed to initialize or was terminated unexpectedly. although i
+  is successeeding in https://openstax.org it need to be work to work and explore both, check logs fo
+  error, investigate, report and fix
+  navigation side panel should be sticky in case big screen , hummbergur in small screens
+  at the moment it is fixed and when i scroll down it disappear up while it should always be by my side
+
+chat rename is broken, it doesn't save it freezes after opening chat name for edit and never accept
+  or close this rename style
+  Console Error
+
+
+
+  Failed to rename session
+  src/components/StickyChat.tsx (1170:17) @ renameSession
+
+
+    1168 |         setEditingTitle("");
+    1169 |       } else {
+  > 1170 |         console.error("Failed to rename session");
+         |                 ^
+    1171 |       }
+    1172 |     } catch (err) {
+    1173 |       console.error("Error renaming session:", err);
+  Call Stack
+  4
+
+  Show 3 ignore-listed frame(s)
+  renameSession
+  src/components/StickyChat.tsx (1170:17)
+
+
+ one book pages view is not working properly also, arbic pages needs to rtl not ltr .. also the
+  layout and formatting and style is aweful and note matching layout on original PDF, also formulaes,
+  law, requestions, rules is not working properly as well it just hallucinates, also it feels too
+  crowded and no titles different in styles or color which we need to fix and make it look elegant an
+  beautiful and readable
+
+combine both tabs 🏫 Curriculum Libraries
+  🛡️ Administrative Uploads into 🏫 Curriculum Libraries where admin uploades goes to general library
+  inside libraries where user can navigate between different libraries like
+  https://ellibrary.moe.gov.eg/ library when ingested or anybook under gets ingested,
+  https://openstax.org/ library same same, and each library should have its unique naame, and unique u
+  where the books and the ingestion process starts, https://openstax.org/ and
+  https://openstax.org/subjects/computer-science are both the same library https://openstax.org/
+  hahaving openstax as library name.. english books now got broken english needs to stay ltr and arabi
+  books rtl .. I can see two books in the production datbase but I don't see them on the localdev
+  environemntn .. I see some other books on production different than local .. clear percentage of
+  completion over subject cause we don't have a critiria for this 100% over subject and at  the moment
+  it just looks fake and stupid, next to 📖 Table of Contents we need to have mind map .. book mind ma
+  for chapters, titles, concepts inside books in swarm svg and collapsable hirerecahal menu for a
+  beautiful mind map for this book
+
+keep the Curriculum Studio in its own tab that was wrong to move into Interactive
+  Knowledge Library General tab I diagree .. please fix immediately
+  Console Error
+
+
+
+    Maximum update depth exceeded. This can happen when a component calls setState inside
+  useEffect, bu
+    useEffect either doesn't have a dependency array, or one of the dependencies changes on
+  every render.
+    src/components/StickyChat.tsx (1707:15) @ Object.handleSendMessage
+
+
+      1705 |
+      1706 |               accumulatedText += safeText;
+    > 1707 |               setMessages((prev) =>
+           |               ^
+      1708 |                 prev.map((msg) =>
+      1709 |                   msg.id === assistantMsgId ? { ...msg, text:
+  accumulatedText.trim() } : msg
+      1710 |                 )
+    Call Stack
+    8
+
+    Show 7 ignore-listed frame(s)
+    Object.handleSendMessage
+    src/components/StickyChat.tsx (1707:15)
+    1
+    2
+    curriclum studio page ui is over flowing to the right more than the screen please fix
+    reautodeploy
+
+I feel like the mindmap need to be a list with expandablaes for chapters, titles, concept
+  inside the book instead of interactive svg swarm, didn't fit the swarm, the list will be
+  more effective
+
+all pages inside Introduction to Computer Science book are the same how is that!! please
+  investigate and fix
+  let's distinct books having the same subject  from other subjects, by havinng color syste
+  for subjects that apply all across our system
+  including highlighting the book card to be with same color for same subject different color
+  for other subjects, each books in one subject sahre this subject color property
+  all pages in book Introduction_to_Python_Programming-WEB are the same
+
+instead of Hierarchy it should be chapters or units
+  Conceptual Outline is the mind map
+  companion should be able to search books and find what the user is searching for to the
+  exact page in our books librarires
+  and of course reference and cite where to find with links as our system should be
+  intelligent to navigate to book or page via url
+  so each book should have unique url and same for the page
+  it can be through varible in the url srting I don't know just do the best practice and
+  most secured
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-05 002150.png
+  C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-05 002136.png look here also the
+  curruclium studio still over flow badly ,please fix
+
+
+ remove hierarchy honetly i like how you did it in pages C:\Users\hesh1\Desktop\Screenshot
+  2026-06-05 005446.png as you can see here no need for hirerachy, also it worth mention an
+  very critical that the book was ingested completely wrong and now showing fake books and
+  fake pages, the table of content is inside the pdf here https://assets.openstax.org/oscms
+  prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf and it is 397 pages ho
+  come it was stored C:\Users\hesh1\Pictures\Screenshots\Screenshot 2026-06-05 010727.png with
+  32 pages only and all pages rules
+  Array (empty)
+
+  formulas
+  Array (empty) , also content is not annotatted for best formatting and deisgn later like
+  titles, new lines, layont, fontsize, visul description, boxed  elemenet, question table of
+  content, chpter, units, titles inside each, emebeding, vector, sematinc, indexing, aaall
+  done on every singly page and on the whole book as well, use smart pdf python advanceed
+  tools and gemini the latest model to help acheieve the best of the layout and format
+  understanding so we can view book pages eabutifully , at the moment the book is showing so
+  made up pages and content althugh some pages wasa imported and ingestd from the same book,
+  we need to  investigate and fix why ingestion failed to import book pages completely ,
+  remeber all book data, layout, info, metadat , mind map, chapters, titles, conccepts all
+  need to be scrabed, extracted, stored, analyzed and processed if needed  and make sure it
+  persistent and is used in for one book pages reader view , another thing use book id as
+  variable in connection string to nviaget directly certain book like youtube and watch
+  variable in the connection string, also for page with page number the same, while profile
+  picture have its own unque url pathes using the power of next.js if you can do the same th
+  would be great for seo I guuess if you did the same to books and pages with
+  en/[bookid]/page/[page number] for example, you improvise for this part or leave it , most
+  important that we need to make one full ingestion for at least one book and it content and
+  everything to the search and viewing and exploring pages and using our companion on and so
+  on, then we can move to the batch processing, so hurry up and focus and let's build

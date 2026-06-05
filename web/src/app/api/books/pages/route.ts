@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
     const bookId = searchParams.get("bookId") || searchParams.get("book_id");
 
@@ -154,6 +153,12 @@ export async function GET(req: NextRequest) {
       const pages = (db as any).book_pages || [];
       
       let cleanBookId = bookId;
+      if (!cleanBookId) {
+        return new Response(JSON.stringify({ error: "Missing required parameter: bookId" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
       if (cleanBookId.startsWith("custom_")) {
         cleanBookId = cleanBookId.replace("custom_", "");
       }
