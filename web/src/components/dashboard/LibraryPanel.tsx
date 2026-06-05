@@ -874,11 +874,108 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [showReaderSidebar, setShowReaderSidebar] = useState(true);
   const [sidebarPageSearch, setSidebarPageSearch] = useState("");
 
+  const [isReadingPage, setIsReadingPage] = useState(false);
+  const [isContinuousListening, setIsContinuousListening] = useState(false);
+  const [isNextPageGlow, setIsNextPageGlow] = useState(false);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+
   // New states for hierarchical menu, library selection, and Swarm SVG Mind Map
-  const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "hierarchy">("pages");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "mindmap">("pages");
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
   const [hoveredNode, setHoveredNode] = useState<any | null>(null);
   const [selectedLibraryId, setSelectedLibraryId] = useState<string>("all");
+
+  const getStoredTtsVoice = (): string => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fahem_tts_voice") || "Aoede";
+    }
+    return "Aoede";
+  };
+
+  const cleanTextForTts = (text: string): string => {
+    if (!text) return "";
+    return text
+      .replace(/\[HEADER:[^\]]*\]/gi, "")
+      .replace(/\[FOOTER:[^\]]*\]/gi, "")
+      .replace(/\[VISUAL:[^\]]*\]/gi, "")
+      .replace(/```[a-z]*\n[\s\S]*?\n```/g, "")
+      .replace(/\|[\s\S]*?\|/g, "")
+      .replace(/==|#|\*\*|__|\*/g, "")
+      .replace(/Law|Rule|Theorem|Definition|Principle|قانون|قاعدة|نظرية|مبدأ|تعريف|التعريف|القاعدة|القانون|Equation|Formula|معادلة|صيغة/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const handleStopReading = () => {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    setIsReadingPage(false);
+  };
+
+  const handleReadPage = async (textToRead: string, totalPages: number) => {
+    if (isReadingPage) {
+      handleStopReading();
+      return;
+    }
+
+    const cleanedText = cleanTextForTts(textToRead);
+    if (!cleanedText) return;
+
+    try {
+      setIsReadingPage(true);
+      const hasArabicChars = /[\u0600-\u06FF]/.test(cleanedText);
+      const reqLang = hasArabicChars ? "ar" : (translationLanguage || "en");
+      const selectedVoice = getStoredTtsVoice();
+
+      const res = await fetch("/api/audio/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: cleanedText,
+          language: reqLang,
+          voice: selectedVoice,
+          userId: user?.uid || "anonymous",
+          userEmail: user?.email || "anonymous@fahem.ai"
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.audioContent) {
+          const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
+          const audio = new Audio(audioUrl);
+          activeAudioRef.current = audio;
+
+          audio.onended = () => {
+            activeAudioRef.current = null;
+            if (isContinuousListening && readerCurrentPage < totalPages) {
+              setReaderCurrentPage(prev => prev + 1);
+            } else {
+              setIsReadingPage(false);
+              setIsNextPageGlow(true);
+              setTimeout(() => setIsNextPageGlow(false), 3000);
+            }
+          };
+
+          audio.onerror = (err) => {
+            console.error("Audio playback error:", err);
+            setIsReadingPage(false);
+          };
+
+          await audio.play();
+        } else {
+          setIsReadingPage(false);
+        }
+      } else {
+        setIsReadingPage(false);
+      }
+    } catch (err) {
+      console.error("TTS processing error:", err);
+      setIsReadingPage(false);
+    }
+  };
 
   const getBookLibraryId = (item: any): string => {
     const url = (item.source_url || item.sourceUrl || "").toLowerCase();
@@ -900,13 +997,102 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     return getSubjectNameLabel(subject || "", lang);
   };
 
+  const isEnglishBookBySubjectOrTitle = (book: any): boolean => {
+    if (!book) return false;
+    const title = (book.titleEn || book.title || "").toLowerCase();
+    const subjectId = book.subject_id || book.subjectId || "";
+    
+    if (subjectId === "subj_arabic_grammar") return false;
+    
+    if (
+      subjectId === "subj_algebra_stats" || 
+      subjectId === "subj_biology" || 
+      subjectId === "sub_computer_science_1780535716963" || 
+      subjectId === "subj_business"
+    ) {
+      return true;
+    }
+    
+    if (
+      title.includes("physics") || 
+      title.includes("chemistry") || 
+      title.includes("mathematics") || 
+      title.includes("algebra") || 
+      title.includes("calculus") || 
+      title.includes("computer science") || 
+      title.includes("ict") || 
+      title.includes("economics") || 
+      title.includes("business")
+    ) {
+      return true;
+    }
+    
+    return false;
+  };
+
   useEffect(() => {
     if (selectedBookReader) {
-      setTranslationLanguage(selectedBookReader.language || language || "en");
+      if (isEnglishBookBySubjectOrTitle(selectedBookReader)) {
+        setTranslationLanguage("en");
+      } else {
+        setTranslationLanguage(selectedBookReader.language || language || "en");
+      }
     } else {
       setTranslationLanguage(language || "en");
     }
   }, [selectedBookReader, language]);
+
+  useEffect(() => {
+    if (selectedBookReader && isReadingPage && isContinuousListening) {
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+      
+      const allPages = getAllPages(selectedBookReader, loadedBookPages);
+      const hasCover = !!selectedBookReader.coverUrl;
+      
+      let contentToRead = "";
+      let pageTotal = hasCover ? allPages.length + 1 : allPages.length;
+      
+      if (hasCover) {
+        if (readerCurrentPage > 1) {
+          const pageObj = allPages[readerCurrentPage - 2] || allPages[0];
+          if (pageObj) {
+            contentToRead = translationLanguage === "ar" 
+              ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
+              : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
+          }
+        }
+      } else {
+        const pageObj = allPages[readerCurrentPage - 1] || allPages[0];
+        if (pageObj) {
+          contentToRead = translationLanguage === "ar" 
+            ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
+            : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
+        }
+      }
+      
+      if (contentToRead) {
+        const timer = setTimeout(() => {
+          setIsReadingPage(false);
+          handleReadPage(contentToRead, pageTotal);
+        }, 600);
+        return () => clearTimeout(timer);
+      } else {
+        setIsReadingPage(false);
+      }
+    }
+  }, [readerCurrentPage]);
+
+  useEffect(() => {
+    return () => {
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
