@@ -49,7 +49,19 @@ export async function GET(req: NextRequest) {
           } catch (e) {}
         }
         
-        if (!isAlive && (!job.active_pid || (Date.now() / 1000 - job.updated_at > 300))) {
+        const ageInSeconds = (Date.now() / 1000) - (job.created_at || job.updated_at || 0);
+        let shouldMarkFailed = false;
+        if (!isAlive) {
+          if (job.active_pid) {
+            // Process was active but is no longer running (exited)
+            shouldMarkFailed = true;
+          } else if (ageInSeconds > 60) {
+            // No PID written and more than 60 seconds have passed
+            shouldMarkFailed = true;
+          }
+        }
+        
+        if (shouldMarkFailed) {
           job.status = "failed";
           if (!job.logs) job.logs = [];
           job.logs.push(job.active_pid
