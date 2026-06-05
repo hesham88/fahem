@@ -3,6 +3,7 @@ import { checkIsAdmin } from "../helper";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -72,69 +73,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2. Fetch from MongoDB in Production
-    try {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db("fahem");
-      const job = await db.collection("crawl_jobs").findOne({ _id: jobId });
-      await client.close();
-
-      if (!job) {
-        return new Response(JSON.stringify({
-          success: true,
-          status: "queued",
-          progress: 5,
-          logs: ["[INIT] Job scheduled. Awaiting database and background spider execution..."],
-          discovered: []
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        status: job.status,
-        progress: job.progress,
-        logs: job.logs,
-        discovered: job.discovered || []
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch (dbErr: any) {
-      // DB connection failed, fallback to local DB read
-      const db = getLocalDb() as any;
-      const crawlJobs = db.crawl_jobs || [];
-      const job = crawlJobs.find((j: any) => j._id === jobId);
-
-      if (!job) {
-        return new Response(JSON.stringify({
-          success: true,
-          status: "queued",
-          progress: 5,
-          logs: ["[INIT] Database unreachable. Awaiting local job synchronization..."],
-          discovered: []
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        status: job.status,
-        progress: job.progress,
-        logs: job.logs,
-        discovered: job.discovered || []
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    // 2. Fetch from Cloud Run Agent in Production
+    return await proxyRequest(`/admin/crawl?jobId=${jobId}`, "GET");
 
   } catch (err: any) {
     console.error("[crawl-status-api] failed:", err);
@@ -176,6 +116,11 @@ export async function POST(req: NextRequest) {
     let targetUrl = url.trim();
     if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
       targetUrl = "https://" + targetUrl;
+    }
+
+    // 2. Production routing via secure Cloud Run proxy helper
+    if (!isLocalEnv()) {
+      return await proxyRequest("/admin/crawl", "POST", { url: targetUrl, maxDepth, requesterEmail });
     }
 
     // Generate a unique jobId

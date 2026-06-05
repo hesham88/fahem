@@ -5829,7 +5829,7 @@ export default function Home() {
             <AdminSecurityDashboard language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "admin-ingestion" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", minWidth: 0, width: "100%", maxWidth: "100%" }}>
             {/* Premium Curriculum Ingestion Studio Panel */}
             <CurriculumIngestionStudio language={language} email={user?.email || undefined} />
           </div>

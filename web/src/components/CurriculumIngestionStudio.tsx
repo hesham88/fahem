@@ -2047,7 +2047,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%", minWidth: 0, maxWidth: "100%" }}>
       
       {/* premium architectural layout card */}
       <div style={{
@@ -2123,7 +2123,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       }}>
         
         {/* ROW 1: Real-time Cloud Run Async Pipeline Telemetry Console */}
-        <section className="panel-card" style={{ width: "100%", padding: "1.5rem" }}>
+        <section className="panel-card" style={{ width: "100%", padding: "1.5rem", minWidth: 0, maxWidth: "100%" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.75rem", marginBottom: "1rem" }}>
             <h3 style={{ fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
               <FiActivity style={{ color: "var(--secondary)" }} />
@@ -2186,7 +2186,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
               {/* Individual Progress Grids */}
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))",
                 gap: "1rem",
                 width: "100%",
                 minWidth: 0
@@ -2553,7 +2553,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
 
         {/* ROW 2: Crawl & Discover Module */}
         {isSuperadmin && (
-          <section className="panel-card" style={{ width: "100%", padding: "1.5rem" }}>
+          <section className="panel-card" style={{ width: "100%", padding: "1.5rem", minWidth: 0, maxWidth: "100%" }}>
             <h3 style={{ fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 1rem 0", borderBottom: "1px solid var(--card-border)", paddingBottom: "0.5rem" }}>
               <FiGlobe style={{ color: "var(--primary)" }} />
               <span>{st("crawler_title")}</span>
@@ -3331,7 +3331,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
       )}
 
         {/* ROW 3: Tabbed Subjects & Books Relational Console */}
-        <section className="panel-card" style={{ width: "100%", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <section className="panel-card" style={{ width: "100%", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", minWidth: 0, maxWidth: "100%" }}>
           
           {/* Custom Emojis List for the Picker */}
           {(() => {

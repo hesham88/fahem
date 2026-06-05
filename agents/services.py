@@ -20,7 +20,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             "/user/token-usage", "/user/token-stats", "/admin/global-stats",
             "/user/profile", "/user/account", "/user/list", "/user/friend",
             "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db",
-            "/admin/sync-db", "/admin/mcp-tool"
+            "/admin/sync-db", "/admin/mcp-tool", "/admin/crawl"
         ]
         
         path = request.url.path
@@ -499,6 +499,148 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 status_code=500,
                 content={"status": "error", "error": str(err)}
             )
+
+    @app.get("/admin/crawl")
+    async def get_crawl_job(request: fastapi.Request):
+        try:
+            job_id = request.query_params.get("jobId")
+            if not job_id:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing jobId parameter"})
+                
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+            db = client["fahem"]
+            job = db["crawl_jobs"].find_one({"_id": job_id})
+            client.close()
+            
+            if not job:
+                return {
+                    "success": True,
+                    "status": "queued",
+                    "progress": 5,
+                    "logs": ["[INIT] Job scheduled. Awaiting database and background spider execution..."],
+                    "discovered": []
+                }
+                
+            return {
+                "success": True,
+                "status": job.get("status"),
+                "progress": job.get("progress"),
+                "logs": job.get("logs", []),
+                "discovered": job.get("discovered", [])
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get crawl job: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"error": str(err)})
+
+    @app.post("/admin/crawl")
+    async def trigger_crawl_job(request: fastapi.Request, background_tasks: fastapi.BackgroundTasks):
+        try:
+            body = await request.json()
+            url = body.get("url")
+            max_depth = body.get("maxDepth", 3)
+            requester_email = body.get("requesterEmail")
+            
+            if not url:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing crawl URL"})
+            if not requester_email:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing requesterEmail parameter"})
+                
+            target_url = url.strip()
+            if not target_url.startswith("http://") and not target_url.startswith("https://"):
+                target_url = "https://" + target_url
+                
+            import time
+            import random
+            job_id = f"crawl_{int(time.time() * 1000)}_{random.randint(10000, 99999)}"
+            
+            initial_logs = [
+                f"[INIT] 🚀 Spawning isolated GCP Cloud Run Harvester container...",
+                f"[INIT] 🌐 Target domain: {target_url}",
+                f"[INIT] ⚙️ Parameters: Max Depth = {max_depth}",
+                f"[INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution..."
+            ]
+            
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+            db = client["fahem"]
+            db["crawl_jobs"].update_one(
+                {"_id": job_id},
+                {"$set": {
+                    "_id": job_id,
+                    "url": target_url,
+                    "status": "harvesting",
+                    "progress": 5,
+                    "logs": initial_logs,
+                    "discovered": [],
+                    "created_at": time.time(),
+                    "updated_at": time.time()
+                }},
+                upsert=True
+            )
+            client.close()
+            
+            import subprocess
+            import json
+            
+            def run_crawler_background(j_id: str, u_str: str, depth: int, email: str):
+                try:
+                    python_path = sys.executable or "python"
+                    script_path = "/app/scripts/async_crawler.py"
+                    if not os.path.exists(script_path):
+                        script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "async_crawler.py")
+                    if not os.path.exists(script_path):
+                        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "async_crawler.py")
+                        
+                    logger.info(f"[run_crawler_background] Spawning {script_path} for jobId {j_id}...")
+                    
+                    payload = {
+                        "jobId": j_id,
+                        "url": u_str,
+                        "maxDepth": depth,
+                        "requesterEmail": email
+                    }
+                    
+                    process = subprocess.Popen(
+                        [python_path, script_path],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    process.stdin.write(json.dumps(payload))
+                    process.stdin.close()
+                    
+                    time.sleep(1.0)
+                    p_id = process.pid
+                    
+                    from pymongo import MongoClient
+                    from tools import get_mongodb_uri
+                    cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
+                    mongodb = cl["fahem"]
+                    mongodb["crawl_jobs"].update_one(
+                        {"_id": j_id},
+                        {"$set": {"active_pid": p_id}}
+                    )
+                    cl.close()
+                    logger.info(f"[run_crawler_background] Successfully started crawler PID {p_id} for jobId {j_id}")
+                except Exception as b_err:
+                    logger.error(f"[run_crawler_background] Failed for job {j_id}: {b_err}", exc_info=True)
+                    
+            background_tasks.add_task(run_crawler_background, job_id, target_url, max_depth, requester_email)
+            
+            return {
+                "success": True,
+                "jobId": job_id,
+                "message": "Asynchronous crawling task dispatched to Cloud Run executor container."
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to trigger crawl job: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"error": str(err)})
 
     @app.get("/audit-logs")
     async def get_logs_endpoint():

@@ -80,6 +80,32 @@ def atomic_write_json(file_path, data):
                 pass
         raise e
 
+_mongo_client = None
+
+def get_mongo_db():
+    global _mongo_client
+    if _mongo_client is None:
+        try:
+            from pymongo import MongoClient
+            uri = get_mongodb_uri()
+            _mongo_client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        except Exception as e:
+            print(f"[Mongo Connect Error] {e}", file=sys.stderr)
+            return None
+    try:
+        return _mongo_client["fahem"]
+    except Exception:
+        return None
+
+def close_mongo_client():
+    global _mongo_client
+    if _mongo_client is not None:
+        try:
+            _mongo_client.close()
+        except Exception:
+            pass
+        _mongo_client = None
+
 def update_book_status(book_id, is_local, status, progress, logs, processed_pages=0, total_pages=0, is_completed=False, new_page_doc=None, **kwargs):
     """
     Safely update book metadata, logs, and pages in both local_db.json (atomically) and MongoDB.
@@ -145,49 +171,44 @@ def update_book_status(book_id, is_local, status, progress, logs, processed_page
 
     # 2. Update MongoDB
     try:
-        from pymongo import MongoClient
-        uri = get_mongodb_uri()
-        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-        db = client["fahem"]
-        
-        set_fields = {
-            "ingestion_status": status,
-            "ingestion_progress": progress,
-            "ingestion_logs": logs,
-            "processed_pages": processed_pages,
-            "total_pages": total_pages,
-            "is_completed": is_completed,
-            "is_processed": is_completed,
-            "is_extracted": is_completed,
-            "is_indexed": is_completed,
-            "is_vectored": is_completed,
-            "is_embedded": is_completed,
-            "is_analyzed": is_completed,
-            "is_downloaded": True,
-            "last_processed_page": processed_pages,
-            "extracted_pages_count": processed_pages,
-            "updated_at": time.time()
-        }
-        for k, v in kwargs.items():
-            if v is not None:
-                set_fields[k] = v
-                
-        db["books"].update_one(
-            {"_id": book_id},
-            {"$set": set_fields},
-            upsert=True
-        )
-        
-        if new_page_doc:
-            db["book_pages"].update_one(
-                {"_id": new_page_doc["_id"]},
-                {"$set": new_page_doc},
+        db = get_mongo_db()
+        if db is not None:
+            set_fields = {
+                "ingestion_status": status,
+                "ingestion_progress": progress,
+                "ingestion_logs": logs,
+                "processed_pages": processed_pages,
+                "total_pages": total_pages,
+                "is_completed": is_completed,
+                "is_processed": is_completed,
+                "is_extracted": is_completed,
+                "is_indexed": is_completed,
+                "is_vectored": is_completed,
+                "is_embedded": is_completed,
+                "is_analyzed": is_completed,
+                "is_downloaded": True,
+                "last_processed_page": processed_pages,
+                "extracted_pages_count": processed_pages,
+                "updated_at": time.time()
+            }
+            for k, v in kwargs.items():
+                if v is not None:
+                    set_fields[k] = v
+                    
+            db["books"].update_one(
+                {"_id": book_id},
+                {"$set": set_fields},
                 upsert=True
             )
             
-        client.close()
-    except Exception:
-        pass
+            if new_page_doc:
+                db["book_pages"].update_one(
+                    {"_id": new_page_doc["_id"]},
+                    {"$set": new_page_doc},
+                    upsert=True
+                )
+    except Exception as e:
+        print(f"[MongoDB Update Error] {e}", file=sys.stderr)
 
 def download_file_progressive(url, output_path, book_id, is_local, logs):
     """
@@ -415,6 +436,8 @@ def main():
                 os.remove(temp_pdf_path)
             except Exception:
                 pass
+        # Close global mongo client
+        close_mongo_client()
 
 if __name__ == "__main__":
     main()
