@@ -134,7 +134,7 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
         uri = get_mongodb_uri()
         if not uri:
             return
-        if "-pri" in uri.lower():
+        if "-pri" in uri.lower() and not os.environ.get("K_SERVICE"):
             # Private endpoint: bypass Mongo connection attempt entirely to prevent DNS hangs
             return
         from pymongo import MongoClient
