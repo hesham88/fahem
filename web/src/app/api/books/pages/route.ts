@@ -324,16 +324,36 @@ export async function GET(req: NextRequest) {
 
       return new Response(JSON.stringify({ success: true, pages: bookPages }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
       });
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET");
+    const proxyRes = await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET");
+    const proxyData = await proxyRes.json();
+    return new Response(JSON.stringify(proxyData), {
+      status: proxyRes.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
     });
   }
 }

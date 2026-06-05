@@ -704,8 +704,17 @@ export default function Home() {
     if (!book) return [];
     
     // 1. If we have real pages loaded in pagesState for this book, map them!
-    const targetBookId = book._id || book.id;
-    const realPages = (pagesState || []).filter((p: any) => p.book_id === targetBookId || p.bookId === targetBookId);
+    const targetBookId = (book._id || book.id || "").toString().trim().toLowerCase();
+    const realPages = (pagesState || [])
+      .filter((p: any) => {
+        const pBookId = (p.book_id || p.bookId || "").toString().trim().toLowerCase();
+        return pBookId === targetBookId;
+      })
+      .sort((a: any, b: any) => {
+        const aNum = Number(a.page_number || a.pageNum || 0);
+        const bNum = Number(b.page_number || b.pageNum || 0);
+        return aNum - bNum;
+      });
     
     if (realPages.length > 0) {
       return realPages.map((p: any) => {
@@ -783,7 +792,13 @@ export default function Home() {
     setLoadingBookPages(true);
     console.log(`[Library-Reader] Fetching book pages for book ID: ${bookId}...`);
     
-    fetch(`/api/books/pages?bookId=${bookId}`)
+    fetch(`/api/books/pages?bookId=${bookId}&_t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache"
+      }
+    })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch pages");
         return res.json();
