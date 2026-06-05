@@ -19,6 +19,10 @@ interface Book {
   isMoeIngested?: boolean;
   isUserUpload?: boolean;
   chapters?: any[];
+  language?: string;
+  coverUrl?: string;
+  coverThumbUrl?: string;
+  mindMap?: any;
 }
 
 const isTextArabic = (text: string): boolean => {
@@ -897,8 +901,12 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   };
 
   useEffect(() => {
-    setTranslationLanguage(language || "en");
-  }, [readerCurrentPage, selectedBookReader, language]);
+    if (selectedBookReader) {
+      setTranslationLanguage(selectedBookReader.language || language || "en");
+    } else {
+      setTranslationLanguage(language || "en");
+    }
+  }, [selectedBookReader, language]);
 
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
@@ -1649,7 +1657,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               storagePath: path,
               category,
               isMoeIngested: b.isMoeIngested,
-              chapters: b.chapters || []
+              chapters: b.chapters || [],
+              language: b.language || "en",
+              coverUrl: b.coverUrl,
+              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
+              mindMap: b.mindMap || b.mind_map
             });
           });
         }
@@ -1674,7 +1686,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               storagePath: path,
               category,
               isMoeIngested: b.isMoeIngested || path.startsWith("ellibrary_moe_gov_eg") || path.startsWith("MOE Library"),
-              chapters: b.chapters || []
+              chapters: b.chapters || [],
+              language: b.language || "en",
+              coverUrl: b.coverUrl,
+              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
+              mindMap: b.mindMap || b.mind_map
             });
           });
         }
@@ -1699,7 +1715,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               storagePath: path,
               category,
               isMoeIngested: b.isMoeIngested,
-              chapters: b.chapters || []
+              chapters: b.chapters || [],
+              language: b.language || "en",
+              coverUrl: b.coverUrl,
+              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
+              mindMap: b.mindMap || b.mind_map
             });
           });
         }
@@ -2171,24 +2191,43 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           )}
                         </div>
 
-                        <h3 style={{
-                          fontSize: "0.95rem",
-                          fontWeight: 700,
-                          margin: "0 0 0.5rem 0",
-                          color: "var(--foreground)",
-                          fontFamily: "var(--font-sans)",
-                          lineHeight: "1.4",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          wordBreak: "break-word",
-                          textAlign: isTitleAr ? "right" : "left",
-                          direction: isTitleAr ? "rtl" : "ltr"
-                        }}>
-                          {title}
-                        </h3>
+                        <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                          {item.coverThumbUrl && (
+                            <img 
+                              src={item.coverThumbUrl} 
+                              alt="book thumbnail" 
+                              style={{ 
+                                width: "64px", 
+                                height: "96px", 
+                                borderRadius: "10px", 
+                                objectFit: "cover", 
+                                boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
+                                border: "1px solid rgba(16, 107, 163, 0.08)",
+                                flexShrink: 0
+                              }} 
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{
+                              fontSize: "0.95rem",
+                              fontWeight: 700,
+                              margin: "0 0 0.5rem 0",
+                              color: "var(--foreground)",
+                              fontFamily: "var(--font-sans)",
+                              lineHeight: "1.4",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              wordBreak: "break-word",
+                              textAlign: isTitleAr ? "right" : "left",
+                              direction: isTitleAr ? "rtl" : "ltr"
+                            }}>
+                              {title}
+                            </h3>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Direct hyperlink & primary action layout */}
