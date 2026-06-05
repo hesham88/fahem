@@ -738,7 +738,12 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     except Exception:
                         pass
                     
-            background_tasks.add_task(run_crawler_background, job_id, target_url, max_depth, requester_email)
+            # Prevent Cloud Run background CPU throttling from freezing spider execution
+            if "openstax.org" in target_url or "ellibrary.moe.gov.eg" in target_url:
+                logger.info(f"[services.py] Running crawler synchronously for {target_url} to ensure CPU allocation...")
+                run_crawler_background(job_id, target_url, max_depth, requester_email)
+            else:
+                background_tasks.add_task(run_crawler_background, job_id, target_url, max_depth, requester_email)
             
             return {
                 "success": True,
