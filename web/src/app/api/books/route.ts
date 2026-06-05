@@ -370,7 +370,7 @@ export async function POST(req: NextRequest) {
       // Spawn Python process
       try {
         const pythonPath = "python";
-        const scriptPath = resolveScriptPath(path.join("ingestion", "job_fetch.py"));
+        const scriptPath = resolveScriptPath(path.join("ingestion_v2", "job_fetch.py"));
 
         const payload = {
           book_id: bookId,
@@ -437,7 +437,7 @@ export async function POST(req: NextRequest) {
     // Also trigger python process in production container
     try {
       const pythonPath = "python";
-      const scriptPath = resolveScriptPath(path.join("ingestion", "job_fetch.py"));
+      const scriptPath = resolveScriptPath(path.join("ingestion_v2", "job_fetch.py"));
 
       const payload = {
         book_id: bookId,
