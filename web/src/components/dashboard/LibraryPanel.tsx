@@ -535,6 +535,96 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
       continue;
     }
 
+    // 1.5. Detect Info / Note / Warning / Attention
+    const infoMatch = line.match(/^(Info|Note|Note Label|Warning|Attention|ملحوظة|ملاحظة|تنبيه|تحذير)\s*[:：]\s*(.*)$/i);
+    if (infoMatch) {
+      const label = infoMatch[1];
+      const content = infoMatch[2];
+      elements.push(
+        <div key={`info-${i}`} style={{
+          margin: "1.75rem 0",
+          padding: "1.5rem",
+          borderRadius: "18px",
+          background: "linear-gradient(135deg, rgba(16, 107, 163, 0.03) 0%, rgba(16, 107, 163, 0.06) 100%)",
+          borderLeft: isAr ? "none" : "5px solid #106ba3",
+          borderRight: isAr ? "5px solid #106ba3" : "none",
+          borderTop: "1px solid rgba(16, 107, 163, 0.12)",
+          borderBottom: "1px solid rgba(16, 107, 163, 0.12)",
+          boxShadow: "0 10px 30px rgba(16, 107, 163, 0.03)",
+          fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+          textAlign: isAr ? "right" : "left",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <div style={{
+            fontSize: "0.85rem",
+            fontWeight: 850,
+            color: "#106ba3",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            marginBottom: "0.6rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem"
+          }}>
+            <span>ℹ️ {label}</span>
+          </div>
+          <div style={{
+            fontSize: "1.02rem",
+            lineHeight: "1.75",
+            color: "var(--foreground)",
+            fontWeight: 600
+          }}>{parseInlineElements(content)}</div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 1.8. Detect Tip / Study Tip / Hint
+    const tipMatch = line.match(/^(Tip|Study Tip|Hint|نصيحة|إرشاد)\s*[:：]\s*(.*)$/i);
+    if (tipMatch) {
+      const label = tipMatch[1];
+      const content = tipMatch[2];
+      elements.push(
+        <div key={`tip-${i}`} style={{
+          margin: "1.75rem 0",
+          padding: "1.5rem",
+          borderRadius: "18px",
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)",
+          borderLeft: isAr ? "none" : "5px solid #10b981",
+          borderRight: isAr ? "5px solid #10b981" : "none",
+          borderTop: "1px solid rgba(16, 185, 129, 0.12)",
+          borderBottom: "1px solid rgba(16, 185, 129, 0.12)",
+          boxShadow: "0 10px 30px rgba(16, 185, 129, 0.03)",
+          fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+          textAlign: isAr ? "right" : "left",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <div style={{
+            fontSize: "0.85rem",
+            fontWeight: 850,
+            color: "#059669",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            marginBottom: "0.6rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem"
+          }}>
+            <span>💡 {label}</span>
+          </div>
+          <div style={{
+            fontSize: "1.02rem",
+            lineHeight: "1.75",
+            color: "var(--foreground)",
+            fontWeight: 600
+          }}>{parseInlineElements(content)}</div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
     // 2. Detect Law / Theorem / Rule / Definition
     const lawMatch = line.match(/^(Law|Rule|Theorem|Definition|Principle|قانون|قاعدة|نظرية|مبدأ|تعريف|التعريف|القاعدة|القانون)\s*[:：]\s*(.*)$/i);
     if (lawMatch) {
@@ -1094,6 +1184,81 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     };
   }, []);
 
+  // Keyboard arrow page navigation with LTR/RTL intelligence
+  useEffect(() => {
+    if (!selectedBookReader) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const allPages = getAllPages(selectedBookReader, loadedBookPages);
+      const hasCover = !!selectedBookReader.coverUrl;
+      const totalPages = hasCover ? allPages.length + 1 : allPages.length;
+      const isAr = translationLanguage === "ar";
+
+      if (e.key === "ArrowRight") {
+        if (isAr) {
+          // RTL: ArrowRight goes to Previous Page
+          if (readerCurrentPage > 1) {
+            setReaderCurrentPage(prev => prev - 1);
+          }
+        } else {
+          // LTR: ArrowRight goes to Next Page
+          if (readerCurrentPage < totalPages) {
+            setReaderCurrentPage(prev => prev + 1);
+          }
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (isAr) {
+          // RTL: ArrowLeft goes to Next Page
+          if (readerCurrentPage < totalPages) {
+            setReaderCurrentPage(prev => prev + 1);
+          }
+        } else {
+          // LTR: ArrowLeft goes to Previous Page
+          if (readerCurrentPage > 1) {
+            setReaderCurrentPage(prev => prev - 1);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedBookReader, readerCurrentPage, translationLanguage, loadedBookPages]);
+
+  // Touch swipe page navigation refs and hooks
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, totalPages: number) => {
+    if (touchStartX.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchStartX.current - touchEndX;
+    const isAr = translationLanguage === "ar";
+
+    if (Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        // Swipe Left (forward in LTR, backward in RTL)
+        if (isAr) {
+          if (readerCurrentPage > 1) setReaderCurrentPage(prev => prev - 1);
+        } else {
+          if (readerCurrentPage < totalPages) setReaderCurrentPage(prev => prev + 1);
+        }
+      } else {
+        // Swipe Right (backward in LTR, forward in RTL)
+        if (isAr) {
+          if (readerCurrentPage < totalPages) setReaderCurrentPage(prev => prev + 1);
+        } else {
+          if (readerCurrentPage > 1) setReaderCurrentPage(prev => prev - 1);
+        }
+      }
+    }
+    touchStartX.current = null;
+  };
+
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
     setVerifierLog([
@@ -1243,14 +1408,22 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {selectedBookReader ? (() => {
         const allPages = getAllPages(selectedBookReader, loadedBookPages);
-        const totalPagesCount = allPages.length || 1;
-        const activePage = allPages[readerCurrentPage - 1] || allPages[0] || {
-          pageNum: 1,
-          titleEn: "Untitled Section",
-          titleAr: "قسم غير معنون",
-          contentEn: "",
-          contentAr: ""
-        };
+        const hasCover = !!selectedBookReader.coverUrl;
+        const totalPagesCount = hasCover ? allPages.length + 1 : (allPages.length || 1);
+        const isCoverPage = hasCover && readerCurrentPage === 1;
+
+        const activePage = isCoverPage 
+          ? null 
+          : (hasCover 
+              ? (allPages[readerCurrentPage - 2] || allPages[0])
+              : (allPages[readerCurrentPage - 1] || allPages[0])
+            ) || {
+              pageNum: 1,
+              titleEn: "Untitled Section",
+              titleAr: "قسم غير معنون",
+              contentEn: "",
+              contentAr: ""
+            };
 
         return (
           /* Premium Dual-Panel Interactive Reader Layout */
