@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
             } catch (e) {}
           }
           
-          if (!isAlive && (!job.active_pid || (Date.now() / 1000 - job.updated_at > 30))) {
+          if (!isAlive && (!job.active_pid || (Date.now() / 1000 - job.updated_at > 300))) {
             job.status = "failed";
             if (!job.logs) job.logs = [];
             job.logs.push(job.active_pid

@@ -335,7 +335,7 @@ def main():
                         
                         # Increment progress smoothly up to 95%
                         prog = min(30 + int((i / len(books)) * 65), 95)
-                        if i % 8 == 0:  # Write progress updates in blocks to avoid too much disk thrashing
+                        if i % 2 == 0 or i == len(books) - 1:  # Write progress updates in blocks to avoid too much disk thrashing
                             update_job_db(job_id, target_url, "harvesting", prog, logs, discovered)
                             time.sleep(0.1)
                 

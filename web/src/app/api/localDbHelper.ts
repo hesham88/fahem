@@ -31,37 +31,7 @@ const DEFAULT_DB: LocalDb = {
     { _id: "subj_business", name: "Business & Economics", name_ar: "الأعمال والاقتصاد", emoji: "💼", category: "Business", grade_level: "General", books_count: 1 },
     { _id: "subj_social_sciences", name: "Social Sciences & Humanities", name_ar: "العلوم الاجتماعية والإنسانيات", emoji: "🌍", category: "Social Sciences", grade_level: "General", books_count: 1 }
   ],
-  books: [
-    {
-      _id: "book_algebra_stats_1",
-      subject_id: "subj_algebra_stats",
-      title: "Advanced Mathematics Grade 9",
-      title_ar: "الرياضيات المتقدمة - الصف التاسع",
-      grade: "Grade 9",
-      term: "Term 1",
-      year: "2026",
-      language: "ar",
-      book_type: "core",
-      chapters: [
-        { title: "Algebra Basics", title_ar: "أساسيات الجبر", start_page: 1, end_page: 25 },
-        { title: "Quadratic Equations", title_ar: "المعادلات التربيعية", start_page: 26, end_page: 50 }
-      ]
-    },
-    {
-      _id: "book_biology_1",
-      subject_id: "subj_biology",
-      title: "Comprehensive Chemistry Handbook",
-      title_ar: "كتاب الكيمياء الشامل والمبسط",
-      grade: "Grade 10",
-      term: "Term 1",
-      year: "2026",
-      language: "ar",
-      book_type: "core",
-      chapters: [
-        { title: "Chemical Bonds", title_ar: "الروابط الكيميائية", start_page: 1, end_page: 30 }
-      ]
-    }
-  ],
+  books: [],
   admins: [
     { email: "hesham1988@gmail.com", name: "Hesham", isApprovedAdmin: true },
     { email: "admin@fahem.edu", name: "Approved Admin", isApprovedAdmin: true }
@@ -118,19 +88,12 @@ const DEFAULT_DB: LocalDb = {
 export function isLocalEnv(): boolean {
   // Automatically detect if running in a local offline/dev environment or GCP Cloud Run production
   const isCloudRun = !!process.env.K_SERVICE || !!process.env.GOOGLE_CLOUD_PROJECT;
-  const isProduction = process.env.NODE_ENV === "production";
-  const hasPriMongo = (process.env.MONGODB_URI || "").includes("-pri");
   
-  if (isCloudRun && isProduction && !hasPriMongo) {
-    return false;
-  }
-  
-  // If we are developing locally, or if Mongo URI is unreachable, fallback to local DB for a freeze-free experience
-  if (!isCloudRun || hasPriMongo || process.env.LOCAL_DEV === "true") {
+  if (process.env.LOCAL_DEV === "true") {
     return true;
   }
   
-  return false;
+  return !isCloudRun;
 }
 
 export function shouldSkipDirectMongo(): boolean {
