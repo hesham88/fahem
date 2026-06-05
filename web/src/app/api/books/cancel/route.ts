@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin } from "../../admin/helper";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,10 @@ export async function POST(req: NextRequest) {
       } catch (killErr: any) {
         console.error(`[Ingestion Controller] Failed to kill process: ${killErr.message}`);
       }
+    }
+
+    if (!isLocalEnv()) {
+      return await proxyRequest("/user/books/cancel", "POST", { bookId, requesterEmail });
     }
 
     // 2. Persist cancellation in Local DB

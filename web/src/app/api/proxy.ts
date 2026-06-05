@@ -9,8 +9,8 @@ let isGcpEnvironment: boolean | null = null; // null = unknown, true = GCP, fals
 export async function getOidcToken(): Promise<string | null> {
   if (!cloudRunUrl) return null;
   
-  // Fast local check: if running in dev mode or not on Cloud Run, bypass OIDC token fetch
-  const isLocal = process.env.NODE_ENV === "development" || !process.env.K_SERVICE;
+  // Fast local check: if running in dev mode, bypass OIDC token fetch
+  const isLocal = process.env.NODE_ENV === "development";
   if (isLocal) {
     isGcpEnvironment = false;
     return null; // Will immediately fallback to local bypass token

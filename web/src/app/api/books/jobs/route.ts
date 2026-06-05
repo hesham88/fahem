@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,13 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const bookId = searchParams.get("bookId");
     const jobId = searchParams.get("jobId") || (bookId ? `job_${bookId}` : null);
+
+    if (!isLocalEnv()) {
+      const params = new URLSearchParams();
+      if (bookId) params.append("bookId", bookId);
+      if (jobId) params.append("jobId", jobId);
+      return await proxyRequest(`/user/books/jobs?${params.toString()}`, "GET");
+    }
 
     if (isLocalEnv()) {
       const db = getLocalDb() as any;

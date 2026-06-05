@@ -1264,6 +1264,43 @@ def register_telemetry_route(app: fastapi.FastAPI):
         t.daemon = True
         t.start()
 
+    @app.get("/user/books/jobs")
+    async def get_books_jobs_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            job_id = request.query_params.get("jobId")
+            book_id = request.query_params.get("bookId")
+            
+            if not job_id and book_id:
+                job_id = f"job_{book_id}"
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            if job_id:
+                job = db["ingestion_jobs"].find_one({"_id": job_id})
+                client.close()
+                if not job:
+                    return fastapi.responses.JSONResponse(content={"error": "Job metadata not found in database."}, status_code=404)
+                # Convert ObjectId to string or format if any
+                if "_id" in job:
+                    job["_id"] = str(job["_id"])
+                return {"success": True, "job": job}
+                
+            jobs = list(db["ingestion_jobs"].find({}).sort("updated_at", -1))
+            for j in jobs:
+                if "_id" in j:
+                    j["_id"] = str(j["_id"])
+            client.close()
+            return {"success": True, "jobs": jobs}
+            
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get books jobs: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(content={"error": str(err)}, status_code=500)
+
     @app.post("/user/books")
     async def post_books_endpoint(request: fastapi.Request):
         try:
@@ -1420,6 +1457,162 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
         except Exception as err:
             logger.error(f"[services.py] Failed to ingest book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/user/books/cancel")
+    async def cancel_books_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import datetime
+            import time
+            
+            data = await request.json()
+            book_id = data.get("bookId")
+            requester_email = data.get("requesterEmail") or "administrator"
+            
+            if not book_id:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required field: bookId"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            book = db["books"].find_one({"_id": book_id})
+            if book:
+                existing_logs = book.get("ingestion_logs") or []
+                timestamp = datetime.datetime.now().strftime("%I:%M:%S %p")
+                cancel_log = f"[{timestamp}] [CANCEL] ⛔ Ingestion task was manually aborted by administrator: {requester_email}"
+                release_log = f"[{timestamp}] [INIT] Releasing virtual machine sandboxed processor context."
+                updated_logs = existing_logs + [cancel_log, release_log]
+                
+                db["books"].update_one(
+                    {"_id": book_id},
+                    {
+                        "$set": {
+                            "ingestion_status": "failed",
+                            "ingestion_logs": updated_logs,
+                            "updated_at": time.time()
+                        }
+                    }
+                )
+                
+                db["ingestion_jobs"].update_one(
+                    {"_id": f"job_{book_id}"},
+                    {
+                        "$set": {
+                            "status": "failed",
+                            "logs": updated_logs,
+                            "updated_at": time.time()
+                        }
+                    }
+                )
+                
+            client.close()
+            return {"success": True, "message": "Job not actively running in memory; status set to failed in database."}
+            
+        except Exception as err:
+            logger.error(f"[services.py] Failed to cancel book ingestion: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/user/books/control")
+    async def control_books_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import datetime
+            import time
+            
+            data = await request.json()
+            book_id = data.get("bookId")
+            job_id = data.get("jobId") or f"job_{book_id}"
+            action = data.get("action")
+            requester_email = data.get("requesterEmail") or "administrator"
+            
+            if not book_id or not action:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields: bookId, action"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            timestamp = datetime.datetime.now().strftime("%I:%M:%S %p")
+            message = ""
+            success = True
+            
+            if action == "pause":
+                job = db["ingestion_jobs"].find_one({"_id": job_id})
+                if job:
+                    updated_logs = (job.get("logs") or []) + [
+                        f"[{timestamp}] [CONTROL] ⏸️ Administrative cooperative pause request sent."
+                    ]
+                    db["ingestion_jobs"].update_one(
+                        {"_id": job_id},
+                        {"$set": {"status": "paused", "logs": updated_logs, "updated_at": time.time()}}
+                    )
+                    db["books"].update_one(
+                        {"_id": book_id},
+                        {"$set": {"ingestion_status": "paused", "ingestion_logs": updated_logs, "updated_at": time.time()}}
+                    )
+                message = "Ingestion job set to pause state. Processing threads are cooperatively resting."
+                
+            elif action == "resume":
+                job = db["ingestion_jobs"].find_one({"_id": job_id})
+                if job:
+                    updated_logs = (job.get("logs") or []) + [
+                        f"[{timestamp}] [CONTROL] ▶️ Administrative cooperative resume request sent. Activating processing thread."
+                    ]
+                    db["ingestion_jobs"].update_one(
+                        {"_id": job_id},
+                        {"$set": {"status": "processing", "logs": updated_logs, "updated_at": time.time()}}
+                    )
+                    db["books"].update_one(
+                        {"_id": book_id},
+                        {"$set": {"ingestion_status": "processing", "ingestion_logs": updated_logs, "updated_at": time.time()}}
+                    )
+                message = "Ingestion job set to processing state. Processing thread context resumed."
+                
+            elif action in ["kill", "stop"]:
+                job = db["ingestion_jobs"].find_one({"_id": job_id})
+                if job:
+                    updated_logs = (job.get("logs") or []) + [
+                        f"[{timestamp}] [CONTROL] 🛑 Ingestion job manually killed/terminated by administrator: {requester_email}",
+                        f"[{timestamp}] [SYSTEM] Process context released."
+                    ]
+                    db["ingestion_jobs"].update_one(
+                        {"_id": job_id},
+                        {"$set": {"status": "killed", "logs": updated_logs, "updated_at": time.time()}}
+                    )
+                    db["books"].update_one(
+                        {"_id": book_id},
+                        {"$set": {"ingestion_status": "failed", "ingestion_logs": updated_logs, "updated_at": time.time()}}
+                    )
+                message = "Job was not running in memory; status set to failed/killed in database."
+                
+            else:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": f"Unrecognized action: {action}"},
+                    status_code=400
+                )
+                
+            client.close()
+            return {"success": success, "message": message}
+            
+        except Exception as err:
+            logger.error(f"[services.py] Failed to control book ingestion: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"error": str(err)},
                 status_code=500

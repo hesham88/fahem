@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
 import { proxyRequest, getOidcToken } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
 import { checkIsSuperadmin, checkIsAdmin } from "../admin/helper";
 import { spawn } from "child_process";
 import path from "path";
@@ -28,6 +28,9 @@ async function getJobMetadata(jobId: string): Promise<any> {
     }
   } else {
     try {
+      if (shouldSkipDirectMongo()) {
+        throw new Error("Direct database connections skipped on App Hosting Serverless");
+      }
       const { MongoClient } = require("mongodb");
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
@@ -410,6 +413,9 @@ export async function POST(req: NextRequest) {
               saveLocalDb(db);
             } else {
               try {
+                if (shouldSkipDirectMongo()) {
+                  throw new Error("Direct database connections skipped on App Hosting Serverless");
+                }
                 const { MongoClient } = require("mongodb");
                 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
                 const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });

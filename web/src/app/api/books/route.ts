@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin, checkIsSuperadmin } from "../admin/helper";
 import { proxyRequest } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -112,6 +112,9 @@ export async function GET(req: NextRequest) {
 
     // 2. Production: Check MongoDB or proxy to Cloud Run Agent
     try {
+      if (shouldSkipDirectMongo()) {
+        throw new Error("Direct database connections skipped on App Hosting Serverless");
+      }
       const { MongoClient } = require("mongodb");
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
@@ -270,6 +273,10 @@ export async function POST(req: NextRequest) {
       created_at: Date.now() / 1000,
       updated_at: Date.now() / 1000
     };
+
+    if (!isLocalEnv()) {
+      return await proxyRequest("/user/books", "POST", body);
+    }
 
     // 1. Local environment check
     if (isLocalEnv()) {
@@ -563,6 +570,9 @@ export async function PUT(req: NextRequest) {
 
     // Production: Update MongoDB directly
     try {
+      if (shouldSkipDirectMongo()) {
+        throw new Error("Direct database connections skipped on App Hosting Serverless");
+      }
       const { MongoClient } = require("mongodb");
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });

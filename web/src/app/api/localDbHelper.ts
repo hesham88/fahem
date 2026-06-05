@@ -116,6 +116,9 @@ const DEFAULT_DB: LocalDb = {
 };
 
 export function isLocalEnv(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return false; // Staging & production are NEVER local envs
+  }
   const isCloudRun = !!process.env.K_SERVICE;
   if (isCloudRun) {
     return false; // Production/Cloud Run is NEVER local
@@ -124,6 +127,13 @@ export function isLocalEnv(): boolean {
   const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
   const noUri = !process.env.MONGODB_URI;
   return noUri || hasPri || process.env.NODE_ENV === "development";
+}
+
+export function shouldSkipDirectMongo(): boolean {
+  // If we are in production and MONGODB_URI contains "-pri" but we are not on Cloud Run directly
+  const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
+  const isCloudRun = !!process.env.K_SERVICE;
+  return hasPri && !isCloudRun;
 }
 
 export function getLocalDb(): LocalDb {

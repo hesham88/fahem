@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin } from "../../admin/helper";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
         status: 403,
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    if (!isLocalEnv()) {
+      return await proxyRequest("/user/books/control", "POST", { bookId, jobId, action, requesterEmail });
     }
 
     const resolvedJobId = jobId || `job_${bookId}`;
