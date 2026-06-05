@@ -723,6 +723,25 @@ export default function Home() {
         // Detect language of the content, or use book's language
         const isAr = book.language === "ar" || /[\u0600-\u06FF]/.test(p.content || "");
         
+        // Find matching chapter inside the book's chapters array dynamically
+        let matchedChapter: any = null;
+        let matchedIndex = 0;
+        if (book.chapters && Array.isArray(book.chapters)) {
+          matchedIndex = book.chapters.findIndex((ch: any) => {
+            const start = ch.page_start ?? ch.start_page ?? 1;
+            const end = ch.page_end ?? ch.end_page ?? 99999;
+            return pageNum >= start && pageNum <= end;
+          });
+          if (matchedIndex !== -1) {
+            matchedChapter = book.chapters[matchedIndex];
+          } else {
+            matchedIndex = 0;
+          }
+        }
+        
+        const fallbackChapterTitleEn = matchedChapter ? (matchedChapter.title || matchedChapter.title_en || matchedChapter.title_ar || matchedChapter.titleAr || `Chapter ${matchedIndex + 1}`) : `Section ${pageNum}`;
+        const fallbackChapterTitleAr = matchedChapter ? (matchedChapter.title_ar || matchedChapter.titleAr || matchedChapter.title || matchedChapter.title_en || `القسم ${matchedIndex + 1}`) : `القسم ${pageNum}`;
+
         // Map fields to match what the viewer expects
         return {
           pageNum: pageNum,
@@ -734,9 +753,9 @@ export default function Home() {
           formulas: p.formulas || [],
           tipEn: p.tipEn || p.tips || "Use the companion chat on the right side to ask questions!",
           tipAr: p.tipAr || p.tips || "اسأل رفيق المذاكرة فهم في لوحة الدردشة الجانبية للتعمق في هذه الصفحة!",
-          chapterTitleEn: p.chapterTitleEn || p.chapter_title_en || `Section ${pageNum}`,
-          chapterTitleAr: p.chapterTitleAr || p.chapter_title_ar || `القسم ${pageNum}`,
-          chapterIndex: p.chapterIndex || 0,
+          chapterTitleEn: p.chapterTitleEn || p.chapter_title_en || fallbackChapterTitleEn,
+          chapterTitleAr: p.chapterTitleAr || p.chapter_title_ar || fallbackChapterTitleAr,
+          chapterIndex: p.chapterIndex ?? matchedIndex ?? 0,
           originalPage: p
         };
       });

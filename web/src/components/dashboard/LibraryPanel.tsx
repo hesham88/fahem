@@ -154,15 +154,6 @@ const isLineMathFormula = (line: string): boolean => {
   
   const indicatorCount = mathIndicators.filter(ind => line.includes(ind)).length;
   if (indicatorCount >= 2) return true;
-  
-  if (line.includes("=") && (line.includes("[") || line.includes("]") || line.includes("×") || line.includes("^") || line.includes("_"))) {
-    return true;
-  }
-  
-  if (/^[a-zA-Z\u0620-\u064A]\s*=\s*/.test(line) && line.length < 50) {
-    return true;
-  }
-
   return false;
 };
 
@@ -171,26 +162,131 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   
-  // Helper to parse ==highlights== inside text
+  // Helper to parse inline styles: ==highlights==, **bold**, __underline__, *italic*
   const parseInlineElements = (textStr: string): React.ReactNode => {
     if (!textStr) return "";
-    const parts = textStr.split("==");
-    if (parts.length === 1) return textStr;
-    return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        return (
-          <span key={index} style={{
-            background: "linear-gradient(120deg, rgba(253, 224, 71, 0.35) 0%, rgba(253, 224, 71, 0.55) 100%)",
-            borderBottom: "2px solid #eab308",
-            padding: "1px 4px",
-            borderRadius: "4px",
-            fontWeight: 700,
-            color: "var(--foreground)"
-          }}>{part}</span>
-        );
+    
+    type Token = { type: "text" | "highlight" | "bold" | "underline" | "italic"; content: string };
+    let tokens: Token[] = [{ type: "text", content: textStr }];
+    
+    // 1. Highlight ==text==
+    let nextTokens: Token[] = [];
+    tokens.forEach(tok => {
+      if (tok.type === "text") {
+        const parts = tok.content.split("==");
+        parts.forEach((p, idx) => {
+          if (idx % 2 === 1) {
+            nextTokens.push({ type: "highlight", content: p });
+          } else if (p) {
+            nextTokens.push({ type: "text", content: p });
+          }
+        });
+      } else {
+        nextTokens.push(tok);
       }
-      return part;
     });
+    tokens = nextTokens;
+    
+    // 2. Bold **text**
+    nextTokens = [];
+    tokens.forEach(tok => {
+      if (tok.type === "text") {
+        const parts = tok.content.split("**");
+        parts.forEach((p, idx) => {
+          if (idx % 2 === 1) {
+            nextTokens.push({ type: "bold", content: p });
+          } else if (p) {
+            nextTokens.push({ type: "text", content: p });
+          }
+        });
+      } else {
+        nextTokens.push(tok);
+      }
+    });
+    tokens = nextTokens;
+    
+    // 3. Underline __text__
+    nextTokens = [];
+    tokens.forEach(tok => {
+      if (tok.type === "text") {
+        const parts = tok.content.split("__");
+        parts.forEach((p, idx) => {
+          if (idx % 2 === 1) {
+            nextTokens.push({ type: "underline", content: p });
+          } else if (p) {
+            nextTokens.push({ type: "text", content: p });
+          }
+        });
+      } else {
+        nextTokens.push(tok);
+      }
+    });
+    tokens = nextTokens;
+    
+    // 4. Italic *text*
+    nextTokens = [];
+    tokens.forEach(tok => {
+      if (tok.type === "text") {
+        const parts = tok.content.split("*");
+        parts.forEach((p, idx) => {
+          if (idx % 2 === 1) {
+            nextTokens.push({ type: "italic", content: p });
+          } else if (p) {
+            nextTokens.push({ type: "text", content: p });
+          }
+        });
+      } else {
+        nextTokens.push(tok);
+      }
+    });
+    tokens = nextTokens;
+    
+    return (
+      <>
+        {tokens.map((tok, idx) => {
+          if (tok.type === "highlight") {
+            return (
+              <span key={idx} style={{
+                background: "linear-gradient(120deg, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.45) 100%)",
+                borderBottom: "2px solid #d97706",
+                padding: "1px 6px",
+                borderRadius: "6px",
+                fontWeight: 700,
+                color: "var(--foreground)",
+                boxShadow: "0 2px 4px rgba(217, 119, 6, 0.05)",
+                display: "inline-block"
+              }}>{tok.content}</span>
+            );
+          }
+          if (tok.type === "bold") {
+            return (
+              <strong key={idx} style={{
+                fontWeight: 800,
+                color: "var(--primary)"
+              }}>{tok.content}</strong>
+            );
+          }
+          if (tok.type === "underline") {
+            return (
+              <span key={idx} style={{
+                borderBottom: "2.5px solid var(--primary)",
+                paddingBottom: "2px",
+                fontWeight: 700
+              }}>{tok.content}</span>
+            );
+          }
+          if (tok.type === "italic") {
+            return (
+              <em key={idx} style={{
+                fontStyle: "italic",
+                opacity: 0.95
+              }}>{tok.content}</em>
+            );
+          }
+          return tok.content;
+        })}
+      </>
+    );
   };
 
   let i = 0;
@@ -211,14 +307,14 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontSize: "0.72rem",
-          fontWeight: 700,
-          color: "#94a3b8",
+          fontSize: "0.75rem",
+          fontWeight: 800,
+          color: "#64748b",
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
-          paddingBottom: "0.5rem",
-          marginBottom: "1.5rem",
+          borderBottom: "1.5px solid rgba(16, 107, 163, 0.12)",
+          paddingBottom: "0.6rem",
+          marginBottom: "1.75rem",
           direction: isAr ? "rtl" : "ltr"
         }}>
           <span>{parseInlineElements(content)}</span>
@@ -238,17 +334,17 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontSize: "0.72rem",
-          fontWeight: 700,
-          color: "#94a3b8",
+          fontSize: "0.75rem",
+          fontWeight: 800,
+          color: "#64748b",
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          borderTop: "1px solid rgba(16, 107, 163, 0.08)",
-          paddingTop: "0.5rem",
-          marginTop: "1.5rem",
+          borderTop: "1.5px solid rgba(16, 107, 163, 0.12)",
+          paddingTop: "0.6rem",
+          marginTop: "1.75rem",
           direction: isAr ? "rtl" : "ltr"
         }}>
-          <span>Fahem Ingestion Studio</span>
+          <span style={{ color: "var(--primary)" }}>Fahem Ingestion Studio</span>
           <span>{parseInlineElements(content)}</span>
         </div>
       );
@@ -262,34 +358,34 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
       const content = visualMatch[1];
       elements.push(
         <div key={`visual-${i}`} style={{
-          margin: "1.5rem 0",
-          padding: "1.25rem",
-          borderRadius: "16px",
-          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)",
-          border: "1px dashed rgba(16, 185, 129, 0.3)",
-          boxShadow: "0 4px 15px rgba(16, 185, 129, 0.02)",
+          margin: "1.75rem 0",
+          padding: "1.5rem",
+          borderRadius: "20px",
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(16, 185, 129, 0.08) 100%)",
+          border: "1.5px dashed rgba(16, 185, 129, 0.35)",
+          boxShadow: "0 10px 30px rgba(16, 185, 129, 0.03)",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left",
           direction: isAr ? "rtl" : "ltr"
         }}>
           <div style={{
-            fontSize: "0.82rem",
-            fontWeight: 800,
-            color: "#047857",
+            fontSize: "0.85rem",
+            fontWeight: 850,
+            color: "#059669",
             textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            marginBottom: "0.5rem",
+            letterSpacing: "0.06em",
+            marginBottom: "0.6rem",
             display: "flex",
             alignItems: "center",
-            gap: "0.4rem"
+            gap: "0.5rem"
           }}>
             <span>🖼️ {isAr ? "وصف مرئي / توضيحي" : "Visual Description / Illustration"}</span>
           </div>
           <div style={{
-            fontSize: "0.92rem",
-            lineHeight: "1.6",
+            fontSize: "0.95rem",
+            lineHeight: "1.75",
             color: "#065f46",
-            fontStyle: "italic",
+            fontStyle: isAr ? "normal" : "italic",
             fontWeight: 600
           }}>{parseInlineElements(content)}</div>
         </div>
@@ -311,30 +407,31 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
       const codeContent = codeLines.join("\n");
       elements.push(
         <div key={`code-${i}`} style={{
-          background: "#1e1e2e",
-          color: "#f8f8f2",
-          borderRadius: "12px",
-          padding: "1rem",
-          margin: "1.25rem 0",
-          fontFamily: "monospace, monospace",
-          fontSize: "0.85rem",
+          background: "#0f172a",
+          color: "#cbd5e1",
+          borderRadius: "16px",
+          padding: "1.25rem 1.5rem",
+          margin: "1.5rem 0",
+          fontFamily: "'Fira Code', 'Courier New', monospace",
+          fontSize: "0.88rem",
           overflowX: "auto",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 12px 35px rgba(15, 23, 42, 0.15)",
+          border: "1px solid rgba(16, 107, 163, 0.18)",
           position: "relative",
           direction: "ltr",
           textAlign: "left"
         }}>
           <div style={{
             position: "absolute",
-            top: "0.5rem",
-            right: "0.5rem",
-            fontSize: "0.7rem",
-            color: "#6c7086",
+            top: "0.6rem",
+            right: "1rem",
+            fontSize: "0.68rem",
+            color: "#64748b",
             textTransform: "uppercase",
-            fontWeight: "bold"
+            fontWeight: 800,
+            letterSpacing: "0.08em"
           }}>{lang || "code"}</div>
-          <pre style={{ margin: 0 }}><code style={{ whiteSpace: "pre-wrap", display: "block" }}>{codeContent}</code></pre>
+          <pre style={{ margin: 0 }}><code style={{ whiteSpace: "pre-wrap", display: "block", lineHeight: "1.65" }}>{codeContent}</code></pre>
         </div>
       );
       continue;
@@ -359,12 +456,12 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
         }
 
         elements.push(
-          <div key={`table-${i}`} style={{ overflowX: "auto", margin: "1.5rem 0", borderRadius: "14px", border: "1px solid rgba(16, 107, 163, 0.12)", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }}>
+          <div key={`table-${i}`} style={{ overflowX: "auto", margin: "1.75rem 0", borderRadius: "16px", border: "1px solid rgba(16, 107, 163, 0.15)", boxShadow: "0 6px 20px rgba(16, 107, 163, 0.02)" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "inherit", textAlign: isAr ? "right" : "left", direction: isAr ? "rtl" : "ltr" }}>
               <thead>
-                <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05) 0%, rgba(16, 107, 163, 0.08) 100%)", borderBottom: "2px solid rgba(16, 107, 163, 0.15)" }}>
+                <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.06) 0%, rgba(16, 107, 163, 0.1) 100%)", borderBottom: "2px solid rgba(16, 107, 163, 0.18)" }}>
                   {headers.map((h, hIdx) => (
-                    <th key={hIdx} style={{ padding: "0.85rem 1.1rem", fontSize: "0.88rem", fontWeight: 800, color: "var(--primary)" }}>
+                    <th key={hIdx} style={{ padding: "0.95rem 1.25rem", fontSize: "0.92rem", fontWeight: 800, color: "var(--primary)" }}>
                       {parseInlineElements(h)}
                     </th>
                   ))}
@@ -372,9 +469,9 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
               </thead>
               <tbody>
                 {dataRows.map((row, rIdx) => (
-                  <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.06)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
+                  <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
                     {row.map((cell, cIdx) => (
-                      <td key={cIdx} style={{ padding: "0.8rem 1.1rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
+                      <td key={cIdx} style={{ padding: "0.9rem 1.25rem", fontSize: "0.92rem", color: "var(--foreground)", fontWeight: 550 }}>
                         {parseInlineElements(cell)}
                       </td>
                     ))}
@@ -392,17 +489,21 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
     if (line.startsWith("#")) {
       const level = line.match(/^#+/)?.[0].length || 1;
       const cleanText = line.replace(/^#+\s*/, "");
-      const headingSizes = ["1.5rem", "1.35rem", "1.2rem", "1.1rem"];
+      const headingSizes = ["1.75rem", "1.5rem", "1.32rem", "1.18rem"];
       const size = headingSizes[Math.min(level - 1, headingSizes.length - 1)];
       elements.push(
         <h4 key={`h-${i}`} style={{
           fontSize: size,
-          fontWeight: 800,
+          fontWeight: 900,
           color: "var(--primary)",
-          marginTop: "1.75rem",
-          marginBottom: "0.85rem",
-          borderBottom: level <= 2 ? "2px solid rgba(16, 107, 163, 0.15)" : "none",
-          paddingBottom: level <= 2 ? "0.4rem" : "0",
+          marginTop: "1.85rem",
+          marginBottom: "0.9rem",
+          borderBottom: level <= 2 ? "2px solid rgba(16, 107, 163, 0.18)" : "none",
+          paddingBottom: level <= 2 ? "0.5rem" : "0",
+          borderLeft: level === 1 ? (isAr ? "none" : "5px solid #d4af37") : "none",
+          borderRight: level === 1 ? (isAr ? "5px solid #d4af37" : "none") : "none",
+          paddingLeft: level === 1 ? (isAr ? "0" : "0.75rem") : "0",
+          paddingRight: level === 1 ? (isAr ? "0.75rem" : "0") : "0",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left",
           lineHeight: "1.4"
@@ -415,26 +516,28 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
     }
 
     // 2. Detect Law / Theorem / Rule / Definition
-    const lawMatch = line.match(/^(Law|Rule|Theorem|Definition|Principle|قانون|قاعدة|نظرية|مبدأ|تعريف|التعريف|القاعدة|القانون)\s*:\s*(.*)$/i);
+    const lawMatch = line.match(/^(Law|Rule|Theorem|Definition|Principle|قانون|قاعدة|نظرية|مبدأ|تعريف|التعريف|القاعدة|القانون)\s*[:：]\s*(.*)$/i);
     if (lawMatch) {
       const label = lawMatch[1];
       const content = lawMatch[2];
       elements.push(
         <div key={`law-${i}`} style={{
-          margin: "1.5rem 0",
-          padding: "1.25rem",
-          borderRadius: "14px",
-          background: "linear-gradient(135deg, rgba(212, 175, 55, 0.04) 0%, rgba(212, 175, 55, 0.08) 100%)",
+          margin: "1.75rem 0",
+          padding: "1.5rem",
+          borderRadius: "18px",
+          background: "linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%)",
           borderLeft: isAr ? "none" : "5px solid #d4af37",
           borderRight: isAr ? "5px solid #d4af37" : "none",
-          boxShadow: "0 4px 15px rgba(212, 175, 55, 0.05)",
+          borderTop: "1px solid rgba(212, 175, 55, 0.15)",
+          borderBottom: "1px solid rgba(212, 175, 55, 0.15)",
+          boxShadow: "0 10px 30px rgba(212, 175, 55, 0.06)",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left",
           direction: isAr ? "rtl" : "ltr"
         }}>
           <div style={{
             fontSize: "0.85rem",
-            fontWeight: 800,
+            fontWeight: 850,
             color: "#b45309",
             textTransform: "uppercase",
             letterSpacing: "0.05em",
@@ -446,8 +549,8 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
             <span>⚖️ {label}</span>
           </div>
           <div style={{
-            fontSize: "1rem",
-            lineHeight: "1.7",
+            fontSize: "1.02rem",
+            lineHeight: "1.75",
             color: "var(--foreground)",
             fontWeight: 600,
             fontStyle: isAr ? "normal" : "italic"
@@ -458,27 +561,78 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
       continue;
     }
 
+    // 2.5 Detect Equation / Formula
+    const equationMatch = line.match(/^(Equation|Formula|Formula Label|معادلة|صيغة رياضية|صيغة)\s*[:：]\s*(.*)$/i);
+    if (equationMatch) {
+      const label = equationMatch[1];
+      const content = equationMatch[2];
+      elements.push(
+        <div key={`equation-${i}`} style={{
+          margin: "1.75rem auto",
+          padding: "1.5rem",
+          borderRadius: "18px",
+          background: "linear-gradient(135deg, rgba(16, 107, 163, 0.03) 0%, rgba(16, 107, 163, 0.06) 100%)",
+          border: "1px solid rgba(16, 107, 163, 0.15)",
+          boxShadow: "0 10px 30px rgba(16, 107, 163, 0.04)",
+          maxWidth: "95%",
+          textAlign: "center",
+          fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+          direction: isAr ? "rtl" : "ltr"
+        }}>
+          <div style={{
+            fontSize: "0.82rem",
+            fontWeight: 850,
+            color: "var(--primary)",
+            marginBottom: "0.6rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.4rem"
+          }}>
+            <span>📐 {label}</span>
+          </div>
+          <div style={{
+            fontSize: "1.32rem",
+            fontFamily: "'Cambria Math', 'Cambria', 'Times New Roman', serif",
+            color: "var(--primary)",
+            fontWeight: 700,
+            padding: "0.6rem 1.25rem",
+            background: "#ffffff",
+            border: "1px dashed rgba(16, 107, 163, 0.25)",
+            borderRadius: "10px",
+            display: "inline-block",
+            minWidth: "60%",
+            direction: "ltr"
+          }}>{parseInlineElements(content)}</div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
     // 3. Detect Question / Request
-    const questionMatch = line.match(/^(Question|Q|Request|سؤال|س|مسألة|تمرين)\s*[:.]\s*(.*)$/i);
+    const questionMatch = line.match(/^(Question|Q|Request|سؤال|س|مسألة|تمرين)\s*[:：.]\s*(.*)$/i);
     if (questionMatch) {
       const label = questionMatch[1];
       const content = questionMatch[2];
       elements.push(
         <div key={`q-${i}`} style={{
-          margin: "1.5rem 0",
-          padding: "1.25rem",
-          borderRadius: "14px",
+          margin: "1.75rem 0",
+          padding: "1.5rem",
+          borderRadius: "18px",
           background: "linear-gradient(135deg, rgba(16, 107, 163, 0.04) 0%, rgba(16, 107, 163, 0.08) 100%)",
           borderLeft: isAr ? "none" : "5px solid var(--primary)",
           borderRight: isAr ? "5px solid var(--primary)" : "none",
-          boxShadow: "0 4px 15px rgba(16, 107, 163, 0.05)",
+          boxShadow: "0 10px 30px rgba(16, 107, 163, 0.05)",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left",
           direction: isAr ? "rtl" : "ltr"
         }}>
           <div style={{
             fontSize: "0.85rem",
-            fontWeight: 800,
+            fontWeight: 850,
             color: "var(--primary)",
             textTransform: "uppercase",
             letterSpacing: "0.05em",
@@ -490,8 +644,8 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
             <span>❓ {label}</span>
           </div>
           <div style={{
-            fontSize: "1rem",
-            lineHeight: "1.7",
+            fontSize: "1.02rem",
+            lineHeight: "1.75",
             color: "var(--foreground)",
             fontWeight: 600
           }}>{parseInlineElements(content)}</div>
@@ -506,34 +660,34 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
     if (isFormula) {
       elements.push(
         <div key={`formula-${i}`} style={{
-          margin: "1.5rem auto",
-          padding: "1.25rem",
-          borderRadius: "12px",
+          margin: "1.75rem auto",
+          padding: "1.5rem",
+          borderRadius: "14px",
           background: "#ffffff",
-          border: "1px solid rgba(16, 107, 163, 0.12)",
-          boxShadow: "0 6px 20px rgba(0, 0, 0, 0.02)",
-          maxWidth: "90%",
+          border: "1px solid rgba(16, 107, 163, 0.15)",
+          boxShadow: "0 8px 25px rgba(0, 0, 0, 0.03)",
+          maxWidth: "92%",
           textAlign: "center"
         }}>
           <div style={{
-            fontSize: "0.75rem",
-            fontWeight: 800,
+            fontSize: "0.78rem",
+            fontWeight: 850,
             color: "#64748b",
             marginBottom: "0.6rem",
             textTransform: "uppercase",
-            letterSpacing: "0.05em",
+            letterSpacing: "0.06em",
             fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)"
           }}>{isAr ? "📐 معادلة / صيغة رياضية" : "📐 Mathematical Expression"}</div>
           <div style={{
-            fontSize: "1.15rem",
+            fontSize: "1.25rem",
             fontFamily: "'Cambria Math', 'Cambria', 'Times New Roman', serif",
             color: "var(--primary)",
             fontWeight: 700,
-            padding: "0.5rem 1rem",
-            background: "rgba(16, 107, 163, 0.02)",
-            borderRadius: "8px",
+            padding: "0.5rem 1.25rem",
+            background: "rgba(16, 107, 163, 0.03)",
+            borderRadius: "10px",
             display: "inline-block",
-            minWidth: "60%",
+            minWidth: "65%",
             direction: "ltr"
           }}>{parseInlineElements(line)}</div>
         </div>
@@ -557,13 +711,13 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
       }
       elements.push(
         <ul key={`list-${i}`} style={{ 
-          margin: "1rem 0", 
-          paddingLeft: isAr ? "0" : "1.5rem", 
-          paddingRight: isAr ? "1.5rem" : "0", 
+          margin: "1.25rem 0", 
+          paddingLeft: isAr ? "0" : "1.75rem", 
+          paddingRight: isAr ? "1.75rem" : "0", 
           listStyleType: "none",
           display: "flex",
           flexDirection: "column",
-          gap: "0.5rem",
+          gap: "0.6rem",
           direction: isAr ? "rtl" : "ltr"
         }}>
           {listItems.map((item, idx) => {
@@ -573,12 +727,12 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
               <li key={idx} style={{ 
                 display: "flex", 
                 alignItems: "flex-start", 
-                gap: "0.5rem",
-                lineHeight: "1.7",
-                fontSize: "0.95rem",
+                gap: "0.6rem",
+                lineHeight: "1.75",
+                fontSize: "0.98rem",
                 textAlign: isAr ? "right" : "left"
               }}>
-                <span style={{ color: "var(--primary)", fontWeight: 800 }}>{prefix}</span>
+                <span style={{ color: "var(--primary)", fontWeight: 900, fontSize: "1.05rem" }}>{prefix}</span>
                 <span style={{ flex: 1 }}>{parseInlineElements(cleanItem)}</span>
               </li>
             );
@@ -590,18 +744,18 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
 
     // 6. Detect subtitle or small headings that are short and end with ":" or are bold
     if (line.length < 80 && (line.endsWith(":") || line.endsWith("：") || line.startsWith("**") && line.endsWith("**"))) {
-      const cleanText = line.replace(/^\*\*|\*\*$/g, "").replace(/:$/, "");
+      const cleanText = line.replace(/^\*\*|\*\*$/g, "").replace(/[:：]$/, "");
       elements.push(
         <h5 key={`sh-${i}`} style={{
-          fontSize: "1.05rem",
-          fontWeight: 700,
+          fontSize: "1.1rem",
+          fontWeight: 800,
           color: "var(--primary)",
-          marginTop: "1.2rem",
-          marginBottom: "0.6rem",
-          borderLeft: isAr ? "none" : "3px solid var(--secondary)",
-          borderRight: isAr ? "3px solid var(--secondary)" : "none",
-          paddingLeft: isAr ? "0" : "0.5rem",
-          paddingRight: isAr ? "0.5rem" : "0",
+          marginTop: "1.35rem",
+          marginBottom: "0.7rem",
+          borderLeft: isAr ? "none" : "3.5px solid var(--secondary)",
+          borderRight: isAr ? "3.5px solid var(--secondary)" : "none",
+          paddingLeft: isAr ? "0" : "0.6rem",
+          paddingRight: isAr ? "0.6rem" : "0",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left"
         }}>
@@ -615,15 +769,15 @@ const renderPremiumContent = (text: string, isAr: boolean): React.ReactNode[] | 
     // 7. Regular paragraph
     elements.push(
       <p key={`p-${i}`} style={{
-        fontSize: "0.98rem",
-        lineHeight: "1.8",
-        marginBottom: "1rem",
+        fontSize: "1.02rem",
+        lineHeight: "1.85",
+        marginBottom: "1.2rem",
         color: "var(--foreground)",
         textAlign: isAr ? "justify" : "justify",
         textJustify: "inter-word",
         direction: isAr ? "rtl" : "ltr",
         fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
-        opacity: 0.95
+        opacity: 0.98
       }}>
         {parseInlineElements(line)}
       </p>
@@ -1371,18 +1525,15 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                         let cleanTitle = "";
                                         const pTitle = language === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
                                         
-                                        // Detect if a title is generic (e.g., contains "Page X" or "Section X", is missing/empty, or is too short)
+                                        // Detect if a title is generic (e.g., purely Page X or purely numbers)
                                         const isGeneric = !pTitle || 
-                                          pTitle.match(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\b/i) ||
-                                          pTitle.toLowerCase().includes("section") ||
-                                          pTitle.toLowerCase().includes("page") ||
-                                          pTitle.includes("الصفحة") ||
-                                          pTitle.includes("قسم") ||
+                                           !!pTitle.match(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\s*\d+$/i) ||
+                                          !!pTitle.match(/^[\d\.\-\s]+$/) ||
                                           pTitle.length < 3;
 
                                         // 1. If page has a real descriptive title (not Page X, Section X etc.) and is not generic
                                         if (pTitle && !isGeneric) {
-                                          cleanTitle = pTitle.replace(/^(Page|الصفحة|Section|قسم)\s+\d+[:\-]?\s*/i, "").trim();
+                                          cleanTitle = pTitle.replace(/^(Page|الصفحة|Section|قسم|Chapter|الفصل)\s+[\d\.]+\s*[:\-]?\s*/i, "").trim();
                                         }
                                         
                                         // 2. Fallback: use first concept tag as the topic title

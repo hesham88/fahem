@@ -49,8 +49,13 @@ Write-Host 'Deploying agent microservice to Cloud Run...' -ForegroundColor Yello
 Write-Host "Source directory: $AgentsDir" -ForegroundColor Gray
 
 try {
+    # Push to agents directory so gcloud uses agents/.gcloudignore and does not ignore untracked files
+    Push-Location $AgentsDir
+
     # Execute the gcloud deploy in a single, robust line with no backticks, using correct --vpc-egress argument
-    gcloud run deploy fahem-agent --source $AgentsDir --region us-east4 --vpc-connector fahem-connector --vpc-egress all-traffic --set-secrets='GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest' --quiet
+    gcloud run deploy fahem-agent --source . --region us-east4 --vpc-connector fahem-connector --vpc-egress all-traffic --set-secrets='GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest' --quiet
+    
+    Pop-Location
         
     Write-Host '==========================================================' -ForegroundColor Green
     Write-Host '                 DEPLOYMENT SUCCESSFUL!                   ' -ForegroundColor Green
@@ -62,6 +67,10 @@ try {
     Write-Host $serviceUrl -ForegroundColor Cyan
     Write-Host '==========================================================' -ForegroundColor Green
 } catch {
+    # Safely restore location if we are still inside $AgentsDir
+    if ((Get-Location).Path -eq $AgentsDir) {
+        Pop-Location
+    }
     Write-Error 'Cloud Run deployment failed. Please check the error log above.'
     # Ensure cleanup is run on failure
     if (Test-Path $TempScriptsDir) {

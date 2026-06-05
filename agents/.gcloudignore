@@ -1,0 +1,14 @@
+# .gcloudignore file to explicitly package all agent assets for GCP Cloud Run
+.gcloudignore
+.git
+.gitignore
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.next/
+out/
+build/
+*.exe
+*.old
+*.log
