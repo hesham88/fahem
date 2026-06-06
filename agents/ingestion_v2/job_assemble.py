@@ -8,8 +8,9 @@ generates professional-grade glassmorphic textbook cover graphics using Pillow, 
 Stage 5 (Embed).
 """
 
-import os
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import time
 import subprocess

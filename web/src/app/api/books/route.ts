@@ -273,9 +273,28 @@ export async function POST(req: NextRequest) {
       created_at: Date.now() / 1000,
       updated_at: Date.now() / 1000
     };
+    const proxyPayload = {
+      subject_id: resolvedSubjectId,
+      title: resolvedTitle,
+      title_ar: resolvedTitleAr,
+      grade: grade || "General",
+      term: term || "Term 1",
+      year: year || new Date().getFullYear().toString(),
+      language: language || "ar",
+      book_type: book_type || "core",
+      source_url: resolvedSourceUrl,
+      storage_path: resolvedStoragePath,
+      chapters: chapters || [],
+      userId: userId || null,
+      sizeBytes: resolvedSizeBytes,
+      size_bytes: resolvedSizeBytes,
+      forceReindex: !!forceReindex,
+      needs_approval: needsApproval,
+      requesterEmail: requesterEmail || null
+    };
 
     if (!isLocalEnv()) {
-      return await proxyRequest("/user/books", "POST", body);
+      return await proxyRequest("/user/books", "POST", proxyPayload);
     }
 
     // 1. Local environment check

@@ -9,8 +9,9 @@ to generate high-fidelity vector embeddings, cleans transient temporary draft ch
 finalizes subject metric links, setting job status as 100% completed.
 """
 
-import os
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import time
 import threading

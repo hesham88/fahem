@@ -242,6 +242,19 @@ def update_job_status_db_only(job_id, status, current_step, progress, logs, is_l
                         if progress is not None:
                             db["ingestion_jobs"][job_idx]["progress"] = progress
                         db["ingestion_jobs"][job_idx]["updated_at"] = time.time()
+                        
+                        # Real-time progress update for the book in local JSON
+                        book_id = job_id[4:] if job_id.startswith("job_") else None
+                        if book_id and "books" in db:
+                            for idx, b in enumerate(db["books"]):
+                                if b.get("_id") == book_id:
+                                    db["books"][idx]["ingestion_status"] = status
+                                    db["books"][idx]["ingestion_logs"] = logs
+                                    if progress is not None:
+                                        db["books"][idx]["ingestion_progress"] = progress
+                                    db["books"][idx]["updated_at"] = time.time()
+                                    break
+                                    
                         atomic_write_json(LOCAL_DB_PATH, db)
                         break
             except Exception:
@@ -268,6 +281,21 @@ def update_job_status_db_only(job_id, status, current_step, progress, logs, is_l
                 {"$set": set_fields},
                 upsert=True
             )
+            
+            # Real-time progress update for the book in MongoDB
+            book_id = job_id[4:] if job_id.startswith("job_") else None
+            if book_id:
+                set_book_fields = {
+                    "ingestion_status": status,
+                    "ingestion_logs": logs,
+                    "updated_at": time.time()
+                }
+                if progress is not None:
+                    set_book_fields["ingestion_progress"] = progress
+                db["books"].update_one(
+                    {"_id": book_id},
+                    {"$set": set_book_fields}
+                )
             client.close()
         except Exception:
             pass
@@ -309,6 +337,22 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
                     
                     for k, v in kwargs.items():
                         job_entry[k] = v
+                        
+                    # Real-time progress update for the book in local JSON
+                    book_id = kwargs.get("book_id")
+                    if not book_id and job_id.startswith("job_"):
+                        book_id = job_id[4:]
+                    if book_id and "books" in db:
+                        for idx, b in enumerate(db["books"]):
+                            if b.get("_id") == book_id:
+                                db["books"][idx]["ingestion_status"] = "completed" if (status == "completed" or is_completed) else status
+                                if progress is not None:
+                                    db["books"][idx]["ingestion_progress"] = progress
+                                db["books"][idx]["ingestion_logs"] = logs
+                                db["books"][idx]["processed_pages"] = processed_pages
+                                db["books"][idx]["total_pages"] = total_pages
+                                db["books"][idx]["updated_at"] = time.time()
+                                break
                         
                     # If there's a new page doc, append/update in book_pages collection
                     if new_page_doc:
@@ -389,6 +433,25 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
                 {"$set": set_fields},
                 upsert=True
             )
+            
+            # Real-time progress update for the book in MongoDB
+            book_id = kwargs.get("book_id")
+            if not book_id and job_id.startswith("job_"):
+                book_id = job_id[4:]
+            if book_id:
+                set_book_fields = {
+                    "ingestion_status": "completed" if (status == "completed" or is_completed) else status,
+                    "ingestion_logs": logs,
+                    "processed_pages": processed_pages,
+                    "total_pages": total_pages,
+                    "updated_at": time.time()
+                }
+                if progress is not None:
+                    set_book_fields["ingestion_progress"] = progress
+                db["books"].update_one(
+                    {"_id": book_id},
+                    {"$set": set_book_fields}
+                )
             
             if new_page_doc:
                 db["book_pages"].update_one(

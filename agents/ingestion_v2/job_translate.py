@@ -9,8 +9,9 @@ keys translation overlay objects by original block IDs under "i18n", saves the p
 and spawns Stage 4 (Assemble).
 """
 
-import os
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import time
 import threading

@@ -8,8 +8,9 @@ with standard vision-first prompts and response schemas to output flat blocks ne
 Saves pages draft blocks to database/local_db and spawns Stage 3.
 """
 
-import os
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import time
 import base64

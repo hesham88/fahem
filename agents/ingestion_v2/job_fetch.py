@@ -7,8 +7,9 @@ Responsible for progressive downloads from URLs, PDF signature validation, and c
 Caches/saves file locally and signals downstream block extraction (Job 2: Struct).
 """
 
-import os
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import time
 import requests

@@ -1503,6 +1503,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
             clean_title = re.sub(r'[^a-z0-9]', '_', title.lower())
             book_id = f"book_{clean_title}_{int(time.time() * 1000)}"
             
+            needs_approval = bool(data.get("needs_approval", False))
+            initial_logs = [
+                "[INIT] Ingestion container spawned successfully.",
+                "[INIT] Awaiting direct binary pipeline allocation...",
+                f"[DOWNLOAD] Queuing download from: {source_url}"
+            ]
+
             # Insert initial draft with states set to False to track progress safely
             draft_book = {
                 "_id": book_id,
@@ -1517,7 +1524,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "source_url": source_url,
                 "storage_path": storage_path,
                 "chapters": chapters,
-                "is_downloaded": True,
+                "is_downloaded": not needs_approval,
                 "is_indexed": False,
                 "is_vectored": False,
                 "is_embedded": False,
@@ -1525,6 +1532,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "is_extracted": False,
                 "is_processed": False,
                 "is_completed": False,
+                "needs_approval": needs_approval,
+                "ingestion_status": "pending_approval" if needs_approval else "queued",
+                "ingestion_progress": 5,
+                "ingestion_logs": initial_logs,
+                "processed_pages": 0,
                 "total_pages": 0,
                 "last_processed_page": 0,
                 "extracted_pages_count": 0,
@@ -1540,27 +1552,31 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 {"$inc": {"books_count": 1}}
             )
             
-            # Trigger real asynchronous ingestion process in background thread
-            payload = {
-                "book_id": book_id,
-                "subject_id": subject_id,
-                "title": title,
-                "title_ar": title_ar,
-                "source_url": source_url,
-                "storage_path": storage_path,
-                "grade": grade,
-                "term": term,
-                "year": year,
-                "language": language,
-                "book_type": book_type,
-                "is_private": bool(user_id),
-                "userId": user_id,
-                "is_local": False
-            }
-            run_ingest_in_background(payload)
+            if not needs_approval:
+                # Trigger real asynchronous ingestion process in background thread
+                payload = {
+                    "book_id": book_id,
+                    "subject_id": subject_id,
+                    "title": title,
+                    "title_ar": title_ar,
+                    "source_url": source_url,
+                    "storage_path": storage_path,
+                    "grade": grade,
+                    "term": term,
+                    "year": year,
+                    "language": language,
+                    "book_type": book_type,
+                    "is_private": bool(user_id),
+                    "userId": user_id,
+                    "is_local": False
+                }
+                run_ingest_in_background(payload)
+                message = "Book registered and background ingestion started."
+            else:
+                message = "Book registered and queued for Superadmin approval."
             
             client.close()
-            return {"success": True, "message": "Book registered and background ingestion started.", "book": draft_book}
+            return {"success": True, "message": message, "book": draft_book}
             
         except Exception as err:
             logger.error(f"[services.py] Failed to ingest book: {err}", exc_info=True)
@@ -1848,7 +1864,119 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client.close()
             return {"success": True, "message": "Book deleted successfully."}
         except Exception as err:
-            logger.error(f"[services.py] Failed to delete book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.get("/admin/approve-ingestion")
+    async def get_approve_ingestion_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            pending_books = list(db["books"].find({"needs_approval": True}))
+            for b in pending_books:
+                if "_id" in b:
+                    b["_id"] = str(b["_id"])
+            client.close()
+            return {"success": True, "books": pending_books}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get pending approvals: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/admin/approve-ingestion")
+    async def post_approve_ingestion_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            data = await request.json()
+            book_id = data.get("book_id", "")
+            action = data.get("action", "")
+            
+            if not book_id or not action:
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Missing required fields: book_id, action"},
+                    status_code=400
+                )
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            book_doc = db["books"].find_one({"_id": book_id})
+            if not book_doc:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": "Book draft not found"},
+                    status_code=404
+                )
+                
+            if action == "approve":
+                db["books"].update_one(
+                    {"_id": book_id},
+                    {
+                        "$set": {
+                            "needs_approval": False,
+                            "is_downloaded": True,
+                            "ingestion_status": "queued",
+                            "ingestion_progress": 5,
+                            "updated_at": int(time.time())
+                        }
+                    }
+                )
+                
+                payload = {
+                    "book_id": book_id,
+                    "subject_id": book_doc.get("subject_id"),
+                    "title": book_doc.get("title"),
+                    "title_ar": book_doc.get("title_ar"),
+                    "source_url": book_doc.get("source_url"),
+                    "storage_path": book_doc.get("storage_path"),
+                    "grade": book_doc.get("grade", "General"),
+                    "term": book_doc.get("term", "Term 1"),
+                    "year": book_doc.get("year", "2026"),
+                    "language": book_doc.get("language", "ar"),
+                    "book_type": book_doc.get("book_type", "core"),
+                    "is_private": bool(book_doc.get("userId")),
+                    "userId": book_doc.get("userId"),
+                    "is_local": False
+                }
+                
+                run_ingest_in_background(payload)
+                msg = "Book approved and background ingestion started successfully."
+                
+            elif action == "reject":
+                db["books"].delete_one({"_id": book_id})
+                
+                subj_id = book_doc.get("subject_id")
+                if subj_id:
+                    db["subjects"].update_one(
+                        {"_id": subj_id},
+                        {"$inc": {"books_count": -1}}
+                    )
+                msg = "Book rejection processed and draft deleted."
+                
+            else:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"error": f"Invalid action: {action}"},
+                    status_code=400
+                )
+                
+            client.close()
+            return {"success": True, "message": msg}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to process approve/reject: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"error": str(err)},
                 status_code=500
