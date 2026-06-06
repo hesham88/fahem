@@ -224,6 +224,10 @@ def run_ingestion_pipeline(book_id, title, title_ar, filename, grade, lang):
         except Exception as e:
             print(f"[MONGO DRAFT ERROR] {e}", file=sys.stderr)
 
+    job_id = f"job_{book_id}"
+    # Initialize the local job state to 'queued' to prevent poller race conditions
+    update_job_status(job_id, "queued", "init", 5, ["[INIT] Test started."], 0, 0, False, **payload)
+
     python_path = sys.executable or "python"
     fetch_script = os.path.join(ROOT_DIR, "agents", "ingestion_v2", "job_fetch.py")
     
@@ -236,7 +240,6 @@ def run_ingestion_pipeline(book_id, title, title_ar, filename, grade, lang):
     proc.stdin.close()
     
     # Wait for completion & poll
-    job_id = f"job_{book_id}"
     poll_start = time.time()
     max_wait = 300
     completed = False

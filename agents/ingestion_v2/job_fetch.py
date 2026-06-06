@@ -162,15 +162,18 @@ def main():
             python_path = sys.executable or "python"
             struct_script = os.path.join(ROOT_DIR, "agents", "ingestion_v2", "job_struct.py")
             
-            proc = subprocess.Popen(
-                [python_path, struct_script],
-                stdin=subprocess.PIPE,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                text=True
-            )
-            proc.stdin.write(JSON_Encoder().encode(payload))
-            proc.stdin.close()
+            log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            with open(log_file_path, "a", encoding="utf-8") as lf:
+                proc = subprocess.Popen(
+                    [python_path, struct_script],
+                    stdin=subprocess.PIPE,
+                    stdout=lf,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                proc.stdin.write(JSON_Encoder().encode(payload))
+                proc.stdin.close()
             print(f"[JOB 1: FETCH] Successfully triggered Job 2 (Struct) with PID {proc.pid}", flush=True)
 
         except Exception as trigger_err:

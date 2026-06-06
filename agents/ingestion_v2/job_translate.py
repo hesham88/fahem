@@ -351,15 +351,18 @@ def main():
         payload["temp_pdf_path"] = temp_pdf_path
         payload["total_pages"] = actual_total_pages
         
-        proc = subprocess.Popen(
-            [python_path, assemble_script],
-            stdin=subprocess.PIPE,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            text=True
-        )
-        proc.stdin.write(JSON_Encoder().encode(payload))
-        proc.stdin.close()
+        log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        with open(log_file_path, "a", encoding="utf-8") as lf:
+            proc = subprocess.Popen(
+                [python_path, assemble_script],
+                stdin=subprocess.PIPE,
+                stdout=lf,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            proc.stdin.write(JSON_Encoder().encode(payload))
+            proc.stdin.close()
         print(f"[JOB 3: TRANSLATE] Successfully triggered Job 4 (Assemble) with PID {proc.pid}", flush=True)
 
     except Exception as trigger_err:
