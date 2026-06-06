@@ -11,6 +11,10 @@ Stage 5 (Embed).
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import io
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import json
 import time
 import subprocess
@@ -18,7 +22,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageColor
 
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
-    JSON_Encoder, is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH
+    JSON_Encoder, is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH,
+    make_progress_bar
 )
 
 def compile_chapters_and_toc(book_id, total_pages, is_local, pdf_toc=None):
@@ -328,16 +333,31 @@ def main():
     job_id = f"job_{book_id}"
     
     # Compile Table of Contents chapters structure
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] Compiling Chapters & Table of Contents Outline...")
     compiled_chapters = compile_chapters_and_toc(book_id, total_pages, is_local, pdf_toc)
-    
+    bar_toc = make_progress_bar(80.0, width=20)
+    log_msg_toc = f"{bar_toc} Chapters & TOC Compiled ({len(compiled_chapters)} chapters)."
+    print(f"[JOB 4: ASSEMBLE] {log_msg_toc}", flush=True)
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] {log_msg_toc}")
+
     # Programmatic professional book cover generation
     title = payload.get("title") or "Curriculum Textbook"
     grade = payload.get("grade", "General")
     term = payload.get("term", "Term 1")
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] Generating premium professional book cover...")
     cover_url, cover_thumb_url = generate_book_cover(book_id, subject_id, title, grade, term)
+    bar_cover = make_progress_bar(83.0, width=20)
+    log_msg_cover = f"{bar_cover} Premium Book Covers generated successfully."
+    print(f"[JOB 4: ASSEMBLE] {log_msg_cover}", flush=True)
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] {log_msg_cover}")
     
     # Compile interactive mind map
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] Building interactive mind map tree...")
     mind_map = build_mind_map(compiled_chapters)
+    bar_map = make_progress_bar(85.0, width=20)
+    log_msg_map = f"{bar_map} Interactive Mind Map generated successfully."
+    print(f"[JOB 4: ASSEMBLE] {log_msg_map}", flush=True)
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] {log_msg_map}")
     
     metadata = {
         "book_id": book_id,
@@ -373,12 +393,22 @@ def main():
         log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
         os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
         with open(log_file_path, "a", encoding="utf-8") as lf:
+            popen_kwargs = {
+                "stdin": subprocess.PIPE,
+                "stdout": lf,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+                "close_fds": True,
+                "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+            else:
+                popen_kwargs["start_new_session"] = True
+
             proc = subprocess.Popen(
                 [python_path, embed_script],
-                stdin=subprocess.PIPE,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-                text=True
+                **popen_kwargs
             )
             proc.stdin.write(JSON_Encoder().encode(payload))
             proc.stdin.close()

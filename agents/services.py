@@ -1342,16 +1342,35 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 import subprocess
                 import os
                 import json
+                import time
                 
-                logger.info(f"[Ingestion Background] Thread started for book {payload.get('book_id')}")
-                python_exe = sys.executable
                 agents_dir = os.path.dirname(os.path.abspath(__file__))
+                root_dir = os.path.dirname(agents_dir)
+                log_path = os.path.join(root_dir, "ignore", "server_fastapi_services.log")
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
+                
+                def log_to_file(message):
+                    try:
+                        t = time.strftime("%Y-%m-%d %H:%M:%S")
+                        with open(log_path, "a", encoding="utf-8") as f:
+                            f.write(f"[{t}] {message}\n")
+                    except Exception:
+                        pass
+
+                book_id = payload.get('book_id')
+                book_title = payload.get('title', 'Untitled')
+                log_to_file(f"[FASTAPI INGEST] 🚀 Thread started for book: \"{book_title}\" (ID: {book_id})")
+                logger.info(f"[Ingestion Background] Thread started for book {book_id}")
+                
+                python_exe = sys.executable
                 script_path = os.path.join(agents_dir, "ingestion_v2", "job_fetch.py")
                 if not os.path.exists(script_path):
-                    root_dir = os.path.dirname(agents_dir)
                     script_path = os.path.join(root_dir, "agents", "ingestion_v2", "job_fetch.py")
                 
+                log_to_file(f"[FASTAPI INGEST] Resolved script path to: \"{script_path}\"")
+                log_to_file(f"[FASTAPI INGEST] Payload sent to python stdin: {json.dumps(payload, indent=2)}")
                 logger.info(f"[Ingestion Background] Resolved ingestion script path to: {script_path}")
+                
                 p = subprocess.Popen(
                     [python_exe, script_path],
                     stdin=subprocess.PIPE,
@@ -1359,12 +1378,29 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     stderr=subprocess.PIPE,
                     text=True
                 )
+                
+                log_to_file(f"[FASTAPI INGEST] Subprocess spawned successfully with PID: {p.pid}")
+                log_to_file(f"[FASTAPI INGEST] Piping payload and waiting for communicate() EOF...")
+                
                 stdout_data, stderr_data = p.communicate(input=json.dumps(payload))
-                logger.info(f"[Ingestion Background stdout] {stdout_data}")
+                
+                log_to_file(f"[FASTAPI INGEST] Subprocess communicate() returned cleanly.")
+                
+                if stdout_data:
+                    log_to_file(f"[FASTAPI PROCESS stdout] [PID {p.pid}] {stdout_data.strip()}")
+                    logger.info(f"[Ingestion Background stdout] {stdout_data}")
                 if stderr_data:
+                    log_to_file(f"[FASTAPI PROCESS stderr] [PID {p.pid}] ⚠️ {stderr_data.strip()}")
                     logger.error(f"[Ingestion Background stderr] {stderr_data}")
-                logger.info(f"[Ingestion Background] Thread completed for book {payload.get('book_id')}")
+                
+                log_to_file(f"[FASTAPI INGEST] ✅ Thread completed successfully for book: \"{book_title}\" (ID: {book_id})")
+                logger.info(f"[Ingestion Background] Thread completed for book {book_id}")
             except Exception as thread_err:
+                msg = f"[FASTAPI INGEST CRITICAL ERROR] Thread failed: {thread_err}"
+                try:
+                    log_to_file(msg)
+                except Exception:
+                    pass
                 logger.error(f"[Ingestion Background Error] {thread_err}", exc_info=True)
 
         t = threading.Thread(target=target)

@@ -539,3 +539,18 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
             client.close()
         except Exception as e:
             print(f"[Mongo Status Update Error] {e}", file=sys.stderr)
+
+def make_progress_bar(percent, width=20):
+    """
+    Renders a beautiful ASCII progress bar.
+    Example: [████████░░░░░░░░░░░░] 40.0%
+    """
+    try:
+        pct = float(percent)
+    except Exception:
+        pct = 0.0
+    pct = max(0.0, min(100.0, pct))
+    completed = int(round(pct / 100.0 * width))
+    bar = "█" * completed + "░" * (width - completed)
+    return f"[{bar}] {pct:.1f}%"
+

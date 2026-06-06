@@ -4,8 +4,24 @@ import { proxyRequest } from "../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 
 export const dynamic = "force-dynamic";
+
+function logToServerFile(message: string) {
+  try {
+    const logDir = path.join(process.cwd(), "ignore");
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const logFilePath = path.join(logDir, "server_nextjs_api.log");
+    const t = new Date().toISOString();
+    fs.appendFileSync(logFilePath, `[${t}] ${message}\n`, "utf8");
+  } catch (err) {
+    console.error("Failed to write to local server log file:", err);
+  }
+}
+
 
 async function translateMetadata(text: string): Promise<Record<string, string>> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -408,25 +424,37 @@ export async function POST(req: NextRequest) {
           is_local: true
         };
 
+        logToServerFile(`[LOCAL INGEST] Triggering local ingestion for book: "${resolvedTitle}" (ID: ${bookId})`);
+        logToServerFile(`[LOCAL INGEST] Script path: "${scriptPath}"`);
+        logToServerFile(`[LOCAL INGEST] Payload sent to python stdin: ${JSON.stringify(payload, null, 2)}`);
+
         const child = spawn(pythonPath, [scriptPath], { env: process.env });
         global.activeBookJobs?.set(bookId, child);
+
+        logToServerFile(`[LOCAL INGEST] Child process spawned successfully with PID: ${child.pid}`);
 
         child.stdin.write(JSON.stringify(payload));
         child.stdin.end();
 
         child.stdout.on("data", (data) => {
-          console.log(`[Ingestion Local stdout] ${data}`);
+          const outStr = data.toString().trim();
+          console.log(`[Ingestion Local stdout] ${outStr}`);
+          logToServerFile(`[LOCAL PROCESS stdout] [PID ${child.pid}] ${outStr}`);
         });
         child.stderr.on("data", (data) => {
-          console.error(`[Ingestion Local stderr] ${data}`);
+          const errStr = data.toString().trim();
+          console.error(`[Ingestion Local stderr] ${errStr}`);
+          logToServerFile(`[LOCAL PROCESS stderr] [PID ${child.pid}] ⚠️ ${errStr}`);
         });
         child.on("close", (code) => {
           global.activeBookJobs?.delete(bookId);
           console.log(`[Ingestion Local Child Process] Book ${bookId} exited with code ${code}`);
+          logToServerFile(`[LOCAL INGEST] Child process (PID ${child.pid}) exited cleanly with code: ${code}`);
         });
 
       } catch (e: any) {
         console.error("[Ingestion Local Child Process Spawn Error]", e);
+        logToServerFile(`[LOCAL INGEST CRITICAL ERROR] Failed to spawn process: ${e.message}\n${e.stack}`);
       }
 
       return new Response(JSON.stringify({ success: true, message: "New book upload queued and background ingestion started.", book: draftBook }), {
@@ -475,17 +503,32 @@ export async function POST(req: NextRequest) {
         is_local: false
       };
 
+      logToServerFile(`[PROD INGEST] Triggering production container ingestion for book: "${resolvedTitle}" (ID: ${bookId})`);
+      logToServerFile(`[PROD INGEST] Script path: "${scriptPath}"`);
+      logToServerFile(`[PROD INGEST] Payload sent to python stdin: ${JSON.stringify(payload, null, 2)}`);
+
       const child = spawn(pythonPath, [scriptPath], { env: process.env });
       global.activeBookJobs?.set(bookId, child);
+
+      logToServerFile(`[PROD INGEST] Child process spawned successfully with PID: ${child.pid}`);
 
       child.stdin.write(JSON.stringify(payload));
       child.stdin.end();
 
-      child.on("close", () => {
-        global.activeBookJobs?.delete(bookId);
+      child.stdout.on("data", (data) => {
+        const outStr = data.toString().trim();
+        logToServerFile(`[PROD PROCESS stdout] [PID ${child.pid}] ${outStr}`);
       });
-    } catch (e) {
-      // Ignore process launch errors in non-local environment if handled by real Cloud Run endpoint
+      child.stderr.on("data", (data) => {
+        const errStr = data.toString().trim();
+        logToServerFile(`[PROD PROCESS stderr] [PID ${child.pid}] ⚠️ ${errStr}`);
+      });
+      child.on("close", (code) => {
+        global.activeBookJobs?.delete(bookId);
+        logToServerFile(`[PROD INGEST] Child process (PID ${child.pid}) exited cleanly with code: ${code}`);
+      });
+    } catch (e: any) {
+      logToServerFile(`[PROD INGEST CRITICAL ERROR] Failed to spawn process: ${e.message}\n${e.stack}`);
     }
 
     // Return proxy result or fallback success

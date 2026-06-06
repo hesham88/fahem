@@ -12,6 +12,10 @@ and spawns Stage 4 (Assemble).
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import io
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import json
 import time
 import threading
@@ -21,7 +25,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, get_gemini_config, execute_with_retry,
-    is_mongodb_enabled, get_mongodb_uri, atomic_write_json, LOCAL_DB_PATH
+    is_mongodb_enabled, get_mongodb_uri, atomic_write_json, LOCAL_DB_PATH,
+    make_progress_bar
 )
 
 db_write_lock = threading.Lock()
@@ -326,7 +331,11 @@ def main():
             if p_doc:
                 translated_count += 1
                 pct = 56 + int((translated_count / actual_total_pages) * 20)  # Range 56% - 76%
-                print(f"[JOB 3: TRANSLATE] Translated Page {p_no}/{actual_total_pages}.", flush=True)
+                sub_pct = (translated_count / actual_total_pages) * 100.0
+                bar = make_progress_bar(sub_pct, width=20)
+                log_msg = f"{bar} Translated Page {p_no}/{actual_total_pages}."
+                print(f"[JOB 3: TRANSLATE] {log_msg}", flush=True)
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] {log_msg}")
                 
                 # Write page back to database
                 with db_write_lock:
@@ -354,12 +363,22 @@ def main():
         log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
         os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
         with open(log_file_path, "a", encoding="utf-8") as lf:
+            popen_kwargs = {
+                "stdin": subprocess.PIPE,
+                "stdout": lf,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+                "close_fds": True,
+                "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+            else:
+                popen_kwargs["start_new_session"] = True
+
             proc = subprocess.Popen(
                 [python_path, assemble_script],
-                stdin=subprocess.PIPE,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-                text=True
+                **popen_kwargs
             )
             proc.stdin.write(JSON_Encoder().encode(payload))
             proc.stdin.close()

@@ -12,6 +12,10 @@ finalizes subject metric links, setting job status as 100% completed.
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import io
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import json
 import time
 import threading
@@ -19,7 +23,8 @@ import threading
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     get_gemini_config, get_gemini_embedding_v2,
-    is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH, atomic_write_json
+    is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH, atomic_write_json,
+    make_progress_bar
 )
 
 db_write_lock = threading.Lock()
@@ -219,6 +224,11 @@ def main():
         
         embedded_count += 1
         pct = 86 + int((embedded_count / actual_pages_count) * 12)  # Range 86% - 98%
+        sub_pct = (embedded_count / actual_pages_count) * 100.0
+        bar = make_progress_bar(sub_pct, width=20)
+        log_msg = f"{bar} Vector Embedded Page {p_doc.get('page_number')}/{actual_pages_count}."
+        print(f"[JOB 5: EMBED] {log_msg}", flush=True)
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
         
         # Update database with embedded page doc
         with db_write_lock:
@@ -235,7 +245,8 @@ def main():
     finalize_subject_link(metadata["subject_id"], is_local)
 
     logs.append(f"[{time.strftime('%H:%M:%S')}] [COMPLETE] ✅ All Ingestion v2 stages successfully finished. Textbook blocks and 3072-d vectors are active.")
-    print(f"[JOB 5: EMBED] Embedded all pages. Finalizing job state...", flush=True)
+    bar_final = make_progress_bar(100.0, width=20)
+    print(f"[JOB 5: EMBED] {bar_final} Ingestion finalized successfully.", flush=True)
 
     update_job_status(
         job_id, "completed", "finalize", 100, logs,

@@ -11,6 +11,10 @@ Saves pages draft blocks to database/local_db and spawns Stage 3.
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import io
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import json
 import time
 import base64
@@ -24,7 +28,7 @@ import requests
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, get_gemini_config, execute_with_retry,
-    is_mongodb_enabled, get_mongodb_uri
+    is_mongodb_enabled, get_mongodb_uri, make_progress_bar
 )
 
 db_write_lock = threading.Lock()
@@ -355,8 +359,11 @@ def main():
                 final_pages[p_no] = p_doc
                 
                 pct = 30 + int((processed_pages / total_pages) * 25)  # Range 30% - 55%
-                log_msg = f"Parsed Page {p_no}/{total_pages} (Blocks Count: {len(p_doc['blocks'])})."
+                sub_pct = (processed_pages / total_pages) * 100.0
+                bar = make_progress_bar(sub_pct, width=20)
+                log_msg = f"{bar} Parsed Page {p_no}/{total_pages} (Blocks Count: {len(p_doc['blocks'])})."
                 print(f"[JOB 2: STRUCT] {log_msg}", flush=True)
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] {log_msg}")
                 
                 # Write page to database
                 with db_write_lock:
@@ -383,12 +390,22 @@ def main():
         log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
         os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
         with open(log_file_path, "a", encoding="utf-8") as lf:
+            popen_kwargs = {
+                "stdin": subprocess.PIPE,
+                "stdout": lf,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+                "close_fds": True,
+                "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+            else:
+                popen_kwargs["start_new_session"] = True
+
             proc = subprocess.Popen(
                 [python_path, translate_script],
-                stdin=subprocess.PIPE,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-                text=True
+                **popen_kwargs
             )
             proc.stdin.write(JSON_Encoder().encode(payload))
             proc.stdin.close()

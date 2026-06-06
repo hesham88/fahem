@@ -10,6 +10,10 @@ Caches/saves file locally and signals downstream block extraction (Job 2: Struct
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import io
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import json
 import time
 import requests
@@ -18,16 +22,16 @@ import fitz  # PyMuPDF
 
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
-    JSON_Encoder, is_mongodb_enabled, get_mongodb_uri
+    JSON_Encoder, is_mongodb_enabled, get_mongodb_uri, make_progress_bar
 )
 
 def download_file_progressive(url, output_path, job_id, is_local, logs, metadata):
-    def add_log(msg):
+    def add_log(msg, progress_val=15):
         t = time.strftime("%H:%M:%S")
         logs.append(f"[{t}] [DOWNLOAD] {msg}")
-        update_job_status(job_id, "processing", "fetch", 15, logs, 0, 0, False, is_local, **metadata)
+        update_job_status(job_id, "processing", "fetch", progress_val, logs, 0, 0, False, is_local, **metadata)
 
-    add_log(f"Connecting to source URL: {url}")
+    add_log(f"Connecting to source URL: {url}", progress_val=5)
     res = requests.get(url, stream=True, timeout=40)
     res.raise_for_status()
     
@@ -42,10 +46,13 @@ def download_file_progressive(url, output_path, job_id, is_local, logs, metadata
                 downloaded += len(chunk)
                 if total_size > 0:
                     pct = (downloaded / total_size) * 100
+                    # Map 0-100% download to 5-20% overall progress
+                    current_prog = 5.0 + (pct / 100.0) * 15.0
                     if downloaded % (512 * 1024) == 0:
-                        add_log(f"Downloaded {downloaded / (1024*1024):.2f}MB / {total_size / (1024*1024):.2f}MB ({pct:.1f}%)")
+                        bar = make_progress_bar(pct, width=20)
+                        add_log(f"{bar} Downloaded {downloaded / (1024*1024):.2f}MB / {total_size / (1024*1024):.2f}MB", progress_val=round(current_prog, 1))
 
-    add_log("Textbook PDF binary download finished successfully.")
+    add_log("Textbook PDF binary download finished successfully.", progress_val=20)
 
 def main():
     try:
@@ -165,12 +172,26 @@ def main():
             log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
             with open(log_file_path, "a", encoding="utf-8") as lf:
+                # To prevent stdout/stderr pipe leakage and handle blockades,
+                # we set close_fds=True. We also detach the child process session.
+                popen_kwargs = {
+                    "stdin": subprocess.PIPE,
+                    "stdout": lf,
+                    "stderr": subprocess.STDOUT,
+                    "text": True,
+                    "close_fds": True,
+                    "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+                }
+                if sys.platform == "win32":
+                    # CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    # CREATE_NO_WINDOW = 0x08000000
+                    popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+                else:
+                    popen_kwargs["start_new_session"] = True
+
                 proc = subprocess.Popen(
                     [python_path, struct_script],
-                    stdin=subprocess.PIPE,
-                    stdout=lf,
-                    stderr=subprocess.STDOUT,
-                    text=True
+                    **popen_kwargs
                 )
                 proc.stdin.write(JSON_Encoder().encode(payload))
                 proc.stdin.close()
