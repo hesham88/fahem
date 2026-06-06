@@ -37,3 +37,7 @@ agy.exe*
 firebase-debug.log
 build_log*.txt
 
+# Ignore temporary folders
+temp/
+temp_test_book_1.pdf
+
