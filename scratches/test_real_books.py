@@ -33,7 +33,8 @@ sys.path.insert(0, os.path.join(ROOT_DIR, "agents", "ingestion_v2"))
 
 from ingestion_v2.utils import (
     update_job_status, get_job_status, LOCAL_DB_PATH,
-    is_mongodb_enabled, get_mongodb_uri
+    is_mongodb_enabled, get_mongodb_uri, get_gemini_config,
+    generate_gemini_image
 )
 
 # Target PDF URLs
@@ -159,6 +160,20 @@ def draw_premium_cover():
     img.convert("RGB").save(COVER_OUT)
     print(f"[IMAGE AGENT] ✅ Premium cover graphic successfully generated and saved to {COVER_OUT}.", flush=True)
 
+def generate_or_draw_cover():
+    print("[IMAGE AGENT] Querying gemini-3.1-flash-image for cover generation...", flush=True)
+    api_key, _ = get_gemini_config()
+    prompt = (
+        "An ultra-premium, gorgeous textbook cover art for 'History of Modern Egypt & The World' Secondary Grade 3. "
+        "Minimalist, modern premium design with warm ancient terracotta and deep gold gradients, geometric pharaonic lines, "
+        "sleek glassmorphic typography card, professional educational suite style, high resolution."
+    )
+    success = generate_gemini_image(prompt, api_key, COVER_OUT)
+    if not success:
+        print("[IMAGE AGENT] Model API fell back. Proceeding with programmatic high-fidelity cover rendering.", flush=True)
+        draw_premium_cover()
+
+
 def run_ingestion_pipeline(book_id, title, title_ar, filename, grade, lang):
     print(f"\n[INGESTION] Spawning pipeline cascade for {book_id}...", flush=True)
     payload = {
@@ -215,8 +230,6 @@ def run_ingestion_pipeline(book_id, title, title_ar, filename, grade, lang):
     proc = subprocess.Popen(
         [python_path, fetch_script],
         stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
         text=True
     )
     proc.stdin.write(json.dumps(payload))
@@ -253,10 +266,8 @@ def run_ingestion_pipeline(book_id, title, title_ar, filename, grade, lang):
             break
         time.sleep(4.0)
         
-    # Read subprocess outputs to make sure there are no issues
-    stdout, stderr = proc.communicate()
-    if stderr:
-        print(f"[STDERR - {book_id}]: {stderr}", file=sys.stderr)
+    # Wait for child processes to finish cleanly
+    proc.wait()
     return completed
 
 def main():
@@ -267,8 +278,8 @@ def main():
     # Step 1: Create directories if needed
     os.makedirs(os.path.join(ROOT_DIR, "ignore"), exist_ok=True)
     
-    # Step 2: Draw the beautiful textbook cover art
-    draw_premium_cover()
+    # Step 2: Generate or draw the beautiful textbook cover art
+    generate_or_draw_cover()
     
     # Step 3: Download full textbooks
     ok = download_file(PYTHON_URL, PYTHON_LOCAL_FULL, "Python Programming")

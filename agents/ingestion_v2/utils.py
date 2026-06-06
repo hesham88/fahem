@@ -139,6 +139,54 @@ def get_fallback_embedding(text, dimensions=3072):
     r = random.Random(seed)
     return [r.uniform(-0.15, 0.15) for _ in range(dimensions)]
 
+def generate_gemini_image(prompt, api_key, output_path):
+    """
+    Generates an image using gemini-3.1-flash-image (or falls back to Pillow layout).
+    """
+    if not api_key:
+        print("[IMAGE AGENT] No API key found. Falling back to premium Pillow layout.", flush=True)
+        return False
+
+    try:
+        # Use v1beta generateContent endpoint for multimodal image generation models
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"]
+            }
+        }
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=45)
+        if res.status_code == 200:
+            import base64
+            res_json = res.json()
+            candidates = res_json.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                for part in parts:
+                    inline_data = part.get("inlineData")
+                    if inline_data:
+                        img_b64 = inline_data.get("data")
+                        if img_b64:
+                            with open(output_path, "wb") as f:
+                                f.write(base64.b64decode(img_b64))
+                            print(f"[IMAGE AGENT] Successfully generated cover using gemini-3.1-flash-image and saved to {output_path}", flush=True)
+                            return True
+            print(f"[IMAGE AGENT] Response JSON structure did not match expected inlineData: {res_json}", file=sys.stderr)
+        else:
+            print(f"[IMAGE AGENT] gemini-3.1-flash-image API returned HTTP {res.status_code}: {res.text}", file=sys.stderr)
+    except Exception as e:
+        print(f"[IMAGE AGENT] API call failed: {e}. Falling back to premium Pillow layout.", flush=True)
+    return False
+
 def atomic_write_json(file_path, data):
     dir_name = os.path.dirname(file_path)
     os.makedirs(dir_name, exist_ok=True)
