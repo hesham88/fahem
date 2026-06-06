@@ -97,7 +97,10 @@ export function isLocalEnv(): boolean {
 }
 
 export function shouldSkipDirectMongo(): boolean {
-  // If we are in production and MONGODB_URI contains "-pri" but we are not on Cloud Run directly
+  // Allow overriding standard bypass via environment variables
+  if (process.env.FORCE_MONGO === "true" || process.env.DISABLE_MONGO_BYPASS === "true") {
+    return false;
+  }
   const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
   const isCloudRun = !!process.env.K_SERVICE;
   return hasPri && !isCloudRun;
@@ -174,6 +177,16 @@ export function saveLocalDb(db: LocalDb): boolean {
 }
 
 export function resolveScriptPath(subPath: string): string {
+  // Try process.cwd()/agents/subPath
+  const localAgentsPath = path.join(process.cwd(), "agents", subPath);
+  if (fs.existsSync(localAgentsPath)) {
+    return localAgentsPath;
+  }
+  // Try process.cwd()/../agents/subPath
+  const parentAgentsPath = path.join(process.cwd(), "..", "agents", subPath);
+  if (fs.existsSync(parentAgentsPath)) {
+    return parentAgentsPath;
+  }
   // Try process.cwd()/scripts/subPath
   const localPath = path.join(process.cwd(), "scripts", subPath);
   if (fs.existsSync(localPath)) {

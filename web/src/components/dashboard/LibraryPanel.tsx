@@ -152,300 +152,164 @@ const getSubjectNameLabel = (subject: string, language: string) => {
   return isAr ? "مادة عامة" : "General Subject";
 };
 
-const preprocessRawText = (text: string, isAr: boolean): string => {
-  return text || "";
-};
-
 const isLineMathFormula = (line: string): boolean => {
-  const trimmed = line.trim();
-  if (!trimmed) return false;
-  
-  // If it starts with math formula indicators or LaTeX wrappers
-  if (trimmed.startsWith("$$") || trimmed.endsWith("$$")) return true;
-  if (trimmed.includes("\\") && (trimmed.includes("frac") || trimmed.includes("sqrt") || trimmed.includes("sum") || trimmed.includes("int") || trimmed.includes("alpha") || trimmed.includes("beta") || trimmed.includes("theta") || trimmed.includes("pi"))) return true;
-  
-  // If it's short and contains an equals sign and some math operators/digits
-  if (trimmed.length < 60 && (trimmed.includes("=") || trimmed.includes("≠") || trimmed.includes("≈") || trimmed.includes("≤") || trimmed.includes("≥"))) {
-    const mathRegex = /[=+\-*/^\\(){}[\]_]|\d+/g;
-    const lettersRegex = /[a-zA-Z\u0620-\u064A]/g;
-    const mathCount = (trimmed.match(mathRegex) || []).length;
-    const letterCount = (trimmed.match(lettersRegex) || []).length;
-    if (mathCount > letterCount && mathCount > 0) return true;
+  const clean = line.trim();
+  if (clean.includes("=") && (clean.includes("+") || clean.includes("-") || clean.includes("*") || clean.includes("/") || clean.includes("^") || /\d/.test(clean))) {
+    return true;
   }
-  
-  return false;
+  return /^[a-zA-Z\d\s\+\-\*\/\=\(\)\{\}\^_\,\.\θ\π\σ\Σ\∫\Δ]+$/.test(clean) && clean.length > 5 && (clean.includes("=") || clean.includes("+") || clean.includes("-") || clean.includes("*") || clean.includes("/"));
 };
 
+const parseInlineStyles = (textStr: string): React.ReactNode => {
+  if (!textStr) return "";
+  
+  type Token = { type: "text" | "highlight" | "bold" | "underline" | "italic"; content: string };
+  let tokens: Token[] = [{ type: "text", content: textStr }];
+  
+  // 1. Highlight ==text==
+  let nextTokens: Token[] = [];
+  tokens.forEach(tok => {
+    if (tok.type === "text") {
+      const parts = tok.content.split("==");
+      parts.forEach((p, idx) => {
+        if (idx % 2 === 1) {
+          nextTokens.push({ type: "highlight", content: p });
+        } else if (p) {
+          nextTokens.push({ type: "text", content: p });
+        }
+      });
+    } else {
+      nextTokens.push(tok);
+    }
+  });
+  tokens = nextTokens;
+  
+  // 2. Bold **text**
+  nextTokens = [];
+  tokens.forEach(tok => {
+    if (tok.type === "text") {
+      const parts = tok.content.split("**");
+      parts.forEach((p, idx) => {
+        if (idx % 2 === 1) {
+          nextTokens.push({ type: "bold", content: p });
+        } else if (p) {
+          nextTokens.push({ type: "text", content: p });
+        }
+      });
+    } else {
+      nextTokens.push(tok);
+    }
+  });
+  tokens = nextTokens;
+  
+  // 3. Underline __text__
+  nextTokens = [];
+  tokens.forEach(tok => {
+    if (tok.type === "text") {
+      const parts = tok.content.split("__");
+      parts.forEach((p, idx) => {
+        if (idx % 2 === 1) {
+          nextTokens.push({ type: "underline", content: p });
+        } else if (p) {
+          nextTokens.push({ type: "text", content: p });
+        }
+      });
+    } else {
+      nextTokens.push(tok);
+    }
+  });
+  tokens = nextTokens;
+  
+  // 4. Italic *text*
+  nextTokens = [];
+  tokens.forEach(tok => {
+    if (tok.type === "text") {
+      const parts = tok.content.split("*");
+      parts.forEach((p, idx) => {
+        if (idx % 2 === 1) {
+          nextTokens.push({ type: "italic", content: p });
+        } else if (p) {
+          nextTokens.push({ type: "text", content: p });
+        }
+      });
+    } else {
+      nextTokens.push(tok);
+    }
+  });
+  tokens = nextTokens;
+  
+  return (
+    <>
+      {tokens.map((tok, idx) => {
+        if (tok.type === "highlight") {
+          return (
+            <span key={idx} style={{
+              background: "linear-gradient(120deg, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.45) 100%)",
+              borderBottom: "2px solid #d97706",
+              padding: "1px 6px",
+              borderRadius: "6px",
+              fontWeight: 700,
+              color: "var(--foreground)",
+              boxShadow: "0 2px 4px rgba(217, 119, 6, 0.05)",
+              display: "inline-block"
+            }}>{tok.content}</span>
+          );
+        }
+        if (tok.type === "bold") {
+          return (
+            <strong key={idx} style={{
+              fontWeight: 800,
+              color: "var(--primary)"
+            }}>{tok.content}</strong>
+          );
+        }
+        if (tok.type === "underline") {
+          return (
+            <span key={idx} style={{
+              borderBottom: "2.5px solid var(--primary)"
+            }}>{tok.content}</span>
+          );
+        }
+        if (tok.type === "italic") {
+          return (
+            <em key={idx} style={{
+              fontStyle: "italic",
+              opacity: 0.9
+            }}>{tok.content}</em>
+          );
+        }
+        return tok.content;
+      })}
+    </>
+  );
+};
 
-const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactNode[] | null => {
+const renderLegacyPageContent = (text: string, isAr: boolean): React.ReactNode => {
   if (!text) return null;
-  const isAr = isTextArabic(text);
-  const processedText = preprocessRawText(text, originalIsAr);
-  const lines = processedText.split("\n");
+  const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   
-  // Helper to parse inline styles: ==highlights==, **bold**, __underline__, *italic*
-  const parseInlineElements = (textStr: string): React.ReactNode => {
-    if (!textStr) return "";
-    
-    type Token = { type: "text" | "highlight" | "bold" | "underline" | "italic"; content: string };
-    let tokens: Token[] = [{ type: "text", content: textStr }];
-    
-    // 1. Highlight ==text==
-    let nextTokens: Token[] = [];
-    tokens.forEach(tok => {
-      if (tok.type === "text") {
-        const parts = tok.content.split("==");
-        parts.forEach((p, idx) => {
-          if (idx % 2 === 1) {
-            nextTokens.push({ type: "highlight", content: p });
-          } else if (p) {
-            nextTokens.push({ type: "text", content: p });
-          }
-        });
-      } else {
-        nextTokens.push(tok);
-      }
-    });
-    tokens = nextTokens;
-    
-    // 2. Bold **text**
-    nextTokens = [];
-    tokens.forEach(tok => {
-      if (tok.type === "text") {
-        const parts = tok.content.split("**");
-        parts.forEach((p, idx) => {
-          if (idx % 2 === 1) {
-            nextTokens.push({ type: "bold", content: p });
-          } else if (p) {
-            nextTokens.push({ type: "text", content: p });
-          }
-        });
-      } else {
-        nextTokens.push(tok);
-      }
-    });
-    tokens = nextTokens;
-    
-    // 3. Underline __text__
-    nextTokens = [];
-    tokens.forEach(tok => {
-      if (tok.type === "text") {
-        const parts = tok.content.split("__");
-        parts.forEach((p, idx) => {
-          if (idx % 2 === 1) {
-            nextTokens.push({ type: "underline", content: p });
-          } else if (p) {
-            nextTokens.push({ type: "text", content: p });
-          }
-        });
-      } else {
-        nextTokens.push(tok);
-      }
-    });
-    tokens = nextTokens;
-    
-    // 4. Italic *text*
-    nextTokens = [];
-    tokens.forEach(tok => {
-      if (tok.type === "text") {
-        const parts = tok.content.split("*");
-        parts.forEach((p, idx) => {
-          if (idx % 2 === 1) {
-            nextTokens.push({ type: "italic", content: p });
-          } else if (p) {
-            nextTokens.push({ type: "text", content: p });
-          }
-        });
-      } else {
-        nextTokens.push(tok);
-      }
-    });
-    tokens = nextTokens;
-    
-    return (
-      <>
-        {tokens.map((tok, idx) => {
-          if (tok.type === "highlight") {
-            return (
-              <span key={idx} style={{
-                background: "linear-gradient(120deg, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.45) 100%)",
-                borderBottom: "2px solid #d97706",
-                padding: "1px 6px",
-                borderRadius: "6px",
-                fontWeight: 700,
-                color: "var(--foreground)",
-                boxShadow: "0 2px 4px rgba(217, 119, 6, 0.05)",
-                display: "inline-block"
-              }}>{tok.content}</span>
-            );
-          }
-          if (tok.type === "bold") {
-            return (
-              <strong key={idx} style={{
-                fontWeight: 800,
-                color: "var(--primary)"
-              }}>{tok.content}</strong>
-            );
-          }
-          if (tok.type === "underline") {
-            return (
-              <span key={idx} style={{
-                borderBottom: "2.5px solid var(--primary)",
-                paddingBottom: "2px",
-                fontWeight: 700
-              }}>{tok.content}</span>
-            );
-          }
-          if (tok.type === "italic") {
-            return (
-              <em key={idx} style={{
-                fontStyle: "italic",
-                opacity: 0.95
-              }}>{tok.content}</em>
-            );
-          }
-          return tok.content;
-        })}
-      </>
-    );
-  };
-
   let i = 0;
   while (i < lines.length) {
     const line = lines[i].trim();
     if (!line) {
-      elements.push(<div key={`space-${i}`} style={{ height: "0.75rem" }} />);
       i++;
       continue;
     }
 
-    // Detect triple-backtick code blocks
-    if (line.startsWith("```")) {
-      const lang = line.replace(/^```/, "").trim();
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].trim().startsWith("```")) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      if (i < lines.length) {
-        i++; // Skip closing ```
-      }
-      const codeText = codeLines.join("\n");
-      elements.push(
-        <div key={`code-${i}`} style={{
-          margin: "1.75rem 0",
-          borderRadius: "14px",
-          background: "#1e1e2e",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
-          overflow: "hidden",
-          fontFamily: "var(--font-mono, monospace)",
-          direction: "ltr"
-        }}>
-          <div style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            padding: "0.5rem 1rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
-          }}>
-            <span style={{ fontSize: "0.75rem", color: "#a6adc8", fontWeight: 700 }}>💻 {lang || "CODE"}</span>
-            <button 
-              onClick={() => navigator.clipboard.writeText(codeText)}
-              style={{
-                fontSize: "0.7rem",
-                color: "#cdd6f4",
-                background: "rgba(255, 255, 255, 0.1)",
-                border: "none",
-                borderRadius: "4px",
-                padding: "0.25rem 0.5rem",
-                cursor: "pointer"
-              }}
-            >
-              Copy
-            </button>
-          </div>
-          <pre style={{
-            margin: 0,
-            padding: "1rem",
-            fontSize: "0.9rem",
-            overflowX: "auto",
-            color: "#cdd6f4",
-            lineHeight: "1.5"
-          }}><code>{codeText}</code></pre>
-        </div>
-      );
-      continue;
-    }
-
-    // A. Detect [HEADER: ...]
-    const headerMatch = line.match(/^\[HEADER:\s*(.*)\]$/i);
-    if (headerMatch) {
-      const content = headerMatch[1];
-      elements.push(
-        <div key={`header-${i}`} style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontSize: "0.75rem",
-          fontWeight: 800,
-          color: "#64748b",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          borderBottom: "1.5px solid rgba(16, 107, 163, 0.12)",
-          paddingBottom: "0.6rem",
-          marginBottom: "1.75rem",
-          direction: isAr ? "rtl" : "ltr"
-        }}>
-          <span>{parseInlineElements(content)}</span>
-          <span>📖 {isAr ? "كتاب منهجي معتمد" : "Official Curriculum"}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-
-    // B. Detect [FOOTER: ...]
-    const footerMatch = line.match(/^\[FOOTER:\s*(.*)\]$/i);
-    if (footerMatch) {
-      const content = footerMatch[1];
-      elements.push(
-        <div key={`footer-${i}`} style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontSize: "0.75rem",
-          fontWeight: 800,
-          color: "#64748b",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          borderTop: "1.5px solid rgba(16, 107, 163, 0.12)",
-          paddingTop: "0.6rem",
-          marginTop: "1.75rem",
-          direction: isAr ? "rtl" : "ltr"
-        }}>
-          <span style={{ color: "var(--primary)" }}>Fahem Ingestion Studio</span>
-          <span>{parseInlineElements(content)}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-
-    // C. Detect [VISUAL: ...]
-    const visualMatch = line.match(/^\[VISUAL:\s*(.*)\]$/i);
-    if (visualMatch) {
-      const content = visualMatch[1];
+    // A. Detect Visual Description / Figure Description
+    if (line.startsWith("Visual Description:") || line.startsWith("وصف مرئي:") || line.startsWith("Figure:") || line.startsWith("شكل:")) {
+      const content = line.replace(/^(Visual Description|وصف مرئي|Figure|شكل)\s*[:：]\s*/i, "");
       elements.push(
         <div key={`visual-${i}`} style={{
           margin: "1.75rem 0",
           padding: "1.5rem",
-          borderRadius: "20px",
-          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(16, 185, 129, 0.08) 100%)",
-          border: "1.5px dashed rgba(16, 185, 129, 0.35)",
+          borderRadius: "18px",
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)",
+          borderLeft: isAr ? "none" : "5px solid #059669",
+          borderRight: isAr ? "5px solid #059669" : "none",
+          borderTop: "1px solid rgba(16, 185, 129, 0.12)",
+          borderBottom: "1px solid rgba(16, 185, 129, 0.12)",
           boxShadow: "0 10px 30px rgba(16, 185, 129, 0.03)",
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left",
@@ -470,14 +334,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             color: "#065f46",
             fontStyle: isAr ? "normal" : "italic",
             fontWeight: 600
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // D. Detect Code Blocks (```)
+    // B. Detect Code Blocks (```)
     if (line.startsWith("```")) {
       const lang = line.replace("```", "").trim();
       const codeLines: string[] = [];
@@ -520,7 +384,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
       continue;
     }
 
-    // E. Detect Tables (| col1 | col2 |)
+    // C. Detect Tables (| col1 | col2 |)
     if (line.startsWith("|")) {
       const tableLines: string[][] = [];
       while (i < lines.length && lines[i].trim().startsWith("|")) {
@@ -545,7 +409,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
                 <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.06) 0%, rgba(16, 107, 163, 0.1) 100%)", borderBottom: "2px solid rgba(16, 107, 163, 0.18)" }}>
                   {headers.map((h, hIdx) => (
                     <th key={hIdx} style={{ padding: "0.95rem 1.25rem", fontSize: "0.92rem", fontWeight: 800, color: "var(--primary)" }}>
-                      {parseInlineElements(h)}
+                      {parseInlineStyles(h)}
                     </th>
                   ))}
                 </tr>
@@ -555,7 +419,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
                   <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
                     {row.map((cell, cIdx) => (
                       <td key={cIdx} style={{ padding: "0.9rem 1.25rem", fontSize: "0.92rem", color: "var(--foreground)", fontWeight: 550 }}>
-                        {parseInlineElements(cell)}
+                        {parseInlineStyles(cell)}
                       </td>
                     ))}
                   </tr>
@@ -568,7 +432,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
       }
     }
 
-    // 1. Detect Markdown headings
+    // D. Detect Markdown headings
     if (line.startsWith("#")) {
       const level = line.match(/^#+/)?.[0].length || 1;
       const cleanText = line.replace(/^#+\s*/, "");
@@ -591,14 +455,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
           textAlign: isAr ? "right" : "left",
           lineHeight: "1.4"
         }}>
-          {parseInlineElements(cleanText)}
+          {parseInlineStyles(cleanText)}
         </h4>
       );
       i++;
       continue;
     }
 
-    // 1.5. Detect Info / Note / Warning / Attention
+    // E. Detect Info / Note / Warning / Attention
     const infoMatch = line.match(/^(Info|Note|Note Label|Warning|Attention|ملحوظة|ملاحظة|تنبيه|تحذير)\s*[:：]\s*(.*)$/i);
     if (infoMatch) {
       const label = infoMatch[1];
@@ -636,14 +500,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             lineHeight: "1.75",
             color: "var(--foreground)",
             fontWeight: 600
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 1.8. Detect Tip / Study Tip / Hint
+    // F. Detect Tip / Study Tip / Hint
     const tipMatch = line.match(/^(Tip|Study Tip|Hint|نصيحة|إرشاد)\s*[:：]\s*(.*)$/i);
     if (tipMatch) {
       const label = tipMatch[1];
@@ -681,14 +545,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             lineHeight: "1.75",
             color: "var(--foreground)",
             fontWeight: 600
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 2. Detect Law / Theorem / Rule / Definition
+    // G. Detect Law / Theorem / Rule / Definition
     const lawMatch = line.match(/^(Law|Rule|Theorem|Definition|Principle|قانون|قاعدة|نظرية|مبدأ|تعريف|التعريف|القاعدة|القانون)\s*[:：]\s*(.*)$/i);
     if (lawMatch) {
       const label = lawMatch[1];
@@ -727,14 +591,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             color: "var(--foreground)",
             fontWeight: 600,
             fontStyle: isAr ? "normal" : "italic"
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 2.5 Detect Equation / Formula
+    // H. Detect Equation / Formula
     const equationMatch = line.match(/^(Equation|Formula|Formula Label|معادلة|صيغة رياضية|صيغة)\s*[:：]\s*(.*)$/i);
     if (equationMatch) {
       const label = equationMatch[1];
@@ -778,14 +642,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             display: "inline-block",
             minWidth: "60%",
             direction: "ltr"
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 3. Detect Question / Request
+    // I. Detect Question / Request
     const questionMatch = line.match(/^(Question|Q|Request|سؤال|س|مسألة|تمرين)\s*[:：.]\s*(.*)$/i);
     if (questionMatch) {
       const label = questionMatch[1];
@@ -821,14 +685,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             lineHeight: "1.75",
             color: "var(--foreground)",
             fontWeight: 600
-          }}>{parseInlineElements(content)}</div>
+          }}>{parseInlineStyles(content)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 4. Detect standalone Formulas / Equations
+    // J. Detect standalone Formulas / Equations
     const isFormula = isLineMathFormula(line);
     if (isFormula) {
       elements.push(
@@ -862,14 +726,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
             display: "inline-block",
             minWidth: "65%",
             direction: "ltr"
-          }}>{parseInlineElements(line)}</div>
+          }}>{parseInlineStyles(line)}</div>
         </div>
       );
       i++;
       continue;
     }
 
-    // 5. Detect List items (bullet or numbered)
+    // K. Detect List items (bullet or numbered)
     if (line.startsWith("-") || line.startsWith("*") || line.startsWith("•") || /^\d+[\.\-\)]/.test(line) || /^[a-zA-Z\u0620-\u064A]+[\.\)]/.test(line)) {
       const listItems: string[] = [];
       while (i < lines.length && lines[i].trim() && (
@@ -906,7 +770,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
                 textAlign: isAr ? "right" : "left"
               }}>
                 <span style={{ color: "var(--primary)", fontWeight: 900, fontSize: "1.05rem" }}>{prefix}</span>
-                <span style={{ flex: 1 }}>{parseInlineElements(cleanItem)}</span>
+                <span style={{ flex: 1 }}>{parseInlineStyles(cleanItem)}</span>
               </li>
             );
           })}
@@ -915,7 +779,7 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
       continue;
     }
 
-    // 6. Detect subtitle or small headings that are short and end with ":" or are bold
+    // L. Detect subtitle or small headings that are short and end with ":" or are bold
     if (line.length < 80 && (line.endsWith(":") || line.endsWith("：") || line.startsWith("**") && line.endsWith("**"))) {
       const cleanText = line.replace(/^\*\*|\*\*$/g, "").replace(/[:：]$/, "");
       elements.push(
@@ -932,14 +796,14 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
           fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
           textAlign: isAr ? "right" : "left"
         }}>
-          {parseInlineElements(cleanText)}
+          {parseInlineStyles(cleanText)}
         </h5>
       );
       i++;
       continue;
     }
 
-    // 7. Regular paragraph
+    // M. Regular paragraph
     elements.push(
       <p key={`p-${i}`} style={{
         fontSize: "1.02rem",
@@ -952,13 +816,78 @@ const renderPremiumContent = (text: string, originalIsAr: boolean): React.ReactN
         fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
         opacity: 0.98
       }}>
-        {parseInlineElements(line)}
+        {parseInlineStyles(line)}
       </p>
     );
     i++;
   }
 
   return elements;
+};
+
+const compilePageTextForTts = (blocks: any[], lang: string, i18n?: any): string => {
+  if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return "";
+  
+  const getProp = (b: any, name: string) => {
+    if (i18n && i18n[b.id] && i18n[b.id][lang] && i18n[b.id][lang][name] !== undefined) {
+      return i18n[b.id][lang][name];
+    }
+    return b[name];
+  };
+
+  const texts: string[] = [];
+  blocks.forEach(b => {
+    const type = b.type;
+    if (type === "heading" || type === "paragraph") {
+      const txt = getProp(b, "text");
+      if (txt) texts.push(txt);
+    } else if (type === "definition") {
+      const term = getProp(b, "term");
+      const txt = getProp(b, "text");
+      if (term || txt) texts.push(`${term ? term + ": " : ""}${txt || ""}`);
+    } else if (type === "list") {
+      const items = getProp(b, "items");
+      if (Array.isArray(items)) {
+        items.forEach(item => texts.push(item));
+      }
+    } else if (type === "table") {
+      const rows = getProp(b, "rows");
+      if (Array.isArray(rows)) {
+        rows.forEach(row => {
+          if (Array.isArray(row)) {
+            texts.push(row.join(", "));
+          }
+        });
+      }
+    } else if (type === "equation") {
+      const latex = getProp(b, "latex") || b.latex;
+      if (latex) texts.push(latex);
+    } else if (type === "code") {
+      const text = getProp(b, "text");
+      if (text) texts.push(text);
+    } else if (type === "figure") {
+      const ref = getProp(b, "ref");
+      const caption = getProp(b, "caption");
+      if (ref || caption) texts.push(`${ref ? ref + ": " : ""}${caption || ""}`);
+    } else if (type === "question") {
+      const prompt = getProp(b, "prompt");
+      const options = getProp(b, "options");
+      if (prompt) texts.push(prompt);
+      if (Array.isArray(options)) {
+        options.forEach(opt => texts.push(opt));
+      }
+    } else if (type === "callout" || type === "example") {
+      const label = getProp(b, "label");
+      const title = getProp(b, "title");
+      if (label || title) texts.push(`${label ? label + " " : ""}${title || ""}`);
+    } else if (type === "step") {
+      const label = getProp(b, "label");
+      const text = getProp(b, "text");
+      if (label || text) texts.push(`${label ? label + ": " : ""}${text || ""}`);
+    }
+  });
+
+  return texts.join("\n");
 };
 
 interface LibraryPanelProps {
@@ -1023,6 +952,646 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [activeLibraryTab, setActiveLibraryTab] = useState<"curriculum" | "private">("curriculum");
 
   const [translationLanguage, setTranslationLanguage] = useState(language || "en");
+  const [selectedMcqAnswers, setSelectedMcqAnswers] = useState<Record<string, string>>({});
+
+  const getPageContentToRead = (pageObj: any, lang: string): string => {
+    if (!pageObj) return "";
+    if (pageObj.blocks && Array.isArray(pageObj.blocks) && pageObj.blocks.length > 0) {
+      return compilePageTextForTts(pageObj.blocks, lang, pageObj.i18n);
+    }
+    const isAr = lang === "ar";
+    return isAr 
+      ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
+      : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
+  };
+
+  const renderBlocks = (blocks: any[], lang: string, i18n?: any) => {
+    // 1. Build children mapping
+    const childrenMap: Record<string, any[]> = {};
+    blocks.forEach(b => {
+      if (b.parent) {
+        if (!childrenMap[b.parent]) {
+          childrenMap[b.parent] = [];
+        }
+        childrenMap[b.parent].push(b);
+      }
+    });
+
+    // 2. Identify root blocks
+    // A block is root if its parent is empty or not in the blocks list
+    const blockIds = new Set(blocks.map(b => b.id));
+    const rootBlocks = blocks.filter(b => !b.parent || b.parent === "" || !blockIds.has(b.parent));
+
+    // 3. Define block property resolver helper
+    const getBlockProp = (b: any, propName: string) => {
+      if (
+        i18n &&
+        i18n[b.id] &&
+        i18n[b.id][lang] &&
+        i18n[b.id][lang][propName] !== undefined
+      ) {
+        return i18n[b.id][lang][propName];
+      }
+      return b[propName];
+    };
+
+    // 4. Recursive block renderer
+    const renderBlock = (b: any): React.ReactNode => {
+      const type = b.type;
+      const id = b.id;
+      const bChildren = childrenMap[id] || [];
+
+      // Resolve fields
+      const text = getBlockProp(b, "text");
+      const term = getBlockProp(b, "term");
+      const caption = getBlockProp(b, "caption");
+      const ref = getBlockProp(b, "ref");
+      const label = getBlockProp(b, "label");
+      const title = getBlockProp(b, "title");
+      const prompt = getBlockProp(b, "prompt");
+      const options = getBlockProp(b, "options");
+      const answer = getBlockProp(b, "answer");
+      const latex = getBlockProp(b, "latex") || b.latex;
+      const variant = b.variant; // note, warning, tip
+      const level = b.level || 1;
+      const ordered = b.ordered;
+      const items = getBlockProp(b, "items");
+      const rows = getBlockProp(b, "rows");
+
+      const isAr = lang === "ar";
+
+      switch (type) {
+        case "heading": {
+          const headingSizes = ["1.85rem", "1.55rem", "1.35rem", "1.18rem"];
+          const size = headingSizes[Math.min(level - 1, headingSizes.length - 1)];
+          const Tag = `h${Math.min(Math.max(level, 1), 6)}` as any;
+          return (
+            <Tag key={id} style={{
+              fontSize: size,
+              fontWeight: 900,
+              color: "var(--primary)",
+              marginTop: "2rem",
+              marginBottom: "1rem",
+              paddingBottom: "0.5rem",
+              borderBottom: level <= 2 ? "2px solid rgba(16, 107, 163, 0.12)" : "none",
+              borderLeft: level === 1 ? (isAr ? "none" : "6px solid #d4af37") : "none",
+              borderRight: level === 1 ? (isAr ? "6px solid #d4af37" : "none") : "none",
+              paddingLeft: level === 1 ? (isAr ? "0" : "0.75rem") : "0",
+              paddingRight: level === 1 ? (isAr ? "0.75rem" : "0") : "0",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              lineHeight: "1.4"
+            }}>
+              {parseInlineStyles(text)}
+            </Tag>
+          );
+        }
+
+        case "paragraph":
+          return (
+            <p key={id} style={{
+              fontSize: "1.05rem",
+              lineHeight: "1.85",
+              marginBottom: "1.25rem",
+              color: "var(--foreground)",
+              textAlign: "justify",
+              direction: isAr ? "rtl" : "ltr",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              opacity: 0.98
+            }}>
+              {parseInlineStyles(text)}
+            </p>
+          );
+
+        case "definition":
+          return (
+            <div key={id} style={{
+              margin: "1.75rem 0",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%)",
+              borderLeft: isAr ? "none" : "5px solid #d4af37",
+              borderRight: isAr ? "5px solid #d4af37" : "none",
+              borderTop: "1px solid rgba(212, 175, 55, 0.15)",
+              borderBottom: "1px solid rgba(212, 175, 55, 0.15)",
+              boxShadow: "0 10px 30px rgba(212, 175, 55, 0.06)",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.85rem",
+                fontWeight: 850,
+                color: "#b45309",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}>
+                <span>⚖️ {isAr ? "تعريف" : "Definition"}</span>
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.5rem" }}>
+                {parseInlineStyles(term)}
+              </div>
+              <div style={{
+                fontSize: "1.02rem",
+                lineHeight: "1.75",
+                color: "var(--foreground)",
+                fontWeight: 600,
+                fontStyle: isAr ? "normal" : "italic"
+              }}>{parseInlineStyles(text)}</div>
+            </div>
+          );
+
+        case "list":
+          return (
+            <ul key={id} style={{ 
+              margin: "1.25rem 0", 
+              paddingLeft: isAr ? "0" : "1.75rem", 
+              paddingRight: isAr ? "1.75rem" : "0", 
+              listStyleType: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.6rem",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              {Array.isArray(items) && items.map((item, idx) => (
+                <li key={idx} style={{ 
+                  display: "flex", 
+                  alignItems: "flex-start", 
+                  gap: "0.6rem",
+                  lineHeight: "1.75",
+                  fontSize: "1rem",
+                  textAlign: isAr ? "right" : "left"
+                }}>
+                  <span style={{ color: "var(--primary)", fontWeight: 900, fontSize: "1.05rem" }}>
+                    {ordered ? `${idx + 1}.` : "•"}
+                  </span>
+                  <span style={{ flex: 1 }}>{parseInlineStyles(item)}</span>
+                </li>
+              ))}
+              {bChildren.map(child => renderBlock(child))}
+            </ul>
+          );
+
+        case "table": {
+          if (!Array.isArray(rows) || rows.length === 0) return null;
+          const headers = rows[0];
+          const dataRows = rows.slice(1);
+          return (
+            <div key={id} style={{ overflowX: "auto", margin: "1.75rem 0", borderRadius: "16px", border: "1px solid rgba(16, 107, 163, 0.15)", boxShadow: "0 6px 20px rgba(16, 107, 163, 0.02)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "inherit", textAlign: isAr ? "right" : "left", direction: isAr ? "rtl" : "ltr" }}>
+                <thead>
+                  <tr style={{ background: "linear-gradient(135deg, rgba(16, 107, 163, 0.06) 0%, rgba(16, 107, 163, 0.1) 100%)", borderBottom: "2px solid rgba(16, 107, 163, 0.18)" }}>
+                    {Array.isArray(headers) && headers.map((h, hIdx) => (
+                      <th key={hIdx} style={{ padding: "0.95rem 1.25rem", fontSize: "0.92rem", fontWeight: 800, color: "var(--primary)" }}>
+                        {parseInlineStyles(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataRows.map((row, rIdx) => (
+                    <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
+                      {Array.isArray(row) && row.map((cell, cIdx) => (
+                        <td key={cIdx} style={{ padding: "0.9rem 1.25rem", fontSize: "0.92rem", color: "var(--foreground)", fontWeight: 550 }}>
+                          {parseInlineStyles(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        case "equation":
+          return (
+            <div key={id} style={{
+              margin: "1.75rem auto",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(16, 107, 163, 0.03) 0%, rgba(16, 107, 163, 0.06) 100%)",
+              border: "1px solid rgba(16, 107, 163, 0.15)",
+              boxShadow: "0 10px 30px rgba(16, 107, 163, 0.04)",
+              maxWidth: "95%",
+              textAlign: "center",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.82rem",
+                fontWeight: 850,
+                color: "var(--primary)",
+                marginBottom: "0.6rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.4rem"
+              }}>
+                <span>📐 {isAr ? "معادلة / صيغة رياضية" : "Equation / Formula"}</span>
+              </div>
+              <div style={{
+                fontSize: "1.32rem",
+                fontFamily: "'Cambria Math', 'Cambria', 'Times New Roman', serif",
+                color: "var(--primary)",
+                fontWeight: 700,
+                padding: "0.6rem 1.25rem",
+                background: "#ffffff",
+                border: "1px dashed rgba(16, 107, 163, 0.25)",
+                borderRadius: "10px",
+                display: "inline-block",
+                minWidth: "60%",
+                direction: "ltr"
+              }}>{latex}</div>
+            </div>
+          );
+
+        case "code":
+          return (
+            <div key={id} style={{
+              background: "#0f172a",
+              color: "#cbd5e1",
+              borderRadius: "16px",
+              padding: "1.25rem 1.5rem",
+              margin: "1.5rem 0",
+              fontFamily: "'Fira Code', 'Courier New', monospace",
+              fontSize: "0.88rem",
+              overflowX: "auto",
+              boxShadow: "0 12px 35px rgba(15, 23, 42, 0.15)",
+              border: "1px solid rgba(16, 107, 163, 0.18)",
+              position: "relative",
+              direction: "ltr",
+              textAlign: "left"
+            }}>
+              <div style={{
+                position: "absolute",
+                top: "0.6rem",
+                right: "1rem",
+                fontSize: "0.68rem",
+                color: "#64748b",
+                textTransform: "uppercase",
+                fontWeight: 800,
+                letterSpacing: "0.08em"
+              }}>{b.lang || "code"}</div>
+              <pre style={{ margin: 0 }}><code style={{ whiteSpace: "pre-wrap", display: "block", lineHeight: "1.65" }}>{text}</code></pre>
+            </div>
+          );
+
+        case "figure":
+          return (
+            <div key={id} style={{
+              margin: "1.75rem auto",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)",
+              borderLeft: isAr ? "none" : "5px solid #059669",
+              borderRight: isAr ? "5px solid #059669" : "none",
+              borderTop: "1px solid rgba(16, 185, 129, 0.12)",
+              borderBottom: "1px solid rgba(16, 185, 129, 0.12)",
+              boxShadow: "0 10px 30px rgba(16, 185, 129, 0.03)",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.85rem",
+                fontWeight: 850,
+                color: "#059669",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: "0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}>
+                <span>🖼️ {ref || (isAr ? "شكل توضيحي" : "Figure")}</span>
+              </div>
+              <div style={{
+                fontSize: "0.95rem",
+                lineHeight: "1.75",
+                color: "#065f46",
+                fontStyle: isAr ? "normal" : "italic",
+                fontWeight: 600
+              }}>{parseInlineStyles(caption)}</div>
+            </div>
+          );
+
+        case "question": {
+          const selectedAnswer = selectedMcqAnswers[id];
+          const hasSelected = selectedAnswer !== undefined;
+          const isCorrect = selectedAnswer === answer;
+          return (
+            <div key={id} style={{
+              margin: "1.75rem 0",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(16, 107, 163, 0.04) 0%, rgba(16, 107, 163, 0.08) 100%)",
+              borderLeft: isAr ? "none" : "5px solid var(--primary)",
+              borderRight: isAr ? "5px solid var(--primary)" : "none",
+              boxShadow: "0 10px 30px rgba(16, 107, 163, 0.05)",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.85rem",
+                fontWeight: 850,
+                color: "var(--primary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}>
+                <span>❓ {isAr ? "سؤال تفاعلي" : "Interactive Question"}</span>
+              </div>
+              <div style={{
+                fontSize: "1.05rem",
+                lineHeight: "1.75",
+                color: "var(--foreground)",
+                fontWeight: 700,
+                marginBottom: "1rem"
+              }}>{parseInlineStyles(prompt)}</div>
+
+              {Array.isArray(options) && options.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem" }}>
+                  {options.map((opt, optIdx) => {
+                    const optLetter = isAr
+                      ? ["أ", "ب", "ج", "د"][optIdx] || String.fromCharCode(1575 + optIdx)
+                      : String.fromCharCode(65 + optIdx); // A, B, C, D...
+                    
+                    const isCurrentSelection = selectedAnswer === optLetter;
+                    const isThisCorrectOption = optLetter === answer;
+
+                    let optBg = "#ffffff";
+                    let optBorder = "1px solid rgba(16, 107, 163, 0.12)";
+                    let optShadow = "0 2px 6px rgba(0,0,0,0.02)";
+
+                    if (hasSelected) {
+                      if (isCurrentSelection) {
+                        if (isCorrect) {
+                          optBg = "rgba(16, 185, 129, 0.1)"; // correct green
+                          optBorder = "2px solid #10b981";
+                          optShadow = "0 4px 12px rgba(16, 185, 129, 0.15)";
+                        } else {
+                          optBg = "rgba(239, 68, 68, 0.1)"; // incorrect red
+                          optBorder = "2px solid #ef4444";
+                          optShadow = "0 4px 12px rgba(239, 68, 68, 0.15)";
+                        }
+                      } else if (isThisCorrectOption) {
+                        // Highlight the correct answer even if the user picked wrong
+                        optBg = "rgba(16, 185, 129, 0.05)";
+                        optBorder = "2px dashed #10b981";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => {
+                          if (hasSelected) return; // allow only one submission
+                          setSelectedMcqAnswers(prev => ({ ...prev, [id]: optLetter }));
+                        }}
+                        disabled={hasSelected}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.85rem",
+                          padding: "0.9rem 1.25rem",
+                          borderRadius: "12px",
+                          border: optBorder,
+                          background: optBg,
+                          boxShadow: optShadow,
+                          cursor: hasSelected ? "default" : "pointer",
+                          textAlign: isAr ? "right" : "left",
+                          width: "100%",
+                          transition: "all 0.2s ease",
+                          fontSize: "0.98rem",
+                          fontWeight: 600,
+                          color: "var(--foreground)"
+                        }}
+                        onMouseOver={(e) => {
+                          if (!hasSelected) {
+                            e.currentTarget.style.transform = "translateY(-1.5px)";
+                            e.currentTarget.style.borderColor = "var(--primary)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(16, 107, 163, 0.08)";
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!hasSelected) {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.12)";
+                            e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.02)";
+                          }
+                        }}
+                      >
+                        <span style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "50%",
+                          background: isCurrentSelection
+                            ? (isCorrect ? "#10b981" : "#ef4444")
+                            : (hasSelected && isThisCorrectOption ? "#10b981" : "rgba(16, 107, 163, 0.08)"),
+                          color: isCurrentSelection || (hasSelected && isThisCorrectOption) ? "#ffffff" : "var(--primary)",
+                          fontWeight: 800,
+                          fontSize: "0.88rem"
+                        }}>
+                          {optLetter}
+                        </span>
+                        <span style={{ flex: 1 }}>{parseInlineStyles(opt)}</span>
+                        {hasSelected && isCurrentSelection && (
+                          <span style={{ fontSize: "1.2rem" }}>
+                            {isCorrect ? "✅" : "❌"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        case "callout": {
+          let calloutBg = "linear-gradient(135deg, rgba(16, 107, 163, 0.03) 0%, rgba(16, 107, 163, 0.06) 100%)";
+          let calloutBorder = "5px solid #106ba3";
+          let calloutTitleColor = "#106ba3";
+          let icon = "ℹ️";
+
+          if (variant === "warning") {
+            calloutBg = "linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(239, 68, 68, 0.06) 100%)";
+            calloutBorder = "5px solid #ef4444";
+            calloutTitleColor = "#ef4444";
+            icon = "⚠️";
+          } else if (variant === "tip") {
+            calloutBg = "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.06) 100%)";
+            calloutBorder = "5px solid #10b981";
+            calloutTitleColor = "#10b981";
+            icon = "💡";
+          }
+
+          return (
+            <div key={id} style={{
+              margin: "1.75rem 0",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: calloutBg,
+              borderLeft: isAr ? "none" : calloutBorder,
+              borderRight: isAr ? calloutBorder : "none",
+              borderTop: "1px solid rgba(16, 107, 163, 0.12)",
+              borderBottom: "1px solid rgba(16, 107, 163, 0.12)",
+              boxShadow: "0 10px 30px rgba(16, 107, 163, 0.03)",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.85rem",
+                fontWeight: 850,
+                color: calloutTitleColor,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}>
+                <span>{icon} {label || (variant === "warning" ? (isAr ? "تحذير" : "Warning") : variant === "tip" ? (isAr ? "نصيحة" : "Tip") : (isAr ? "تنبيه" : "Note"))}</span>
+              </div>
+              {title && (
+                <div style={{ fontSize: "1.1rem", fontWeight: 800, color: calloutTitleColor, marginBottom: "0.5rem" }}>
+                  {parseInlineStyles(title)}
+                </div>
+              )}
+              {text && (
+                <div style={{
+                  fontSize: "1.02rem",
+                  lineHeight: "1.75",
+                  color: "var(--foreground)",
+                  fontWeight: 600
+                }}>{parseInlineStyles(text)}</div>
+              )}
+              {bChildren.length > 0 && (
+                <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bChildren.map(child => renderBlock(child))}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        case "example":
+          return (
+            <div key={id} style={{
+              margin: "1.75rem 0",
+              padding: "1.5rem",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%)",
+              borderLeft: isAr ? "none" : "5px solid #d4af37",
+              borderRight: isAr ? "5px solid #d4af37" : "none",
+              borderTop: "1px solid rgba(212, 175, 55, 0.15)",
+              borderBottom: "1px solid rgba(212, 175, 55, 0.15)",
+              boxShadow: "0 10px 30px rgba(212, 175, 55, 0.06)",
+              fontFamily: isAr ? "Cairo, var(--font-sans), sans-serif" : "var(--font-sans)",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{
+                fontSize: "0.85rem",
+                fontWeight: 850,
+                color: "#b45309",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}>
+                <span>⭐ {label || (isAr ? "مثال" : "Example")}</span>
+              </div>
+              {title && (
+                <div style={{ fontSize: "1.12rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.75rem" }}>
+                  {parseInlineStyles(title)}
+                </div>
+              )}
+              {text && (
+                <div style={{
+                  fontSize: "1.02rem",
+                  lineHeight: "1.75",
+                  color: "var(--foreground)",
+                  fontWeight: 600,
+                  marginBottom: bChildren.length > 0 ? "1rem" : 0
+                }}>{parseInlineStyles(text)}</div>
+              )}
+              {bChildren.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem" }}>
+                  {bChildren.map(child => renderBlock(child))}
+                </div>
+              )}
+            </div>
+          );
+
+        case "step":
+          return (
+            <div key={id} style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              padding: "0.75rem 1rem",
+              background: "rgba(16, 107, 163, 0.02)",
+              border: "1px solid rgba(16, 107, 163, 0.06)",
+              borderRadius: "12px",
+              margin: "0.5rem 0",
+              textAlign: isAr ? "right" : "left",
+              direction: isAr ? "rtl" : "ltr"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--primary)",
+                  color: "#ffffff",
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%"
+                }}>{label || "•"}</span>
+                <span style={{ fontSize: "0.98rem", fontWeight: 700, color: "var(--foreground)" }}>
+                  {parseInlineStyles(text)}
+                </span>
+              </div>
+              {bChildren.length > 0 && (
+                <div style={{ paddingLeft: isAr ? 0 : "1.5rem", paddingRight: isAr ? "1.5rem" : 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bChildren.map(child => renderBlock(child))}
+                </div>
+              )}
+            </div>
+          );
+
+        default:
+          return text ? <div key={id}>{parseInlineStyles(text)}</div> : null;
+      }
+    };
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        {rootBlocks.map(b => renderBlock(b))}
+      </div>
+    );
+  };
 
   // Premium On-the-fly Translation Agent States
   const [translatedPages, setTranslatedPages] = useState<Record<string, string>>({});
@@ -1265,17 +1834,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         if (readerCurrentPage > 1) {
           const pageObj = allPages[readerCurrentPage - 2] || allPages[0];
           if (pageObj) {
-            contentToRead = translationLanguage === "ar" 
-              ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
-              : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
+            contentToRead = getPageContentToRead(pageObj, translationLanguage);
           }
         }
       } else {
         const pageObj = allPages[readerCurrentPage - 1] || allPages[0];
         if (pageObj) {
-          contentToRead = translationLanguage === "ar" 
-            ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
-            : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
+          contentToRead = getPageContentToRead(pageObj, translationLanguage);
         }
       }
       
@@ -2510,7 +3075,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                               <button
-                                onClick={() => handleReadPage(activeContent, totalPagesCount)}
+                                onClick={() => handleReadPage(getPageContentToRead(activePage, translationLanguage), totalPagesCount)}
                                 style={{
                                   background: isReadingPage 
                                     ? "linear-gradient(135deg, #ef4444, #dc2626)" 
@@ -2644,7 +3209,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           </h3>
 
                           <div style={{ fontSize: "1.05rem", marginBottom: "2rem" }}>
-                            {renderPremiumContent(activeContent, isAr)}
+                            {activePage.blocks && Array.isArray(activePage.blocks) && activePage.blocks.length > 0 ? (
+                              renderBlocks(activePage.blocks, translationLanguage, activePage.i18n)
+                            ) : (
+                              renderLegacyPageContent(activeContent, isAr)
+                            )}
                           </div>
 
                           {/* Equations / Formulas Area if any */}

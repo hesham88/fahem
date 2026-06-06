@@ -191,6 +191,28 @@ def main():
         # 3. Call gemini-embedding-2 to get 3072-dim vector representation
         vector = get_gemini_embedding_v2(final_embedding_text, api_key)
         
+        # 4. Extract page concepts and formulas from structured blocks
+        concepts_found = []
+        formulas_found = []
+        for b in blocks:
+            b_type = b.get("type")
+            if b_type == "equation":
+                f_latex = b.get("latex")
+                if f_latex:
+                    formulas_found.append(f_latex.strip())
+                elif b.get("text"):
+                    formulas_found.append(b["text"].strip())
+            elif b_type == "definition" and b.get("term"):
+                concepts_found.append(b["term"].strip())
+            elif b_type == "heading" and b.get("text"):
+                h_text = b["text"].strip()
+                if "page" not in h_text.lower() and "overview" not in h_text.lower():
+                    concepts_found.append(h_text)
+            elif b_type in ["callout", "example"] and b.get("title"):
+                concepts_found.append(b["title"].strip())
+
+        p_doc["concepts"] = list(dict.fromkeys(concepts_found))[:5]
+        p_doc["formulas"] = list(dict.fromkeys(formulas_found))[:5]
         p_doc["embedding"] = vector
         p_doc["status"] = "embedded"
         

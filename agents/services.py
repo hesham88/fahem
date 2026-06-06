@@ -1346,10 +1346,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 logger.info(f"[Ingestion Background] Thread started for book {payload.get('book_id')}")
                 python_exe = sys.executable
                 agents_dir = os.path.dirname(os.path.abspath(__file__))
-                root_dir = os.path.dirname(agents_dir)
-                script_path = os.path.join(root_dir, "scripts", "ingest_book.py")
+                script_path = os.path.join(agents_dir, "ingestion_v2", "job_fetch.py")
                 if not os.path.exists(script_path):
-                    script_path = os.path.join(agents_dir, "scripts", "ingest_book.py")
+                    root_dir = os.path.dirname(agents_dir)
+                    script_path = os.path.join(root_dir, "agents", "ingestion_v2", "job_fetch.py")
                 
                 logger.info(f"[Ingestion Background] Resolved ingestion script path to: {script_path}")
                 p = subprocess.Popen(

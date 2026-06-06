@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { checkIsSuperadmin } from "../helper";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { spawn } from "child_process";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 
@@ -84,10 +85,10 @@ export async function POST(req: NextRequest) {
         db.books[idx].is_downloaded = true;
         saveLocalDb(db);
 
-        // Trigger real asynchronous background execution of scripts/ingest_book.py passing JSON through stdin
+        // Trigger real asynchronous background execution of ingestion v2 passing JSON through stdin
         try {
           const pythonPath = "python";
-          const scriptPath = "C:\\Users\\hesh1\\Desktop\\fahem\\scripts\\ingest_book.py";
+          const scriptPath = resolveScriptPath(path.join("ingestion_v2", "job_fetch.py"));
           
           const payload = {
             book_id: book._id,

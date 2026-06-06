@@ -51,7 +51,7 @@ def is_mongodb_enabled():
         return not _MONGO_DISABLED
     
     uri = get_mongodb_uri()
-    if "-pri" in uri.lower() and not os.environ.get("K_SERVICE"):
+    if "-pri" in uri.lower() and not os.environ.get("K_SERVICE") and os.environ.get("FORCE_MONGO") != "true" and os.environ.get("DISABLE_MONGO_BYPASS") != "true":
         print("[MongoDB Offline Check] Private MongoDB Atlas URI detected locally. Bypassing MongoDB connection attempt.", file=sys.stderr)
         _MONGO_DISABLED = True
         return False
