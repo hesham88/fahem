@@ -24,6 +24,9 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import fitz  # PyMuPDF
 import requests
+from google import genai
+from google.genai import types
+from schema import PageStructure, FlatBlock
 
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
@@ -32,6 +35,7 @@ from utils import (
 )
 
 db_write_lock = threading.Lock()
+
 
 PAGE_STRUCTURE_SCHEMA = {
   "type": "OBJECT",
@@ -153,56 +157,69 @@ def parse_salvaged_json(json_str):
         
     return None
 
-def analyze_page_with_gemini_vision(png_bytes, api_key, model):
+def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
     """
-    Call Gemini LLM via direct HTTP POST, passing the image base64,
-    the structuring prompt, and the strict PageStructure JSON schema.
+    Call Gemini LLM via official google-genai SDK, passing the image bytes,
+    the structuring prompt, and the PageStructure Pydantic schema.
     """
-    if not api_key:
-        return None
-        
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        
-        b64_image = base64.b64encode(png_bytes).decode("utf-8")
-        
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "inlineData": {
-                                "mimeType": "image/png",
-                                "data": b64_image
-                            }
-                        },
-                        {
-                            "text": STRUCTURING_PROMPT
-                        }
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": PAGE_STRUCTURE_SCHEMA,
-                "temperature": 0.0
-            }
-        }
-        
-        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=45)
-        if res.status_code == 200:
-            json_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-            # Clean possible markdown wrap ```json
-            if json_text.strip().startswith("```"):
-                json_text = json_text.strip().strip("```").strip("json").strip()
-            
-            parsed = parse_salvaged_json(json_text)
-            if parsed:
-                return parsed
+        if api_key:
+            client = genai.Client(api_key=api_key)
         else:
-            print(f"[Vision API Error] HTTP {res.status_code}: {res.text}", file=sys.stderr)
+            client = genai.Client()
+            
+        # Ensure we replace page placeholder in prompt
+        prompt = STRUCTURING_PROMPT
+        if "{page}" in prompt:
+            prompt = prompt.replace("{page}", str(page_num))
+            
+        resp = client.models.generate_content(
+            model=model or "gemini-3.1-flash-lite",
+            contents=[
+                types.Part.from_bytes(data=png_bytes, mime_type="image/png"),
+                prompt,
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=PageStructure,
+                temperature=0.0,
+                max_output_tokens=32768,
+            ),
+        )
+        
+        json_text = resp.text
+        if not json_text:
+            return None
+            
+        if json_text.strip().startswith("```"):
+            json_text = json_text.strip().strip("```").strip("json").strip()
+            
+        parsed_struct = PageStructure.model_validate_json(json_text)
+        
+        # Defensive: force page-scoped, collision-free ids even if the model drifts.
+        for i, b in enumerate(parsed_struct.blocks):
+            if not b.id:
+                b.id = f"p{page_num}-b{i}"
+                
+        return {
+            "dir": parsed_struct.dir,
+            "blocks": [b.model_dump(exclude_none=True) for b in parsed_struct.blocks]
+        }
     except Exception as e:
         print(f"[Vision call Exception] {e}", file=sys.stderr)
+        # Attempt recovery with salvage parser if we have JSON string
+        try:
+            if 'resp' in locals() and resp and resp.text:
+                json_text = resp.text
+                if json_text.strip().startswith("```"):
+                    json_text = json_text.strip().strip("```").strip("json").strip()
+                parsed = parse_salvaged_json(json_text)
+                if parsed:
+                    print(f"[Vision call Exception] Successfully salvaged partial response for Page {page_num}", file=sys.stderr)
+                    return parsed
+        except Exception as salvage_err:
+            print(f"[Vision call Exception] Salvage attempt failed: {salvage_err}", file=sys.stderr)
+            
     return None
 
 def fallback_structuring(text, page_num):
@@ -274,10 +291,12 @@ def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload)
         
         # 4. Attempt structuring (via API or fallback)
         structured_data = None
-        if api_key:
+        try:
             def _api_call():
-                return analyze_page_with_gemini_vision(png_bytes, api_key, model)
+                return analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num)
             structured_data = execute_with_retry(_api_call, max_retries=3, base_delay=2.0)
+        except Exception as api_err:
+            print(f"[Worker] API Structuring attempt failed on Page {page_num}: {api_err}", file=sys.stderr)
             
         if not structured_data:
             print(f"[Worker] Running offline fallback structuring on Page {page_num} ...", flush=True)
@@ -335,9 +354,9 @@ def main():
 
     api_key, model = get_gemini_config()
     if api_key:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] Configured vision analyzer. Model: '{model}'. Launching parallel workers.")
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] Configured vision analyzer with API key. Model: '{model}'. Launching parallel workers.")
     else:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] API Key missing. Falling back to local deterministic rule analyzer.")
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] Configured vision analyzer using Application Default Credentials (ADC) / Vertex AI. Model: '{model}'. Launching parallel workers.")
 
     processed_pages = 0
     final_pages = {}

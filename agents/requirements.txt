@@ -5,3 +5,5 @@ dnspython
 google-cloud-recaptcha-enterprise
 requests
 pymupdf
+google-genai
+pydantic

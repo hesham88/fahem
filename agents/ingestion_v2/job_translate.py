@@ -28,137 +28,90 @@ from utils import (
     is_mongodb_enabled, get_mongodb_uri, atomic_write_json, LOCAL_DB_PATH,
     make_progress_bar
 )
+from google import genai
+from google.genai import types
+from schema import Translation, TranslatedBlock
 
 db_write_lock = threading.Lock()
 
 TRANSLATABLE_TYPES = ["paragraph", "heading", "definition", "list", "figure", "question", "callout", "example", "step"]
 
-TRANSLATION_SCHEMA = {
-  "type": "OBJECT",
-  "properties": {
-    "translations": {
-      "type": "ARRAY",
-      "items": {
-        "type": "OBJECT",
-        "properties": {
-          "id": {"type": "STRING"},
-          "ar": {
-            "type": "OBJECT",
-            "properties": {
-              "text": {"type": "STRING"},
-              "term": {"type": "STRING"},
-              "items": {"type": "ARRAY", "items": {"type": "STRING"}},
-              "caption": {"type": "STRING"},
-              "prompt": {"type": "STRING"},
-              "options": {"type": "ARRAY", "items": {"type": "STRING"}},
-              "answer": {"type": "STRING"},
-              "label": {"type": "STRING"},
-              "title": {"type": "STRING"}
-            }
-          },
-          "en": {
-            "type": "OBJECT",
-            "properties": {
-              "text": {"type": "STRING"},
-              "term": {"type": "STRING"},
-              "items": {"type": "ARRAY", "items": {"type": "STRING"}},
-              "caption": {"type": "STRING"},
-              "prompt": {"type": "STRING"},
-              "options": {"type": "ARRAY", "items": {"type": "STRING"}},
-              "answer": {"type": "STRING"},
-              "label": {"type": "STRING"},
-              "title": {"type": "STRING"}
-            }
-          }
-        },
-        "required": ["id"]
-      }
-    }
-  },
-  "required": ["translations"]
-}
+# Blocks whose payload must never be translated.
+SKIP_TYPES = {"equation", "code", "table"}
+# Only these fields carry user-visible prose.
+TRANSLATABLE = ("text", "term", "items", "caption", "prompt", "options", "answer", "label", "title")
 
-TRANSLATION_PROMPT_TEMPLATE = """
-You are an expert bilingual academic translator. Your task is to translate translatable block fields between Arabic and English.
-Identify the source language of the input blocks.
-If the source language is Arabic, fill the "en" (English) translation translation properties.
-If the source language is English, fill the "ar" (Arabic) translation translation properties.
 
-Strictly adhere to these rules:
-1. Translate ONLY the specified translatable text fields (text, term, items, caption, prompt, options, answer, label, title).
-2. NEVER merge, split, or reorder the block IDs. Keep the original ID keys exactly matching.
-3. For mathematical LaTeX fragments inside captions or titles, preserve them EXACTLY without translating.
-4. If a field is not present in the original block, do NOT include it in the translation.
+def _payload(blocks: list[dict]) -> list[dict]:
+    out = []
+    for b in blocks:
+        if b.get("type") in SKIP_TYPES:
+            continue
+        item = {"id": b["id"]}
+        for f in TRANSLATABLE:
+            if b.get(f) is not None:
+                item[f] = b[f]
+        if len(item) > 1:  # has something to translate beyond the id
+            out.append(item)
+    return out
 
-Input blocks JSON:
-{input_blocks_json}
-"""
 
-def call_gemini_translation(blocks, api_key, model):
+def call_gemini_translation(blocks, api_key, model, target_lang):
     """
-    Call Gemini API with translatable blocks, returning the i18n JSON object.
+    Call Gemini LLM via official google-genai SDK, passing the translatable blocks,
+    and translating them into target_lang using the Translation Pydantic schema.
     """
-    if not api_key:
-        return None
-        
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        
-        # Strip block list to only essential fields to save token space
-        reduced_blocks = []
-        for b in blocks:
-            if b.get("type") in TRANSLATABLE_TYPES:
-                reduced = {
-                    "id": b["id"],
-                    "type": b["type"]
-                }
-                for field in ["text", "term", "items", "caption", "prompt", "options", "answer", "label", "title"]:
-                    if field in b:
-                        reduced[field] = b[field]
-                reduced_blocks.append(reduced)
-                
-        if not reduced_blocks:
-            return {"i18n": {}}
-            
-        prompt = TRANSLATION_PROMPT_TEMPLATE.format(input_blocks_json=json.dumps(reduced_blocks, ensure_ascii=False))
-        
-        payload = {
-            "contents": [
-                {
-                    "parts": [{"text": prompt}]
-                }
-            ],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": TRANSLATION_SCHEMA,
-                "temperature": 0.0
-            }
-        }
-        
-        import requests
-        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=40)
-        if res.status_code == 200:
-            json_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-            # Clean possible wrapping
-            if json_text.strip().startswith("```"):
-                json_text = json_text.strip().strip("```").strip("json").strip()
-            
-            data = json.loads(json_text)
-            i18n_map = {}
-            translations = data.get("translations", [])
-            for item in translations:
-                b_id = item.get("id")
-                if b_id:
-                    i18n_map[b_id] = {}
-                    if "ar" in item:
-                        i18n_map[b_id]["ar"] = item["ar"]
-                    if "en" in item:
-                        i18n_map[b_id]["en"] = item["en"]
-            return {"i18n": i18n_map}
+        # Initialize Google GenAI Client
+        if api_key:
+            client = genai.Client(api_key=api_key)
         else:
-            print(f"[Translate API Error] HTTP {res.status_code}: {res.text}", file=sys.stderr)
+            client = genai.Client()
+
+        # Prepare payload
+        payload = _payload(blocks)
+        if not payload:
+            return {"i18n": {}}
+
+        lang_name = {"ar": "Arabic", "en": "English"}.get(target_lang, target_lang)
+        prompt = (
+            f"Translate the user-visible text of these textbook blocks into {lang_name}.\n"
+            "Rules: keep each `id` exactly; translate ONLY the fields present on each block; "
+            "never merge, split, drop, or reorder blocks; preserve list/option order; do not "
+            "translate proper nouns or programming keywords/code identifiers.\n\n"
+            f"Blocks (JSON):\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+
+        resp = client.models.generate_content(
+            model=model or "gemini-3.1-flash-lite",
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Translation,
+                temperature=0,
+            ),
+        )
+
+        json_text = resp.text
+        if not json_text:
+            return None
+
+        if json_text.strip().startswith("```"):
+            json_text = json_text.strip().strip("```").strip("json").strip()
+
+        result = Translation.model_validate_json(json_text)
+        
+        i18n_map = {}
+        for tb in result.blocks:
+            fields = tb.model_dump(exclude_none=True)
+            fields.pop("id", None)
+            if fields:
+                i18n_map[tb.id] = {target_lang: fields}
+                
+        return {"i18n": i18n_map}
     except Exception as e:
-        print(f"[Translation Exception] {e}", file=sys.stderr)
+        print(f"[Translation call Exception] {e}", file=sys.stderr)
+        
     return None
 
 def fallback_translation(blocks):
@@ -234,17 +187,27 @@ def load_structured_pages(book_id, is_local):
             pass
     return sorted(pages, key=lambda p: p.get("page_number", 1))
 
-def process_translate_page_worker(p_doc, api_key, model):
+def process_translate_page_worker(p_doc, api_key, model, default_target_lang=None):
     """
     Thread-pool worker translating a single page's blocks.
     """
     try:
         blocks = p_doc.get("blocks", [])
+        
+        # Determine target language
+        target_lang = default_target_lang
+        if not target_lang:
+            target_lang = "en" if p_doc.get("dir") == "rtl" else "ar"
+            
         i18n_data = None
-        if api_key:
-            def _api_call():
-                return call_gemini_translation(blocks, api_key, model)
+        
+        # Always try to call the API even if api_key is None (rely on ADC/Vertex AI in production)
+        def _api_call():
+            return call_gemini_translation(blocks, api_key, model, target_lang)
+        try:
             i18n_data = execute_with_retry(_api_call, max_retries=3, base_delay=1.5)
+        except Exception as api_err:
+            print(f"[Translate Worker Exception] {api_err}", file=sys.stderr)
             
         if not i18n_data or not isinstance(i18n_data, dict):
             print(f"[Translate] Warning: Invalid or missing translation data format, using local fallback.", file=sys.stderr)
@@ -312,14 +275,22 @@ def main():
     if api_key:
         logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] Gemini credentials discovered. Running automated key translation overlays.")
     else:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] Running offline mock academic translation overlays.")
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] Configured translator using Application Default Credentials (ADC) / Vertex AI. Model: '{model}'. Running automated key translation overlays.")
 
     translated_count = 0
+
+    book_lang = payload.get("language") or ""
+    default_target_lang = None
+    if book_lang:
+        if "ar" in book_lang.lower():
+            default_target_lang = "en"
+        elif "en" in book_lang.lower():
+            default_target_lang = "ar"
 
     # Thread Pool execution with 3 workers
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
-            executor.submit(process_translate_page_worker, p_doc, api_key, model): p_doc.get("page_number", 1)
+            executor.submit(process_translate_page_worker, p_doc, api_key, model, default_target_lang): p_doc.get("page_number", 1)
             for p_doc in structured_pages
         }
         

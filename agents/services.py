@@ -1374,24 +1374,19 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 p = subprocess.Popen(
                     [python_exe, script_path],
                     stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=None,
+                    stderr=None,
                     text=True
                 )
                 
                 log_to_file(f"[FASTAPI INGEST] Subprocess spawned successfully with PID: {p.pid}")
-                log_to_file(f"[FASTAPI INGEST] Piping payload and waiting for communicate() EOF...")
+                log_to_file(f"[FASTAPI INGEST] Piping payload and waiting for process exit...")
                 
-                stdout_data, stderr_data = p.communicate(input=json.dumps(payload))
+                p.stdin.write(json.dumps(payload))
+                p.stdin.close()
+                p.wait()
                 
-                log_to_file(f"[FASTAPI INGEST] Subprocess communicate() returned cleanly.")
-                
-                if stdout_data:
-                    log_to_file(f"[FASTAPI PROCESS stdout] [PID {p.pid}] {stdout_data.strip()}")
-                    logger.info(f"[Ingestion Background stdout] {stdout_data}")
-                if stderr_data:
-                    log_to_file(f"[FASTAPI PROCESS stderr] [PID {p.pid}] ⚠️ {stderr_data.strip()}")
-                    logger.error(f"[Ingestion Background stderr] {stderr_data}")
+                log_to_file(f"[FASTAPI INGEST] Subprocess wait() returned cleanly with code {p.returncode}.")
                 
                 log_to_file(f"[FASTAPI INGEST] ✅ Thread completed successfully for book: \"{book_title}\" (ID: {book_id})")
                 logger.info(f"[Ingestion Background] Thread completed for book {book_id}")

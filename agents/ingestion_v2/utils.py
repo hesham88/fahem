@@ -114,24 +114,21 @@ def execute_with_retry(func, *args, max_retries=5, base_delay=2.0, **kwargs):
 
 def get_gemini_embedding_v2(text, api_key):
     """
-    Fetches 3072-dimensional embeddings using gemini-embedding-2.
+    Fetches 3072-dimensional embeddings using the official google-genai SDK.
     """
-    if not api_key:
-        return get_fallback_embedding(text)
     try:
-        # Use gemini-embedding-2 endpoint
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key={api_key}"
-        payload = {
-            "model": "models/gemini-embedding-2",
-            "content": {
-                "parts": [{"text": text}]
-            }
-        }
-        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
-        if res.status_code == 200:
-            return res.json()["embedding"]["values"]
+        from google import genai
+        if api_key:
+            client = genai.Client(api_key=api_key)
         else:
-            print(f"[Embedding API Error] HTTP {res.status_code}: {res.text}", file=sys.stderr)
+            client = genai.Client()
+
+        resp = client.models.embed_content(
+            model="gemini-embedding-2",
+            contents=text,
+        )
+        if resp and resp.embeddings:
+            return resp.embeddings[0].values
     except Exception as e:
         print(f"[Embedding Error] {e}. Falling back to deterministic SHA256 embedding.", file=sys.stderr)
     return get_fallback_embedding(text)
