@@ -22,7 +22,7 @@ import threading
 
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
-    get_gemini_config, get_gemini_embedding_v2,
+    get_gemini_config, get_gemini_embedding_v2, get_fallback_embedding,
     is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH, atomic_write_json,
     make_progress_bar
 )
@@ -165,15 +165,18 @@ def main():
     else:
         logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] API credentials omitted. Utilizing 3072-dimensional deterministic offline hashing.")
 
-    embedded_count = 0
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    for idx, p_doc in enumerate(translated_pages):
+    embedded_count = 0
+    state_lock = threading.Lock()
+
+    def process_and_embed_page(idx, p_doc):
+        nonlocal embedded_count
         check_cooperative_control(job_id, is_local, logs)
         
         blocks = p_doc.get("blocks", [])
         
         # 1. Chunk on boundary blocks
-        # Extract meaningful texts from blocks and concatenate
         chunk_texts = []
         for b in blocks:
             b_type = b.get("type")
@@ -194,8 +197,15 @@ def main():
         heading_path = get_heading_path(blocks)
         final_embedding_text = f"{heading_path}{raw_joined_text}" if raw_joined_text else f"Page {p_doc.get('page_number')}"
         
-        # 3. Call gemini-embedding-2 to get 3072-dim vector representation
-        vector = get_gemini_embedding_v2(final_embedding_text, api_key)
+        # 3. Call gemini-embedding-2 to get 3072-dim vector representation with safe fallback
+        try:
+            vector = get_gemini_embedding_v2(final_embedding_text, api_key)
+        except Exception as api_err:
+            warn_msg = f"Page {p_doc.get('page_number')} failed Gemini API call: {api_err}. Falling back to deterministic pseudo-embedding."
+            print(f"[Embedding Warning] {warn_msg}", file=sys.stderr, flush=True)
+            with state_lock:
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] {warn_msg}")
+            vector = get_fallback_embedding(final_embedding_text, dimensions=3072)
         
         # 4. Extract page concepts and formulas from structured blocks
         concepts_found = []
@@ -222,21 +232,31 @@ def main():
         p_doc["embedding"] = vector
         p_doc["status"] = "embedded"
         
-        embedded_count += 1
-        pct = 86 + int((embedded_count / actual_pages_count) * 12)  # Range 86% - 98%
-        sub_pct = (embedded_count / actual_pages_count) * 100.0
-        bar = make_progress_bar(sub_pct, width=20)
-        log_msg = f"{bar} Vector Embedded Page {p_doc.get('page_number')}/{actual_pages_count}."
-        print(f"[JOB 5: EMBED] {log_msg}", flush=True)
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
+        with state_lock:
+            embedded_count += 1
+            current_embedded = embedded_count
+            pct = 86 + int((current_embedded / actual_pages_count) * 12)  # Range 86% - 98%
+            sub_pct = (current_embedded / actual_pages_count) * 100.0
+            bar = make_progress_bar(sub_pct, width=20)
+            log_msg = f"{bar} Vector Embedded Page {p_doc.get('page_number')}/{actual_pages_count}."
+            print(f"[JOB 5: EMBED] {log_msg}", flush=True)
+            logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
         
-        # Update database with embedded page doc
+        # Update database with embedded page doc (protected by thread lock)
         with db_write_lock:
             update_job_status(
                 job_id, "processing", "embed", pct, logs,
-                processed_pages=embedded_count, total_pages=actual_pages_count,
+                processed_pages=current_embedded, total_pages=actual_pages_count,
                 is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
             )
+
+    # Launch ThreadPoolExecutor
+    max_workers = min(3, actual_pages_count)
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Spawning ThreadPoolExecutor with {max_workers} parallel workers.")
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(process_and_embed_page, idx, p_doc): p_doc for idx, p_doc in enumerate(translated_pages)}
+        for fut in as_completed(futures):
+            fut.result()
 
     # Clean temporary drafts
     clean_draft_chunks(book_id, is_local)

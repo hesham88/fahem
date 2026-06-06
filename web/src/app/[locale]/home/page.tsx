@@ -831,6 +831,8 @@ export default function Home() {
           chapterTitleEn: p.chapterTitleEn || p.chapter_title_en || fallbackChapterTitleEn,
           chapterTitleAr: p.chapterTitleAr || p.chapter_title_ar || fallbackChapterTitleAr,
           chapterIndex: p.chapterIndex ?? matchedIndex ?? 0,
+          blocks: p.blocks || [],
+          i18n: p.i18n || {},
           originalPage: p
         };
       });
