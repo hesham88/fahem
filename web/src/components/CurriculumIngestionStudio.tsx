@@ -1120,7 +1120,7 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
               console.error("Failed to decode filename:", e);
             }
 
-            const totalPages = b.total_pages || (b.chapters && b.chapters.length > 0 ? Math.max(...b.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 120);
+            const totalPages = b.total_pages || (b.chapters && b.chapters.length > 0 ? Math.max(...b.chapters.map((ch: any) => parseInt(ch.end_page || 0))) : 0);
             const processedPages = b.processed_pages !== undefined ? b.processed_pages : (b.ingestion_status === "completed" ? totalPages : 0);
             const progress = b.ingestion_progress !== undefined ? b.ingestion_progress : (b.ingestion_status === "completed" ? 100 : 0);
             const status = b.ingestion_status || "completed";
@@ -2293,7 +2293,10 @@ export default function CurriculumIngestionStudio({ language, email }: { languag
                       <div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", fontWeight: 700, marginBottom: "3px" }}>
                           <span style={{ color: "#4f6371" }}>
-                            {st("analyzing_page", { processed: String(job.processedPages), total: String(job.totalPages) })}
+                            {job.totalPages > 0 
+                              ? st("analyzing_page", { processed: String(job.processedPages), total: String(job.totalPages) })
+                              : (language === "ar" ? "تحليل المستند: جاري تحديد الصفحات..." : "Analyzing document: resolving page count...")
+                            }
                           </span>
                           <span style={{ color: "var(--primary)" }}>{job.progress}%</span>
                         </div>

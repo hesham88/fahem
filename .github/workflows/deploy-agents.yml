@@ -38,6 +38,9 @@ jobs:
           gcloud run deploy fahem-agent \
             --source agents \
             --region us-east4 \
+            --vpc-connector fahem-connector \
+            --vpc-egress all-traffic \
+            --memory 2Gi \
             --no-cpu-throttling \
             --set-secrets="GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest"
 

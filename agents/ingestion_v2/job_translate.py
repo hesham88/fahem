@@ -354,34 +354,34 @@ def main():
     # Trigger Job 4 (Assemble)
     try:
         python_path = sys.executable or "python"
-        assemble_script = os.path.join(ROOT_DIR, "agents", "ingestion_v2", "job_assemble.py")
+        SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+        assemble_script = os.path.join(SCRIPT_DIR, "job_assemble.py")
         
         payload["ingestion_logs"] = logs
         payload["temp_pdf_path"] = temp_pdf_path
         payload["total_pages"] = actual_total_pages
         
-        log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-        with open(log_file_path, "a", encoding="utf-8") as lf:
-            popen_kwargs = {
-                "stdin": subprocess.PIPE,
-                "stdout": lf,
-                "stderr": subprocess.STDOUT,
-                "text": True,
-                "close_fds": True,
-                "env": dict(os.environ, PYTHONIOENCODING="utf-8")
-            }
-            if sys.platform == "win32":
-                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
-            else:
-                popen_kwargs["start_new_session"] = True
+        # To prevent stdout/stderr swallow and ensure visibility in GCP container logs,
+        # we write standard streams directly without local file log cache redirection.
+        popen_kwargs = {
+            "stdin": subprocess.PIPE,
+            "stdout": None,
+            "stderr": None,
+            "text": True,
+            "close_fds": True,
+            "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+        }
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+        else:
+            popen_kwargs["start_new_session"] = True
 
-            proc = subprocess.Popen(
-                [python_path, assemble_script],
-                **popen_kwargs
-            )
-            proc.stdin.write(JSON_Encoder().encode(payload))
-            proc.stdin.close()
+        proc = subprocess.Popen(
+            [python_path, assemble_script],
+            **popen_kwargs
+        )
+        proc.stdin.write(JSON_Encoder().encode(payload))
+        proc.stdin.close()
         print(f"[JOB 3: TRANSLATE] Successfully triggered Job 4 (Assemble) with PID {proc.pid}", flush=True)
 
     except Exception as trigger_err:

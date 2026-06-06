@@ -52,8 +52,8 @@ try {
     # Push to agents directory so gcloud uses agents/.gcloudignore and does not ignore untracked files
     Push-Location $AgentsDir
 
-    # Execute the gcloud deploy in a single, robust line with no backticks, using correct --vpc-egress argument
-    gcloud run deploy fahem-agent --source . --region us-east4 --vpc-connector fahem-connector --vpc-egress all-traffic --set-secrets='GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest' --quiet
+    # Execute the gcloud deploy in a single, robust line with no backticks, using correct --vpc-egress argument and 2Gi Memory limits to avoid OOM
+    gcloud run deploy fahem-agent --source . --region us-east4 --vpc-connector fahem-connector --vpc-egress all-traffic --memory 2Gi --no-cpu-throttling --set-secrets='GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest' --quiet
     
     Pop-Location
         

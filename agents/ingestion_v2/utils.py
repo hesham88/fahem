@@ -50,15 +50,21 @@ def is_mongodb_enabled():
     if _MONGO_DISABLED is not None:
         return not _MONGO_DISABLED
     
+    is_cloud_run = bool(os.environ.get("K_SERVICE"))
+    if is_cloud_run or os.environ.get("FORCE_MONGO") == "true":
+        # In Cloud Run, MongoDB is mandatory. We should never fall back to local JSON database.
+        _MONGO_DISABLED = False
+        return True
+
     uri = get_mongodb_uri()
-    if "-pri" in uri.lower() and not os.environ.get("K_SERVICE") and os.environ.get("FORCE_MONGO") != "true" and os.environ.get("DISABLE_MONGO_BYPASS") != "true":
+    if "-pri" in uri.lower() and not is_cloud_run and os.environ.get("FORCE_MONGO") != "true" and os.environ.get("DISABLE_MONGO_BYPASS") != "true":
         print("[MongoDB Offline Check] Private MongoDB Atlas URI detected locally. Bypassing MongoDB connection attempt.", file=sys.stderr)
         _MONGO_DISABLED = True
         return False
 
     try:
         from pymongo import MongoClient
-        client = MongoClient(uri, serverSelectionTimeoutMS=1000)
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
         client.server_info()
         client.close()
         _MONGO_DISABLED = False
@@ -222,14 +228,16 @@ def get_job_status(job_id, is_local):
     else:
         try:
             from pymongo import MongoClient
-            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=1500)
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
             db = client["fahem"]
             job = db["ingestion_jobs"].find_one({"_id": job_id})
             client.close()
             if job:
                 return job.get("status", "queued")
-        except Exception:
+        except Exception as mongo_err:
+            print(f"[Mongo Error] Failed to get job status: {mongo_err}", file=sys.stderr)
             pass
+        return "queued"
     return "queued"
 
 def check_cooperative_control(job_id, is_local, logs):
@@ -311,7 +319,7 @@ def update_job_status_db_only(job_id, status, current_step, progress, logs, is_l
     if is_mongodb_enabled():
         try:
             from pymongo import MongoClient
-            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=1500)
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
             db = client["fahem"]
             
             set_fields = {
@@ -345,7 +353,8 @@ def update_job_status_db_only(job_id, status, current_step, progress, logs, is_l
                     {"$set": set_book_fields}
                 )
             client.close()
-        except Exception:
+        except Exception as mongo_err:
+            print(f"[Mongo Error] Failed to update job status db only: {mongo_err}", file=sys.stderr)
             pass
 
 def update_job_status(job_id, status, current_step, progress, logs, processed_pages=0, total_pages=0, is_completed=False, is_local=True, new_page_doc=None, **kwargs):
@@ -461,7 +470,7 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
     if is_mongodb_enabled():
         try:
             from pymongo import MongoClient
-            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=1500)
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
             db = client["fahem"]
             
             set_fields = {

@@ -163,38 +163,35 @@ def main():
 
         logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] ✅ Fetch completed. Triggering Downstream Job 2 (Struct: Vision Block Extraction)...")
         update_job_status(job_id, "processing", "struct", 25, logs, 0, page_count, False, is_local, **meta_copy)
-
         # 3. Trigger Job 2: Struct (Vision Block Extraction)
         try:
             python_path = sys.executable or "python"
-            struct_script = os.path.join(ROOT_DIR, "agents", "ingestion_v2", "job_struct.py")
+            SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+            struct_script = os.path.join(SCRIPT_DIR, "job_struct.py")
             
-            log_file_path = os.path.join(ROOT_DIR, "ignore", f"ingestion_{book_id}.log")
-            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            with open(log_file_path, "a", encoding="utf-8") as lf:
-                # To prevent stdout/stderr pipe leakage and handle blockades,
-                # we set close_fds=True. We also detach the child process session.
-                popen_kwargs = {
-                    "stdin": subprocess.PIPE,
-                    "stdout": lf,
-                    "stderr": subprocess.STDOUT,
-                    "text": True,
-                    "close_fds": True,
-                    "env": dict(os.environ, PYTHONIOENCODING="utf-8")
-                }
-                if sys.platform == "win32":
-                    # CREATE_NEW_PROCESS_GROUP = 0x00000200
-                    # CREATE_NO_WINDOW = 0x08000000
-                    popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
-                else:
-                    popen_kwargs["start_new_session"] = True
+            # To prevent stdout/stderr swallow and ensure visibility in GCP container logs,
+            # we write standard streams directly without local file log cache redirection.
+            popen_kwargs = {
+                "stdin": subprocess.PIPE,
+                "stdout": None,
+                "stderr": None,
+                "text": True,
+                "close_fds": True,
+                "env": dict(os.environ, PYTHONIOENCODING="utf-8")
+            }
+            if sys.platform == "win32":
+                # CREATE_NEW_PROCESS_GROUP = 0x00000200
+                # CREATE_NO_WINDOW = 0x08000000
+                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
+            else:
+                popen_kwargs["start_new_session"] = True
 
-                proc = subprocess.Popen(
-                    [python_path, struct_script],
-                    **popen_kwargs
-                )
-                proc.stdin.write(JSON_Encoder().encode(payload))
-                proc.stdin.close()
+            proc = subprocess.Popen(
+                [python_path, struct_script],
+                **popen_kwargs
+            )
+            proc.stdin.write(JSON_Encoder().encode(payload))
+            proc.stdin.close()
             print(f"[JOB 1: FETCH] Successfully triggered Job 2 (Struct) with PID {proc.pid}", flush=True)
 
         except Exception as trigger_err:
