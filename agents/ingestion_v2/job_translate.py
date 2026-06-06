@@ -114,55 +114,6 @@ def call_gemini_translation(blocks, api_key, model, target_lang):
         
     return None
 
-def fallback_translation(blocks):
-    """
-    Simulates translations deterministically for offline testing.
-    """
-    i18n = {}
-    for b in blocks:
-        b_id = b["id"]
-        b_type = b["type"]
-        if b_type not in TRANSLATABLE_TYPES:
-            continue
-            
-        ar_trans = {}
-        en_trans = {}
-        
-        # Simple string-prepender mocks
-        if "text" in b:
-            ar_trans["text"] = f"مترجم إلى العربية: {b['text']}"
-            en_trans["text"] = f"Translated to English: {b['text']}"
-        if "term" in b:
-            ar_trans["term"] = f"مصطلح: {b['term']}"
-            en_trans["term"] = f"Term: {b['term']}"
-        if "items" in b:
-            ar_trans["items"] = [f"عنصر {idx+1}: {item}" for idx, item in enumerate(b["items"])]
-            en_trans["items"] = [f"Item {idx+1}: {item}" for idx, item in enumerate(b["items"])]
-        if "caption" in b:
-            ar_trans["caption"] = f"وصف الشكل: {b['caption']}"
-            en_trans["caption"] = f"Figure Caption: {b['caption']}"
-        if "prompt" in b:
-            ar_trans["prompt"] = f"سؤال: {b['prompt']}"
-            en_trans["prompt"] = f"Question Stem: {b['prompt']}"
-        if "options" in b:
-            ar_trans["options"] = [f"خيار {idx+1}: {opt}" for idx, opt in enumerate(b["options"])]
-            en_trans["options"] = [f"Option {idx+1}: {opt}" for idx, opt in enumerate(b["options"])]
-        if "answer" in b:
-            ar_trans["answer"] = f"الإجابة: {b['answer']}"
-            en_trans["answer"] = f"Answer: {b['answer']}"
-        if "label" in b:
-            ar_trans["label"] = f"شارة: {b['label']}"
-            en_trans["label"] = f"Label: {b['label']}"
-        if "title" in b:
-            ar_trans["title"] = f"عنوان: {b['title']}"
-            en_trans["title"] = f"Title: {b['title']}"
-            
-        i18n[b_id] = {
-            "ar": ar_trans,
-            "en": en_trans
-        }
-    return {"i18n": i18n}
-
 def load_structured_pages(book_id, is_local):
     """
     Loads all structured pages from database.
@@ -200,6 +151,7 @@ def process_translate_page_worker(p_doc, api_key, model, default_target_lang=Non
             target_lang = "en" if p_doc.get("dir") == "rtl" else "ar"
             
         i18n_data = None
+        err_msg = ""
         
         # Always try to call the API even if api_key is None (rely on ADC/Vertex AI in production)
         def _api_call():
@@ -207,11 +159,11 @@ def process_translate_page_worker(p_doc, api_key, model, default_target_lang=Non
         try:
             i18n_data = execute_with_retry(_api_call, max_retries=3, base_delay=1.5)
         except Exception as api_err:
+            err_msg = str(api_err)
             print(f"[Translate Worker Exception] {api_err}", file=sys.stderr)
             
         if not i18n_data or not isinstance(i18n_data, dict):
-            print(f"[Translate] Warning: Invalid or missing translation data format, using local fallback.", file=sys.stderr)
-            i18n_data = fallback_translation(blocks)
+            raise RuntimeError(f"Gemini translation failed or returned empty for Page {p_doc.get('page_number', 1)}. Details: {err_msg}")
             
         p_doc["i18n"] = i18n_data.get("i18n", {}) if isinstance(i18n_data, dict) else {}
         p_doc["status"] = "translated"
@@ -278,6 +230,7 @@ def main():
         logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] Configured translator using Application Default Credentials (ADC) / Vertex AI. Model: '{model}'. Running automated key translation overlays.")
 
     translated_count = 0
+    has_errors = False
 
     book_lang = payload.get("language") or ""
     default_target_lang = None
@@ -316,8 +269,16 @@ def main():
                         is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
                     )
             else:
+                has_errors = True
                 logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE_ERROR] Page {p_num} translation failed: {err_msg}")
-                update_job_status(job_id, "processing", "translate", 56, logs, translated_count, actual_total_pages, False, is_local, **metadata)
+                print(f"[JOB 3: TRANSLATE_ERROR] Page {p_num} translation failed: {err_msg}", file=sys.stderr)
+                with db_write_lock:
+                    update_job_status(job_id, "processing", "translate", 56, logs, translated_count, actual_total_pages, False, is_local, **metadata)
+
+    if has_errors or translated_count < actual_total_pages:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ❌ Job 3 failed. Page translation did not complete successfully for all pages. Downstream jobs aborted.")
+        update_job_status(job_id, "failed", "translate", 56, logs, translated_count, actual_total_pages, False, is_local, **metadata)
+        sys.exit(1)
 
     logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ✅ All pages successfully translated and annotated. Triggering Downstream Job 4 (Assemble)...")
     update_job_status(job_id, "processing", "assemble", 76, logs, translated_count, actual_total_pages, False, is_local, **metadata)

@@ -129,9 +129,10 @@ def get_gemini_embedding_v2(text, api_key):
         )
         if resp and resp.embeddings:
             return resp.embeddings[0].values
+        raise RuntimeError("Empty response from Gemini embedding API")
     except Exception as e:
-        print(f"[Embedding Error] {e}. Falling back to deterministic SHA256 embedding.", file=sys.stderr)
-    return get_fallback_embedding(text)
+        print(f"[Embedding Error] {e}", file=sys.stderr)
+        raise RuntimeError(f"Gemini embedding API call failed: {e}")
 
 def get_fallback_embedding(text, dimensions=3072):
     """

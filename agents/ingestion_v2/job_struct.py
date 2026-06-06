@@ -104,7 +104,11 @@ Strictly adhere to the following layout parsing rules:
 3. CALLOUTS & EXAMPLES:
    - Callouts and examples MUST contain their body as children. Never emit an empty callout/example block with no children. Capture the banner label (e.g. "CHECKPOINT" or "معلومة إثرائية") in "label", severity in "variant", and the actual title line in "title".
 4. QUESTIONS & MCQs:
-   - Options must carry NO letter prefixes (like 'a.', 'b.', 'أ.', 'ب.'). The rendering client handles prefix injection automatically. Keep answer letters clean.
+   - When a multiple-choice question is present on the page, represent it as a single block of type "question".
+   - Put the question stem/text into the "prompt" field.
+   - Put the multiple-choice choices (options) together as a list of strings in the "options" field of that same "question" block.
+   - NEVER emit multiple-choice options as separate "paragraph" or "list" blocks. They must always be grouped inside the "options" field of the "question" block.
+   - Options must carry NO letter or number prefixes (like 'a.', 'b.', '1.', '2.', 'أ.', 'ب.'). The rendering client handles prefix injection automatically. Keep option/answer text clean.
 5. FIGURES & GRAPHS:
    - Create exactly ONE "figure" block per visual chart, diagram, map, or photo. The "caption" is REQUIRED and must contain your detailed, direct visual description of the visual's content (~40-90 words summarizing visual trends/objects; do not transcribe data). Store printed labels ("Figure 1.2") in "ref". Empty captions are invalid.
 6. MATH, CODE, & DEFINITIONS:
@@ -222,53 +226,6 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
             
     return None
 
-def fallback_structuring(text, page_num):
-    """
-    Deterministic regex-based fallback if offline or API key missing.
-    Ensures that we still produce valid FlatBlock structures.
-    """
-    blocks = []
-    lines = [line.strip() for line in text.split("\n") if line.strip()]
-    
-    # 1. Page Heading block
-    blocks.append({
-        "id": f"p{page_num}-b1",
-        "parent": "",
-        "type": "heading",
-        "level": 1,
-        "text": f"Chapter Section Overview - Page {page_num}"
-    })
-    
-    # Iterate lines and generate paragraphs or other types
-    for idx, line in enumerate(lines[:12]):  # limit lines for mock brevity
-        b_id = f"p{page_num}-b{idx+2}"
-        
-        if "?" in line or "MCQ:" in line:
-            blocks.append({
-                "id": b_id,
-                "parent": "",
-                "type": "question",
-                "prompt": line,
-                "options": ["Option A", "Option B", "Option C"],
-                "answer": "Option A"
-            })
-        elif "=" in line and ("+" in line or "-" in line or "/" in line):
-            blocks.append({
-                "id": b_id,
-                "parent": "",
-                "type": "equation",
-                "latex": f"f(x) = {line}"
-            })
-        else:
-            blocks.append({
-                "id": b_id,
-                "parent": "",
-                "type": "paragraph",
-                "text": line
-            })
-            
-    return {"dir": "ltr", "blocks": blocks}
-
 def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload):
     """
     Thread-pool worker processing a single PDF page: rasterization, sha1, Gemini structuring.
@@ -282,25 +239,26 @@ def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload)
         pix = page.get_pixmap(dpi=170)
         png_bytes = pix.tobytes("png")
         
-        # 2. Extract plain text as a fallback resource
+        # 2. Extract plain text as a fallback resource (no longer used for fallback structuring, keeping closure clean)
         raw_text = page.get_text()
         doc.close()
         
         # 3. Calculate pageHash
         page_hash = hashlib.sha1(png_bytes).hexdigest()
         
-        # 4. Attempt structuring (via API or fallback)
+        # 4. Attempt structuring via API
         structured_data = None
+        err_msg = ""
         try:
             def _api_call():
                 return analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num)
             structured_data = execute_with_retry(_api_call, max_retries=3, base_delay=2.0)
         except Exception as api_err:
+            err_msg = str(api_err)
             print(f"[Worker] API Structuring attempt failed on Page {page_num}: {api_err}", file=sys.stderr)
             
         if not structured_data:
-            print(f"[Worker] Running offline fallback structuring on Page {page_num} ...", flush=True)
-            structured_data = fallback_structuring(raw_text, page_num)
+            raise RuntimeError(f"Gemini visual structuring failed or returned empty for Page {page_num}. Details: {err_msg}")
             
         # Assemble PageDoc structure
         page_doc = {
@@ -311,7 +269,7 @@ def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload)
             "blocks": structured_data.get("blocks", []),
             "status": "structured",
             "pageHash": page_hash,
-            "model": model or "mock-fallback"
+            "model": model or "gemini-3.1-flash-lite"
         }
         
         return page_num, page_doc, None
@@ -360,6 +318,7 @@ def main():
 
     processed_pages = 0
     final_pages = {}
+    has_errors = False
 
     # Thread Pool execution with 3 workers
     with ThreadPoolExecutor(max_workers=3) as executor:
@@ -392,8 +351,16 @@ def main():
                         is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
                     )
             else:
+                has_errors = True
                 logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT_ERROR] Page {p_num} failed: {err_msg}")
-                update_job_status(job_id, "processing", "struct", 30, logs, processed_pages, total_pages, False, is_local, **metadata)
+                print(f"[JOB 2: STRUCT_ERROR] Page {p_num} failed: {err_msg}", file=sys.stderr)
+                with db_write_lock:
+                    update_job_status(job_id, "processing", "struct", 30, logs, processed_pages, total_pages, False, is_local, **metadata)
+
+    if has_errors or processed_pages < total_pages:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ❌ Job 2 failed. Page structuring did not complete successfully for all pages. Downstream jobs aborted.")
+        update_job_status(job_id, "failed", "struct", 30, logs, processed_pages, total_pages, False, is_local, **metadata)
+        sys.exit(1)
 
     logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ✅ Page structuring completed successfully. Triggering Downstream Job 3 (Translate)...")
     update_job_status(job_id, "processing", "translate", 55, logs, processed_pages, total_pages, False, is_local, **metadata)
