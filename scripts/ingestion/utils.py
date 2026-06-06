@@ -67,9 +67,9 @@ def get_gemini_embedding(text, api_key):
     if not api_key:
         return get_fallback_embedding(text)
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key={api_key}"
         payload = {
-            "model": "models/text-embedding-004",
+            "model": "models/gemini-embedding-2",
             "content": {
                 "parts": [{"text": text}]
             }
