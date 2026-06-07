@@ -1305,8 +1305,8 @@ export default function Home() {
           .map((act: any) => {
             if (act.action === "space_history") {
               return {
-                actionEn: act.details?.actionEn || act.details || "",
-                actionAr: act.details?.actionAr || act.details || "",
+                actionEn: act.details?.actionEn || (typeof act.details === "string" ? act.details : ""),
+                actionAr: act.details?.actionAr || (typeof act.details === "string" ? act.details : ""),
                 timestamp: new Date(act.timestamp)
               };
             } else { // practice_session
@@ -1961,7 +1961,9 @@ export default function Home() {
                 background: "rgba(255, 255, 255, 0.4)", border: "1px solid rgba(0, 0, 0, 0.02)"
               }}>
                 <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                  {language === "ar" ? log.actionAr : log.actionEn}
+                  {typeof (language === "ar" ? log.actionAr : log.actionEn) === "object"
+                    ? JSON.stringify(language === "ar" ? log.actionAr : log.actionEn)
+                    : String(language === "ar" ? log.actionAr : log.actionEn)}
                 </span>
                 <span style={{ fontSize: "0.75rem", color: "#8fa0ac" }}>
                   {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

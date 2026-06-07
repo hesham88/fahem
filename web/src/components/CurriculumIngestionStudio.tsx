@@ -1019,7 +1019,16 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   libraries.map(lib => (
                     <div key={lib._id} className="item-row-card">
                       <div className="item-meta">
-                        <img src={lib.logo} alt={lib.name} className="lib-logo-thumbnail" onError={e => { (e.target as HTMLImageElement).src = "/libs/moe.svg" }} />
+                        <img
+                          src={lib.logo}
+                          alt={lib.name}
+                          className="lib-logo-thumbnail"
+                          onError={e => {
+                            const img = e.target as HTMLImageElement;
+                            img.onerror = null;
+                            img.src = "/libs/logo.svg";
+                          }}
+                        />
                         <div>
                           <h4>{isAr ? lib.name_ar : lib.name} <span className="badge-pill">{lib.source}</span></h4>
                           <small className="monospace-id">{lib._id}</small>
