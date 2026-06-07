@@ -6,6 +6,17 @@ import json
 
 logger = logging.getLogger("google_adk." + __name__)
 
+def get_active_db(client):
+    try:
+        from agents.mongodb_engine import db_target_var
+    except ImportError:
+        try:
+            from mongodb_engine import db_target_var
+        except ImportError:
+            return client['fahem']
+    return client[db_target_var.get()]
+
+
 # Helper to register route on a FastAPI app
 def register_telemetry_route(app: fastapi.FastAPI):
     # Check if the route is already registered to avoid duplication
@@ -176,7 +187,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 masked_uri = prefix.split("//")[0] + "//" + "fahem_mcp:****@" + suffix
                 
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             cols = db.list_collection_names()
             
             counts = {}
@@ -210,7 +221,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             # --- 1. SEED SUBJECTS ---
             subjects_data = [
@@ -498,7 +509,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             summary = {}
             for col_name, documents in payload.items():
@@ -578,7 +589,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from tools import get_mongodb_uri
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-            db = client["fahem"]
+            db = get_active_db(client)
 
             if not job_id:
                 # Retrieve all crawl jobs, sorted by creation time descending, limited to 50
@@ -650,7 +661,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from tools import get_mongodb_uri
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-            db = client["fahem"]
+            db = get_active_db(client)
             db["crawl_jobs"].update_one(
                 {"_id": job_id},
                 {"$set": {
@@ -1091,7 +1102,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             query = {}
             if subject_id:
@@ -1111,7 +1122,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             pages = list(db["book_pages"].find({"book_id": book_id}).sort("page_number", 1))
             # Convert ObjectId to string for JSON serialization
@@ -1131,7 +1142,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             if request:
                 curriculum_id = request.query_params.get("curriculum_id") or curriculum_id
@@ -1167,7 +1178,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             libraries = list(db["libraries"].find({}))
             for lib in libraries:
@@ -1208,7 +1219,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             library_doc = {
                 "_id": lib_id,
@@ -1241,7 +1252,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             query = {}
             if library_id:
@@ -1295,7 +1306,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             library = db["libraries"].find_one({"_id": library_id})
             if not library:
@@ -1370,7 +1381,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             body = await request.json()
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             curr = db["curricula"].find_one({"_id": id})
             if not curr:
@@ -1401,7 +1412,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             normalized_email = email.lower().strip()
             
@@ -1427,7 +1438,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             # Fetch users with role admin and all admins
             users = list(db["users"].find({"role": "admin"}))
@@ -1497,7 +1508,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             is_approved = (action == "approve")
             
@@ -1535,7 +1546,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             config_doc = db["config"].find_one({})
             if not config_doc:
@@ -1574,7 +1585,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             data = await request.json()
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             # Prepare update fields
             update_fields = {}
@@ -1633,7 +1644,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             name_en = data.get("name_en") or name
             slug = re.sub(r'[^a-z0-9]+', '-', name_en.lower().strip()).strip('-')
@@ -1699,7 +1710,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             name_en = data.get("name_en") or name
             slug = re.sub(r'[^a-z0-9]+', '-', name_en.lower().strip()).strip('-')
@@ -1768,7 +1779,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             # Delete associated books
             db["books"].delete_many({"subject_id": id})
@@ -1874,7 +1885,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             if job_id:
                 job = db["ingestion_jobs"].find_one({"_id": job_id})
@@ -1928,7 +1939,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             # Enforce limits for private student uploads
             if user_id:
@@ -2094,7 +2105,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             book = db["books"].find_one({"_id": book_id})
             if book:
@@ -2158,7 +2169,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             timestamp = datetime.datetime.now().strftime("%I:%M:%S %p")
             message = ""
@@ -2258,7 +2269,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             old_book = db["books"].find_one({"_id": book_id})
             if not old_book:
@@ -2330,7 +2341,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             book_doc = db["books"].find_one({"_id": id})
             if not book_doc:
@@ -2366,7 +2377,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             pending_books = list(db["books"].find({"needs_approval": True}))
             for b in pending_books:
@@ -2400,7 +2411,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             book_doc = db["books"].find_one({"_id": book_id})
             if not book_doc:
@@ -2653,7 +2664,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from pymongo import MongoClient
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             groups = list(db["social_groups"].find({}))
             for g in groups:
                 if "_id" in g:
@@ -2685,7 +2696,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
 
             import time
             group_id = f"group_{int(time.time() * 1000)}"
@@ -2716,7 +2727,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from pymongo import MongoClient
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
 
             if thread_id:
                 thread = db["social_threads"].find_one({"_id": thread_id})
@@ -2758,7 +2769,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
 
             import time
             from datetime import datetime
@@ -2869,7 +2880,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             query = {"recipient_uid": uid}
             if unreadOnly == "true":
@@ -2896,7 +2907,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             count = db["notifications"].count_documents({"recipient_uid": uid, "read": False})
             return {"success": True, "count": count}
@@ -2921,7 +2932,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             query = {"recipient_uid": uid}
             if notification_ids:
@@ -2967,7 +2978,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             now = int(time.time())
             
@@ -3026,7 +3037,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             if active:
                 db["active_practice_sessions"].update_one(
@@ -3063,7 +3074,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             assignments_query_result = db["group_assignments"].find({"group_id": group_id}).sort("created_at", -1)
             assignments_list = list(assignments_query_result)
@@ -3121,7 +3132,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             anchor_valid = False
             if subject_id:
@@ -3215,7 +3226,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             asg = db["group_assignments"].find_one({"_id": assignment_id})
             if not asg:
@@ -3364,7 +3375,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             asg = db["group_assignments"].find_one({"_id": assignment_id})
             if not asg:

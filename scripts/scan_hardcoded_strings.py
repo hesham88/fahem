@@ -96,6 +96,9 @@ def scan_files():
                     if "console.log" in stripped or "typeof " in stripped:
                         continue
                     
+                    if any(op in line for op in ["&&", "||", "===", "!=="]) and ("<" in line and ">" in line):
+                        continue
+                    
                     jsx_match = JSX_TEXT_PATTERN.search(line)
                     if jsx_match:
                         text_val = jsx_match.group(1).strip()
