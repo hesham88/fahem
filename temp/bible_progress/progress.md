@@ -1,5 +1,5 @@
 # Builder Progress
-_Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
+_Current tasks: builder-1 -> P1-5 · Updated: 2026-06-07T09:50:00+03:00_
 
 ## Task board
 | id | owner | phase | task | source (bible@sha12) | status | DoD met? | artifact (commit/PR) |
@@ -15,6 +15,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P1-2 | builder-1 | 1 | Dynamic scope form & curriculum builder UI | phase-1-data-model §B.2 @ 798fddd37ed1 | done | yes | [web/src/components/CurriculumIngestionStudio.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/CurriculumIngestionStudio.tsx) |
 | P1-3 | builder-1 | 1 | Migration script for legacy books | phase-1-data-model §B.3 @ 798fddd37ed1 | done | yes | [web/scripts/migrate_curricula.js](file:///C:/Users/hesh1/Desktop/fahem/web/scripts/migrate_curricula.js) |
 | P1-4 | builder-1 | 1 | Knowledge Library consumer view + subject color | phase-1-data-model §B.7 @ 798fddd37ed1 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P1-5 | builder-1 | 1 | Duplicate subjects & broken subject↔book↔TOC wiring | phase-1-data-model §B.3b @ b8b12d19cf5b | in-progress | — | — |
 | P2-1 | builder-2 | 2 | Hardened page parsing & post-parse integrity checks | phase-2-pipeline-hardening §2.1 @ def27750e171 | done | yes | [agents/ingestion_v2/job_struct.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_struct.py) |
 | P2-2 | builder-2 | 2 | Arabic-shaped covers, storage bucket uploads & palette | phase-2-pipeline-hardening §2.3 @ def27750e171 | done | yes | [agents/ingestion_v2/job_assemble.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_assemble.py) |
 | P2-3 | builder-2 | 2 | Optional Image Agent with Pillow cover fallback | phase-2-pipeline-hardening §2.4 @ def27750e171 | done | yes | [agents/ingestion_v2/utils.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/utils.py) |
@@ -66,6 +67,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 - 2026-06-07T08:55:00+03:00 [builder-4] DONE P5-1, P5-2, P5-3, P7-4: Verified components (Practice, Plan, Zatona history unification, Insights, Social panel repairs, StickyChat open state sessionStorage persistence, sticky language & mount stability). All compile checks pass successfully.
 - 2026-06-07T09:05:00+03:00 [builder-1] DONE Case 46: Completed Premium Styling of Curriculum Ingestion Studio with deep glassmorphism and real DevOps telemetry console terminal styles.
 - 2026-06-07T09:12:00+03:00 [builder-1] DONE Case 47: Updated landing page hero-card text to student benefits-first copy across English and Arabic, and built a high-premium horizontal tech stack logo section containing Gemini, ADK, Antigravity, Firebase, Next.js, Google Maps, MongoDB, and Cloud Armor logos with CSS hover glow animations.
+- 2026-06-07T09:50:00+03:00 [builder-1] CLAIM+START P1-5: Duplicate subjects + broken subject↔book↔TOC wiring (B.3b)
 
 
 
