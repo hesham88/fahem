@@ -1809,7 +1809,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
     try {
       setIsTranslating(true);
-      const res = await fetch("/api/translate", {
+      const res = await authedFetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, targetLanguage: targetLang })
@@ -1856,7 +1856,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
     try {
       setIsTranslating(true);
-      const res = await fetch("/api/translate/page", {
+      const res = await authedFetch("/api/translate/page", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1923,7 +1923,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     const pageNum = readerCurrentPage;
 
     try {
-      const res = await fetch("/api/practice/evaluate", {
+      const res = await authedFetch("/api/practice/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2246,7 +2246,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       const hasArabicChars = /[\u0600-\u06FF]/.test(cleanedText);
       const reqLang = hasArabicChars ? "ar" : (translationLanguage || "en");
 
-      const res = await fetch("/api/audio/tts", {
+      const res = await authedFetch("/api/audio/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2357,7 +2357,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   }, [selectedBookReader]);
 
   const logActivityEvent = (action: string, contextDetails: any) => {
-    fetch("/api/activity", {
+    authedFetch("/api/activity", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2389,7 +2389,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       });
 
       // Also upsert initial reading session
-      fetch("/api/reading-session", {
+      authedFetch("/api/reading-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2412,7 +2412,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
       lastHeartbeatTimeRef.current = now;
 
-      fetch("/api/reading-session", {
+      authedFetch("/api/reading-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2439,7 +2439,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       const now = Date.now();
       const diffSec = Math.round((now - lastHeartbeatTimeRef.current) / 1000);
       if (diffSec > 0) {
-        fetch("/api/reading-session", {
+        authedFetch("/api/reading-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2581,7 +2581,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     );
 
     try {
-      const response = await fetch("/api/books/verify", {
+      const response = await authedFetch("/api/books/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2615,7 +2615,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           const detectedSubjectId = categoryToSubjectId[verdict.category] || "subj_biology";
 
           // Trigger ingestion in /api/books
-          const ingestRes = await fetch("/api/books", {
+          const ingestRes = await authedFetch("/api/books", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

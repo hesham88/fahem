@@ -1,4 +1,5 @@
 "use client";
+import { authedFetch } from "../../../lib/authedFetch";
 
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "../../../context/LanguageContext";
@@ -98,7 +99,7 @@ export default function ReportPage() {
         console.log("[reCAPTCHA Enterprise] SDK load failure or bypassed. Continuing submission (Fail-Open).");
       }
 
-      const response = await fetch("/api/agent", {
+      const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

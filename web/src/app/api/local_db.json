@@ -1,55 +1,82 @@
 {
   "subjects": [
     {
-      "_id": "subj_algebra_stats",
+      "_id": "sub_computer_science_1780535716963",
+      "curriculum_id": "cur_openstax_math_college",
+      "name": "Computer Science",
+      "name_ar": "علوم الحاسب",
+      "color": "#6366F1",
+      "emoji": "💻",
+      "category": "Computer Science",
+      "core_book_ids": [
+        "book_introduction_to_python_programming_1780627757426"
+      ],
+      "supporting_book_ids": [],
+      "books_count": 1
+    },
+    {
+      "_id": "subj_algebra_stats_secondary2_term1",
+      "curriculum_id": "cur_moe_secondary2_term1_2026",
       "name": "Pure Mathematics",
       "name_ar": "الرياضيات العامة",
+      "color": "#1E96A0",
       "emoji": "📐",
       "category": "Math",
-      "grade_level": "General",
+      "core_book_ids": [
+        "book_math_101"
+      ],
+      "supporting_book_ids": [],
       "books_count": 1
     },
     {
-      "_id": "subj_biology",
+      "_id": "subj_biology_secondary2_term1",
+      "curriculum_id": "cur_moe_secondary2_term1_2026",
       "name": "Physics & Chemistry",
       "name_ar": "العلوم والفيزياء",
+      "color": "#E11D48",
       "emoji": "🧪",
       "category": "Science",
-      "grade_level": "General",
-      "books_count": 1
-    },
-    {
-      "_id": "subj_arabic_grammar",
-      "name": "Arabic Grammar & Literature",
-      "name_ar": "اللغة العربية وآدابها",
-      "emoji": "📚",
-      "category": "Arabic",
-      "grade_level": "General",
+      "core_book_ids": [
+        "book_science_201"
+      ],
+      "supporting_book_ids": [],
       "books_count": 1
     }
   ],
   "books": [
     {
       "_id": "book_math_101",
-      "subject_id": "subj_algebra_stats",
+      "subject_id": "subj_algebra_stats_secondary2_term1",
       "title": "Introduction to Algebra",
       "title_ar": "مقدمة في الجبر",
       "author": "Fahem Academy",
       "description": "Master the fundamentals of quadratic equations, functions, and graph scaling.",
       "description_ar": "تعلم أساسيات المعادلات التربيعية، الدوال، وتمثيل المخططات البيانية.",
-      "status": "published",
-      "pages_count": 2
+      "status": "processing",
+      "pages_count": 2,
+      "library_id": "lib_moe",
+      "curriculum_id": "cur_moe_secondary2_term1_2026",
+      "role": "core",
+      "visibility": "public",
+      "owner_uid": null,
+      "totalPages": 0
     },
     {
       "_id": "book_science_201",
-      "subject_id": "subj_biology",
+      "subject_id": "subj_biology_secondary2_term1",
       "title": "Essentials of Physics",
       "title_ar": "أساسيات الفيزياء",
       "author": "Fahem Academy",
       "description": "Explore the laws of thermodynamics, kinetic energy, and optics.",
       "description_ar": "استكشف قوانين الديناميكا الحرارية، الطاقة الحركية، والبصريات.",
-      "status": "published",
-      "pages_count": 2
+      "status": "processing",
+      "pages_count": 2,
+      "library_id": "lib_moe",
+      "curriculum_id": "cur_moe_secondary2_term1_2026",
+      "role": "core",
+      "visibility": "public",
+      "owner_uid": null,
+      "totalPages": 0
     }
   ],
   "admins": [
@@ -239,30 +266,149 @@
   "ingestion_chunks_draft": [],
   "libraries": [
     {
-      "_id": "lib_math_1",
-      "name": "Standard Math Syllabus",
-      "name_ar": "منهج الرياضيات الموحد",
-      "subject_id": "subj_algebra_stats"
+      "_id": "lib_moe",
+      "name": "Egyptian MOE",
+      "name_ar": "وزارة التربية والتعليم",
+      "source": "moe",
+      "logo": "/libs/moe.svg",
+      "scopeSchema": [
+        {
+          "key": "grade",
+          "label": "Grade",
+          "label_ar": "الصف",
+          "type": "enum",
+          "options": [
+            "Primary 1",
+            "Primary 2",
+            "Primary 3",
+            "Primary 4",
+            "Primary 5",
+            "Primary 6",
+            "Preparatory 1",
+            "Preparatory 2",
+            "Preparatory 3",
+            "Secondary 1",
+            "Secondary 2",
+            "Secondary 3"
+          ]
+        },
+        {
+          "key": "term",
+          "label": "Term",
+          "label_ar": "الفصل الدراسي",
+          "type": "enum",
+          "options": [
+            "Term 1",
+            "Term 2",
+            "Full Year"
+          ]
+        },
+        {
+          "key": "year",
+          "label": "Year",
+          "label_ar": "العام الدراسي",
+          "type": "string"
+        }
+      ],
+      "status": "active"
     },
     {
-      "_id": "lib_science_1",
-      "name": "General Science Curriculum",
-      "name_ar": "منهج العلوم العام",
-      "subject_id": "subj_biology"
+      "_id": "lib_openstax",
+      "name": "OpenStax Library",
+      "name_ar": "مكتبة أوبن ستاكس",
+      "source": "openstax",
+      "logo": "/libs/openstax.svg",
+      "scopeSchema": [
+        {
+          "key": "discipline",
+          "label": "Discipline",
+          "label_ar": "التخصص",
+          "type": "enum",
+          "options": [
+            "Science",
+            "Mathematics",
+            "Social Sciences",
+            "Humanities",
+            "Business",
+            "College Success"
+          ]
+        },
+        {
+          "key": "level",
+          "label": "Level",
+          "label_ar": "المستوى",
+          "type": "enum",
+          "options": [
+            "College",
+            "High School",
+            "General"
+          ]
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "_id": "lib_private",
+      "name": "Private Vault",
+      "name_ar": "الخزانة الخاصة",
+      "source": "private",
+      "logo": "/libs/private.svg",
+      "scopeSchema": [
+        {
+          "key": "category",
+          "label": "Category",
+          "label_ar": "الفئة",
+          "type": "enum",
+          "options": [
+            "My Uploads",
+            "Shared with Me",
+            "Uncategorized"
+          ]
+        }
+      ],
+      "status": "active"
     }
   ],
   "curricula": [
     {
-      "_id": "curr_grade_9",
-      "grade": "Grade 9",
-      "grade_ar": "الصف التاسع",
-      "subject_id": "subj_algebra_stats"
+      "_id": "cur_openstax_math_college",
+      "library_id": "lib_openstax",
+      "title": "OpenStax — Mathematics & CS College Series",
+      "title_ar": "أوبن ستاكس — سلسلة الرياضيات وعلوم الحاسب الجامعية",
+      "scope": {
+        "discipline": "Mathematics",
+        "level": "College"
+      },
+      "subject_ids": [
+        "sub_computer_science_1780535716963"
+      ],
+      "status": "published",
+      "visibility": "public",
+      "owner_uid": null,
+      "created_by": "system",
+      "created_at": "2026-06-07T04:23:50.360Z",
+      "updated_at": "2026-06-07T04:23:50.362Z"
     },
     {
-      "_id": "curr_grade_10",
-      "grade": "Grade 10",
-      "grade_ar": "الصف العاشر",
-      "subject_id": "subj_biology"
+      "_id": "cur_moe_secondary2_term1_2026",
+      "library_id": "lib_moe",
+      "title": "MOE — Secondary 2 · Term 1 · 2026",
+      "title_ar": "وزارة التربية والتعليم — الصف الثاني الثانوي · الفصل الدراسي الأول · 2026",
+      "scope": {
+        "grade": "Secondary 2",
+        "term": "Term 1",
+        "year": "2026"
+      },
+      "subject_ids": [
+        "subj_algebra_stats_secondary2_term1",
+        "subj_biology_secondary2_term1"
+      ],
+      "status": "published",
+      "visibility": "public",
+      "owner_uid": null,
+      "created_by": "system",
+      "created_at": "2026-06-07T04:23:50.362Z",
+      "updated_at": "2026-06-07T04:23:50.362Z"
     }
   ]
 }

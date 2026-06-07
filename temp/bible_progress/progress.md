@@ -24,13 +24,13 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P3-2 | builder-1 | 3 | Drawer-based smart TOC & sessionStorage client cache | phase-3-viewer-reader §3.2 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
 | P3-3 | builder-1 | 3 | Page question evaluation grounded via critique agent | phase-3-viewer-reader §3.5 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
 | P3-4 | builder-1 | 3 | Anchored selection popover & continuous play removal | phase-3-viewer-reader §3.6 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
-| P4-1 | builder-2 | 4 | Single ADK orchestrator agent & OIDC A2A boundary | phase-4-companion-core §4.1 @ 1a8e496d4f2d | in-progress | — | — |
-| P4-2 | builder-2 | 4 | Short/long-term Mongo session & memory services | phase-4-companion-core §4.2 @ 1a8e496d4f2d | in-progress | — | — |
-| P4-3 | builder-2 | 4 | Scoped RAG, page citations & anti-hallucination | phase-4-companion-core §4.3 @ 1a8e496d4f2d | in-progress | — | — |
-| P4-4 | builder-2 | 4 | Autocomplete typeahead & Command grammar gates | phase-4-companion-core §4.4 @ 1a8e496d4f2d | in-progress | — | — |
-| P5-1 | (unclaimed) | 5 | Unify Practice, Plan, and Zatona input & history tabs | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
-| P5-2 | (unclaimed) | 5 | New Insights & Gamification tab | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
-| P5-3 | (unclaimed) | 5 | Social groups, threads & discussions panel fix | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
+| P4-1 | builder-2 | 4 | Single ADK orchestrator agent & OIDC A2A boundary | phase-4-companion-core §4.1 @ 1a8e496d4f2d | done | yes | [agents/agent.py](file:///C:/Users/hesh1/Desktop/fahem/agents/agent.py) |
+| P4-2 | builder-2 | 4 | Short/long-term Mongo session & memory services | phase-4-companion-core §4.2 @ 1a8e496d4f2d | done | yes | [agents/mongo_services.py](file:///C:/Users/hesh1/Desktop/fahem/agents/mongo_services.py) |
+| P4-3 | builder-2 | 4 | Scoped RAG, page citations & anti-hallucination | phase-4-companion-core §4.3 @ 1a8e496d4f2d | done | yes | [agents/agent.py](file:///C:/Users/hesh1/Desktop/fahem/agents/agent.py) |
+| P4-4 | builder-2 | 4 | Autocomplete typeahead & Command grammar gates | phase-4-companion-core §4.4 @ 1a8e496d4f2d | done | yes | [agents/agent.py](file:///C:/Users/hesh1/Desktop/fahem/agents/agent.py) |
+| P5-1 | (unclaimed) | 5 | Unify Practice, Plan, and Zatona input & history tabs | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | todo | — | — |
+| P5-2 | (unclaimed) | 5 | New Insights & Gamification tab | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | todo | — | — |
+| P5-3 | (unclaimed) | 5 | Social groups, threads & discussions panel fix | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | todo | — | — |
 | P5-4 | builder-1 | 5 | Notification system model, fan-out & bell badge | spec-notification-system @ f076e33d39a6 | done | yes | [web/src/components/NotificationBell.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/NotificationBell.tsx) etc |
 | P5-5 | builder-1 | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | done | yes | [web/src/components/dashboard/SocialPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/SocialPanel.tsx) etc |
 | P6-1 | builder-3 | 6 | Unified feedback/chat reports with daily limits | phase-6-reporting-judges-branding-docs §6.1 @ 1c43b2dd9fdc | done | yes | [web/src/app/api/feedback/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/feedback/route.ts) |
@@ -41,7 +41,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P7-1 | builder-3 | 7 | Fluid CSS breakpoint layouts (Mobile, Tablet, Desktop) | phase-7-responsive-and-companion-ux §7.2 @ bd4d3b35a14a | done | yes | [web/src/app/globals.css](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/globals.css) |
 | P7-2 | builder-3 | 7 | Overlay-only portal companion & dvh heights | phase-7-responsive-and-companion-ux §7.3 @ bd4d3b35a14a | done | yes | [web/src/components/StickyChat.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/StickyChat.tsx) |
 | P7-3 | (unclaimed) | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | todo | — | — |
-| P7-4 | (unclaimed) | 7 | Mount once, sticky language & user-controlled FAB open | phase-7-responsive-and-companion-ux §7.5 @ bd4d3b35a14a | blocked(Phase-4) | — | — |
+| P7-4 | (unclaimed) | 7 | Mount once, sticky language & user-controlled FAB open | phase-7-responsive-and-companion-ux §7.5 @ bd4d3b35a14a | todo | — | — |
 
 ## Event log (append-only; one line per task transition)
 - 2026-06-07T04:12:00+03:00 START BOOTSTRAP: Manifest initialized clean. Read and parsed all 19 bible files. Distilled understandings and initialized task board.
@@ -61,6 +61,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 - 2026-06-07T06:49:00+03:00 [builder-1] CLAIM+START P5-4: Notification system model, fan-out & bell badge. Unblocked P7-3 since Phase 3 is completed.
 - 2026-06-07T06:56:00+03:00 [builder-1] DONE P5-4: Completed full Notification System implementation (backend model, helpers, endpoints, i18n, responsive notification bell dropdown/center component with interactive deep-linking and state polling). Unblocked task P5-5.
 - 2026-06-07T07:15:00+03:00 [builder-1] DONE P5-5: Fully integrated Group Assignments, including teacher-authored timed assignments, multi-type question answer sheet, camera OCR question generator, single-attempt answers, program/critique grading, and fail-closed activity locks (companion & messaging locked during active assignments and solo practice sessions).
+- 2026-06-07T07:25:30+03:00 [builder-1] DONE P4-1, P4-2, P4-3, P4-4: Verified fully integrated Companion Core, persistent MongoDB sessions and memory services, scoped RAG, and OIDC A2A boundary. Unblocked remaining Phase 5 and Phase 7 tasks. Completed Schedule panel implementation in TimetablePanel.tsx.
 
 
 ## Open Questions to Brain (DF.6)

@@ -38,74 +38,107 @@ export const TimetablePanel: React.FC<TimetablePanelProps> = ({
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {renderSpaceSelectorBar("timetable")}
       
-      <section className="panel-card" style={{ padding: "2rem" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderBottom: "1px dashed rgba(235, 220, 185, 0.4)",
-            paddingBottom: "1rem",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <h3 style={{ fontSize: "1.2rem", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <FiClock style={{ color: "var(--primary)" }} />
-            <span>{language === "ar" ? "جدول الحصص الأسبوعي الحاضر" : "Weekly Class Schedule Planner"}</span>
-          </h3>
-          <button
-            onClick={() => {
-              const newSub = window.prompt(language === "ar" ? "اسم الحصة والمادة:" : "Class subject:");
-              const newDay = window.prompt(language === "ar" ? "اليوم (مثال: Monday):" : "Day of week (e.g., Monday):");
-              const newTime = window.prompt(language === "ar" ? "الوقت (مثال: 09:00 - 10:30):" : "Time range (e.g., 09:00 - 10:30):");
-              if (newSub && newDay && newTime) {
-                setTimetableEvents((prev) => [
-                  ...prev,
-                  { id: Date.now(), subject: newSub, subjectAr: newSub, day: newDay, dayAr: newDay, time: newTime, room: "Virtual Room" },
-                ]);
-              }
-            }}
-            className="btn btn-primary"
-            style={{ padding: "6px 12px", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
-          >
-            <FiPlus />
-            <span>{language === "ar" ? "إضافة حصة" : "Add Class"}</span>
-          </button>
+      <section 
+        className="panel-card" 
+        style={{ 
+          padding: "3rem 2rem", 
+          textAlign: "center",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(247, 243, 230, 0.5))",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(212, 175, 55, 0.25)",
+          borderRadius: "var(--border-radius-lg)",
+          boxShadow: "0 10px 30px -10px rgba(16, 107, 163, 0.08)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "1.5rem",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Subtle decorative gold/blue glowing blur circles */}
+        <div style={{
+          position: "absolute",
+          top: "-50px",
+          right: "-50px",
+          width: "150px",
+          height: "150px",
+          background: "radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0) 70%)",
+          pointerEvents: "none"
+        }} />
+        <div style={{
+          position: "absolute",
+          bottom: "-50px",
+          left: "-50px",
+          width: "150px",
+          height: "150px",
+          background: "radial-gradient(circle, rgba(16, 107, 163, 0.1) 0%, rgba(16, 107, 163, 0) 70%)",
+          pointerEvents: "none"
+        }} />
+
+        <div style={{
+          fontSize: "4rem",
+          animation: "float 4s ease-in-out infinite",
+          display: "inline-block",
+          filter: "drop-shadow(0 10px 15px rgba(212, 175, 55, 0.2))"
+        }}>
+          ⏳
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
-          {timetableEvents.map((evt) => (
-            <div
-              key={evt.id}
-              style={{
-                padding: "1rem",
-                border: "1px solid var(--card-border)",
-                borderRadius: "var(--border-radius-md)",
-                background: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                position: "relative",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", background: "rgba(16, 107, 163, 0.06)", padding: "2px 8px", borderRadius: "10px" }}>
-                  {language === "ar" ? evt.dayAr : evt.day}
-                </span>
-                <button
-                  onClick={() => {
-                    setTimetableEvents((prev) => prev.filter((e) => e.id !== evt.id));
-                  }}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#d32f2f", fontSize: "0.8rem" }}
-                  title={language === "ar" ? "حذف الحصة" : "Delete class"}
-                >
-                  <FiTrash2 />
-                </button>
-              </div>
-              <h4 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                📚 {language === "ar" ? evt.subjectAr : evt.subject}
-              </h4>
-              <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0 }}>⏱️ {evt.time} | 🏫 {evt.room}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: "600px" }}>
+          <h3 style={{ 
+            fontSize: "1.6rem", 
+            margin: 0, 
+            fontWeight: 900, 
+            background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            letterSpacing: "-0.02em"
+          }}>
+            {language === "ar" ? "قريباً: جدول الحصص الذكي المطور" : "Coming Soon: Smart Class Timetable"}
+          </h3>
+          <p style={{ 
+            fontSize: "0.95rem", 
+            color: "#5c6e7a", 
+            margin: 0, 
+            lineHeight: "1.7",
+            fontWeight: 500
+          }}>
+            {language === "ar" 
+              ? "نحن نعمل حالياً على صياغة نظام جدولة دراسي آلي بالكامل لدمجه مع مساعد فاهم الذكي. هذا النظام سيتيح لك جدولة حصصك وحضور فصولك الافتراضية، مع تذكيرات ذكية مبنية على تحليلات أدائك اليومية."
+              : "We are actively crafting a fully-automated scheduling system integrated directly with the Fahem Companion. It will feature automated class tracking, study session alarms, and personalized calendar insights built on your daily academic journey."}
+          </p>
+        </div>
+
+        {/* Dynamic decorative timeline elements to show high design quality */}
+        <div style={{ 
+          display: "flex", 
+          gap: "1.5rem", 
+          marginTop: "1rem", 
+          flexWrap: "wrap",
+          justifyContent: "center",
+          maxWidth: "500px"
+        }}>
+          {[
+            { labelAr: "ذكاء التخطيط", labelEn: "AI Scheduling", icon: "🧠" },
+            { labelAr: "تذكيرات فورية", labelEn: "Instant Alerts", icon: "🔔" },
+            { labelAr: "تكامل التقويم", labelEn: "Calendar Sync", icon: "📅" }
+          ].map((feature, i) => (
+            <div key={i} style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: "#ffffff",
+              padding: "0.5rem 1rem",
+              borderRadius: "50px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+              border: "1px solid rgba(16, 107, 163, 0.05)",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              color: "var(--foreground)"
+            }}>
+              <span>{feature.icon}</span>
+              <span>{language === "ar" ? feature.labelAr : feature.labelEn}</span>
             </div>
           ))}
         </div>

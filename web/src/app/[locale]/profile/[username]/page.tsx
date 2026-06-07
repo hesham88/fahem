@@ -1,4 +1,5 @@
 "use client";
+import { authedFetch } from "../../../../lib/authedFetch";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -348,13 +349,13 @@ export default function UserProfilePage() {
     if (!username) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/user/profile?username=${encodeURIComponent(username)}`);
+      const res = await authedFetch(`/api/user/profile?username=${encodeURIComponent(username)}`);
       if (res.ok) {
         const data = await res.json();
         setTargetProfile(data.profile || null);
       }
       
-      const listRes = await fetch("/api/user/list");
+      const listRes = await authedFetch("/api/user/list");
       if (listRes.ok) {
         const listData = await listRes.json();
         setAllUsersList(listData.users || []);
@@ -378,7 +379,7 @@ export default function UserProfilePage() {
     
     try {
       setFriendActionLoading(true);
-      const res = await fetch("/api/user/friend", {
+      const res = await authedFetch("/api/user/friend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 "use client";
+import { authedFetch } from "../../../lib/authedFetch";
 
 import { useState, useRef, useEffect } from "react";
 import { auth, db, storage } from "../../../lib/firebase";
@@ -914,7 +915,7 @@ export default function Home() {
     setLoadingBookPages(true);
     console.log(`[Library-Reader] Fetching book pages for book ID: ${bookId}...`);
     
-    fetch(`/api/books/pages?bookId=${bookId}&_t=${Date.now()}`, {
+    authedFetch(`/api/books/pages?bookId=${bookId}&_t=${Date.now()}`, {
       cache: "no-store",
       headers: {
         "Pragma": "no-cache",
@@ -963,7 +964,7 @@ export default function Home() {
   const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
 
   useEffect(() => {
-    fetch("/api/admin/config")
+    authedFetch("/api/admin/config")
       .then((res) => res.json())
       .then((data) => {
         if (data && data.success && data.config && data.config.maxUploadSize) {
@@ -1278,7 +1279,7 @@ export default function Home() {
       ...prev
     ]);
     if (user) {
-      fetch("/api/activity", {
+      authedFetch("/api/activity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1295,7 +1296,7 @@ export default function Home() {
   const fetchSpaceHistory = async (userId: string) => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/activity?userId=${encodeURIComponent(userId)}`);
+      const res = await authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];
@@ -1989,7 +1990,7 @@ export default function Home() {
 
     const intervalId = setInterval(async () => {
       try {
-        const res = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
+        const res = await authedFetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
         if (res.ok) {
           const data = await res.json();
           const fetchedMsgs = data.messages || [];
@@ -2205,7 +2206,7 @@ export default function Home() {
   const fetchAllUsersList = async () => {
     setLoadingAllUsers(true);
     try {
-      const res = await fetch("/api/user/list");
+      const res = await authedFetch("/api/user/list");
       if (res.ok) {
         const data = await res.json();
         setAllUsers(data.users || []);
@@ -2221,7 +2222,7 @@ export default function Home() {
     if (!user || !user.email) return;
     setParentChildrenLoading(true);
     try {
-      const res = await fetch(`/api/parent/children?parentEmail=${encodeURIComponent(user.email)}`);
+      const res = await authedFetch(`/api/parent/children?parentEmail=${encodeURIComponent(user.email)}`);
       if (res.ok) {
         const data = await res.json();
         setParentChildren(data.children || []);
@@ -2236,7 +2237,7 @@ export default function Home() {
   const approveChildProfile = async (childId: string) => {
     if (!user || !user.email) return;
     try {
-      const res = await fetch("/api/parent/approve", {
+      const res = await authedFetch("/api/parent/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parentEmail: user.email, childId })
@@ -2255,7 +2256,7 @@ export default function Home() {
     if (!user) return;
     setChatLoading(true);
     try {
-      const res = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(recipientId)}`);
+      const res = await authedFetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(recipientId)}`);
       if (res.ok) {
         const data = await res.json();
         setChatMessages(data.messages || []);
@@ -2283,7 +2284,7 @@ export default function Home() {
     setChatMessages((prev) => [...prev, tempMsg]);
 
     try {
-      const res = await fetch("/api/chat/message", {
+      const res = await authedFetch("/api/chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2298,7 +2299,7 @@ export default function Home() {
         // Log activity
         await logActivity("send_chat_message", "success", `Sent direct message to ${chatRecipient.userId}`);
         // Fetch actual list to keep sync
-        const messagesRes = await fetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
+        const messagesRes = await authedFetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
         if (messagesRes.ok) {
           const mData = await messagesRes.json();
           setChatMessages(mData.messages || []);
@@ -2312,7 +2313,7 @@ export default function Home() {
   const logActivity = async (action: string, status: string, details?: string) => {
     if (!user) return;
     try {
-      await fetch("/api/activity", {
+      await authedFetch("/api/activity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2341,7 +2342,7 @@ export default function Home() {
           showActivity: privacyShowActivity
         }
       };
-      const res = await fetch("/api/user/profile", {
+      const res = await authedFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2384,7 +2385,7 @@ export default function Home() {
     if (!confirm(confirmMsg)) return;
 
     try {
-      const res = await fetch(`/api/user/account?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email)}`, {
+      const res = await authedFetch(`/api/user/account?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email)}`, {
         method: "DELETE"
       });
       if (res.ok) {
@@ -2912,7 +2913,7 @@ export default function Home() {
         setUserProfile(updatedProfile);
         
         try {
-          await fetch("/api/user/profile", {
+          await authedFetch("/api/user/profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2975,8 +2976,7 @@ export default function Home() {
 
       try {
         const countryParam = onboardingCountry || "Egypt";
-        const res = await fetch(
-          `/api/places/search?query=${encodeURIComponent(query)}&country=${encodeURIComponent(countryParam)}`,
+        const res = await authedFetch(`/api/places/search?query=${encodeURIComponent(query)}&country=${encodeURIComponent(countryParam)}`,
           { signal: controller.signal }
         );
         if (res.ok) {
@@ -3019,7 +3019,7 @@ export default function Home() {
     setOnboardingMessages(prev => [...prev, { sender: "fahem", text: "" }]);
 
     try {
-      const response = await fetch("/api/agent", {
+      const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -3174,7 +3174,7 @@ export default function Home() {
         setTimeout(async () => {
           setLoadingProfile(true);
           try {
-            const res = await fetch(`/api/user/profile?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email || "")}&t=${Date.now()}`, { cache: "no-store" });
+            const res = await authedFetch(`/api/user/profile?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email || "")}&t=${Date.now()}`, { cache: "no-store" });
             if (res.ok) {
               const data = await res.json();
               if (data.profile && data.profile.userId) {
@@ -3257,7 +3257,7 @@ export default function Home() {
     };
 
     try {
-      const res = await fetch("/api/user/profile", {
+      const res = await authedFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3319,7 +3319,7 @@ export default function Home() {
     };
 
     try {
-      const res = await fetch("/api/user/profile", {
+      const res = await authedFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3354,7 +3354,7 @@ export default function Home() {
         ...targetUser,
         ...updatedFields
       };
-      const res = await fetch("/api/user/profile", {
+      const res = await authedFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3383,13 +3383,13 @@ export default function Home() {
     if (!user || !user.email) return;
     setLoadingAdminData(true);
     try {
-      const statsRes = await fetch(`/api/admin/activities?email=${encodeURIComponent(user.email)}`);
+      const statsRes = await authedFetch(`/api/admin/activities?email=${encodeURIComponent(user.email)}`);
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setAdminStats(statsData);
       }
       
-      const logsRes = await fetch(`/api/admin/logs?email=${encodeURIComponent(user.email)}`);
+      const logsRes = await authedFetch(`/api/admin/logs?email=${encodeURIComponent(user.email)}`);
       if (logsRes.ok) {
         const logsData = await logsRes.json();
         setAdminLogs(logsData.logs || []);
@@ -3406,7 +3406,7 @@ export default function Home() {
     const isFriend = userProfile.friends?.includes(targetUser.userId);
     const action = isFriend ? "remove" : "add";
     try {
-      const res = await fetch("/api/user/friend", {
+      const res = await authedFetch("/api/user/friend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3442,7 +3442,7 @@ export default function Home() {
     try {
       const activeEmail = emailParam || user?.email;
       if (!activeEmail) return;
-      const response = await fetch(`/api/db-metadata?email=${encodeURIComponent(activeEmail)}`);
+      const response = await authedFetch(`/api/db-metadata?email=${encodeURIComponent(activeEmail)}`);
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -3459,7 +3459,7 @@ export default function Home() {
     if (!activeUserId) return;
     setIsSessionsLoading(true);
     try {
-      const response = await fetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
+      const response = await authedFetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
       if (response.ok) {
         const data = await response.json();
         setSessions(data.sessions || []);
@@ -3475,7 +3475,7 @@ export default function Home() {
     const activeUserId = userIdVal || user?.uid;
     if (!activeUserId) return;
     try {
-      const response = await fetch(`/api/telemetry?userId=${encodeURIComponent(activeUserId)}`);
+      const response = await authedFetch(`/api/telemetry?userId=${encodeURIComponent(activeUserId)}`);
       if (response.ok) {
         const data = await response.json();
         const rawStats = (data && data.stats) ? data.stats : (data || {});
@@ -3503,13 +3503,13 @@ export default function Home() {
     setLoadingBooks(true);
     setLoadingSubjects(true);
     try {
-      const subjectsRes = await fetch("/api/subjects", { cache: "no-store" });
+      const subjectsRes = await authedFetch("/api/subjects", { cache: "no-store" });
       if (subjectsRes.ok) {
         const subjectsData = await subjectsRes.json();
         setDynamicSubjects(subjectsData.subjects || []);
       }
       
-      const booksRes = await fetch("/api/books", { cache: "no-store" });
+      const booksRes = await authedFetch("/api/books", { cache: "no-store" });
       if (booksRes.ok) {
         const booksData = await booksRes.json();
         setDynamicBooks(booksData.books || []);
@@ -3526,7 +3526,7 @@ export default function Home() {
     if (!sessionIdVal) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
+      const response = await authedFetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
       if (response.ok) {
         const data = await response.json();
         const sess = data.session;
@@ -3558,7 +3558,7 @@ export default function Home() {
       return;
     }
     try {
-      const response = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
+      const response = await authedFetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
         method: "DELETE"
       });
       if (response.ok) {
@@ -3641,7 +3641,7 @@ export default function Home() {
           setLoadingProfile(false);
           setIsAdmin(savedPersona === "admin"); // Allow judge Standard/Superadmin console access for auditing
         } else {
-          fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
+          authedFetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
             .then((res) => {
               if (!res.ok) {
                 throw new Error(`HTTP error! Status: ${res.status}`);
@@ -3674,7 +3674,7 @@ export default function Home() {
                     localStorage.setItem("onboarding_completed_" + currentUser.uid, "true");
                   }
                   if (data.profile.onboardingCompleted !== true) {
-                    fetch("/api/user/profile", {
+                    authedFetch("/api/user/profile", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -3692,7 +3692,7 @@ export default function Home() {
                   }
 
                   // Fetch onboarding history
-                  fetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
+                  authedFetch(`/api/history/detail?sessionId=onboarding_session_${currentUser.uid}`)
                     .then((res) => res.json())
                     .then((histData) => {
                       if (histData?.session?.messages && histData.session.messages.length > 0) {
@@ -3805,7 +3805,7 @@ export default function Home() {
 
         // Verify superadmin status
         if (currentUser.email && !isJudgeBypass && !isRealJudgeEmail) {
-          fetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
+          authedFetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
             .then((res) => res.json())
             .then((data) => setIsAdmin(data.isAdmin))
             .catch(() => setIsAdmin(false));
@@ -3853,7 +3853,7 @@ export default function Home() {
     setStylizerTime("");
 
     try {
-      const response = await fetch("/api/agent/grounded", {
+      const response = await authedFetch("/api/agent/grounded", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -4109,7 +4109,7 @@ export default function Home() {
     setDbOrchTime("");
 
     try {
-      const response = await fetch("/api/agent", {
+      const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -4282,7 +4282,7 @@ export default function Home() {
         getDownloadURL(snapshot.ref).then(async (downloadURL) => {
           // Automatic Ingestion Trigger
           try {
-            await fetch("/api/books", {
+            await authedFetch("/api/books", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -4395,7 +4395,7 @@ export default function Home() {
     setReaderMessages((prev) => [...prev, { id: agentMsgId, sender: "fahem", text: "...", isStreaming: true }]);
 
     try {
-      const response = await fetch("/api/agent", {
+      const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -5359,7 +5359,7 @@ export default function Home() {
                               setOnboardingAvatar(downloadURL);
                               
                               // Immediate Firebase avatar download URL sync to /api/user/profile on upload
-                              fetch("/api/user/profile", {
+                              authedFetch("/api/user/profile", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({

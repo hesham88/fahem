@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { auth, storage } from "../lib/firebase";
+import { authedFetch } from "../lib/authedFetch";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useTranslation } from "../context/LanguageContext";
@@ -727,15 +728,13 @@ export default function StickyChat() {
       const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
       const reqLang = hasArabic ? "ar" : (language || "en");
       
-      const res = await fetch("/api/audio/tts", {
+      const res = await authedFetch("/api/audio/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: cleanText,
           language: reqLang,
           voice: selectedVoice, // use the user's selected voice dynamically!
-          userId: user?.uid || "anonymous",
-          userEmail: user?.email || "anonymous@fahem.ai"
         })
       });
 
@@ -1075,8 +1074,8 @@ export default function StickyChat() {
     const fetchMetadataForMentions = async () => {
       try {
         const [subRes, booksRes] = await Promise.all([
-          fetch("/api/subjects"),
-          fetch("/api/books")
+          authedFetch("/api/subjects"),
+          authedFetch("/api/books")
         ]);
         if (subRes.ok) {
           const subData = await subRes.json();
@@ -1103,7 +1102,7 @@ export default function StickyChat() {
     if (!activeUserId) return;
     setIsSessionsLoading(true);
     try {
-      const response = await fetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
+      const response = await authedFetch(`/api/history?userId=${encodeURIComponent(activeUserId)}`);
       if (response.ok) {
         const data = await response.json();
         setSessions(data.sessions || []);
@@ -1119,7 +1118,7 @@ export default function StickyChat() {
     const activeUserId = userIdVal || user?.uid;
     if (!activeUserId) return;
     try {
-      const response = await fetch(`/api/activity?userId=${encodeURIComponent(activeUserId)}`);
+      const response = await authedFetch(`/api/activity?userId=${encodeURIComponent(activeUserId)}`);
       if (response.ok) {
         const data = await response.json();
         setUserActivities(data.activities || []);
@@ -1133,7 +1132,7 @@ export default function StickyChat() {
     if (!sessionIdVal) return;
     setIsSessionsLoading(true);
     try {
-      const response = await fetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
+      const response = await authedFetch(`/api/history/detail?sessionId=${encodeURIComponent(sessionIdVal)}`);
       if (response.ok) {
         const data = await response.json();
         const sess = data.session;
@@ -1172,7 +1171,7 @@ export default function StickyChat() {
       return;
     }
     try {
-      const response = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
+      const response = await authedFetch(`/api/history?sessionId=${encodeURIComponent(sessionIdVal)}`, {
         method: "DELETE"
       });
       if (response.ok) {
@@ -1189,7 +1188,7 @@ export default function StickyChat() {
   async function renameSession(sessionIdVal: string, newTitle: string) {
     if (!sessionIdVal || !newTitle.trim()) return;
     try {
-      const response = await fetch("/api/history", {
+      const response = await authedFetch("/api/history", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sessionIdVal, title: newTitle.trim() })
@@ -1594,7 +1593,7 @@ export default function StickyChat() {
       ]);
       
       try {
-        const response = await fetch(`/api/books/pages?query=${encodeURIComponent(searchQuery)}`);
+        const response = await authedFetch(`/api/books/pages?query=${encodeURIComponent(searchQuery)}`);
         const data = await response.json();
         
         let responseText = "";
@@ -1786,7 +1785,7 @@ User Question: ${queryText}`;
 
     try {
       const endpoint = useGrounded ? "/api/agent/grounded" : "/api/agent";
-      const response = await fetch(endpoint, {
+      const response = await authedFetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1794,8 +1793,6 @@ User Question: ${queryText}`;
         body: JSON.stringify({
           prompt: promptPayload,
           language: (bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language,
-          userEmail: activeUser.email || "",
-          userId: activeUser.uid || "",
           sessionId: currentSessionId || undefined,
           selected_book_ids: selectedBookIds
         }),
