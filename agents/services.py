@@ -218,171 +218,872 @@ def register_telemetry_route(app: fastapi.FastAPI):
         try:
             from tools import get_mongodb_uri
             from pymongo import MongoClient
+            import time
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
             
-            # --- 1. SEED SUBJECTS ---
-            subjects_data = [
+            # --- 0. DROP HISTORICAL COLLECTIONS TO PREVENT INDEX COLLISIONS ---
+            collections_to_drop = [
+                "libraries", "curricula", "subjects", "books", "book_pages", 
+                "question_bank", "social_groups", "social_threads", "social_replies", 
+                "group_assignments", "assignment_submissions", "companion_facts", 
+                "companion_memories", "active_practice_sessions"
+            ]
+            for col in collections_to_drop:
+                db[col].drop()
+                logger.info(f"[SEED] Dropped collection: {col}")
+
+            # --- 1. SEED LIBRARIES (2) ---
+            libraries_data = [
                 {
-                    "_id": "subj_algebra_stats",
-                    "name": "Algebra and Statistics",
-                    "name_ar": "الجبر والإحصاء",
-                    "emoji": "📊",
-                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                    "_id": "lib_moe",
+                    "name": "Egyptian MOE",
+                    "name_ar": "وزارة التربية والتعليم",
+                    "source": "moe",
+                    "logo": "/libs/moe.svg",
+                    "scopeSchema": [
+                        { "key": "grade", "label": "Grade", "label_ar": "الصف", "type": "enum", "options": ["Primary 1", "Primary 2", "Primary 3", "Primary 4", "Primary 5", "Primary 6", "Preparatory 1", "Preparatory 2", "Preparatory 3", "Secondary 1", "Secondary 2", "Secondary 3"] },
+                        { "key": "term", "label": "Term", "label_ar": "الفصل الدراسي", "type": "enum", "options": ["Term 1", "Term 2", "Full Year"] },
+                        { "key": "year", "label": "Year", "label_ar": "العام الدراسي", "type": "string" }
+                    ],
+                    "status": "active"
                 },
                 {
-                    "_id": "subj_biology",
+                    "_id": "lib_openstax",
+                    "name": "OpenStax Library",
+                    "name_ar": "مكتبة أوبن ستاكس",
+                    "source": "openstax",
+                    "logo": "/libs/openstax.svg",
+                    "scopeSchema": [
+                        { "key": "discipline", "label": "Discipline", "label_ar": "التخصص", "type": "enum", "options": ["Science", "Mathematics", "Social Sciences", "Humanities", "Business", "College Success"] },
+                        { "key": "level", "label": "Level", "label_ar": "المستوى", "type": "enum", "options": ["College", "High School", "General"] }
+                    ],
+                    "status": "active"
+                }
+            ]
+            for lib in libraries_data:
+                db["libraries"].replace_one({"_id": lib["_id"]}, lib, upsert=True)
+
+            # --- 2. SEED CURRICULA (3) ---
+            curricula_data = [
+                {
+                    "_id": "cur_moe_g10_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Grade 10 - Term 1 Curriculum (2026)",
+                    "title_ar": "منهج الصف الأول الثانوي - الفصل الدراسي الأول (2026)",
+                    "scope": {"grade": "Secondary 1", "term": "Term 1", "year": "2026"},
+                    "subject_ids": ["subj_cur_moe_g10_t1_2026_algebra", "subj_cur_moe_g10_t1_2026_chemistry"],
+                    "status": "published",
+                    "visibility": "public",
+                    "owner_uid": None,
+                    "created_by": "system",
+                    "created_at": "2026-06-07T12:00:00Z",
+                    "updated_at": "2026-06-07T12:00:00Z"
+                },
+                {
+                    "_id": "cur_moe_g11_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Grade 11 - Term 1 Curriculum (2026)",
+                    "title_ar": "منهج الصف الثاني الثانوي - الفصل الدراسي الأول (2026)",
+                    "scope": {"grade": "Secondary 2", "term": "Term 1", "year": "2026"},
+                    "subject_ids": ["subj_cur_moe_g11_t1_2026_biology", "subj_cur_moe_g11_t1_2026_history"],
+                    "status": "published",
+                    "visibility": "public",
+                    "owner_uid": None,
+                    "created_by": "system",
+                    "created_at": "2026-06-07T12:00:00Z",
+                    "updated_at": "2026-06-07T12:00:00Z"
+                },
+                {
+                    "_id": "cur_openstax_college_2026",
+                    "library_id": "lib_openstax",
+                    "title": "OpenStax College Essentials (2026)",
+                    "title_ar": "سلسلة الكليات أوبن ستاكس (2026)",
+                    "scope": {"discipline": "Mathematics", "level": "College"},
+                    "subject_ids": ["subj_cur_openstax_college_2026_calculus", "subj_cur_openstax_college_2026_physics"],
+                    "status": "published",
+                    "visibility": "public",
+                    "owner_uid": None,
+                    "created_by": "system",
+                    "created_at": "2026-06-07T12:00:00Z",
+                    "updated_at": "2026-06-07T12:00:00Z"
+                }
+            ]
+            for curr in curricula_data:
+                db["curricula"].replace_one({"_id": curr["_id"]}, curr, upsert=True)
+
+            # --- 3. SEED SUBJECTS (6 with canonical color/emoji & deterministic ID) ---
+            subjects_data = [
+                {
+                    "_id": "subj_cur_moe_g10_t1_2026_algebra",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "slug": "algebra",
+                    "name": "Algebra & Analytic Geometry",
+                    "name_ar": "الجبر والهندسة التحليلية",
+                    "emoji": "📐",
+                    "color": "#EF4444",
+                    "category": "Mathematics",
+                    "grade_level": "Grade 10",
+                    "core_book_ids": ["book_moe_alg_g10_t1_core"],
+                    "supporting_book_ids": ["book_moe_alg_g10_t1_sup"],
+                    "books_count": 2
+                },
+                {
+                    "_id": "subj_cur_moe_g10_t1_2026_chemistry",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "slug": "chemistry",
+                    "name": "Chemistry",
+                    "name_ar": "الكيمياء",
+                    "emoji": "🧪",
+                    "color": "#3B82F6",
+                    "category": "Science",
+                    "grade_level": "Grade 10",
+                    "core_book_ids": ["book_moe_chem_g10_t1_core"],
+                    "supporting_book_ids": ["book_moe_chem_g10_t1_sup"],
+                    "books_count": 2
+                },
+                {
+                    "_id": "subj_cur_moe_g11_t1_2026_biology",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "slug": "biology",
                     "name": "Biology",
                     "name_ar": "الأحياء",
                     "emoji": "🧬",
-                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                    "color": "#10B981",
+                    "category": "Science",
+                    "grade_level": "Grade 11",
+                    "core_book_ids": ["book_moe_bio_g11_t1_core"],
+                    "supporting_book_ids": ["book_moe_bio_g11_t1_sup"],
+                    "books_count": 2
                 },
                 {
-                    "_id": "subj_arabic_grammar",
-                    "name": "Arabic Grammar",
-                    "name_ar": "النحو والصرف",
-                    "emoji": "📖",
-                    "grade_levels": ["Grade 10", "Grade 11", "Grade 12"]
+                    "_id": "subj_cur_moe_g11_t1_2026_history",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "slug": "history",
+                    "name": "History",
+                    "name_ar": "التاريخ",
+                    "emoji": "📜",
+                    "color": "#F59E0B",
+                    "category": "Social Sciences",
+                    "grade_level": "Grade 11",
+                    "core_book_ids": ["book_moe_hist_g11_t1_core"],
+                    "supporting_book_ids": ["book_moe_hist_g11_t1_sup"],
+                    "books_count": 2
+                },
+                {
+                    "_id": "subj_cur_openstax_college_2026_calculus",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "slug": "calculus",
+                    "name": "Calculus Volume 1",
+                    "name_ar": "حساب التفاضل والتكامل 1",
+                    "emoji": "📈",
+                    "color": "#8B5CF6",
+                    "category": "Mathematics",
+                    "grade_level": "College",
+                    "core_book_ids": ["book_openstax_calc_core"],
+                    "supporting_book_ids": ["book_openstax_calc_sup"],
+                    "books_count": 2
+                },
+                {
+                    "_id": "subj_cur_openstax_college_2026_physics",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "slug": "physics",
+                    "name": "University Physics Volume 1",
+                    "name_ar": "الفيزياء الجامعية 1",
+                    "emoji": "🌌",
+                    "color": "#EC4899",
+                    "category": "Science",
+                    "grade_level": "College",
+                    "core_book_ids": ["book_openstax_phys_core"],
+                    "supporting_book_ids": ["book_openstax_phys_sup"],
+                    "books_count": 2
                 }
             ]
-            
-            # Insert or replace subjects
             for subj in subjects_data:
                 db["subjects"].replace_one({"_id": subj["_id"]}, subj, upsert=True)
-                
-            # --- 2. SEED BOOKS ---
+
+            # --- 4. SEED BOOKS (12 books, 2 per subject: 1 core and 1 supporting) ---
             books_data = [
+                # 1. Algebra Core
                 {
-                    "_id": "book_moe_alg_g10_t1",
-                    "subject_id": "subj_algebra_stats",
-                    "title": "High School Algebra and Analytic Geometry",
-                    "title_ar": "الجبر الهندسة التحليلية للمرحلة الثانوية",
+                    "_id": "book_moe_alg_g10_t1_core",
+                    "subject_id": "subj_cur_moe_g10_t1_2026_algebra",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "High School Algebra & Analytical Geometry",
+                    "title_ar": "كتاب الجبر والهندسة التحليلية - كتاب الطالب",
                     "grade": "Grade 10",
                     "term": "Term 1",
                     "year": "2026",
                     "language": "ar",
-                    "book_type": "core", 
-                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Algebra_G10.pdf",
-                    "storage_path": "gs://fahem-academic-lake/moe/alg_g10_t1.pdf",
+                    "book_type": "core",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/alg_g10_t1_core.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/alg_g10_t1_core.pdf",
+                    "coverUrl": "/libs/covers/alg_g10_core.jpg",
+                    "coverThumbUrl": "/libs/covers/alg_g10_core_thumb.jpg",
                     "chapters": [
                         {
                             "id": "ch_1",
-                            "title": "Linear Equations and Matrices",
-                            "title_ar": "المعادلات الخطية والمصفوفات",
-                            "page_start": 4,
-                            "page_end": 28,
-                            "concepts": ["Matrix Inversion", "Determinants", "Cramer's Rule"]
-                        },
-                        {
-                            "id": "ch_2",
-                            "title": "Vectors and Linear Spaces",
-                            "title_ar": "المتجهات والفراغات الخطية",
-                            "page_start": 29,
-                            "page_end": 50,
-                            "concepts": ["Vector Dot Product", "Cross Product", "Geometric Dimension"]
+                            "title": "Matrices and Determinants",
+                            "title_ar": "المصفوفات والمحددات",
+                            "page_start": 1,
+                            "page_end": 15,
+                            "concepts": ["Matrix definition", "Operations", "Determinant", "Inverse Matrix"],
+                            "topics": [
+                                { "id": "t_alg_1_1", "title": "Introduction to Matrices", "title_ar": "مقدمة عن المصفوفات", "page": 1 },
+                                { "id": "t_alg_1_2", "title": "Determinant calculation", "title_ar": "حساب المحددات", "page": 7 },
+                                { "id": "t_alg_1_3", "title": "Inverse of a 2x2 Matrix", "title_ar": "المعكوس الضربي للمصفوفة الثنائية", "page": 12 }
+                            ]
                         }
-                    ],
-                    "mindmap": {
-                        "root": "Matrices & Vectors",
-                        "children": [
-                            { "name": "Linear Algebra", "children": [{ "name": "Matrices" }, { "name": "Determinants" }] },
-                            { "name": "Analytic Geometry", "children": [{ "name": "Vectors" }, { "name": "Lines in Space" }] }
-                        ]
-                    },
-                    "keywords": ["matrix", "determinant", "vector", "linear system", "cramer"]
+                    ]
                 },
+                # 2. Algebra Supporting
                 {
-                    "_id": "book_moe_bio_g11_t1",
-                    "subject_id": "subj_biology",
-                    "title": "High School Biology",
-                    "title_ar": "الأحياء للمرحلة الثانوية",
+                    "_id": "book_moe_alg_g10_t1_sup",
+                    "subject_id": "subj_cur_moe_g10_t1_2026_algebra",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Algebra Practice Handbook & Solved Exercises",
+                    "title_ar": "دليل تدريبات الجبر والمسائل المحلولة",
+                    "grade": "Grade 10",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "supporting",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/alg_g10_t1_sup.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/alg_g10_t1_sup.pdf",
+                    "coverUrl": "/libs/covers/alg_g10_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/alg_g10_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Matrix Multiplication & Determinant Challenges",
+                            "title_ar": "تحديات ضرب المصفوفات والمحددات",
+                            "page_start": 1,
+                            "page_end": 10,
+                            "concepts": ["High-order multiplication", "Cramer's rule application"],
+                            "topics": [
+                                { "id": "t_alg_sup_1_1", "title": "Step-by-step Multiplication", "title_ar": "خطوات ضرب المصفوفات بالتفصيل", "page": 1 },
+                                { "id": "t_alg_sup_1_2", "title": "Cramer's Rule Solved Examples", "title_ar": "مسائل محلولة بطريقة كرامر", "page": 6 }
+                            ]
+                        }
+                    ]
+                },
+                # 3. Chemistry Core
+                {
+                    "_id": "book_moe_chem_g10_t1_core",
+                    "subject_id": "subj_cur_moe_g10_t1_2026_chemistry",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Chemistry: Energy and Matter",
+                    "title_ar": "الكيمياء: المادة والطاقة",
+                    "grade": "Grade 10",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "core",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/chem_g10_t1_core.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/chem_g10_t1_core.pdf",
+                    "coverUrl": "/libs/covers/chem_g10_core.jpg",
+                    "coverThumbUrl": "/libs/covers/chem_g10_core_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Chemical Bonding",
+                            "title_ar": "الروابط الكيميائية",
+                            "page_start": 1,
+                            "page_end": 12,
+                            "concepts": ["Ionic bond", "Covalent bond", "Valence electrons"],
+                            "topics": [
+                                { "id": "t_chem_1_1", "title": "Ionic vs Covalent bonds", "title_ar": "الروابط الأيونية والتساهمية", "page": 1 },
+                                { "id": "t_chem_1_2", "title": "Lewis Dot Structures", "title_ar": "تمثيل لويس النقطي", "page": 7 }
+                            ]
+                        }
+                    ]
+                },
+                # 4. Chemistry Supporting
+                {
+                    "_id": "book_moe_chem_g10_t1_sup",
+                    "subject_id": "subj_cur_moe_g10_t1_2026_chemistry",
+                    "curriculum_id": "cur_moe_g10_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Lab Experiments and Bonding Worksheets",
+                    "title_ar": "تجارب المعمل وأوراق عمل الروابط",
+                    "grade": "Grade 10",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "supporting",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/chem_g10_t1_sup.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/chem_g10_t1_sup.pdf",
+                    "coverUrl": "/libs/covers/chem_g10_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/chem_g10_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Bonding Lab Simulations",
+                            "title_ar": "محاكاة معمل الروابط",
+                            "page_start": 1,
+                            "page_end": 8,
+                            "concepts": ["Electronegativity measurements", "Conductivity of ionic solutions"],
+                            "topics": [
+                                { "id": "t_chem_sup_1_1", "title": "Conductivity Lab", "title_ar": "تجربة التوصيل الكهربائي", "page": 1 },
+                                { "id": "t_chem_sup_1_2", "title": "Electronegativity Scale", "title_ar": "مقياس السالبية الكهربائية", "page": 5 }
+                            ]
+                        }
+                    ]
+                },
+                # 5. Biology Core
+                {
+                    "_id": "book_moe_bio_g11_t1_core",
+                    "subject_id": "subj_cur_moe_g11_t1_2026_biology",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "High School Biology & Life Systems",
+                    "title_ar": "علم الأحياء وأنظمة الحياة للمرحلة الثانوية",
                     "grade": "Grade 11",
                     "term": "Term 1",
                     "year": "2026",
                     "language": "ar",
                     "book_type": "core",
-                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Biology_G11.pdf",
-                    "storage_path": "gs://fahem-academic-lake/moe/bio_g11_t1.pdf",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/bio_g11_t1_core.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/bio_g11_t1_core.pdf",
+                    "coverUrl": "/libs/covers/bio_g11_core.jpg",
+                    "coverThumbUrl": "/libs/covers/bio_g11_core_thumb.jpg",
                     "chapters": [
                         {
                             "id": "ch_1",
-                            "title": "Nutrition and Autotrophic Processes",
-                            "title_ar": "التغذية والعمليات الذاتية",
-                            "page_start": 5,
-                            "page_end": 35,
-                            "concepts": ["Photosynthesis", "Chloroplasts", "Light Reactions", "Calvin Cycle"]
-                        },
-                        {
-                            "id": "ch_2",
-                            "title": "Human Transport System",
-                            "title_ar": "النقل في الإنسان",
-                            "page_start": 36,
-                            "page_end": 65,
-                            "concepts": ["Heart Chambers", "Blood Vessels", "Blood Composition", "Lymphatic System"]
+                            "title": "Plant Nutrition & Transport",
+                            "title_ar": "التغذية والنقل في النبات",
+                            "page_start": 1,
+                            "page_end": 15,
+                            "concepts": ["Autotrophic nutrition", "Photosynthesis", "Xylem and Phloem"],
+                            "topics": [
+                                { "id": "t_bio_1_1", "title": "The Mechanism of Photosynthesis", "title_ar": "آلية البناء الضوئي", "page": 1 },
+                                { "id": "t_bio_1_2", "title": "Water Transport in Xylem", "title_ar": "نقل الماء في الخشب", "page": 8 }
+                            ]
                         }
-                    ],
-                    "mindmap": {
-                        "root": "Biology Grade 11",
-                        "children": [
-                            { "name": "Plant Physiology", "children": [{ "name": "Photosynthesis" }, { "name": "Nutrition" }] },
-                            { "name": "Human Physiology", "children": [{ "name": "Circulation" }, { "name": "Respiration" }] }
-                        ]
-                    },
-                    "keywords": ["photosynthesis", "nutrition", "chloroplast", "heart", "circulatory", "blood"]
+                    ]
                 },
+                # 6. Biology Supporting
                 {
-                    "_id": "book_moe_grammar_g12",
-                    "subject_id": "subj_arabic_grammar",
-                    "title": "High School Arabic Grammar & Rhetoric",
-                    "title_ar": "النحو والصرف والبلاغة للمرحلة الثانوية العامة",
-                    "grade": "Grade 12",
-                    "term": "Full Year",
+                    "_id": "book_moe_bio_g11_t1_sup",
+                    "subject_id": "subj_cur_moe_g11_t1_2026_biology",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Biology Interactive Guide & Topic Summaries",
+                    "title_ar": "الملخصات الوافية والدليل التفاعلي للأحياء",
+                    "grade": "Grade 11",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "supporting",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/bio_g11_t1_sup.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/bio_g11_t1_sup.pdf",
+                    "coverUrl": "/libs/covers/bio_g11_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/bio_g11_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Photosynthesis Diagrams & Exercises",
+                            "title_ar": "مخططات وتدريبات البناء الضوئي",
+                            "page_start": 1,
+                            "page_end": 10,
+                            "concepts": ["Chloroplast anatomy", "Calvin cycle steps"],
+                            "topics": [
+                                { "id": "t_bio_sup_1_1", "title": "Chloroplast Map", "title_ar": "رسم تخطيطي للبلاستيدة الخضراء", "page": 1 },
+                                { "id": "t_bio_sup_1_2", "title": "Calvin Cycle Summary", "title_ar": "ملخص دورة كالفن", "page": 5 }
+                            ]
+                        }
+                    ]
+                },
+                # 7. History Core
+                {
+                    "_id": "book_moe_hist_g11_t1_core",
+                    "subject_id": "subj_cur_moe_g11_t1_2026_history",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "History of Islamic & Egyptian Civilizations",
+                    "title_ar": "تاريخ الحضارة المصرية والإسلامية",
+                    "grade": "Grade 11",
+                    "term": "Term 1",
                     "year": "2026",
                     "language": "ar",
                     "book_type": "core",
-                    "source_url": "https://ellibrary.moe.gov.eg/content/HighSchool_Arabic_Grammar_G12.pdf",
-                    "storage_path": "gs://fahem-academic-lake/moe/arabic_grammar_g12.pdf",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/hist_g11_t1_core.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/hist_g11_t1_core.pdf",
+                    "coverUrl": "/libs/covers/hist_g11_core.jpg",
+                    "coverThumbUrl": "/libs/covers/hist_g11_core_thumb.jpg",
                     "chapters": [
                         {
                             "id": "ch_1",
-                            "title": "The Dynamic Verbs (Kaada and her Sisters)",
-                            "title_ar": "كاد وأخواتها (أفعال المقاربة والرجاء والشروع)",
-                            "page_start": 10,
-                            "page_end": 22,
-                            "concepts": ["Subject of Kaada", "Predicate conditions (An + Present verb)", "Differences with Kana"]
-                        },
-                        {
-                            "id": "ch_2",
-                            "title": "The Excepted (Al-Mustathna)",
-                            "title_ar": "الاستثناء وأحكامه (إلا، غير، سوى، خلا، عدا، حاشا)",
-                            "page_start": 23,
-                            "page_end": 38,
-                            "concepts": ["Tam Mitbah (Complete Affirmative)", "Tam Manfi (Complete Negative)", "Naqis Manfi (Defective Negative)"]
+                            "title": "The Rise of Islamic Civilization",
+                            "title_ar": "ظهور الحضارة الإسلامية",
+                            "page_start": 1,
+                            "page_end": 14,
+                            "concepts": ["Prophetic era", "Umayyad and Abbasid achievements"],
+                            "topics": [
+                                { "id": "t_hist_1_1", "title": "The Golden Age of Abbasids", "title_ar": "العصر العباسي الذهبي", "page": 1 },
+                                { "id": "t_hist_1_2", "title": "Trade and Culture Expansion", "title_ar": "طرق التجارة والتبادل الثقافي", "page": 8 }
+                            ]
                         }
-                    ],
-                    "mindmap": {
-                        "root": "Arabic Grammar",
-                        "children": [
-                            { "name": "Verbs & Nouns", "children": [{ "name": "Kaada" }, { "name": "Kana" }] },
-                            { "name": "Grammatical Styles", "children": [{ "name": "Excepted Style" }, { "name": "Exclamatory Style" }] }
-                        ]
-                    },
-                    "keywords": ["kaada", "mustathna", "nahw", "arabic grammar", "thanaweya", "بلاغة"]
+                    ]
+                },
+                # 8. History Supporting
+                {
+                    "_id": "book_moe_hist_g11_t1_sup",
+                    "subject_id": "subj_cur_moe_g11_t1_2026_history",
+                    "curriculum_id": "cur_moe_g11_t1_2026",
+                    "library_id": "lib_moe",
+                    "title": "Historical Source Reader & Essays",
+                    "title_ar": "مصادر ومراجع وقراءات في التاريخ الإسلامي",
+                    "grade": "Grade 11",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "ar",
+                    "book_type": "supporting",
+                    "source_url": "https://ellibrary.moe.gov.eg/content/hist_g11_t1_sup.pdf",
+                    "storage_path": "gs://fahem-academic-lake/moe/hist_g11_t1_sup.pdf",
+                    "coverUrl": "/libs/covers/hist_g11_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/hist_g11_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Medieval Travel Diaries",
+                            "title_ar": "يوميات الرحالة في العصور الوسطى",
+                            "page_start": 1,
+                            "page_end": 10,
+                            "concepts": ["Ibn Battuta descriptions", "Alexandria port records"],
+                            "topics": [
+                                { "id": "t_hist_sup_1_1", "title": "Ibn Battuta in Egypt", "title_ar": "ابن بطوطة في مصر", "page": 1 },
+                                { "id": "t_hist_sup_1_2", "title": "Economic Centers Maps", "title_ar": "خرائط المراكز الاقتصادية", "page": 6 }
+                            ]
+                        }
+                    ]
+                },
+                # 9. Calculus Core
+                {
+                    "_id": "book_openstax_calc_core",
+                    "subject_id": "subj_cur_openstax_college_2026_calculus",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "library_id": "lib_openstax",
+                    "title": "Calculus Volume 1 (College)",
+                    "title_ar": "حساب التفاضل والتكامل للمرحلة الجامعية 1",
+                    "grade": "College",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "en",
+                    "book_type": "core",
+                    "source_url": "https://openstax.org/details/books/calculus-volume-1",
+                    "storage_path": "gs://fahem-academic-lake/openstax/calculus_v1_core.pdf",
+                    "coverUrl": "/libs/covers/calc_core.jpg",
+                    "coverThumbUrl": "/libs/covers/calc_core_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Limits and Continuity",
+                            "title_ar": "النهايات والاتصال",
+                            "page_start": 1,
+                            "page_end": 15,
+                            "concepts": ["Limit definition", "Squeeze theorem", "Continuity conditions"],
+                            "topics": [
+                                { "id": "t_calc_1_1", "title": "The Concept of Limit", "title_ar": "مفهوم النهاية", "page": 1 },
+                                { "id": "t_calc_1_2", "title": "Squeeze Theorem Proof", "title_ar": "برهان نظرية الساندوتش (الإحاطة)", "page": 7 },
+                                { "id": "t_calc_1_3", "title": "Infinite Limits", "title_ar": "النهايات اللانهائية", "page": 12 }
+                            ]
+                        }
+                    ]
+                },
+                # 10. Calculus Supporting
+                {
+                    "_id": "book_openstax_calc_sup",
+                    "subject_id": "subj_cur_openstax_college_2026_calculus",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "library_id": "lib_openstax",
+                    "title": "Calculus Study Guide & Problem Book",
+                    "title_ar": "دليل دراسة التفاضل والتكامل ومسائل محلولة",
+                    "grade": "College",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "en",
+                    "book_type": "supporting",
+                    "source_url": "https://openstax.org/details/books/calculus-volume-1-guide",
+                    "storage_path": "gs://fahem-academic-lake/openstax/calculus_v1_sup.pdf",
+                    "coverUrl": "/libs/covers/calc_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/calc_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Practice Problems on Limits",
+                            "title_ar": "تدريب على مسائل النهايات والاتصال",
+                            "page_start": 1,
+                            "page_end": 10,
+                            "concepts": ["Epsilon-delta proofs", "Limits with trigonometric functions"],
+                            "topics": [
+                                { "id": "t_calc_sup_1_1", "title": "Epsilon-Delta Exercises", "title_ar": "مسائل إبسلون ودلتا", "page": 1 },
+                                { "id": "t_calc_sup_1_2", "title": "Trig Limit Shortcuts", "title_ar": "طرق سريعة لنهايات الدوال المثلثية", "page": 6 }
+                            ]
+                        }
+                    ]
+                },
+                # 11. Physics Core
+                {
+                    "_id": "book_openstax_phys_core",
+                    "subject_id": "subj_cur_openstax_college_2026_physics",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "library_id": "lib_openstax",
+                    "title": "University Physics Volume 1: Mechanics",
+                    "title_ar": "الفيزياء الجامعية 1: الميكانيكا والحرارة",
+                    "grade": "College",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "en",
+                    "book_type": "core",
+                    "source_url": "https://openstax.org/details/books/university-physics-volume-1",
+                    "storage_path": "gs://fahem-academic-lake/openstax/physics_v1_core.pdf",
+                    "coverUrl": "/libs/covers/phys_core.jpg",
+                    "coverThumbUrl": "/libs/covers/phys_core_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Newtonian Motion",
+                            "title_ar": "قوانين نيوتن للحركة",
+                            "page_start": 1,
+                            "page_end": 12,
+                            "concepts": ["Three Laws of Motion", "Friction coefficient", "Inertial systems"],
+                            "topics": [
+                                { "id": "t_phys_1_1", "title": "First and Second Laws", "title_ar": "القانون الأول والثاني لنيوتن", "page": 1 },
+                                { "id": "t_phys_1_2", "title": "Inclined Plane Forces", "title_ar": "تحليل القوى على المستوى المائل", "page": 6 }
+                            ]
+                        }
+                    ]
+                },
+                # 12. Physics Supporting
+                {
+                    "_id": "book_openstax_phys_sup",
+                    "subject_id": "subj_cur_openstax_college_2026_physics",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "library_id": "lib_openstax",
+                    "title": "Physics Lab Manual & Mechanics Worksheets",
+                    "title_ar": "دليل تجارب الفيزياء الجامعية ميكانيكا",
+                    "grade": "College",
+                    "term": "Term 1",
+                    "year": "2026",
+                    "language": "en",
+                    "book_type": "supporting",
+                    "source_url": "https://openstax.org/details/books/university-physics-volume-1-manual",
+                    "storage_path": "gs://fahem-academic-lake/openstax/physics_v1_sup.pdf",
+                    "coverUrl": "/libs/covers/phys_sup.jpg",
+                    "coverThumbUrl": "/libs/covers/phys_sup_thumb.jpg",
+                    "chapters": [
+                        {
+                            "id": "ch_1",
+                            "title": "Friction Lab Investigations",
+                            "title_ar": "تجارب الاحتكاك الحركي والسكوني",
+                            "page_start": 1,
+                            "page_end": 8,
+                            "concepts": ["Static vs kinetic friction", "Angle of repose"],
+                            "topics": [
+                                { "id": "t_phys_sup_1_1", "title": "Friction Coefficient Lab", "title_ar": "معمل قياس معامل الاحتكاك", "page": 1 },
+                                { "id": "t_phys_sup_1_2", "title": "Angle of Repose Proofs", "title_ar": "زاوية الانزلاق بالتفصيل", "page": 5 }
+                            ]
+                        }
+                    ]
                 }
             ]
-            
             for bk in books_data:
                 db["books"].replace_one({"_id": bk["_id"]}, bk, upsert=True)
-                
-            # --- 3. SEED QUESTION BANK ---
+
+            # --- 5. SEED BOOK PAGES (With 3072-dim embeddings for RAG) ---
+            book_pages_data = [
+                # Algebra page 1
+                {
+                    "_id": "page_moe_alg_g10_p1",
+                    "book_id": "book_moe_alg_g10_t1_core",
+                    "page_number": 1,
+                    "content": "مقدمة عن المصفوفات والمحددات: المصفوفة هي تنظيم مستطيل الشكل من الأرقام أو الرموز مرتبة في صفوف وأعمدة. نرمز للمصفوفة بحرف كبير مثل أ.",
+                    "content_ar": "مقدمة عن المصفوفات والمحددات: المصفوفة هي تنظيم مستطيل الشكل من الأرقام أو الرموز مرتبة في صفوف وأعمدة. نرمز للمصفوفة بحرف كبير مثل أ.",
+                    "i18n": {
+                        "en": "Introduction to Matrices and Determinants: A matrix is a rectangular array of numbers or symbols arranged in rows and columns. We denote matrices by uppercase letters like A.",
+                        "ar": "مقدمة عن المصفوفات والمحددات: المصفوفة هي تنظيم مستطيل الشكل من الأرقام أو الرموز مرتبة في صفوف وأعمدة. نرمز للمصفوفة بحرف كبير مثل أ.",
+                        "es": "Introducción a las matrices y determinantes: una matriz es una disposición rectangular de números o símbolos organizados en filas y columnas. Representamos las matrices con letras mayúsculas como A.",
+                        "fr": "Introduction aux matrices et déterminants : Une matrice est un tableau rectangulaire de nombres ou de symboles disposés en lignes et en colonnes. Nous désignons les matrices par des lettres majuscules comme A.",
+                        "de": "Einführung in Matrizen und Determinanten: Eine Matrix ist eine rechteckige Anordnung von Zahlen oder Symbolen, die in Zeilen und Spalten angeordnet sind. Wir bezeichnen Matrizen mit Großbuchstaben wie A.",
+                        "zh": "矩阵与行列式简介：矩阵是按行和列排列的数字或符号的矩形阵列。我们用大写字母（如A）表示矩阵。",
+                        "it": "Introduzione a matrici e determinanti: una matrice è una disposizione rettangolare di numeri o simboli disposti in righe e colonne. Indichiamo le matrici con lettere maiuscole come A."
+                    },
+                    "embedding": [0.001] * 3072
+                },
+                # Algebra page 7
+                {
+                    "_id": "page_moe_alg_g10_p7",
+                    "book_id": "book_moe_alg_g10_t1_core",
+                    "page_number": 7,
+                    "content": "المحددات هي قيمة عددية ترتبط بالمصفوفات المربعة فقط. إذا كانت أ مصفوفة من الرتبة 2*2 فإن محدد أ = أ11*أ22 - أ12*أ21. إذا كان المحدد يساوي صفرًا فإن المصفوفة منفردة.",
+                    "content_ar": "المحددات هي قيمة عددية ترتبط بالمصفوفات المربعة فقط. إذا كانت أ مصفوفة من الرتبة 2*2 فإن محدد أ = أ11*أ22 - أ12*أ21. إذا كان المحدد يساوي صفرًا فإن المصفوفة منفردة.",
+                    "i18n": {
+                        "en": "Determinants are numerical values associated only with square matrices. For a 2x2 matrix A, det(A) = a11*a22 - a12*a21. If the determinant is zero, the matrix is singular and has no inverse.",
+                        "ar": "المحددات هي قيمة عددية ترتبط بالمصفوفات المربعة فقط. إذا كانت أ مصفوفة من الرتبة 2*2 فإن محدد أ = أ11*أ22 - أ12*أ21. إذا كان المحدد يساوي صفرًا فإن المصفوفة منفردة.",
+                        "es": "Los determinantes son valores numéricos asociados únicamente con matrices cuadradas. Para una matriz de 2x2 A, det(A) = a11*a22 - a12*a21. Si el determinante es cero, la matriz es singular.",
+                        "fr": "Les déterminants sont des valeurs numériques associées uniquement aux matrices carrées. Pour une matrice 2x2 A, det(A) = a11*a22 - a12*a21. Si le déterminant est nul, la matrice est singulière.",
+                        "de": "Determinanten sind numerische Werte, die nur quadratischen Matrizen zugeordnet sind. Für eine 2x2-Matrix A gilt: det(A) = a11*a22 - a12*a21. Wenn die Determinante Null ist, ist die Matrix singulär.",
+                        "zh": "行列式是仅与方阵相关的数值。对于一个2x2矩阵A，det(A) = a11*a22 - a12*a21。如果行列式为零，则该矩阵为奇异矩阵。",
+                        "it": "I determinanti sono valori nucleici associati solo alle matrici quadrate. Per una matrice 2x2 A, det(A) = a11*a22 - a12*a21. Se il determinante è zero, la matrice è singolare."
+                    },
+                    "embedding": [0.001] * 3072
+                },
+                # Biology page 1
+                {
+                    "_id": "page_moe_bio_g11_p1",
+                    "book_id": "book_moe_bio_g11_t1_core",
+                    "page_number": 1,
+                    "content": "التغذية الذاتية هي العملية التي تقوم بها النباتات الخضراء لصنع غذائها بنفسها باستخدام عملية البناء الضوئي. تمتص البلاستيدات الخضراء الضوء بواسطة الكلوروفيل.",
+                    "content_ar": "التغذية الذاتية هي العملية التي تقوم بها النباتات الخضراء لصنع غذائها بنفسها باستخدام عملية البناء الضوئي. تمتص البلاستيدات الخضراء الضوء بواسطة الكلوروفيل.",
+                    "i18n": {
+                        "en": "Autotrophic nutrition is the process by which green plants make their own food using photosynthesis. Chloroplasts absorb solar energy using chlorophyll pigments.",
+                        "ar": "التغذية الذاتية هي العملية التي تقوم بها النباتات الخضراء لصنع غذائها بنفسها باستخدام عملية البناء الضوئي. تمتص البلاستيدات الخضراء الضوء بواسطة الكلوروفيل.",
+                        "es": "La nutrición autótrofa es el proceso mediante el cual las plantas verdes fabrican su propio alimento mediante la fotosíntesis.",
+                        "fr": "La nutrition autotrophe est le processus par lequel les plantes vertes fabriquent leur propre nourriture grâce à la photosynthèse.",
+                        "de": "Autotrophe Ernährung ist der Prozess, durch den grüne Pflanzen mithilfe der Fotosynthese ihre eigene Nahrung herstellen.",
+                        "zh": "自养营养是绿色植物利用光合作用制造自身食物的过程。",
+                        "it": "La nutrizione autotrofica è il processo mediante il quale le piante verdi producono il proprio cibo utilizzando la fotosintesi."
+                    },
+                    "embedding": [0.001] * 3072
+                },
+                # Calculus page 1
+                {
+                    "_id": "page_openstax_calc_p1",
+                    "book_id": "book_openstax_calc_core",
+                    "page_number": 1,
+                    "content": "Limits and Continuity: In calculus, a limit is the value that a function approaches as the input approaches some value. Limits are essential to define derivatives, integrals, and continuity.",
+                    "content_ar": "النهايات والاتصال: في التفاضل والتكامل، النهاية هي القيمة التي تقترب منها الدالة عندما يقترب المدخل من قيمة معينة. النهايات أساسية لتعريف المشتقات والتكاملات والاتصال.",
+                    "i18n": {
+                        "en": "Limits and Continuity: In calculus, a limit is the value that a function approaches as the input approaches some value. Limits are essential to define derivatives, integrals, and continuity.",
+                        "ar": "النهايات والاتصال: في التفاضل والتكامل، النهاية هي القيمة التي تقترب منها الدالة عندما يقترب المدخل من قيمة معينة. النهايات أساسية لتعريف المشتقات والتكاملات والاتصال.",
+                        "es": "Límites y continuidad: en cálculo, un límite es el valor al que se aproxima una función a medida que la entrada se aproxima a algún valor.",
+                        "fr": "Limites et continuité : En calcul, une limite est la valeur vers laquelle tend une fonction lorsque l'entrée s'approche d'une certaine valeur.",
+                        "de": "Grenzwerte und Stetigkeit: In der Analysis ist ein Grenzwert der Wert, dem sich eine Funktion nähert, wenn sich die Eingabe einem bestimmten Wert nähert.",
+                        "zh": "极限与连续性：在微积分中，极限是当自变量接近某个值时，函数所接近的值。极限对于定义导数、积分和连续性至关重要。",
+                        "it": "Limiti e continuità: nel calcolo, un limite è il valore a cui si avvicina una funzione quando l'input si avvicina a un certo valore."
+                    },
+                    "embedding": [0.001] * 3072
+                }
+            ]
+            for pg in book_pages_data:
+                db["book_pages"].replace_one({"_id": pg["_id"]}, pg, upsert=True)
+
+            # --- 6. SEED USERS (3: Student, Teacher, Admin) ---
+            users_data = [
+                {
+                    "userId": "test_user_id_gemini_2026",
+                    "_id": "test_user_id_gemini_2026",
+                    "name": "Ziad Al-Ghazali",
+                    "username": "ziad_student",
+                    "email": "ziad.student@fahem.pro",
+                    "role": "student",
+                    "userType": "student",
+                    "school": "Suez High School",
+                    "avatar": "👨‍🎓",
+                    "country": "EG",
+                    "grade": "Secondary 1",
+                    "isWhitelisted": True,
+                    "banned": False,
+                    "tokenPolicy": { "weeklyLimit": 250000, "usedTokens": 5000 }
+                },
+                {
+                    "userId": "test_teacher_id_gemini_2026",
+                    "_id": "test_teacher_id_gemini_2026",
+                    "name": "Mr. Tarek Al-Masry",
+                    "username": "tarek_teacher",
+                    "email": "tarek.teacher@fahem.pro",
+                    "role": "teacher",
+                    "userType": "teacher",
+                    "school": "Suez High School",
+                    "avatar": "👨‍🏫",
+                    "country": "EG",
+                    "grade": "Secondary 1",
+                    "isWhitelisted": True,
+                    "banned": False,
+                    "tokenPolicy": { "weeklyLimit": 500000, "usedTokens": 2000 }
+                },
+                {
+                    "userId": "fDtKpvuKYuSgB3km8DRTRgOU3RH3",
+                    "_id": "fDtKpvuKYuSgB3km8DRTRgOU3RH3",
+                    "name": "Hesham (Admin)",
+                    "username": "hesham_admin",
+                    "email": "hesham1988@gmail.com",
+                    "role": "super-admin",
+                    "userType": "admin",
+                    "school": "Fahem HQ",
+                    "avatar": "👑",
+                    "country": "EG",
+                    "grade": "General",
+                    "isWhitelisted": True,
+                    "banned": False
+                }
+            ]
+            for usr in users_data:
+                db["users"].replace_one({"_id": usr["_id"]}, usr, upsert=True)
+
+            # --- 7. SEED SOCIAL CHANNELS (2 groups, 2 threads, 2 replies) ---
+            social_groups_data = [
+                {
+                    "_id": "group_math",
+                    "name": "Pure Mathematics Club",
+                    "name_ar": "نادي الرياضيات البحتة",
+                    "description": "Math enthusiasts and algebra discussion.",
+                    "description_ar": "مساحة مخصصة لعشاق الرياضيات ومناقشة المسائل الجبرية.",
+                    "category": "Math",
+                    "emoji": "📐",
+                    "members_count": 12
+                },
+                {
+                    "_id": "group_science",
+                    "name": "Physics & Chemistry Lab",
+                    "name_ar": "مختبر الفيزياء والكيمياء",
+                    "description": "Scientific experiments and theory chat.",
+                    "description_ar": "تجارب ونقاشات حول النظريات الفيزيائية والتفاعلات الكيميائية.",
+                    "category": "Science",
+                    "emoji": "🧪",
+                    "members_count": 8
+                }
+            ]
+            for sg in social_groups_data:
+                db["social_groups"].replace_one({"_id": sg["_id"]}, sg, upsert=True)
+
+            social_threads_data = [
+                {
+                    "_id": "thread_math_1",
+                    "group_id": "group_math",
+                    "title": "How to solve complex quadratic equations quickly?",
+                    "title_ar": "كيفية حل المعادلات التربيعية المعقدة بسرعة؟",
+                    "content": "Does anyone have a fast method or shortcut for resolving quadratic equations with high constants?",
+                    "content_ar": "هل لدى أحدكم طريقة سريعة أو اختصار لحل المعادلات التربيعية ذات الثوابت الكبيرة؟",
+                    "author_id": "test_user_id_gemini_2026",
+                    "author_name": "Ziad Al-Ghazali",
+                    "author_avatar": "👨‍🎓",
+                    "created_at": "2026-06-03T12:00:00Z",
+                    "likes_count": 4,
+                    "replies_count": 1
+                },
+                {
+                    "_id": "thread_science_1",
+                    "group_id": "group_science",
+                    "title": "Photosynthesis light reactions summary",
+                    "title_ar": "ملخص تفاعلات الضوء في البناء الضوئي",
+                    "content": "I am summarizing the light reactions vs the Calvin cycle. Can someone confirm the exact roles of Photosystem I and II?",
+                    "content_ar": "أقوم بتلخيص تفاعلات الضوء مقابل دورة كالفن. هل يمكن لأحد تأكيد الأدوار الدقيقة للنظام الضوئي الأول والثاني؟",
+                    "author_id": "test_user_id_gemini_2026",
+                    "author_name": "Ziad Al-Ghazali",
+                    "author_avatar": "👨‍🎓",
+                    "created_at": "2026-06-04T09:15:00Z",
+                    "likes_count": 2,
+                    "replies_count": 1
+                }
+            ]
+            for st in social_threads_data:
+                db["social_threads"].replace_one({"_id": st["_id"]}, st, upsert=True)
+
+            social_replies_data = [
+                {
+                    "_id": "reply_math_1_1",
+                    "thread_id": "thread_math_1",
+                    "content": "You can use the quadratic formula directly, or perfect square trinomial decompositions. Try dividing by common factors first!",
+                    "content_ar": "يمكنك استخدام القانون العام مباشرة، أو تحليل المربع الكامل. جرب القسمة على العوامل المشتركة أولاً!",
+                    "author_id": "test_teacher_id_gemini_2026",
+                    "author_name": "Mr. Tarek Al-Masry",
+                    "author_avatar": "👨‍🏫",
+                    "created_at": "2026-06-03T14:30:00Z"
+                },
+                {
+                    "_id": "reply_science_1_1",
+                    "thread_id": "thread_science_1",
+                    "content": "Photosystem II absorbs light first, splitting water to release O2 and proton gradient. Photosystem I then uses light to reduce NADP+ to NADPH!",
+                    "content_ar": "يمتص النظام الضوئي الثاني الضوء أولاً، ويقوم بشطر الماء لإطلاق الأكسجين وتدرج البروتونات. ثم يستخدم النظام الضوئي الأول الضوء لاختزال NADP+ إلى NADPH!",
+                    "author_id": "test_teacher_id_gemini_2026",
+                    "author_name": "Mr. Tarek Al-Masry",
+                    "author_avatar": "👨‍🏫",
+                    "created_at": "2026-06-04T10:45:00Z"
+                }
+            ]
+            for sr in social_replies_data:
+                db["social_replies"].replace_one({"_id": sr["_id"]}, sr, upsert=True)
+
+            # --- 8. SEED GROUP ASSIGNMENTS & TIMED WORK (1+ with individual answeredAt) ---
+            now_ts = int(time.time())
+            group_assignments_data = [
+                {
+                    "_id": "asg_moe_alg_g10_t1_linear_eq",
+                    "group_id": "group_math",
+                    "title": "Algebra Assignment: Linear Equations and Matrices",
+                    "title_ar": "واجب الجبر: المعادلات الخطية والمصفوفات",
+                    "instructions": "Please review Chapter 1 of High School Algebra and solve the questions before the timer ends. Double check matrix inversions.",
+                    "instructions_ar": "يرجى مراجعة الفصل الأول من كتاب الجبر وحل الأسئلة قبل انتهاء المؤقت. تأكد من المعكوس الضربي للمصفوفات.",
+                    "book_id": "book_moe_alg_g10_t1_core",
+                    "chapter_id": "ch_1",
+                    "creator_id": "test_teacher_id_gemini_2026",
+                    "duration_minutes": 45,
+                    "status": "active",
+                    "created_at": now_ts - 600,
+                    "starts_at": now_ts - 600,
+                    "ends_at": now_ts + 3600,
+                    "questions": [
+                        { "question_id": "q_mat_001", "weight": 5 },
+                        { "question_id": "q_mat_002", "weight": 5 }
+                    ]
+                }
+            ]
+            for ga in group_assignments_data:
+                db["group_assignments"].replace_one({"_id": ga["_id"]}, ga, upsert=True)
+
+            assignment_submissions_data = [
+                {
+                    "_id": "sub_ziad_asg_moe_alg",
+                    "assignment_id": "asg_moe_alg_g10_t1_linear_eq",
+                    "uid": "test_user_id_gemini_2026",
+                    "answers": [
+                        { "question_id": "q_mat_001", "answer": "The matrix does not possess an inverse.", "answeredAt": "2026-06-07T18:00:00Z" }
+                    ],
+                    "score": 5,
+                    "status": "graded",
+                    "graded_by": "system",
+                    "graded_at": "2026-06-07T18:05:00Z",
+                    "feedback": "Excellent work! Correctly identified singular matrix criteria.",
+                    "feedback_ar": "عمل ممتاز! تم تحديد شروط المصفوفة المنفردة بشكل صحيح."
+                }
+            ]
+            for asb in assignment_submissions_data:
+                db["assignment_submissions"].replace_one({"_id": asb["_id"]}, asb, upsert=True)
+
+            # --- 9. SEED COMPANION PERSONA-GUIDED PREFERENCES ---
+            companion_facts_data = [
+                {
+                    "_id": "fact_ziad_preference",
+                    "userId": "test_user_id_gemini_2026",
+                    "fact": "Prefers dark mode, loves visual explanations using math diagrams, struggles slightly with matrix division.",
+                    "created_at": "2026-06-07T12:00:00Z",
+                    "updated_at": "2026-06-07T12:00:00Z"
+                },
+                {
+                    "_id": "fact_tarek_preference",
+                    "userId": "test_teacher_id_gemini_2026",
+                    "fact": "Focuses heavily on step-by-step proofs and real-world Egyptian application problems.",
+                    "created_at": "2026-06-07T12:00:00Z",
+                    "updated_at": "2026-06-07T12:00:00Z"
+                }
+            ]
+            for cf in companion_facts_data:
+                db["companion_facts"].replace_one({"_id": cf["_id"]}, cf, upsert=True)
+
+            # --- 10. SEED QUESTION BANK (6 realistic MCQs grounded in seeded books) ---
             questions_data = [
                 {
                     "_id": "q_mat_001",
-                    "book_id": "book_moe_alg_g10_t1",
+                    "book_id": "book_moe_alg_g10_t1_core",
                     "chapter_id": "ch_1",
-                    "page_reference": 14,
+                    "page_reference": 7,
                     "type": "MCQ",
                     "complexity_rating": "intermediate",
                     "question_text": "Given a matrix A where det(A) = 0, what can be inferred about its inverse?",
@@ -404,9 +1105,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 },
                 {
                     "_id": "q_mat_002",
-                    "book_id": "book_moe_alg_g10_t1",
+                    "book_id": "book_moe_alg_g10_t1_core",
                     "chapter_id": "ch_1",
-                    "page_reference": 22,
+                    "page_reference": 7,
                     "type": "MCQ",
                     "complexity_rating": "hard",
                     "question_text": "Under what condition is Cramer's rule inapplicable to a system of linear equations?",
@@ -427,10 +1128,34 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "embedding": [-0.02, 0.051, 0.118, 0.612]
                 },
                 {
-                    "_id": "q_bio_001",
-                    "book_id": "book_moe_bio_g11_t1",
+                    "_id": "q_chem_001",
+                    "book_id": "book_moe_chem_g10_t1_core",
                     "chapter_id": "ch_1",
-                    "page_reference": 18,
+                    "page_reference": 1,
+                    "type": "MCQ",
+                    "complexity_rating": "intermediate",
+                    "question_text": "What type of chemical bond is formed when electrons are shared between two atoms?",
+                    "question_text_ar": "ما نوع الرابطة الكيميائية التي تتكون عند مشاركة الإلكترونات بين ذرتين؟",
+                    "distractors": [
+                        "Ionic bond",
+                        "Hydrogen bond",
+                        "Metallic bond"
+                    ],
+                    "distractors_ar": [
+                        "رابطة أيونية",
+                        "رابطة هيدروجينية",
+                        "رابطة فلزية"
+                    ],
+                    "correct_answer": "Covalent bond",
+                    "correct_answer_ar": "رابطة تساهمية",
+                    "pedagogical_intent": "Identify the difference between ionic and covalent bonding mechanisms.",
+                    "embedding": [0.001] * 3072
+                },
+                {
+                    "_id": "q_bio_001",
+                    "book_id": "book_moe_bio_g11_t1_core",
+                    "chapter_id": "ch_1",
+                    "page_reference": 1,
                     "type": "MCQ",
                     "complexity_rating": "intermediate",
                     "question_text": "Which wavelength of light is least absorbed by chlorophyll a and b during photosynthesis?",
@@ -451,46 +1176,96 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "embedding": [0.089, -0.112, 0.301, 0.154]
                 },
                 {
-                    "_id": "q_ara_001",
-                    "book_id": "book_moe_grammar_g12",
+                    "_id": "q_hist_001",
+                    "book_id": "book_moe_hist_g11_t1_core",
                     "chapter_id": "ch_1",
-                    "page_reference": 12,
+                    "page_reference": 1,
                     "type": "MCQ",
-                    "complexity_rating": "hard",
-                    "question_text": "In the sentence 'أنشأ المهندس يبني المصنع', what is the grammatical position of the verb 'أنشأ' and its predicate?",
-                    "question_text_ar": "في الجملة 'أنشأ المهندس يبني المصنع'، ما هو الموقع الإعرابي للفعل 'أنشأ' وخبره؟",
+                    "complexity_rating": "intermediate",
+                    "question_text": "Which famous traveler visited Egypt during the medieval era and documented Alexandria's port?",
+                    "question_text_ar": "أي الرحالة المشهورين زار مصر في العصور الوسطى ووثق معالم ميناء الإسكندرية؟",
                     "distractors": [
-                        "Ansha is a standard transitive verb, and the sentence 'yabni' is an adjective clause.",
-                        "Ansha is an inchoative verb, and its predicate 'yabni' can be prefixed with 'An'.",
-                        "Ansha behaves exactly like Kana and its predicate must be a singular noun."
+                        "Marco Polo",
+                        "Vasco da Gama",
+                        "Magellan"
                     ],
                     "distractors_ar": [
-                        "أنشأ فعل تام متعدٍ، وجملة 'يبني' في محل نصب نعت.",
-                        "أنشأ فعل شروع، ويجوز اقتران خبره 'يبني' بـ 'أن'.",
-                        "أنشأ يعمل عمل كان تماماً وخبره يجب أن يكون مفرداً."
+                        "ماركو بولو",
+                        "فاسكو دي غاما",
+                        "ماجلان"
                     ],
-                    "correct_answer": "Ansha is an inchoative verb (verb of beginning) whose predicate 'yabni' must be an un-associated present tense clause.",
-                    "correct_answer_ar": "أنشأ فعل شروع ناقص جامد، وخبره الجملة الفعلية 'يبني' يمتنع اقترانه بـ 'أن'.",
-                    "pedagogical_intent": "Verify understanding of Shuroo' verbs (Ansha) predicate association rules.",
-                    "embedding": [0.03, 0.22, -0.12, 0.81]
+                    "correct_answer": "Ibn Battuta",
+                    "correct_answer_ar": "ابن بطوطة",
+                    "pedagogical_intent": "Recognize major historical figures and source documents of Islamic trade eras.",
+                    "embedding": [0.001] * 3072
+                },
+                {
+                    "_id": "q_calc_001",
+                    "book_id": "book_openstax_calc_core",
+                    "chapter_id": "ch_1",
+                    "page_reference": 1,
+                    "type": "MCQ",
+                    "complexity_rating": "easy",
+                    "question_text": "In calculus, what is the value of the limit of sin(x)/x as x approaches 0?",
+                    "question_text_ar": "في التفاضل والتكامل، ما هي قيمة نهاية الدالة جا(س)/س عندما تقترب س من الصفر؟",
+                    "distractors": [
+                        "0",
+                        "Infinity",
+                        "Undefined"
+                    ],
+                    "distractors_ar": [
+                        "0",
+                        "ما لا نهاية",
+                        "غير معرفة"
+                    ],
+                    "correct_answer": "1",
+                    "correct_answer_ar": "1",
+                    "pedagogical_intent": "Understand basic trigonometric limit identities.",
+                    "embedding": [0.001] * 3072
                 }
             ]
-            
             for q in questions_data:
                 db["question_bank"].replace_one({"_id": q["_id"]}, q, upsert=True)
-                
-            # Create indexes for the new collections
+
+            # --- 11. SEED ACTIVE PRACTICE SESSIONS ---
+            active_practice_sessions_data = [
+                {
+                    "_id": "prac_ziad_1",
+                    "uid": "test_user_id_gemini_2026",
+                    "book_id": "book_moe_alg_g10_t1_core",
+                    "subject_id": "subj_cur_moe_g10_t1_2026_algebra",
+                    "status": "active",
+                    "created_at": "2026-06-07T18:00:00Z"
+                }
+            ]
+            for ps in active_practice_sessions_data:
+                db["active_practice_sessions"].replace_one({"_id": ps["_id"]}, ps, upsert=True)
+
+            # --- 12. CREATE TUNED COMPOUND AND SINGLE INDEXES ---
             db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True)
             db["books"].create_index([("subject_id", 1)])
             db["question_bank"].create_index([("book_id", 1), ("chapter_id", 1)])
-            
+            db["book_pages"].create_index([("book_id", 1), ("page_number", 1)])
+            logger.info("[SEED] Successfully established all sandbox indexes!")
+
             return {
                 "status": "success",
                 "message": "Database seeded successfully with dynamic Egyptian curriculum models!",
                 "seeded_counts": {
+                    "libraries": len(libraries_data),
+                    "curricula": len(curricula_data),
                     "subjects": len(subjects_data),
                     "books": len(books_data),
-                    "question_bank": len(questions_data)
+                    "book_pages": len(book_pages_data),
+                    "users": len(users_data),
+                    "social_groups": len(social_groups_data),
+                    "social_threads": len(social_threads_data),
+                    "social_replies": len(social_replies_data),
+                    "group_assignments": len(group_assignments_data),
+                    "assignment_submissions": len(assignment_submissions_data),
+                    "companion_facts": len(companion_facts_data),
+                    "question_bank": len(questions_data),
+                    "active_practice_sessions": len(active_practice_sessions_data)
                 }
             }
         except Exception as err:
