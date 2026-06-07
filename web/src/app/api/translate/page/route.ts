@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "../../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
           mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
           await mongoClient.connect();
-          const db = mongoClient.db("fahem");
+          const db = mongoClient.db(getDbTarget());
           page = await db.collection("book_pages").findOne({
             book_id: bookId,
             page_number: Number(pageNumber)
@@ -314,7 +314,7 @@ MANDATORY RULES:
         saveLocalDb(localDb);
       }
     } else if (mongoClient) {
-      const db = mongoClient.db("fahem");
+      const db = mongoClient.db(getDbTarget());
       await db.collection("book_pages").updateOne(
         { _id: page._id },
         { $set: { i18n: page.i18n } }

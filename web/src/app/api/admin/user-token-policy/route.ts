@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
+import { getLocalDb, saveLocalDb, isLocalEnv, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { requireAdmin } from "../../_auth";
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
       const userDoc = await db.collection("users").findOne({ userId });
       await client.close();
 
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
     const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
     await client.connect();
-    const db = client.db("fahem");
+    const db = client.db(getDbTarget());
 
     let result;
     if (clearPolicy) {

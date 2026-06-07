@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       uid: uid,
       email: email,
       role: role,
-      db_target: "fahem_sandbox",
+      db_target: email === "hesham1988@gmail.com" ? "fahem" : "fahem_sandbox",
       sandbox_session_id: sandboxSessionId,
       exp: exp
     };

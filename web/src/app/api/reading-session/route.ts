@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo, getDbTarget } from "../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
           const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
           mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
           await mongoClient.connect();
-          const db = mongoClient.db("fahem");
+          const db = mongoClient.db(getDbTarget());
           sessions = await db.collection("reading_sessions").find({ uid: uid }).toArray();
           await mongoClient.close();
         }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
           const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
           mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
           await mongoClient.connect();
-          const db = mongoClient.db("fahem");
+          const db = mongoClient.db(getDbTarget());
           session = await db.collection("reading_sessions").findOne({ _id: sessionKey });
         }
       } catch (mongoErr) {
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       }
       saveLocalDb(localDb);
     } else if (mongoClient) {
-      const db = mongoClient.db("fahem");
+      const db = mongoClient.db(getDbTarget());
       await db.collection("reading_sessions").updateOne(
         { _id: sessionKey },
         { $set: session },

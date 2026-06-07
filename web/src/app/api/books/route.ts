@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { checkIsAdmin, checkIsSuperadmin } from "../admin/helper";
 import { proxyRequest } from "../proxy";
 import { verifyAuth } from "../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo, getDbTarget } from "../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
 
       if (bookId) {
         const book = await db.collection("books").findOne({ _id: bookId });
@@ -498,7 +498,7 @@ export async function POST(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
 
       await db.collection("books").updateOne(
         { _id: bookId },
@@ -678,7 +678,7 @@ export async function PUT(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
       await db.collection("books").updateOne(
         { _id: id },
         {

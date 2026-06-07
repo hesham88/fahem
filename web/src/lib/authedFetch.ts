@@ -18,7 +18,9 @@ export async function authedFetch(path: string, init: RequestInit = {}): Promise
         token = await currentUser.getIdToken();
         // Clear bypass flags if a real user is successfully authenticated
         localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("judge_bypass_email");
         localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
       } catch (err) {
         console.error("[authedFetch] Failed to retrieve Firebase ID token:", err);
       }

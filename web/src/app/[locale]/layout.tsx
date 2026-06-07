@@ -215,10 +215,7 @@ export default async function LocaleLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <Script
-          src="https://www.google.com/recaptcha/enterprise.js?render=6LfT9wQtAAAAAFElDHZ9ddSZHbKzMZx2-IO7PLKV"
-          strategy="afterInteractive"
-        />
+
       </head>
       <body>
         <LanguageProvider locale={locale as Language}>

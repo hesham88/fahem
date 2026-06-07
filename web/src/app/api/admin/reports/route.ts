@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
+import { getLocalDb, saveLocalDb, isLocalEnv, getDbTarget } from "../../localDbHelper";
 import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
     await client.connect();
-    const db = client.db("fahem");
+    const db = client.db(getDbTarget());
     const reports = await db.collection("reports").find({}).sort({ createdAt: -1 }).toArray();
     await client.close();
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
     await client.connect();
-    const db = client.db("fahem");
+    const db = client.db(getDbTarget());
     
     const result = await db.collection("reports").updateOne(
       { _id: reportId },

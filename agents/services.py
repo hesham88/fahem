@@ -730,7 +730,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         from pymongo import MongoClient
                         from tools import get_mongodb_uri
                         cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
-                        mongodb = cl["fahem"]
+                        mongodb = get_active_db(cl)
                         mongodb["crawl_jobs"].update_one(
                             {"_id": j_id},
                             {"$set": {"active_pid": p_id}}
@@ -776,7 +776,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             from pymongo import MongoClient
                             from tools import get_mongodb_uri
                             cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
-                            mongodb = cl["fahem"]
+                            mongodb = get_active_db(cl)
                             
                             job = mongodb["crawl_jobs"].find_one({"_id": j_id})
                             existing_logs = job.get("logs", []) if job else []
@@ -818,7 +818,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         from pymongo import MongoClient
                         from tools import get_mongodb_uri
                         cl = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=2000)
-                        mongodb = cl["fahem"]
+                        mongodb = get_active_db(cl)
                         mongodb["crawl_jobs"].update_one(
                             {"_id": j_id},
                             {"$set": {

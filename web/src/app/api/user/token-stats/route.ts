@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getLocalDb, isLocalEnv } from "../../localDbHelper";
+import { getLocalDb, isLocalEnv, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { requireUser } from "../../_auth";
 
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
         const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
         await client.connect();
-        const db = client.db("fahem");
+        const db = client.db(getDbTarget());
 
         // Config doc
         const dbConfig = await db.collection("config").findOne({});

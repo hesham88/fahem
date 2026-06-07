@@ -2,6 +2,17 @@ import os
 import json
 import httpx
 import datetime
+
+def get_active_db(client):
+    try:
+        from agents.mongodb_engine import db_target_var
+    except ImportError:
+        try:
+            from mongodb_engine import db_target_var
+        except ImportError:
+            return client['fahem']
+    return client[db_target_var.get()]
+
 import logging
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
@@ -427,7 +438,7 @@ async def admin_tool(action: str, payload: Optional[dict] = None) -> Dict[str, A
                 from pymongo import MongoClient
                 uri = get_mongodb_uri()
                 client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-                mdb = client["fahem"]
+                mdb = get_active_db(client)
                 mdb["books"].update_one({"_id": book_id}, {"$set": draft_book}, upsert=True)
                 mdb["ingestion_jobs"].update_one({"_id": job_id}, {"$set": draft_job}, upsert=True)
                 client.close()

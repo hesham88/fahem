@@ -23,6 +23,7 @@ interface SubjectsPanelProps {
   dynamicBooks: Book[];
   selectedSubjectId: string;
   setSelectedSubjectId: (id: string) => void;
+  handleStartStudy: (book: any, pageNum?: number) => void;
   t: (key: string) => string;
 }
 
@@ -37,9 +38,10 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
   dynamicBooks,
   selectedSubjectId,
   setSelectedSubjectId,
+  handleStartStudy,
   t,
 }) => {
-  const [expandedModule, setExpandedModule] = useState<number | null>(null);
+  const [expandedModule, setExpandedModule] = useState<string | null>(null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -128,150 +130,148 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
           <h3 style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800 }}>
             {language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}
           </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {(() => {
-              const activeBook = dynamicBooks && dynamicBooks.find((b: any) => b.subject_id === selectedSubjectId);
-              const modulesList =
-                activeBook && activeBook.chapters && activeBook.chapters.length > 0
-                  ? activeBook.chapters.map((ch: any) => ({
-                      titleAr: ch.title_ar || ch.title,
-                      titleEn: ch.title,
-                      lessons: ch.concepts || [],
-                    }))
-                  : selectedSubjectId === "subj_algebra_stats"
-                  ? [
-                      {
-                        titleAr: "الوحدة الأولى: الجبر والنسب المثلثية",
-                        titleEn: "Module 1: Algebra & Trigonometry Trigonometric Functions",
-                        lessons: ["المعادلات التربيعية", "المتطابقات المثلثية", "المصفوفات والمحددات"],
-                      },
-                      {
-                        titleAr: "الوحدة الثانية: علم التفاضل والتكامل المبسط",
-                        titleEn: "Module 2: Basics of Calculus & Limits",
-                        lessons: ["النهايات والاتصال", "قواعد الاشتقاق وتطبيقاته", "المشتقات العليا"],
-                      },
-                      {
-                        titleAr: "الوحدة الثالثة: الاحتمالات والإحصاء التطبيقي",
-                        titleEn: "Module 3: Probability & Applied Statistics",
-                        lessons: ["التوزيع الطبيعي المعتدل", "معامل الارتباط وبيرسون", "مبدأ العد والتباديل"],
-                      },
-                    ]
-                  : selectedSubjectId === "subj_biology"
-                  ? [
-                      {
-                        titleAr: "الوحدة الأولى: التغذية والعمليات الذاتية",
-                        titleEn: "Module 1: Nutrition & Autotrophic Processes",
-                        lessons: ["التغذية الذاتية والغير ذاتية", "البناء الضوئي وتفاعلاته", "حلقة كالفن وإنتاج الطاقة"],
-                      },
-                      {
-                        titleAr: "الوحدة الثانية: النقل في الكائنات الحية",
-                        titleEn: "Module 2: Transport in Living Organisms",
-                        lessons: ["جهاز الدوران في الإنسان", "تركيب الدم والقلب والأوعية", "النظام الليمفاوي ومقاومة الأمراض"],
-                      },
-                    ]
-                  : selectedSubjectId === "subj_arabic_grammar"
-                  ? [
-                      {
-                        titleAr: "الوحدة الأولى: الأفعال الناسخة المقاربة والشروع",
-                        titleEn: "Module 1: Dynamic Verbs (Kaada & her Sisters)",
-                        lessons: ["اسم كاد وخبرها الجملة الفعلية", "شروط اقتران الخبر بأن", "الفروق الجوهرية بين كان وكاد"],
-                      },
-                      {
-                        titleAr: "الوحدة الثانية: أسلوب الاستثناء وأدواته",
-                        titleEn: "Module 2: Style of Exception (Al-Mustathna)",
-                        lessons: ["أحكام المستثنى بعد إلا وغير وسوى", "الاستثناء التام والناقص المنفي", "أحكام الاستثناء بخلا وعدا وحاشا"],
-                      },
-                    ]
-                  : [
-                      {
-                        titleAr: "الوحدة الأولى: المناهج العامة والدراسات",
-                        titleEn: "Module 1: General Curriculum & Studies",
-                        lessons: ["مراجعة عامة", "مفاهيم أساسية", "تدريبات وتطبيقات مخصصة"],
-                      },
-                    ];
+              const subjectBooks = dynamicBooks ? dynamicBooks.filter((b: any) => b.subject_id === selectedSubjectId) : [];
+              if (subjectBooks.length === 0) {
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", textAlign: "center", gap: "1rem" }}>
+                    <span style={{ fontSize: "3rem" }}>📚</span>
+                    <span style={{ fontWeight: 700, color: "#6a7c88", fontSize: "0.95rem" }}>
+                      {language === "ar" ? "لا توجد كتب دراسية مخصصة لهذه المادة بعد" : "No textbooks linked to this subject yet"}
+                    </span>
+                  </div>
+                );
+              }
 
-              return modulesList.map((mod: any, index: number) => (
-                <div
-                  key={index}
-                  style={{
-                    border: "1px solid var(--card-border)",
-                    borderRadius: "var(--border-radius-sm)",
-                    background: "#ffffff",
-                    overflow: "hidden",
-                  }}
-                >
-                  <button
-                    onClick={() => setExpandedModule(expandedModule === index ? null : index)}
-                    style={{
-                      width: "100%",
-                      padding: "1rem",
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontWeight: 700,
-                      color: "var(--primary)",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    <span>{language === "ar" ? mod.titleAr : mod.titleEn}</span>
-                    <span>{expandedModule === index ? "▼" : "▶"}</span>
-                  </button>
-                  {expandedModule === index && (
-                    <div
-                      style={{
-                        padding: "0.5rem 1rem 1rem 1rem",
-                        borderTop: "1px solid rgba(0,0,0,0.04)",
-                        background: "rgba(16, 107, 163, 0.01)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      {mod.lessons.map((les: string, lessonIdx: number) => (
-                        <div
-                          key={lessonIdx}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "0.5rem",
-                            background: "#ffffff",
-                            border: "1px solid rgba(0,0,0,0.03)",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>📚 {les}</span>
-                          <button
-                            onClick={() =>
-                              alert(
-                                language === "ar"
-                                  ? `جاري بدء الدرس التفاعلي الموثق بالصفحات الدراسية لـ: ${les}`
-                                  : `Starting page-grounded interactive tutor lesson for: ${les}`
-                              )
-                            }
+              return subjectBooks.map((book: any, bIdx: number) => {
+                const chapters = book.chapters || [];
+                return (
+                  <div key={bIdx} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", borderBottom: bIdx < subjectBooks.length - 1 ? "1px dashed rgba(0, 0, 0, 0.05)" : "none", paddingBottom: bIdx < subjectBooks.length - 1 ? "1.5rem" : "0" }}>
+                    {/* Book Subtitle */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(16, 107, 163, 0.04)", padding: "0.5rem 1rem", borderRadius: "10px", marginBottom: "0.25rem" }}>
+                      <span style={{ fontSize: "1.2rem" }}>📖</span>
+                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--foreground)" }}>
+                        {language === "ar" ? (book.titleAr || book.title) : (book.titleEn || book.title)}
+                      </span>
+                    </div>
+
+                    {chapters.length === 0 ? (
+                      <div style={{ padding: "1rem", fontStyle: "italic", fontSize: "0.85rem", color: "#6a7c88", textAlign: "center" }}>
+                        {language === "ar" ? "لا توجد فصول دراسية مدخلة بعد" : "No chapters available yet"}
+                      </div>
+                    ) : (
+                      chapters.map((ch: any, cIdx: number) => {
+                        const chapterKey = `${book._id || bIdx}-${cIdx}`;
+                        const isExpanded = expandedModule === chapterKey;
+                        const chapterTitle = language === "ar" 
+                          ? (ch.title_ar || ch.titleAr || ch.title || `الفصل ${cIdx + 1}`)
+                          : (ch.titleEn || ch.title || `Chapter ${cIdx + 1}`);
+                        const topics = ch.topics || [];
+
+                        return (
+                          <div
+                            key={cIdx}
                             style={{
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              border: "none",
-                              cursor: "pointer",
-                              background: "var(--primary)",
-                              color: "#ffffff",
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
+                              border: "1px solid var(--card-border)",
+                              borderRadius: "var(--border-radius-sm)",
+                              background: "#ffffff",
+                              overflow: "hidden",
                             }}
                           >
-                            {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ));
+                            <button
+                              onClick={() => setExpandedModule(isExpanded ? null : chapterKey)}
+                              style={{
+                                width: "100%",
+                                padding: "1rem",
+                                border: "none",
+                                background: "none",
+                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                fontWeight: 700,
+                                color: "var(--primary)",
+                                fontFamily: "var(--font-sans)",
+                                fontSize: "0.9rem",
+                              }}
+                            >
+                              <span>{chapterTitle}</span>
+                              <span>{isExpanded ? "▼" : "▶"}</span>
+                            </button>
+                            {isExpanded && (
+                              <div
+                                style={{
+                                  padding: "0.5rem 1rem 1rem 1rem",
+                                  borderTop: "1px solid rgba(0,0,0,0.04)",
+                                  background: "rgba(16, 107, 163, 0.01)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                {topics.length === 0 ? (
+                                  <div style={{ fontSize: "0.82rem", color: "#6a7c88", padding: "0.5rem", textAlign: "center" }}>
+                                    {language === "ar" ? "لا توجد موضوعات مضافة" : "No topics added"}
+                                  </div>
+                                ) : (
+                                  topics.map((top: any, tIdx: number) => {
+                                    const topicTitle = language === "ar"
+                                      ? (top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`)
+                                      : (top.titleEn || top.title || `Topic ${tIdx + 1}`);
+                                    const pageNum = top.pageNum || top.page_number || top.pageNumber || 1;
+
+                                    return (
+                                      <div
+                                        key={tIdx}
+                                        style={{
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          alignItems: "center",
+                                          padding: "0.5rem 0.75rem",
+                                          background: "#ffffff",
+                                          border: "1px solid rgba(0,0,0,0.03)",
+                                          borderRadius: "8px",
+                                          boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                                        }}
+                                      >
+                                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>📚 {topicTitle}</span>
+                                        <button
+                                          onClick={() => handleStartStudy(book, pageNum)}
+                                          style={{
+                                            padding: "4px 12px",
+                                            borderRadius: "6px",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            background: "var(--primary)",
+                                            color: "#ffffff",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 700,
+                                            boxShadow: "0 2px 4px rgba(16, 107, 163, 0.15)",
+                                            transition: "all 0.2s",
+                                          }}
+                                          onMouseOver={(e) => {
+                                            e.currentTarget.style.opacity = "0.9";
+                                          }}
+                                          onMouseOut={(e) => {
+                                            e.currentTarget.style.opacity = "1";
+                                          }}
+                                        >
+                                          {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
+                                        </button>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              });
             })()}
           </div>
         </div>

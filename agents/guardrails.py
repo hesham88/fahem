@@ -11,6 +11,17 @@ from google.adk.models.llm_response import LlmResponse
 
 logger = logging.getLogger("fahem.guardrails")
 
+def get_active_db(client):
+    try:
+        from agents.mongodb_engine import db_target_var
+    except ImportError:
+        try:
+            from mongodb_engine import db_target_var
+        except ImportError:
+            return client['fahem']
+    return client[db_target_var.get()]
+
+
 # Configure basic logging for auditing visibility
 try:
     logging.basicConfig(level=logging.INFO)
@@ -195,7 +206,7 @@ def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
         
         uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
         client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-        db = client["fahem"]
+        db = get_active_db(client)
         
         # 1. Load System Config defaults
         config_doc = db["config"].find_one() or {}
@@ -534,7 +545,7 @@ def after_tool_callback(*args, **kwargs) -> Optional[dict]:
                     from datetime import datetime, timedelta
                     uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
                     client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-                    db = client["fahem"]
+                    db = get_active_db(client)
                     config_doc = db["config"].find_one() or {}
                     weekly_limit = config_doc.get("weeklyAllocationLimit", 250000)
                     user_prof = db["user_profiles"].find_one({"userId": uid}) or {}

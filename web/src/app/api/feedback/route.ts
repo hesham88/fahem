@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, getDbTarget } from "../localDbHelper";
 import { requireUser } from "../_auth";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
       
       const count = await db.collection("reports").countDocuments({
         userId: ctx.uid,
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
     await client.connect();
-    const db = client.db("fahem");
+    const db = client.db(getDbTarget());
     
     await db.collection("reports").insertOne(newReport);
     await client.close();

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { proxyRequest, getOidcToken } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo, checkFocusLockLocal } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo, checkFocusLockLocal, getDbTarget } from "../localDbHelper";
 import { checkIsSuperadmin, checkIsAdmin } from "../admin/helper";
 import { requireUser } from "../_auth";
 import { spawn } from "child_process";
@@ -35,7 +35,7 @@ async function getJobMetadata(jobId: string): Promise<any> {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
       const job = await db.collection("ingestion_jobs").findOne({ _id: jobId });
       await client.close();
       return job || null;
@@ -411,20 +411,27 @@ export async function POST(req: NextRequest) {
 
                   // 4. Content / Text Streaming
                   if (event.content?.parts) {
-                    let textChunk = "";
-                    for (const part of event.content.parts) {
-                      if (part.text) {
-                        textChunk += part.text;
+                    if (event.partial === false && finalResponseText) {
+                      // Skip duplicate final consolidated events if we already streamed the partials
+                    } else {
+                      let textChunk = "";
+                      for (const part of event.content.parts) {
+                        if (part.thought) {
+                          continue; // skip thoughts
+                        }
+                        if (part.text) {
+                          textChunk += part.text;
+                        }
                       }
-                    }
 
-                    if (textChunk) {
-                      if (!hasStartedFinalOutput) {
-                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-                        hasStartedFinalOutput = true;
+                      if (textChunk) {
+                        if (!hasStartedFinalOutput) {
+                          controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                          hasStartedFinalOutput = true;
+                        }
+                        finalResponseText += textChunk;
+                        controller.enqueue(encoder.encode(textChunk));
                       }
-                      finalResponseText += textChunk;
-                      controller.enqueue(encoder.encode(textChunk));
                     }
                   }
 
@@ -454,19 +461,26 @@ export async function POST(req: NextRequest) {
             try {
               const event = JSON.parse(dataStr);
               if (event.content?.parts) {
-                let textChunk = "";
-                for (const part of event.content.parts) {
-                  if (part.text) {
-                    textChunk += part.text;
+                if (event.partial === false && finalResponseText) {
+                  // Skip duplicate final consolidated events
+                } else {
+                  let textChunk = "";
+                  for (const part of event.content.parts) {
+                    if (part.thought) {
+                      continue; // skip thoughts
+                    }
+                    if (part.text) {
+                      textChunk += part.text;
+                    }
                   }
-                }
-                if (textChunk) {
-                  if (!hasStartedFinalOutput) {
-                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-                    hasStartedFinalOutput = true;
+                  if (textChunk) {
+                    if (!hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                      hasStartedFinalOutput = true;
+                    }
+                    finalResponseText += textChunk;
+                    controller.enqueue(encoder.encode(textChunk));
                   }
-                  finalResponseText += textChunk;
-                  controller.enqueue(encoder.encode(textChunk));
                 }
               }
             } catch (e) {}

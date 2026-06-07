@@ -623,8 +623,7 @@ export default function Home() {
     const domain = email.toLowerCase().split("@")[1];
     return ["google.com", "mongodb.com", "devpost.com"].includes(domain);
   };
-  const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
-  const isJudge = isJudgeBypass || isJudgeEmail(user?.email) || userProfile?.role === "judge" || userProfile?.isWhitelisted;
+  const isJudge = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
   
   // Conversational Onboarding states
   const [localCompleted, setLocalCompleted] = useState(false);
@@ -2805,12 +2804,20 @@ export default function Home() {
   }, [onboardingRecaptchaVerifier]);
 
   // Phone verification methods for onboarding
+  // Phone verification methods for onboarding
   const setupOnboardingRecaptcha = (containerId: string) => {
     if (typeof window === "undefined") return null;
     try {
       const container = document.getElementById(containerId);
       if (!container) return null;
-      container.innerHTML = '<div id="onboarding-recaptcha-widget"></div>';
+      
+      // Use existing stable element if present to avoid churning the DOM node between attempts
+      let widget = document.getElementById("onboarding-recaptcha-widget");
+      if (!widget) {
+        widget = document.createElement("div");
+        widget.id = "onboarding-recaptcha-widget";
+        container.appendChild(widget);
+      }
 
       // Respect the user's test mode state on localhost/127.0.0.1
       if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
@@ -2821,7 +2828,7 @@ export default function Home() {
       }
 
       const verifier = new RecaptchaVerifier(auth, "onboarding-recaptcha-widget", {
-        size: "normal",
+        size: "invisible",
         callback: (response: any) => {
           console.log("[reCAPTCHA] Onboarding resolved successfully");
         },
@@ -2877,7 +2884,13 @@ export default function Home() {
       console.log("[Onboarding Phone] SMS sent successfully");
     } catch (error: any) {
       console.error("[Onboarding Phone] Error sending SMS:", error);
-      setOnboardingPhoneError(error.message || (language === "ar" ? "فشل إرسال رمز التحقق" : "Failed to send verification code"));
+      let errMsg = error.message || (language === "ar" ? "فشل إرسال رمز التحقق" : "Failed to send verification code");
+      if (error.code === "auth/provider-already-linked" || error.code === "auth/credential-already-in-use") {
+        errMsg = language === "ar" 
+          ? "رقم الهاتف هذا مسجل بالفعل لتبادل البيانات أو مرتبط بحساب آخر." 
+          : "This phone number is already linked or registered to another account.";
+      }
+      setOnboardingPhoneError(errMsg);
       cleanupOnboardingRecaptcha();
     } finally {
       setOnboardingSendingCode(false);
@@ -2931,7 +2944,13 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error("[Onboarding Phone] Verification failed:", error);
-      setOnboardingPhoneError(error.message || (language === "ar" ? "رمز التحقق غير صحيح" : "Verification code is incorrect"));
+      let errMsg = error.message || (language === "ar" ? "رمز التحقق غير صحيح" : "Verification code is incorrect");
+      if (error.code === "auth/provider-already-linked" || error.code === "auth/credential-already-in-use") {
+        errMsg = language === "ar" 
+          ? "رقم الهاتف هذا مسجل بالفعل لتبادل البيانات أو مرتبط بحساب آخر." 
+          : "This phone number is already linked or registered to another account.";
+      }
+      setOnboardingPhoneError(errMsg);
     } finally {
       setOnboardingVerifyingCode(false);
     }
@@ -3584,23 +3603,45 @@ export default function Home() {
 
   // Auth Guard & Initial Load
   useEffect(() => {
+    // One-time boot purge of legacy bypass/demo flags if a leftover legacy bypass flag exists, purge it to free trapped users on load!
+    if (typeof window !== "undefined") {
+      if (localStorage.getItem("judge_bypass_session") === "true") {
+        localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("judge_bypass_email");
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
-      if (!firebaseUser && !isJudgeBypass) {
+      const isDemoModeActive = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+      
+      if (!firebaseUser && !isDemoModeActive) {
         router.push(`/${language}`);
       } else {
-        const savedBypassEmail = typeof window !== "undefined" ? (localStorage.getItem("judge_bypass_email") || "judge.evaluation@fahem.edu") : "judge.evaluation@fahem.edu";
+        if (firebaseUser) {
+          // Real Firebase user wins: clean up demo/bypass state entirely
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("app_mode");
+            localStorage.removeItem("demo_auth_token");
+            localStorage.removeItem("judge_bypass_session");
+            localStorage.removeItem("judge_bypass_email");
+            sessionStorage.removeItem("judge_selected_persona");
+          }
+        }
+
+        const savedBypassEmail = typeof window !== "undefined" ? (localStorage.getItem("judge_bypass_email") || "demo.evaluation@fahem.edu") : "demo.evaluation@fahem.edu";
         const currentUser = firebaseUser || ({
-          uid: "judge_evaluation_uid_01",
+          uid: "demo_evaluation_uid_01",
           email: savedBypassEmail,
-          displayName: "⭐ JUDGE",
+          displayName: "⭐ DEMO",
           photoURL: "/avatars/golden_crown.svg",
           phoneNumber: "+15555555555",
         } as unknown as User);
 
         setUser(currentUser);
         if (typeof window !== "undefined") {
-          const isDone = localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true" || isJudgeBypass;
+          const isDone = localStorage.getItem("onboarding_completed_" + currentUser.uid) === "true";
           if (isDone) {
             setLocalCompleted(true);
           }
@@ -3611,18 +3652,16 @@ export default function Home() {
         fetchBooksAndSubjects(); // Fetch dynamic books and subjects from database
         fetchSpaceHistory(currentUser.uid); // Fetch active recall and space audit history
         
-        const isRealJudgeEmail = currentUser.email && isJudgeEmail(currentUser.email);
-        
         // Fetch User Profile over MongoDB Agent Proxies
         setLoadingProfile(true);
         setProfileLoadError(null);
-        if (isJudgeBypass || isRealJudgeEmail) {
+        if (isDemoModeActive && !firebaseUser) {
           const savedPersona = typeof window !== "undefined" ? (sessionStorage.getItem("judge_selected_persona") || "admin") : "admin";
           const judgeProfile = {
             userId: currentUser.uid,
-            email: currentUser.email || "judge.evaluation@fahem.edu",
-            name: currentUser.email && isRealJudgeEmail ? `⭐ JUDGE (${currentUser.email.split("@")[1]})` : "⭐ JUDGE (Sandbox)",
-            username: currentUser.email && isRealJudgeEmail ? `judge_${currentUser.email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "")}` : "judge_evaluation",
+            email: currentUser.email || "demo.evaluation@fahem.edu",
+            name: "⭐ DEMO (Sandbox)",
+            username: "demo_evaluation",
             onboardingCompleted: true,
             userType: savedPersona === "teacher" ? "teacher" : "student",
             role: savedPersona === "admin" ? "admin" : savedPersona,
@@ -3802,8 +3841,9 @@ export default function Home() {
         }
 
         // Verify superadmin status
-        if (currentUser.email && !isJudgeBypass && !isRealJudgeEmail) {
-          authedFetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
+        const isDemoModeActiveAfter = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !firebaseUser;
+        if (currentUser.email && !isDemoModeActiveAfter) {
+          authedFetch(`/api/admin/check`)
             .then((res) => res.json())
             .then((data) => setIsAdmin(data.isAdmin))
             .catch(() => setIsAdmin(false));
@@ -4084,6 +4124,13 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+        localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("judge_bypass_email");
+        sessionStorage.removeItem("judge_selected_persona");
+      }
       await signOut(auth);
       router.push(`/${language}`);
     } catch (err) {
@@ -4329,9 +4376,10 @@ export default function Home() {
       });
   };
 
-  const handleStartStudy = (book: any) => {
+  const handleStartStudy = (book: any, pageNum: number = 1) => {
     setSelectedBookReader(book);
-    setReaderCurrentPage(1);
+    setReaderCurrentPage(pageNum);
+    setActiveTab("library"); // ensure we switch to the library tab where the reader panel is housed!
     const welcomeText = language === "ar" 
       ? `أهلاً بك يا بطل في مساحتك الدراسية التفاعلية الدافئة لكتاب "${book.titleAr || book.title}"! أنا رفيقك الدراسي الذكي وصديقك المقرب، متواجد هنا دائماً لأفكر وأحلل وأتعلم معك خطوة بخطوة 🌟. دعنا نجعل المذاكرة ممتعة وسهلة جداً! في أي وقت تحتاج توجيهي، استخدم الإشارات الذكية في الدردشة: اكتب @ لتحديد المادة، # لاختيار مرجع من الكتاب، أو / لتفعيل أحد الأوامر الدراسية السحرية مثل (/explain أو /summary) لمساعدتك فوراً. بمَ ترغب في أن نبدأ اليوم؟` 
       : `Welcome to your cozy interactive study space for "${book.titleEn || book.title}"! I'm your friendly AI study partner, always here to think, solve, and explore with you 🌟. Let's make learning fun and painless! Whenever you need anything, just mention it: type @ to target a subject, # to reference a textbook chapter, or / to use one of my magical shortcuts (like /explain or /summary) to get helpful answers right away. What shall we learn today?`;
@@ -6202,6 +6250,7 @@ export default function Home() {
             dynamicBooks={dynamicBooks}
             selectedSubjectId={selectedSubjectId}
             setSelectedSubjectId={setSelectedSubjectId}
+            handleStartStudy={handleStartStudy}
             t={t}
           />
         ) : activeTab === "practice" ? (

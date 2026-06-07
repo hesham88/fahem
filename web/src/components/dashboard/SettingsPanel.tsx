@@ -510,6 +510,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 {placesResults.map((place, idx) => (
                   <button
                     key={idx}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setPreferencesSchool(place.name);
+                      setPlacesResults([]);
+                    }}
                     onClick={() => {
                       setPreferencesSchool(place.name);
                       setPlacesResults([]);

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { verifyAuth } from "../../_auth";
 
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
 
       if (jobId) {
         const job = await db.collection("ingestion_jobs").findOne({ _id: jobId });

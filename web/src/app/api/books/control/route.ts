@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "../../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { spawn } from "child_process";
 import path from "path";
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
         const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
         await client.connect();
-        const db = client.db("fahem");
+        const db = client.db(getDbTarget());
 
         const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
         if (job) {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
         const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
         const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
         await client.connect();
-        const db = client.db("fahem");
+        const db = client.db(getDbTarget());
 
         const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
         if (job) {
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
         const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
         const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
         await client.connect();
-        const db = client.db("fahem");
+        const db = client.db(getDbTarget());
 
         const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
         if (job) {

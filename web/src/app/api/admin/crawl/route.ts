@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, getDbTarget } from "../../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 import { proxyRequest } from "../../proxy";
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
       await db.collection("crawl_jobs").updateOne(
         { _id: jobId },
         {
@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
             const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
             const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
             await client.connect();
-            const db = client.db("fahem");
+            const db = client.db(getDbTarget());
             await db.collection("crawl_jobs").updateOne(
               { _id: jobId },
               { $set: { active_pid: pid, updated_at: Date.now() / 1000 } }

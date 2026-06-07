@@ -69,9 +69,14 @@ export default function LandingPage() {
       
       if (currentUser || isDemoMode) {
         if (currentUser) {
-          // Real Firebase user wins: clean up demo mode
+          // Real Firebase user wins: clean up demo mode and any bypass flags
           localStorage.removeItem("app_mode");
           localStorage.removeItem("demo_auth_token");
+          localStorage.removeItem("judge_bypass_session");
+          localStorage.removeItem("judge_bypass_email");
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("judge_selected_persona");
+          }
         }
         router.push(`/${language}/home`);
       } else {
@@ -451,7 +456,6 @@ export default function LandingPage() {
                     
                     localStorage.setItem("app_mode", "demo");
                     localStorage.setItem("demo_auth_token", cleanToken);
-                    localStorage.setItem("judge_bypass_session", "true");
                     localStorage.setItem("judge_bypass_email", trimmedEmail);
                     router.push(`/${language}/home`);
                   } else {

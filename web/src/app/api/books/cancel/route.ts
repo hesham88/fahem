@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "../../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, getDbTarget } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
       const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
       await client.connect();
-      const db = client.db("fahem");
+      const db = client.db(getDbTarget());
 
       const book = await db.collection("books").findOne({ _id: bookId });
       if (book) {

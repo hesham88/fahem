@@ -1,4 +1,4 @@
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, getDbTarget } from "../localDbHelper";
 
 interface CreateNotificationParams {
   recipient_uid: string;
@@ -55,7 +55,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 });
     await client.connect();
     
-    const db = client.db("fahem");
+    const db = client.db(getDbTarget());
     await db.collection("notifications").insertOne(newNotif);
     await client.close();
 
