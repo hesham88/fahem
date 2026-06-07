@@ -59,6 +59,12 @@ function getLanguageName(lang: string): string {
   return mapping[lang] || "English";
 }
 
+function cleanFabricatedUrls(text: string): string {
+  if (!text) return text;
+  // Convert [Text](http://external) or [Text](https://external) or [Text](www.external) to just Text
+  return text.replace(/\[([^\]]+)\]\(((?:https?:\/\/|www\.)[^\s)]+)\)/g, "$1");
+}
+
 function extractFinalAgentOutput(resData: any): string {
   if (!resData) return "";
   if (!Array.isArray(resData)) {
@@ -430,8 +436,9 @@ export async function POST(req: NextRequest) {
                           controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
                           hasStartedFinalOutput = true;
                         }
-                        finalResponseText += textChunk;
-                        controller.enqueue(encoder.encode(textChunk));
+                        const cleanedChunk = cleanFabricatedUrls(textChunk);
+                        finalResponseText += cleanedChunk;
+                        controller.enqueue(encoder.encode(cleanedChunk));
                       }
                     }
                   }
@@ -444,8 +451,9 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
                         hasStartedFinalOutput = true;
                       }
-                      finalResponseText += fallbackText;
-                      controller.enqueue(encoder.encode(fallbackText));
+                      const cleanedFallback = cleanFabricatedUrls(fallbackText);
+                      finalResponseText += cleanedFallback;
+                      controller.enqueue(encoder.encode(cleanedFallback));
                     }
                   }
 
@@ -480,8 +488,9 @@ export async function POST(req: NextRequest) {
                       controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
                       hasStartedFinalOutput = true;
                     }
-                    finalResponseText += textChunk;
-                    controller.enqueue(encoder.encode(textChunk));
+                    const cleanedChunk = cleanFabricatedUrls(textChunk);
+                    finalResponseText += cleanedChunk;
+                    controller.enqueue(encoder.encode(cleanedChunk));
                   }
                 }
               }

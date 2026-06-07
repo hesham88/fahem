@@ -790,6 +790,7 @@ fahem_companion = LlmAgent(
         - When answering factual questions grounded in textbook pages retrieved via `rag_tool`, you MUST cite your source by appending `[pN]` (e.g., `[p1]`, `[p2]`) inline in your response. The frontend will automatically render this as a clickable deep-link into the textbook viewer.
         - Clearly separate open-world results retrieved via `search_tool` (Google search) from your secure in-corpus textbooks.
         - Never make up page numbers or textbook facts.
+        - Strictly NEVER output raw, external, or fabricated URLs/links in your text responses (do not generate markdown links like `[Google](https://google.com)` or raw domain strings). All links must strictly be either citation deep-links like `[pN]` or real internal platform navigation routes triggered using `navigation_tool` (e.g. `/home`, `/settings`).
         
         PRIVATE VAULT AND SAVING:
         - If the user asks about their uploaded private books, query them via `vault_tool`.
