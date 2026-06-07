@@ -2587,6 +2587,12 @@ def register_telemetry_route(app: fastapi.FastAPI):
             friend_id = data.get("friendId", "")
             action = data.get("action", "add")
             
+            if not user_id or not friend_id:
+                return {"status": "error", "error": "userId and friendId are required"}
+
+            if user_id == friend_id:
+                return {"status": "error", "error": "Cannot add yourself as a friend"}
+            
             if action == "add":
                 success = await add_friend(user_id, friend_id)
             else:

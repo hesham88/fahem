@@ -44,3 +44,13 @@ temp_test_book_1.pdf
 # Ignore scratchpad / experimental scripts
 scratches/
 
+# Ignore user screenshots and logos
+screenshots/
+logos/
+
+# Ignore local launcher scripts
+Launch Agents.bat
+launch_agents.ps1
+
+# Ignore test and scratch scripts in agents folder (not used in production)
+agents/test_*.py

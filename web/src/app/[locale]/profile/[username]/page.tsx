@@ -45,7 +45,8 @@ const profileTranslations = {
     offline: "Offline",
     underageWarning: "Profile pending parental approval",
     lifeLongLearner: "Lifelong Learner",
-    viewProfile: "View Profile"
+    viewProfile: "View Profile",
+    editProfile: "Edit Profile"
   },
   ar: {
     back: "العودة للرئيسية",
@@ -68,7 +69,8 @@ const profileTranslations = {
     offline: "غير متصل",
     underageWarning: "الملف الشخصي معلق بانتظار موافقة ولي الأمر",
     lifeLongLearner: "متعلم مدى الحياة",
-    viewProfile: "عرض الملف الشخصي"
+    viewProfile: "عرض الملف الشخصي",
+    editProfile: "تعديل الملف الشخصي"
   },
   es: {
     back: "Volver al Inicio",
@@ -91,7 +93,8 @@ const profileTranslations = {
     offline: "Desconectado",
     underageWarning: "Perfil pendiente de aprobación parental",
     lifeLongLearner: "Estudiante de por vida",
-    viewProfile: "Ver Perfil"
+    viewProfile: "Ver Perfil",
+    editProfile: "Editar Perfil"
   },
   fr: {
     back: "Retour à l'accueil",
@@ -114,7 +117,8 @@ const profileTranslations = {
     offline: "Hors ligne",
     underageWarning: "Profil en attente d'approbation parentale",
     lifeLongLearner: "Apprenant à vie",
-    viewProfile: "Voir le profil"
+    viewProfile: "Voir le profil",
+    editProfile: "Modifier le profil"
   },
   de: {
     back: "Zurück zur Startseite",
@@ -137,7 +141,8 @@ const profileTranslations = {
     offline: "Offline",
     underageWarning: "Profil wartet auf elterliche Genehmigung",
     lifeLongLearner: "Lebenslanger Lerner",
-    viewProfile: "Profil anzeigen"
+    viewProfile: "Profil anzeigen",
+    editProfile: "Profil bearbeiten"
   },
   zh: {
     back: "返回主页",
@@ -160,7 +165,8 @@ const profileTranslations = {
     offline: "离线",
     underageWarning: "个人资料正等待家长批准",
     lifeLongLearner: "终身学习者",
-    viewProfile: "查看个人资料"
+    viewProfile: "查看个人资料",
+    editProfile: "编辑个人资料"
   },
   it: {
     back: "Torna alla Home",
@@ -183,7 +189,8 @@ const profileTranslations = {
     offline: "Disconnesso",
     underageWarning: "Profilo in attesa di approvazione dei genitori",
     lifeLongLearner: "Studente permanente",
-    viewProfile: "Visualizza Profilo"
+    viewProfile: "Visualizza Profilo",
+    editProfile: "Modifica Profilo"
   }
 };
 
@@ -702,7 +709,7 @@ export default function UserProfilePage() {
               </div>
             </div>
 
-            {/* Friend Action Button */}
+            {/* Friend Action Button / Edit Profile */}
             {currentUser && currentUser.uid !== targetProfile.userId && (
               <button 
                 onClick={handleFriendAction}
@@ -723,6 +730,20 @@ export default function UserProfilePage() {
                     <FiUserPlus /> {getT("addFriend")}
                   </>
                 )}
+              </button>
+            )}
+
+            {currentUser && currentUser.uid === targetProfile.userId && (
+              <button 
+                onClick={() => router.push(`/${language}/home?tab=settings`)}
+                onMouseEnter={handleBtnPrimaryMouseEnter}
+                onMouseLeave={handleBtnPrimaryMouseLeave}
+                style={{ 
+                  ...styles.btn, 
+                  ...styles.btnPrimary 
+                }}
+              >
+                <FiUser /> {getT("editProfile")}
               </button>
             )}
           </div>
