@@ -23,6 +23,11 @@ interface LocalDb {
   libraries?: any[];
   curricula?: any[];
   reading_sessions?: any[];
+  notifications?: any[];
+  group_assignments?: any[];
+  assignment_submissions?: any[];
+  assignment_reports?: any[];
+  active_practice_sessions?: any[];
 }
 
 const DEFAULT_DB: LocalDb = {
@@ -158,6 +163,26 @@ export function getLocalDb(): LocalDb {
       db.reading_sessions = [];
       updated = true;
     }
+    if (!db.notifications) {
+      db.notifications = [];
+      updated = true;
+    }
+    if (!db.group_assignments) {
+      db.group_assignments = [];
+      updated = true;
+    }
+    if (!db.assignment_submissions) {
+      db.assignment_submissions = [];
+      updated = true;
+    }
+    if (!db.assignment_reports) {
+      db.assignment_reports = [];
+      updated = true;
+    }
+    if (!db.active_practice_sessions) {
+      db.active_practice_sessions = [];
+      updated = true;
+    }
     
     if (updated) {
       saveLocalDb(db);
@@ -168,6 +193,42 @@ export function getLocalDb(): LocalDb {
     console.error("[localDbHelper] Error reading local DB:", err);
     return DEFAULT_DB;
   }
+}
+
+export function checkFocusLockLocal(uid: string, role: string): { locked: boolean; reason?: string; message?: string; message_ar?: string } {
+  if (role !== "student" && role !== "user") {
+    return { locked: false };
+  }
+  const db = getLocalDb();
+  const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+  
+  // 1. Check for active assignments
+  const activeAssignment = (db.group_assignments || []).find(
+    (asg: any) => asg.status === "active" && asg.ends_at > now
+  );
+  if (activeAssignment) {
+    return {
+      locked: true,
+      reason: "assignment_active",
+      message: "An academic assignment is active. Your companion and messaging are locked.",
+      message_ar: "هناك واجب نشط قيد التشغيل حالياً. تم تعطيل المعلم والمراسلة."
+    };
+  }
+  
+  // 2. Check for active practice sessions
+  const activePractice = (db.active_practice_sessions || []).find(
+    (ps: any) => ps.uid === uid
+  );
+  if (activePractice) {
+    return {
+      locked: true,
+      reason: "practice_active",
+      message: "A solo practice session is active. Direct messaging is suppressed.",
+      message_ar: "هناك جلسة تدريب فردي نشطة. تم كتم الرسائل المباشرة."
+    };
+  }
+  
+  return { locked: false };
 }
 
 export function saveLocalDb(db: LocalDb): boolean {

@@ -315,6 +315,12 @@ class MongoDBEngine:
             
             self._db["book_pages"].create_index([("book_id", 1), ("page_number", 1)], background=True)
             
+            # 8. Notification & Assignment Systems
+            self._db["notifications"].create_index([("recipient_uid", 1), ("read", 1), ("createdAt", -1)], background=True)
+            self._db["group_assignments"].create_index([("group_id", 1), ("status", 1), ("ends_at", 1)], background=True)
+            self._db["assignment_submissions"].create_index([("assignment_id", 1), ("uid", 1)], unique=True, background=True)
+            self._db["assignment_reports"].create_index("assignment_id", background=True)
+            
             logger.info("[MongoDBEngine] Auto-healing schema & unique index tuning completed successfully! 🚀")
         except Exception as e:
             logger.warning(f"[MongoDBEngine] Non-critical schema index-tuning warning: {e}")

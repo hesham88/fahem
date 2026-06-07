@@ -2636,6 +2636,573 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 content={"success": False, "error": str(err)}
             )
 
+    # =================================----------------------------
+    # NOTIFICATION SYSTEM ENDPOINTS & HELPERS
+    # =================================----------------------------
+    def create_notification_internal(db, recipient_uid: str, ntf_type: str, title: str, title_ar: str, body: str, body_ar: str, payload: dict = None):
+        import time
+        ntf_id = f"ntf_{int(time.time() * 1000)}_{recipient_uid[:8]}"
+        notification = {
+            "_id": ntf_id,
+            "recipient_uid": recipient_uid,
+            "type": ntf_type,
+            "title": title,
+            "title_ar": title_ar,
+            "body": body,
+            "body_ar": body_ar,
+            "payload": payload or {},
+            "read": False,
+            "createdAt": int(time.time() * 1000)
+        }
+        db["notifications"].insert_one(notification)
+        return notification
+
+    @app.get("/notifications")
+    async def get_notifications_endpoint(request: fastapi.Request, unreadOnly: str = "false"):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            query = {"recipient_uid": uid}
+            if unreadOnly == "true":
+                query["read"] = False
+                
+            notifications = list(db["notifications"].find(query).sort("createdAt", -1))
+            for n in notifications:
+                n["_id"] = str(n["_id"])
+            return {"success": True, "notifications": notifications}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get notifications: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.get("/notifications/count")
+    async def get_notifications_count_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            count = db["notifications"].count_documents({"recipient_uid": uid, "read": False})
+            return {"success": True, "count": count}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to count notifications: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.post("/notifications/read")
+    async def post_notifications_read_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import bson
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            body = await request.json()
+            notification_ids = body.get("notification_ids", [])
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            query = {"recipient_uid": uid}
+            if notification_ids:
+                object_ids = []
+                for nid in notification_ids:
+                    try:
+                        object_ids.append(bson.ObjectId(nid))
+                    except Exception:
+                        object_ids.append(nid)
+                query["_id"] = {"$in": object_ids + notification_ids}
+                
+            db["notifications"].update_many(query, {"$set": {"read": True}})
+            return {"success": True}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to mark notifications as read: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    # =================================----------------------------
+    # GROUP ASSIGNMENTS & FOCUS LOCK ENDPOINTS
+    # =================================----------------------------
+    @app.get("/assignments/focus-lock")
+    async def get_assignments_focus_lock_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            uid = principal.get("uid")
+            role = principal.get("role")
+            
+            if role not in ["student", "user"]:
+                return {"locked": False}
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            now = int(time.time())
+            
+            # Check active assignment
+            active_asg = db["group_assignments"].find_one({
+                "status": "active",
+                "ends_at": {"$gt": now}
+            })
+            if active_asg:
+                client.close()
+                return {
+                    "locked": True,
+                    "reason": "assignment_active",
+                    "message": "An academic assignment is active. Your companion and messaging are locked.",
+                    "message_ar": "هناك واجب نشط قيد التشغيل حالياً. تم تعطيل المعلم والمراسلة."
+                }
+                
+            # Check active solo practice session
+            active_practice = db["active_practice_sessions"].find_one({"uid": uid})
+            if active_practice:
+                client.close()
+                return {
+                    "locked": True,
+                    "reason": "practice_active",
+                    "message": "A solo practice session is active. Direct messaging is suppressed.",
+                    "message_ar": "هناك جلسة تدريب فردي نشطة. تم كتم الرسائل المباشرة."
+                }
+                
+            client.close()
+            return {"locked": False}
+        except Exception as err:
+            logger.error(f"[services.py] Focus lock check failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.post("/practice/lock")
+    async def post_practice_lock_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            uid = principal.get("uid")
+            
+            body = await request.json()
+            active = body.get("active", False)
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            if active:
+                db["active_practice_sessions"].update_one(
+                    {"uid": uid},
+                    {"$set": {"uid": uid, "started_at": int(time.time())}},
+                    upsert=True
+                )
+            else:
+                db["active_practice_sessions"].delete_many({"uid": uid})
+                
+            client.close()
+            return {"success": True}
+        except Exception as err:
+            logger.error(f"[services.py] Practice lock update failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.get("/assignments")
+    async def get_assignments_endpoint(request: fastapi.Request, group_id: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            uid = principal.get("uid")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            assignments_query_result = db["group_assignments"].find({"group_id": group_id}).sort("created_at", -1)
+            assignments_list = list(assignments_query_result)
+            
+            for asg in assignments_list:
+                asg["_id"] = str(asg["_id"])
+                submission = db["assignment_submissions"].find_one({
+                    "assignment_id": asg["_id"],
+                    "uid": uid
+                })
+                if submission:
+                    submission["_id"] = str(submission["_id"])
+                    asg["user_submission"] = submission
+                else:
+                    asg["user_submission"] = None
+                    
+            client.close()
+            return {"success": True, "assignments": assignments_list}
+        except Exception as err:
+            logger.error(f"[services.py] Get assignments failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.post("/assignments")
+    async def post_assignments_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            role = principal.get("role")
+            if role not in ["teacher", "admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(status_code=403, content={"error": "Forbidden: Only instructors can post assignments"})
+                
+            body = await request.json()
+            group_id = body.get("group_id")
+            title = body.get("title")
+            title_ar = body.get("title_ar")
+            subject_id = body.get("subject_id")
+            book_id = body.get("book_id")
+            questions = body.get("questions", [])
+            timer_seconds = int(body.get("timer_seconds", 120))
+            
+            if not group_id or not title or not title_ar or (not subject_id and not book_id):
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing required fields: group_id, title, title_ar, and (subject_id or book_id)"})
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            anchor_valid = False
+            if subject_id:
+                subj = db["subjects"].find_one({"_id": subject_id})
+                if subj:
+                    anchor_valid = True
+            if not anchor_valid and book_id:
+                bk = db["books"].find_one({"_id": book_id})
+                if bk:
+                    anchor_valid = True
+                    
+            if not anchor_valid:
+                client.close()
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Fail-closed: Question must have a valid subject_id or book_id anchor."})
+                
+            now = int(time.time())
+            asg_id = f"asg_{int(time.time() * 1000)}"
+            ends_at = now + timer_seconds
+            
+            new_asg = {
+                "_id": asg_id,
+                "group_id": group_id,
+                "author_uid": principal.get("uid"),
+                "title": title,
+                "title_ar": title_ar,
+                "subject_id": subject_id,
+                "book_id": book_id,
+                "questions": questions,
+                "timer_seconds": timer_seconds,
+                "starts_at": now,
+                "ends_at": ends_at,
+                "status": "active",
+                "created_at": now,
+                "updated_at": now
+            }
+            
+            db["group_assignments"].insert_one(new_asg)
+            
+            users_query_result = db["users"].find({"role": {"$in": ["student", "user"]}, "userId": {"$ne": principal.get("uid")}})
+            users_to_notify = list(users_query_result)
+            
+            for student in users_to_notify:
+                student_uid = student.get("userId") or student.get("uid")
+                if student_uid:
+                    create_notification_internal(
+                        db=db,
+                        recipient_uid=student_uid,
+                        ntf_type="assignment_new",
+                        title=f"New Assignment: {title}",
+                        title_ar=f"واجب جديد: {title_ar}",
+                        body=f"Your instructor posted a new timed assignment: '{title}'",
+                        body_ar=f"قام المعلم بنشر واجب مؤقت جديد: '{title_ar}'",
+                        payload={
+                            "group_id": group_id,
+                            "assignment_id": asg_id,
+                            "deep_link": f"?tab=social&group={group_id}&assignment={asg_id}"
+                        }
+                    )
+                    
+            client.close()
+            return {"success": True, "assignment": new_asg}
+        except Exception as err:
+            logger.error(f"[services.py] Create assignment failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.post("/assignments/submit")
+    async def post_assignments_submit_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            import os
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            uid = principal.get("uid")
+            body = await request.json()
+            assignment_id = body.get("assignment_id")
+            answers_input = body.get("answers", [])
+            
+            if not assignment_id:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "assignment_id is required"})
+                
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            asg = db["group_assignments"].find_one({"_id": assignment_id})
+            if not asg:
+                client.close()
+                return fastapi.responses.JSONResponse(status_code=404, content={"error": "Assignment not found"})
+                
+            now = int(time.time())
+            before_timer = now <= asg["ends_at"]
+            
+            sub_id = f"sub_{assignment_id}_{uid}"
+            existing = db["assignment_submissions"].find_one({"_id": sub_id})
+            if existing:
+                client.close()
+                return fastapi.responses.JSONResponse(status_code=409, content={"error": "You have already submitted this assignment"})
+                
+            graded_answers = []
+            total_score = 0.0
+            max_score = 0.0
+            
+            questions_dict = {q["id"]: q for q in asg.get("questions", [])}
+            
+            for ans in answers_input:
+                qid = ans.get("question_id")
+                val = ans.get("value")
+                answered_at = ans.get("answeredAt") or now
+                
+                q = questions_dict.get(qid)
+                if not q:
+                    continue
+                    
+                q_type = q.get("type", "mcq")
+                correct = False
+                score = 0.0
+                explanation = ""
+                
+                max_score += 1.0
+                
+                if q_type == "mcq":
+                    expected = str(q.get("answer", "")).strip().lower()
+                    submitted = str(val).strip().lower()
+                    if expected == submitted:
+                        correct = True
+                        score = 1.0
+                        explanation = "Correct option index matches precisely."
+                    else:
+                        explanation = f"Incorrect. The expected option index is {q.get('answer')}."
+                        
+                elif q_type in ["exact_answer", "complete_sentence"]:
+                    expected = str(q.get("answer", "")).strip().lower()
+                    submitted = str(val).strip().lower()
+                    if expected == submitted:
+                        correct = True
+                        score = 1.0
+                        explanation = "Your answer matches the expected value precisely."
+                    else:
+                        explanation = f"Incorrect. The correct answer is '{q.get('answer')}'."
+                        
+                elif q_type == "open_ended":
+                    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+                    if gemini_api_key:
+                        try:
+                            from google.genai import GoogleGenAI
+                            ai = GoogleGenAI(api_key=gemini_api_key)
+                            
+                            rubric_text = q.get("rubric", "Standard completeness and academic accuracy.")
+                            prompt_text = f"""
+                            You are an expert academic critique grader. Grade the submitted student answer for the question below.
+                            
+                            Question: {q.get('prompt')}
+                            Rubric/Guidelines: {rubric_text}
+                            Student Submission: {val}
+                            
+                            Critique and grade the submission. Provide:
+                            1. A score between 0.0 and 1.0 (float)
+                            2. A short explanation/critique in the language of the submission.
+                            
+                            Format your output strictly as a JSON object containing keys "score" and "explanation".
+                            """
+                            resp = ai.models.generateContent(
+                                model=os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite"),
+                                contents=prompt_text,
+                                config={"responseMimeType": "application/json"}
+                            )
+                            import json
+                            res_data = json.loads(resp.text)
+                            score = float(res_data.get("score", 0.0))
+                            correct = score >= 0.7
+                            explanation = res_data.get("explanation", "")
+                        except Exception as grading_err:
+                            logger.warn(f"Gemini grading failed: {grading_err}")
+                            explanation = "Graded manually or fallback complete."
+                    else:
+                        score = 0.5
+                        explanation = "Critique grading queued/fallback."
+                        
+                total_score += score
+                graded_answers.append({
+                    "question_id": qid,
+                    "value": val,
+                    "answeredAt": answered_at,
+                    "before_timer": before_timer,
+                    "correct": correct,
+                    "score": score,
+                    "explanation": explanation
+                })
+                
+            submission_doc = {
+                "_id": sub_id,
+                "assignment_id": assignment_id,
+                "group_id": asg.get("group_id"),
+                "uid": uid,
+                "answers": graded_answers,
+                "total_score": total_score,
+                "max_score": max_score,
+                "submitted_at": now,
+                "graded": True
+            }
+            
+            db["assignment_submissions"].insert_one(submission_doc)
+            
+            client.close()
+            return {"success": True, "submission": submission_doc}
+        except Exception as err:
+            logger.error(f"[services.py] Assignment submission failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
+    @app.get("/assignments/results")
+    async def get_assignments_results_endpoint(request: fastapi.Request, assignment_id: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                p_header = request.headers.get("X-Verified-Principal")
+                if p_header:
+                    import json
+                    principal = json.loads(p_header)
+            
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            
+            uid = principal.get("uid")
+            role = principal.get("role")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            asg = db["group_assignments"].find_one({"_id": assignment_id})
+            if not asg:
+                client.close()
+                return fastapi.responses.JSONResponse(status_code=404, content={"error": "Assignment not found"})
+                
+            submissions_query_result = db["assignment_submissions"].find({"assignment_id": assignment_id})
+            submissions_list = list(submissions_query_result)
+            
+            if role in ["student", "user"]:
+                own_subs = [s for s in submissions_list if s["uid"] == uid]
+                for s in own_subs:
+                    s["_id"] = str(s["_id"])
+                client.close()
+                return {"success": True, "submissions": own_subs, "assignment": {
+                    "_id": str(asg["_id"]),
+                    "title": asg.get("title"),
+                    "title_ar": asg.get("title_ar"),
+                    "ends_at": asg.get("ends_at"),
+                    "status": asg.get("status")
+                }}
+                
+            for s in submissions_list:
+                s["_id"] = str(s["_id"])
+                
+            client.close()
+            return {"success": True, "submissions": submissions_list, "assignment": {
+                "_id": str(asg["_id"]),
+                "title": asg.get("title"),
+                "title_ar": asg.get("title_ar"),
+                "ends_at": asg.get("ends_at"),
+                "status": asg.get("status")
+            }}
+        except Exception as err:
+            logger.error(f"[services.py] Get results failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(status_code=500, content={"success": False, "error": str(err)})
+
     @app.post("/verify-recaptcha")
     async def post_verify_recaptcha_endpoint(request: fastapi.Request):
         try:

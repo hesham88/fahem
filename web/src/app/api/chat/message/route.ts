@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
 import { verifyAuth } from "../../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, checkFocusLockLocal } from "../../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +77,30 @@ export async function POST(req: NextRequest) {
         status: 401,
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    // Focus Lock Check (Suppress messaging during active assignments or solo practice)
+    if (isLocalEnv()) {
+      const lock = checkFocusLockLocal(ctx.uid, ctx.role);
+      if (lock.locked) {
+        return new Response(JSON.stringify({ error: lock.message, focusLocked: true }), {
+          status: 423,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    } else {
+      try {
+        const { checkFocusLockProd } = require("../../assignments/helper");
+        const lock = await checkFocusLockProd(ctx.uid, ctx.role);
+        if (lock.locked) {
+          return new Response(JSON.stringify({ error: lock.message, focusLocked: true }), {
+            status: 423,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check focus lock in production:", err);
+      }
     }
 
     const body = await req.json();

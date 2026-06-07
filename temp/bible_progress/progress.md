@@ -31,8 +31,8 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P5-1 | (unclaimed) | 5 | Unify Practice, Plan, and Zatona input & history tabs | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
 | P5-2 | (unclaimed) | 5 | New Insights & Gamification tab | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
 | P5-3 | (unclaimed) | 5 | Social groups, threads & discussions panel fix | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
-| P5-4 | (unclaimed) | 5 | Notification system model, fan-out & bell badge | spec-notification-system @ f076e33d39a6 | todo | — | — |
-| P5-5 | (unclaimed) | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | blocked(P5-4) | — | — |
+| P5-4 | builder-1 | 5 | Notification system model, fan-out & bell badge | spec-notification-system @ f076e33d39a6 | done | yes | [web/src/components/NotificationBell.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/NotificationBell.tsx) etc |
+| P5-5 | (unclaimed) | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | todo | — | — |
 | P6-1 | builder-3 | 6 | Unified feedback/chat reports with daily limits | phase-6-reporting-judges-branding-docs §6.1 @ 1c43b2dd9fdc | done | yes | [web/src/app/api/feedback/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/feedback/route.ts) |
 | P6-2 | builder-3 | 6 | Admin report triager & per-user token override UI | phase-6-reporting-judges-branding-docs §6.2 @ 1c43b2dd9fdc | done | yes | [web/src/components/AdminSecurityDashboard.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/AdminSecurityDashboard.tsx) |
 | P6-3 | builder-3 | 6 | Judge domain whitelist & switchable sandbox personas | phase-6-reporting-judges-branding-docs §6.3 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
@@ -40,7 +40,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P6-5 | builder-3 | 6 | Brand-compliant logos & copy revisions | phase-6-reporting-judges-branding-docs §6.7 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
 | P7-1 | builder-3 | 7 | Fluid CSS breakpoint layouts (Mobile, Tablet, Desktop) | phase-7-responsive-and-companion-ux §7.2 @ bd4d3b35a14a | done | yes | [web/src/app/globals.css](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/globals.css) |
 | P7-2 | builder-3 | 7 | Overlay-only portal companion & dvh heights | phase-7-responsive-and-companion-ux §7.3 @ bd4d3b35a14a | done | yes | [web/src/components/StickyChat.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/StickyChat.tsx) |
-| P7-3 | (unclaimed) | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | blocked(Phase-3) | — | — |
+| P7-3 | (unclaimed) | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | todo | — | — |
 | P7-4 | (unclaimed) | 7 | Mount once, sticky language & user-controlled FAB open | phase-7-responsive-and-companion-ux §7.5 @ bd4d3b35a14a | blocked(Phase-4) | — | — |
 
 ## Event log (append-only; one line per task transition)
@@ -58,6 +58,8 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 - 2026-06-07T05:56:00+03:00 [builder-3] CLAIM+START P6-1, P6-2, P6-3, P6-4, P6-5, P7-1, P7-2 (verified manifest, all previous dependencies satisfied)
 - 2026-06-07T06:45:00+03:00 [builder-3] DONE P6-1, P6-2, P6-3, P6-4, P6-5, P7-1, P7-2: Completed and verified reporting backend integration, DVH-based layout overlays, and cleaned up mobile/tablet layout shifts with 100% compliance pass.
 - 2026-06-07T06:46:00+03:00 [builder-1] DONE P3-1, P3-2, P3-3, P3-4: Resolved redeclared variables, missing properties, possibly null selectedBookReader, and untyped parameters in LibraryPanel.tsx. Verified zero compilation errors and verified that Next.js production build compiles with 100% success.
+- 2026-06-07T06:49:00+03:00 [builder-1] CLAIM+START P5-4: Notification system model, fan-out & bell badge. Unblocked P7-3 since Phase 3 is completed.
+- 2026-06-07T06:56:00+03:00 [builder-1] DONE P5-4: Completed full Notification System implementation (backend model, helpers, endpoints, i18n, responsive notification bell dropdown/center component with interactive deep-linking and state polling). Unblocked task P5-5.
 
 ## Open Questions to Brain (DF.6)
 - 2026-06-07T04:12:00+03:00 Q: Please review and confirm the proposed resolutions for Open Decisions D1 through D10 in part-5-open-decisions.md (recommended: Option A for D1, D2, D3, D4, D5, D7, D8, D9, D10; Teacher persona for D6).

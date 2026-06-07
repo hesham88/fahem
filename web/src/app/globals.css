@@ -1337,6 +1337,10 @@ body[dir="rtl"] .glass-nav-links {
 }
 
 @media (max-width: 900px) {
+  .desktop-notification-bell {
+    display: none !important;
+  }
+
   .app-layout {
     flex-direction: column !important;
     height: auto !important;

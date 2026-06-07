@@ -45,7 +45,8 @@ ALLOWED_COLLECTIONS = {
     "chat_sessions", "companion_sessions",          # Phase 4
     "social_groups", "social_threads", "social_replies",
     "reports", "feedback", "user_activities", "token_telemetry", "audit_logs",
-    "reading_sessions"
+    "reading_sessions",
+    "notifications", "group_assignments", "assignment_submissions", "assignment_reports" # Notification & Assignment Systems
 }
 MAX_RETURN_RECORDS = 50
 

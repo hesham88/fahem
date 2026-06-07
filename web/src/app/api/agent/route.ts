@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
 import { proxyRequest, getOidcToken } from "../proxy";
-import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo, checkFocusLockLocal } from "../localDbHelper";
 import { checkIsSuperadmin, checkIsAdmin } from "../admin/helper";
 import { requireUser } from "../_auth";
 import { spawn } from "child_process";
@@ -180,6 +180,30 @@ export async function POST(req: NextRequest) {
     const { prompt, language, sessionId, onboarding, recaptchaToken } = body;
     const userId = ctx.uid;
     const userEmail = ctx.email || "anonymous@fahem.ai";
+
+    // Focus Lock Check (Suppress companion during active assignments)
+    if (isLocalEnv()) {
+      const lock = checkFocusLockLocal(ctx.uid, ctx.role);
+      if (lock.locked && lock.reason === "assignment_active") {
+        return new Response(JSON.stringify({ error: language === "ar" ? lock.message_ar : lock.message, focusLocked: true }), {
+          status: 423,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    } else {
+      try {
+        const { checkFocusLockProd } = require("../assignments/helper");
+        const lock = await checkFocusLockProd(ctx.uid, ctx.role);
+        if (lock.locked && lock.reason === "assignment_active") {
+          return new Response(JSON.stringify({ error: language === "ar" ? lock.message_ar : lock.message, focusLocked: true }), {
+            status: 423,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check focus lock in production:", err);
+      }
+    }
     if (recaptchaToken) {
       console.log(`[reCAPTCHA Enterprise Server-Side] Received action protection token: ${recaptchaToken.substring(0, 15)}...`);
       try {

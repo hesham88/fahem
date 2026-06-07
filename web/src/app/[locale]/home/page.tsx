@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
 import CurriculumIngestionStudio from "../../../components/CurriculumIngestionStudio";
+import { NotificationBell } from "../../../components/NotificationBell";
 import { UserAccountsPanel } from "../../../components/dashboard/UserAccountsPanel";
 import { LibraryPanel } from "../../../components/dashboard/LibraryPanel";
 import { SubjectsPanel } from "../../../components/dashboard/SubjectsPanel";
@@ -5706,7 +5707,16 @@ export default function Home() {
           </div>
           <span style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
         </div>
-        <div className="mobile-header-right" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div className="mobile-header-right" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <NotificationBell
+            language={language}
+            user={user}
+            setActiveTab={setActiveTab}
+            setSelectedSubjectId={setSelectedSubjectId}
+            chatRecipient={chatRecipient}
+            setChatRecipient={setChatRecipient}
+            allUsers={allUsers}
+          />
           <button 
             className="mobile-hamburger-btn" 
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -6110,9 +6120,22 @@ export default function Home() {
         )}
 
         {/* Page Title Section */}
-        <header className="page-title-section">
-          <h1>{getTabHeader().title}</h1>
-          <p>{getTabHeader().subtitle}</p>
+        <header className="page-title-section" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+          <div>
+            <h1>{getTabHeader().title}</h1>
+            <p>{getTabHeader().subtitle}</p>
+          </div>
+          <div className="desktop-notification-bell" style={{ display: "block" }}>
+            <NotificationBell
+              language={language}
+              user={user}
+              setActiveTab={setActiveTab}
+              setSelectedSubjectId={setSelectedSubjectId}
+              chatRecipient={chatRecipient}
+              setChatRecipient={setChatRecipient}
+              allUsers={allUsers}
+            />
+          </div>
         </header>
 
         {activeTab === "admin" ? (

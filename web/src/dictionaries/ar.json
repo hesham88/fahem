@@ -164,5 +164,11 @@
   "session_expired": "انتهت صلاحية الجلسة. يرجى إرسال الرمز مجدداً.",
   "phone_send_failed": "فشل إرسال رمز SMS. تأكد من إكمال التحقق من reCAPTCHA.",
   "code_verify_failed": "الرمز غير صحيح. يرجى المحاولة مرة أخرى.",
-  "phone_back": "العودة / البدء من جديد"
+  "phone_back": "العودة / البدء من جديد",
+  "notification_center": "مركز الإشعارات",
+  "notifications_empty": "لا توجد لديك أي إشعارات",
+  "notifications_all_caught_up": "لقد قرأت جميع الإشعارات!",
+  "notifications_mark_all_read": "تحديد الكل كمقروء",
+  "notifications_view_all": "عرض الكل",
+  "notifications_unread": "غير مقروء"
 }
