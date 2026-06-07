@@ -21,6 +21,8 @@ import { ZatonaPanel } from "../../../components/dashboard/ZatonaPanel";
 import { SocialPanel } from "../../../components/dashboard/SocialPanel";
 import { SettingsPanel } from "../../../components/dashboard/SettingsPanel";
 import { InsightsPanel } from "../../../components/dashboard/InsightsPanel";
+import { DemoTourGuide } from "../../../components/DemoTourGuide";
+
 
 import { 
   FiCpu, 
@@ -6446,6 +6448,7 @@ export default function Home() {
           </>
         )}
       </main>
+      <DemoTourGuide activeTab={activeTab} setActiveTab={setActiveTab} language={language} />
     </div>
   );
 }

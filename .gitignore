@@ -41,3 +41,6 @@ build_log*.txt
 temp/
 temp_test_book_1.pdf
 
+# Ignore scratchpad / experimental scripts
+scratches/
+

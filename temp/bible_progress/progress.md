@@ -52,6 +52,12 @@ _Current tasks: builder-1 -> P1-5 · Updated: 2026-06-07T09:50:00+03:00_
 | R5 | builder-1 | 0 | S1 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | Deploying live to Cloud Run |
 | SE-1 | builder-1 | 8 | S2 | SEO Foundation (robots, sitemap, layouts noindex, hreflang, metadataBase) | spec-seo.md @ SE.0 | done | yes | [web/src/app/sitemap.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/sitemap.ts) |
 | SE-2 | builder-1 | 8 | S2 | My Public Profile sidebar nav restore + dynamic fallbacks | phase-6-reporting-judges-branding-docs §6.6 @ cb904dcd892e | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) |
+| ES-1 | builder-1 | 8 | S2 | Signed evaluation/demo tokens & server-authoritative bypass | spec-eval-sandbox-mode.md @ ES.2 | done | yes | [web/src/app/api/demo/enter/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/demo/enter/route.ts) |
+| ES-2 | builder-1 | 8 | S2 | Physical database read/write isolation (fahem_sandbox) | spec-eval-sandbox-mode.md @ ES.6.1 | done | yes | [web/src/app/api/localDbHelper.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/localDbHelper.ts) |
+| ES-3 | builder-1 | 8 | S2 | Consolidated User Management sandbox live controls | spec-eval-sandbox-mode.md @ ES.7 | done | yes | [web/src/components/dashboard/UserAccountsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/UserAccountsPanel.tsx) |
+| ES-4 | builder-1 | 8 | S2 | Guided 7-step UI evaluation tutorial overlay walkthrough | spec-eval-sandbox-mode.md @ ES.3.2 | done | yes | [web/src/components/DemoTourGuide.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/DemoTourGuide.tsx) |
+| ES-5 | builder-1 | 8 | S2 | Persist tutorial steps & skip state in demo_sessions | spec-eval-sandbox-mode.md @ ES.7.1 | done | yes | [web/src/app/api/demo/tutorial/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/demo/tutorial/route.ts) |
+
 
 ## Event log (append-only; one line per task transition)
 - 2026-06-07T04:12:00+03:00 START BOOTSTRAP: Manifest initialized clean. Read and parsed all 19 bible files. Distilled understandings and initialized task board.
@@ -81,6 +87,8 @@ _Current tasks: builder-1 -> P1-5 · Updated: 2026-06-07T09:50:00+03:00_
 - 2026-06-07T10:35:10+03:00 [builder-1] CLAIM+START R4, R1, R6, R2, R7, R3, R5: Claimed and started resolving the verified production regressions R1–R7, beginning with R4 (the E2E smoke test gate) and S1 outage fixes (R1 and R6).
 - 2026-06-07T11:20:00+03:00 [builder-3] DONE R1, R2, R3, R4, R6, R7, R5: Fully resolved remaining active regressions and gate issues. Implemented recursive MongoDB ObjectId sanitization on user profile endpoint, eliminating HTTP 500 serialization error. Validated all endpoints, verified E2E smoke tests successfully, and prepared live deployment commit.
 - 2026-06-07T11:46:17+03:00 [builder-1] DONE SE-1, SE-2: Completed SEO Foundation (hreflang, sitemap, robots, route noindex) and restored My Public Profile navigation buttons with fallback username support. Staged, committed, and pushed to GitHub repository. Tested Next.js production build and verified E2E smoke tests successfully (100% PASS).
+- 2026-06-07T13:20:00+03:00 [builder-1] DONE ES-1, ES-2, ES-3, ES-4, ES-5: Completed Phase B / Guided Evaluation Sandbox and the 7-step UI tutorial/walkthrough overlay, with automatic tab matching, dual English/Arabic translation support, and backend API telemetry persistence. Verified Next.js compiler check and completed full task board coverage.
+
 
 ## Open Questions to Brain (DF.6)
 - 2026-06-07T04:12:00+03:00 Q: Please review and confirm the proposed resolutions for Open Decisions D1 through D10 in part-5-open-decisions.md (recommended: Option A for D1, D2, D3, D4, D5, D7, D8, D9, D10; Teacher persona for D6).
