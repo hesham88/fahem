@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
+import { authedFetch } from "../../lib/authedFetch";
 
 interface Book {
   _id?: string;
@@ -23,6 +24,9 @@ interface Book {
   coverUrl?: string;
   coverThumbUrl?: string;
   mindMap?: any;
+  curriculum?: string;
+  curriculumId?: string;
+  subjectId?: string;
 }
 
 const isTextArabic = (text: string): boolean => {
@@ -32,10 +36,51 @@ const isTextArabic = (text: string): boolean => {
   return arCount > enCount;
 };
 
-const getSubjectTheme = (subject: string) => {
-  const s = (subject || "").toLowerCase();
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  const fullHex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+};
+
+const getDynamicSubjectTheme = (colorHex: string, emoji: string) => {
+  const fallbackColor = "#106ba3"; // Cairo brand blue fallback
+  const hex = (colorHex && colorHex.startsWith("#")) ? colorHex : fallbackColor;
+  const rgb = hexToRgb(hex) || { r: 16, g: 107, b: 163 };
+
+  const rSec = Math.min(255, rgb.r + 40);
+  const gSec = Math.min(255, rgb.g + 40);
+  const bSec = Math.min(255, rgb.b + 40);
+  const secondaryHex = `#${((1 << 24) + (rSec << 16) + (gSec << 8) + bSec).toString(16).slice(1)}`;
+
+  const rText = Math.max(0, rgb.r - 30);
+  const gText = Math.max(0, rgb.g - 30);
+  const bText = Math.max(0, rgb.b - 30);
+  const badgeTextHex = `#${((1 << 24) + (rText << 16) + (gText << 8) + bText).toString(16).slice(1)}`;
+
+  return {
+    primary: hex,
+    secondary: secondaryHex,
+    glowColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`,
+    badgeBg: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`,
+    badgeText: badgeTextHex,
+    emoji: emoji || "📚",
+    gradient: `linear-gradient(135deg, ${hex}, ${secondaryHex})`
+  };
+};
+
+const getSubjectTheme = (subjectOrColor: string, customEmoji?: string) => {
+  const s = (subjectOrColor || "").toLowerCase().trim();
   
-  if (s.includes("math") || s.includes("algebra") || s.includes("calculus") || s.includes("رياضيات") || s === "subj_algebra_stats") {
+  if (s.startsWith("#") || s.startsWith("rgb")) {
+    return getDynamicSubjectTheme(subjectOrColor, customEmoji || "📚");
+  }
+
+  if (s.includes("math") || s.includes("algebra") || s.includes("calculus") || s.includes("رياضيات") || s === "subj_algebra_stats" || s === "subj_math") {
     return {
       primary: "#2563eb",
       secondary: "#3b82f6",
@@ -112,26 +157,29 @@ const getSubjectTheme = (subject: string) => {
       gradient: "linear-gradient(135deg, var(--primary), var(--secondary))"
     };
   }
-  // Default/fallback
+
   return {
-    primary: "#e11d48",
-    secondary: "#fb7185",
-    glowColor: "rgba(225, 29, 72, 0.15)",
-    badgeBg: "rgba(225, 29, 72, 0.08)",
-    badgeText: "#be123c",
-    emoji: "📚",
-    gradient: "linear-gradient(135deg, #e11d48, #fb7185)"
+    primary: "#106ba3",
+    secondary: "#3190cb",
+    glowColor: "rgba(16, 107, 163, 0.15)",
+    badgeBg: "rgba(16, 107, 163, 0.08)",
+    badgeText: "#106ba3",
+    emoji: customEmoji || "📚",
+    gradient: "linear-gradient(135deg, #106ba3, #3190cb)"
   };
 };
 
-const getSubjectNameLabel = (subject: string, language: string) => {
-  const s = (subject || "").toLowerCase();
+const getSubjectNameLabel = (subject: string, language: string, customNameAr?: string, customNameEn?: string) => {
+  const s = (subject || "").toLowerCase().trim();
   const isAr = language === "ar";
   
+  if (isAr && customNameAr) return customNameAr;
+  if (!isAr && customNameEn) return customNameEn;
+
   if (s === "all") {
     return isAr ? "كل المواد" : "All Subjects";
   }
-  if (s.includes("math") || s.includes("algebra") || s.includes("calculus") || s.includes("رياضيات") || s === "subj_algebra_stats") {
+  if (s.includes("math") || s.includes("algebra") || s.includes("calculus") || s.includes("رياضيات") || s === "subj_algebra_stats" || s === "subj_math") {
     return isAr ? "الرياضيات البحتة" : "Pure Mathematics";
   }
   if (s.includes("computer") || s.includes("programming") || s.includes("coding") || s.includes("حاسب") || s === "sub_computer_science_1780535716963") {
@@ -149,7 +197,62 @@ const getSubjectNameLabel = (subject: string, language: string) => {
   if (s.includes("social") || s.includes("history") || s.includes("humanities") || s.includes("اجتماع") || s.includes("تاريخ") || s === "subj_social_sciences") {
     return isAr ? "العلوم الاجتماعية والإنسانيات" : "Social Sciences & Humanities";
   }
-  return isAr ? "مادة عامة" : "General Subject";
+
+  if (subject && !subject.startsWith("subj_") && !subject.startsWith("sub_")) {
+    return subject;
+  }
+
+  return isAr ? "مادة دراسية" : "Academic Subject";
+};
+
+const getLibraryDescription = (id: string, name: string, name_ar: string, language: string): string => {
+  const isAr = language === "ar";
+  if (id === "all") {
+    return isAr ? "البوابة الرقمية الموحدة للمناهج والمرفوعات" : "Consolidated digital library portal";
+  }
+  if (id === "moe") {
+    return isAr ? "المناهج المصرية الرسمية المعتمدة" : "Official Egyptian education library";
+  }
+  if (id === "openstax") {
+    return isAr ? "كتب جامعية وأكاديمية مفتوحة المصدر" : "Peer-reviewed open textbooks";
+  }
+  if (id === "general") {
+    return isAr ? "المصادر العامة والمرفوعات الإدارية" : "General research, administrative and reference uploads";
+  }
+  return isAr 
+    ? `تصفح المناهج والكتب الدراسية الخاصة بـ ${name_ar || name}` 
+    : `Explore curriculum and courses for ${name || name_ar}`;
+};
+
+const renderLibraryLogo = (logo: string, name: string, isSelected: boolean) => {
+  const isImg = logo && (logo.startsWith("/") || logo.startsWith("http://") || logo.startsWith("https://") || logo.includes(".png") || logo.includes(".svg") || logo.includes(".jpg") || logo.includes(".jpeg"));
+
+  if (isImg) {
+    return (
+      <img
+        src={logo}
+        alt={name}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+          const fallbackSpan = e.currentTarget.parentElement?.querySelector(".logo-fallback");
+          if (fallbackSpan) {
+            (fallbackSpan as HTMLElement).style.display = "inline-flex";
+          }
+        }}
+        style={{
+          width: "1.5rem",
+          height: "1.5rem",
+          objectFit: "contain"
+        }}
+      />
+    );
+  }
+
+  return (
+    <span style={{ fontSize: "1.2rem" }}>
+      {logo || "🏫"}
+    </span>
+  );
 };
 
 const isLineMathFormula = (line: string): boolean => {
@@ -917,6 +1020,8 @@ interface LibraryPanelProps {
   handleStartStudy: (item: any) => void;
   t: (key: string) => string;
   isAdmin?: boolean;
+  translationLanguage?: string;
+  setTranslationLanguage?: (val: string) => void;
 }
 
 export const LibraryPanel: React.FC<LibraryPanelProps> = ({
@@ -925,6 +1030,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   selectedBookReader,
   setSelectedBookReader,
   loadedBookPages,
+  setLoadedBookPages,
   loadingBookPages,
   readerCurrentPage,
   setReaderCurrentPage,
@@ -943,7 +1049,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   dynamicMaxUploadSize,
   handleStartStudy,
   t,
-  isAdmin = false
+  isAdmin = false,
+  translationLanguage: propsTranslationLanguage,
+  setTranslationLanguage: propsSetTranslationLanguage
 }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifierLog, setVerifierLog] = useState<string[]>([]);
@@ -951,7 +1059,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [rejectedInfo, setRejectedInfo] = useState<any>(null);
   const [activeLibraryTab, setActiveLibraryTab] = useState<"curriculum" | "private">("curriculum");
 
-  const [translationLanguage, setTranslationLanguage] = useState(language || "en");
+  const [localTranslationLanguage, setLocalTranslationLanguage] = useState("Original");
+  const translationLanguage = propsTranslationLanguage !== undefined ? propsTranslationLanguage : localTranslationLanguage;
+  const setTranslationLanguage = propsSetTranslationLanguage !== undefined ? propsSetTranslationLanguage : setLocalTranslationLanguage;
   const [selectedMcqAnswers, setSelectedMcqAnswers] = useState<Record<string, string>>({});
 
   const getPageContentToRead = (pageObj: any, lang: string): string => {
@@ -959,7 +1069,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (pageObj.blocks && Array.isArray(pageObj.blocks) && pageObj.blocks.length > 0) {
       return compilePageTextForTts(pageObj.blocks, lang, pageObj.i18n);
     }
-    const isAr = lang === "ar";
+    if (lang !== "Original" && pageObj.i18n && typeof pageObj.i18n[lang] === "string") {
+      return pageObj.i18n[lang];
+    }
+    const isAr = lang === "Original" ? (selectedBookReader?.language === "ar") : (lang === "ar");
     return isAr 
       ? (pageObj.contentAr || pageObj.contentEn || pageObj.content || "") 
       : (pageObj.contentEn || pageObj.contentAr || pageObj.content || "");
@@ -1018,7 +1131,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       const items = getBlockProp(b, "items");
       const rows = getBlockProp(b, "rows");
 
-      const isAr = lang === "ar";
+      const isAr = lang === "Original" ? (selectedBookReader?.language === "ar") : (lang === "ar");
 
       switch (type) {
         case "heading": {
@@ -1285,7 +1398,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         case "question": {
           const selectedAnswer = selectedMcqAnswers[id];
           const hasSelected = selectedAnswer !== undefined;
-          const isCorrect = selectedAnswer === answer;
+          const evaluation = mcqEvaluations[id];
+          const isCorrect = evaluation ? evaluation.isCorrect : (selectedAnswer === answer);
           return (
             <div key={id} style={{
               margin: "1.75rem 0",
@@ -1335,20 +1449,26 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     let optShadow = "0 2px 6px rgba(0,0,0,0.02)";
 
                     if (hasSelected) {
-                      if (isCurrentSelection) {
-                        if (isCorrect) {
-                          optBg = "rgba(16, 185, 129, 0.1)"; // correct green
-                          optBorder = "2px solid #10b981";
-                          optShadow = "0 4px 12px rgba(16, 185, 129, 0.15)";
-                        } else {
-                          optBg = "rgba(239, 68, 68, 0.1)"; // incorrect red
-                          optBorder = "2px solid #ef4444";
-                          optShadow = "0 4px 12px rgba(239, 68, 68, 0.15)";
+                      if (evaluation && !evaluation.loading) {
+                        if (isCurrentSelection) {
+                          if (evaluation.isCorrect) {
+                            optBg = "rgba(16, 185, 129, 0.1)"; // correct green
+                            optBorder = "2px solid #10b981";
+                            optShadow = "0 4px 12px rgba(16, 185, 129, 0.15)";
+                          } else {
+                            optBg = "rgba(239, 68, 68, 0.1)"; // incorrect red
+                            optBorder = "2px solid #ef4444";
+                            optShadow = "0 4px 12px rgba(239, 68, 68, 0.15)";
+                          }
+                        } else if (isThisCorrectOption) {
+                          optBg = "rgba(16, 185, 129, 0.05)";
+                          optBorder = "2px dashed #10b981";
                         }
-                      } else if (isThisCorrectOption) {
-                        // Highlight the correct answer even if the user picked wrong
-                        optBg = "rgba(16, 185, 129, 0.05)";
-                        optBorder = "2px dashed #10b981";
+                      } else {
+                        if (isCurrentSelection) {
+                          optBg = "rgba(16, 107, 163, 0.08)";
+                          optBorder = "2px solid var(--primary)";
+                        }
                       }
                     }
 
@@ -1357,7 +1477,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         key={optIdx}
                         onClick={() => {
                           if (hasSelected) return; // allow only one submission
-                          setSelectedMcqAnswers(prev => ({ ...prev, [id]: optLetter }));
+                          handleEvaluateMcq(id, prompt, optLetter, answer, blocks || []);
                         }}
                         disabled={hasSelected}
                         style={{
@@ -1409,7 +1529,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           {optLetter}
                         </span>
                         <span style={{ flex: 1 }}>{parseInlineStyles(opt)}</span>
-                        {hasSelected && isCurrentSelection && (
+                        {hasSelected && isCurrentSelection && !evaluation?.loading && (
                           <span style={{ fontSize: "1.2rem" }}>
                             {isCorrect ? "✅" : "❌"}
                           </span>
@@ -1417,6 +1537,89 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       </button>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Gamified Feedback & Explanation Card */}
+              {evaluation && (
+                <div style={{
+                  marginTop: "1.25rem",
+                  padding: "1rem 1.25rem",
+                  borderRadius: "12px",
+                  background: evaluation.loading 
+                    ? "rgba(16, 107, 163, 0.04)" 
+                    : (evaluation.isCorrect ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)"),
+                  border: evaluation.loading
+                    ? "1px solid rgba(16, 107, 163, 0.12)"
+                    : (evaluation.isCorrect ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)"),
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                  transition: "all 0.3s ease",
+                  fontFamily: isAr ? "Cairo, sans-serif" : "inherit"
+                }}>
+                  {evaluation.loading ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{
+                        display: "inline-block",
+                        width: "14px",
+                        height: "14px",
+                        border: "2px solid rgba(16, 107, 163, 0.3)",
+                        borderTopColor: "var(--primary)",
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite"
+                      }}></span>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#6a7c88" }}>
+                        {language === "ar" ? "جاري تقييم إجابتك..." : "Evaluating your answer..."}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.5rem",
+                        marginBottom: "0.5rem"
+                      }}>
+                        <div style={{ 
+                          fontSize: "0.95rem", 
+                          fontWeight: 800, 
+                          color: evaluation.isCorrect ? "#10b981" : "#ef4444",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.4rem"
+                        }}>
+                          <span>{evaluation.isCorrect ? "✨" : "🛡️"}</span>
+                          <span>{evaluation.feedback}</span>
+                        </div>
+                        {evaluation.isCorrect && evaluation.xpGained && (
+                          <div style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 900,
+                            background: "linear-gradient(135deg, #d4af37, #b28d25)",
+                            color: "#ffffff",
+                            padding: "3px 8px",
+                            borderRadius: "20px",
+                            boxShadow: "0 2px 6px rgba(212, 175, 55, 0.3)"
+                          }}>
+                            +{evaluation.xpGained} XP
+                          </div>
+                        )}
+                      </div>
+                      {evaluation.explanation && (
+                        <p style={{
+                          margin: 0,
+                          fontSize: "0.85rem",
+                          lineHeight: "1.6",
+                          color: "var(--foreground)",
+                          opacity: 0.9,
+                          fontWeight: 500
+                        }}>
+                          {parseInlineStyles(evaluation.explanation)}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1631,11 +1834,216 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
   };
 
+  const handleLazyTranslate = async (targetLang: string) => {
+    if (!selectedBookReader) return;
+    const allPages = getAllPages(selectedBookReader, loadedBookPages);
+    const hasCover = !!selectedBookReader.coverUrl;
+    const isCoverPage = hasCover && readerCurrentPage === 1;
+    if (isCoverPage) return;
+    
+    const activePage = hasCover 
+      ? (allPages[readerCurrentPage - 2] || allPages[0])
+      : (allPages[readerCurrentPage - 1] || allPages[0]);
+      
+    if (!activePage) return;
+    const bookId = selectedBookReader._id || selectedBookReader.id;
+    const pageNumber = activePage.page_number || activePage.pageNum || readerCurrentPage;
+
+    if (activePage.i18n && activePage.i18n[targetLang]) {
+      setTranslationLanguage(targetLang);
+      return;
+    }
+
+    try {
+      setIsTranslating(true);
+      const res = await fetch("/api/translate/page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          pageNumber: Number(pageNumber),
+          targetLanguage: targetLang
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch translation");
+      }
+
+      const data = await res.json();
+      if (data.success && data.i18n) {
+        const updatedPages = loadedBookPages.map((p: any) => {
+          const pNum = p.page_number || p.pageNum || 0;
+          if (Number(pNum) === Number(pageNumber)) {
+            return {
+              ...p,
+              i18n: {
+                ...(p.i18n || {}),
+                ...data.i18n
+              }
+            };
+          }
+          return p;
+        });
+        setLoadedBookPages(updatedPages);
+        setTranslationLanguage(targetLang);
+
+        logActivityEvent("page_translated", {
+          book_id: bookId,
+          page_number: Number(pageNumber),
+          lang: targetLang
+        });
+      } else {
+        alert(language === "ar" ? "فشلت الترجمة، يرجى المحاولة مرة أخرى." : "Translation failed, please try again.");
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      alert(language === "ar" ? "حدث خطأ أثناء الاتصال بوكيل الترجمة." : "An error occurred while contacting the translation agent.");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleEvaluateMcq = async (blockId: string, questionText: string, selectedOpt: string, correctOpt: string, pageBlocks: any[]) => {
+    if (mcqEvaluations[blockId]) return;
+
+    setSelectedMcqAnswers(prev => ({ ...prev, [blockId]: selectedOpt }));
+
+    setMcqEvaluations(prev => ({
+      ...prev,
+      [blockId]: {
+        isCorrect: false,
+        feedback: "",
+        explanation: "",
+        loading: true
+      }
+    }));
+
+    const bookId = selectedBookReader?._id || selectedBookReader?.id;
+    const pageNum = readerCurrentPage;
+
+    try {
+      const res = await fetch("/api/practice/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: questionText,
+          mode: "mcq",
+          userAnswer: selectedOpt,
+          correctOption: correctOpt,
+          language: translationLanguage === "Original" ? (selectedBookReader?.language || language) : translationLanguage,
+          bookId,
+          pageNumber: Number(pageNum)
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to evaluate MCQ");
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        setMcqEvaluations(prev => ({
+          ...prev,
+          [blockId]: {
+            isCorrect: data.isCorrect,
+            feedback: data.feedback || "",
+            explanation: data.correctExplanation || "",
+            xpGained: data.xpGained || 0,
+            loading: false
+          }
+        }));
+
+        logActivityEvent("question_checked", {
+          book_id: bookId,
+          page_number: Number(pageNum),
+          block_id: blockId,
+          user_answer: selectedOpt,
+          is_correct: data.isCorrect,
+          xp_gained: data.xpGained || 0
+        });
+      } else {
+        throw new Error("Evaluation response success was false");
+      }
+    } catch (err) {
+      console.error("MCQ evaluation error:", err);
+      const localCorrect = selectedOpt === correctOpt;
+      setMcqEvaluations(prev => ({
+        ...prev,
+        [blockId]: {
+          isCorrect: localCorrect,
+          feedback: localCorrect 
+            ? (language === "ar" ? "إجابة صحيحة! أحسنت! 🎉" : "Correct! Excellent job! 🎉")
+            : (language === "ar" ? "للأسف، إجابة غير صحيحة. 🛡️ حاول مرة أخرى" : "Incorrect. 🛡️ Try again!"),
+          explanation: localCorrect 
+            ? (language === "ar" ? `الاختيار (${correctOpt}) هو الإجابة الصحيحة.` : `Option (${correctOpt}) is the correct choice.`)
+            : (language === "ar" ? `الإجابة الصحيحة هي الاختيار (${correctOpt}).` : `The correct answer is Option (${correctOpt}).`),
+          xpGained: localCorrect ? 15 : 0,
+          loading: false
+        }
+      }));
+    }
+  };
+
+  const buildTOC = () => {
+    const allPages = getAllPages(selectedBookReader!, loadedBookPages);
+    if (selectedBookReader?.chapters && selectedBookReader.chapters.length > 0) {
+      return selectedBookReader.chapters.map((ch: any, idx: number) => {
+        return {
+          id: `ch-${idx}`,
+          titleEn: ch.titleEn || ch.title || `Chapter ${idx + 1}`,
+          titleAr: ch.titleAr || ch.title_ar || ch.title || `الفصل ${idx + 1}`,
+          topics: (ch.topics || []).map((top: any, tIdx: number) => ({
+            id: `top-${idx}-${tIdx}`,
+            titleEn: top.titleEn || top.title || `Topic ${tIdx + 1}`,
+            titleAr: top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`,
+            pageNum: top.pageNum || top.page_number || top.pageNumber || 1
+          }))
+        };
+      });
+    }
+
+    const chaptersMap: Record<string, { titleEn: string; titleAr: string; pages: any[] }> = {};
+    allPages.forEach((p: any) => {
+      const chTitleEn = p.chapterTitleEn || "General";
+      const chTitleAr = p.chapterTitleAr || "عام";
+      const key = chTitleEn;
+      if (!chaptersMap[key]) {
+        chaptersMap[key] = {
+          titleEn: chTitleEn,
+          titleAr: chTitleAr,
+          pages: []
+        };
+      }
+      chaptersMap[key].pages.push(p);
+    });
+
+    const sortedChapters = Object.values(chaptersMap).map((ch: any, idx: number) => {
+      const sortedPages = [...ch.pages].sort((a, b) => (a.pageNum || 0) - (b.pageNum || 0));
+      return {
+        id: `ch-${idx}`,
+        titleEn: ch.titleEn,
+        titleAr: ch.titleAr,
+        topics: sortedPages.map((p: any) => ({
+          id: `top-${idx}-${p.pageNum}`,
+          titleEn: p.titleEn || `Page ${p.pageNum}`,
+          titleAr: p.titleAr || `صفحة ${p.pageNum}`,
+          pageNum: p.pageNum
+        }))
+      };
+    }).sort((a, b) => {
+      const aMinPage = a.topics[0]?.pageNum || 9999;
+      const bMinPage = b.topics[0]?.pageNum || 9999;
+      return aMinPage - bMinPage;
+    });
+
+    return sortedChapters;
+  };
+
   const [showReaderSidebar, setShowReaderSidebar] = useState(true);
   const [sidebarPageSearch, setSidebarPageSearch] = useState("");
 
   const [isReadingPage, setIsReadingPage] = useState(false);
-  const [isContinuousListening, setIsContinuousListening] = useState(false);
   const [isNextPageGlow, setIsNextPageGlow] = useState(false);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -1656,10 +2064,144 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   };
 
   // New states for hierarchical menu, library selection, and Swarm SVG Mind Map
-  const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "mindmap">("pages");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "toc">("toc");
+  const [tocSearch, setTocSearch] = useState("");
+  const [mcqEvaluations, setMcqEvaluations] = useState<Record<string, { isCorrect: boolean; feedback: string; explanation: string; loading?: boolean; xpGained?: number }>>({});
+  const viewerPanelRef = useRef<HTMLDivElement>(null);
+  const lastOpenedBookIdRef = useRef<string | null>(null);
+  const lastHeartbeatTimeRef = useRef<number>(Date.now());
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
   const [hoveredNode, setHoveredNode] = useState<any | null>(null);
   const [selectedLibraryId, setSelectedLibraryId] = useState<string>("all");
+
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [curriculumSubjects, setCurriculumSubjects] = useState<any[]>([]);
+  const [scopeValues, setScopeValues] = useState<Record<string, string>>({});
+  const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
+  const [libraryCounts, setLibraryCounts] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const fetchCounts = async (libs: any[]) => {
+    const counts: Record<string, number> = {};
+    for (const lib of libs) {
+      try {
+        const res = await authedFetch(`/api/knowledge?library_id=${encodeURIComponent(lib._id)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            counts[lib._id] = data.total_books || 0;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch count for library " + lib._id, err);
+      }
+    }
+    counts["all"] = Object.values(counts).reduce((a, b) => a + b, 0);
+    setLibraryCounts(counts);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadLibraries = async () => {
+      try {
+        setIsLoading(true);
+        const res = await authedFetch("/api/libraries");
+        if (!res.ok) throw new Error("Failed to fetch libraries");
+        const data = await res.json();
+        if (isMounted && data.success) {
+          setLibraries(data.libraries || []);
+          fetchCounts(data.libraries || []);
+        }
+      } catch (err) {
+        console.error("Error loading libraries:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    loadLibraries();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadSelectedBooks = () => {
+      const stored = sessionStorage.getItem("fahem_selected_book_ids");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setSelectedBookIds(new Set(parsed));
+          }
+        } catch (e) {
+          console.error("Failed to parse selected books:", e);
+        }
+      } else {
+        setSelectedBookIds(new Set());
+      }
+    };
+
+    loadSelectedBooks();
+
+    const handleScopeChanged = () => {
+      loadSelectedBooks();
+    };
+
+    window.addEventListener("fahemRAGScopeChanged", handleScopeChanged);
+    return () => {
+      window.removeEventListener("fahemRAGScopeChanged", handleScopeChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeLibraryTab !== "curriculum") return;
+    
+    let isMounted = true;
+    const fetchCurriculum = async () => {
+      try {
+        setIsLoading(true);
+        const params = new URLSearchParams();
+        if (selectedLibraryId && selectedLibraryId !== "all") {
+          params.append("library_id", selectedLibraryId);
+        }
+        if (librarySearch) {
+          params.append("query", librarySearch);
+        }
+        
+        Object.entries(scopeValues).forEach(([key, val]) => {
+          if (val && val !== "all") {
+            params.append(key, val);
+          }
+        });
+
+        const res = await authedFetch(`/api/knowledge?${params.toString()}`);
+        if (!res.ok) throw new Error("Failed to load curriculum knowledge");
+        const data = await res.json();
+        
+        if (isMounted && data.success) {
+          setCurriculumSubjects(data.subjects || []);
+        }
+      } catch (err) {
+        console.error("Error fetching dynamic curriculum:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchCurriculum();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeLibraryTab, selectedLibraryId, scopeValues, librarySearch]);
+
+  useEffect(() => {
+    setScopeValues({});
+    setLibrarySubject("all");
+  }, [selectedLibraryId]);
+
+  const activeLibrary = libraries.find(lib => lib._id === selectedLibraryId);
 
   const getStoredTtsVoice = (): string => {
     if (typeof window !== "undefined") {
@@ -1712,7 +2254,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           language: reqLang,
           voice: selectedVoice,
           userId: user?.uid || "anonymous",
-          userEmail: user?.email || "anonymous@fahem.ai"
+          userEmail: user?.email || "anonymous@fahem.ai",
+          bookId: selectedBookReader?._id || selectedBookReader?.id,
+          pageNumber: readerCurrentPage
         })
       });
 
@@ -1723,15 +2267,18 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           const audio = new Audio(audioUrl);
           activeAudioRef.current = audio;
 
+          // Log audio activity telemetry
+          logActivityEvent("audio_played", {
+            book_id: selectedBookReader?._id || selectedBookReader?.id,
+            page_number: readerCurrentPage,
+            lang: reqLang
+          });
+
           audio.onended = () => {
             activeAudioRef.current = null;
-            if (isContinuousListening && readerCurrentPage < totalPages) {
-              setReaderCurrentPage(readerCurrentPage + 1);
-            } else {
-              setIsReadingPage(false);
-              setIsNextPageGlow(true);
-              setTimeout(() => setIsNextPageGlow(false), 3000);
-            }
+            setIsReadingPage(false);
+            setIsNextPageGlow(true);
+            setTimeout(() => setIsNextPageGlow(false), 3000);
           };
 
           audio.onerror = (err) => {
@@ -1806,55 +2353,106 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   };
 
   useEffect(() => {
-    if (selectedBookReader) {
-      if (isEnglishBookBySubjectOrTitle(selectedBookReader)) {
-        setTranslationLanguage("en");
-      } else {
-        setTranslationLanguage(selectedBookReader.language || language || "en");
-      }
-    } else {
-      setTranslationLanguage(language || "en");
-    }
-  }, [selectedBookReader, language]);
+    setTranslationLanguage("Original");
+  }, [selectedBookReader]);
 
+  const logActivityEvent = (action: string, contextDetails: any) => {
+    fetch("/api/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        status: "success",
+        details: contextDetails
+      })
+    }).catch(e => console.warn(`Failed to log activity ${action}:`, e));
+  };
+
+  // Reading session heartbeat & book/page visit telemetry
   useEffect(() => {
-    if (selectedBookReader && isReadingPage && isContinuousListening) {
-      if (activeAudioRef.current) {
-        activeAudioRef.current.pause();
-        activeAudioRef.current = null;
-      }
-      
-      const allPages = getAllPages(selectedBookReader, loadedBookPages);
-      const hasCover = !!selectedBookReader.coverUrl;
-      
-      let contentToRead = "";
-      let pageTotal = hasCover ? allPages.length + 1 : allPages.length;
-      
-      if (hasCover) {
-        if (readerCurrentPage > 1) {
-          const pageObj = allPages[readerCurrentPage - 2] || allPages[0];
-          if (pageObj) {
-            contentToRead = getPageContentToRead(pageObj, translationLanguage);
-          }
-        }
-      } else {
-        const pageObj = allPages[readerCurrentPage - 1] || allPages[0];
-        if (pageObj) {
-          contentToRead = getPageContentToRead(pageObj, translationLanguage);
-        }
-      }
-      
-      if (contentToRead) {
-        const timer = setTimeout(() => {
-          setIsReadingPage(false);
-          handleReadPage(contentToRead, pageTotal);
-        }, 600);
-        return () => clearTimeout(timer);
-      } else {
-        setIsReadingPage(false);
-      }
+    if (!selectedBookReader) {
+      lastOpenedBookIdRef.current = null;
+      return;
     }
-  }, [readerCurrentPage]);
+
+    const bookId = selectedBookReader._id || selectedBookReader.id;
+    if (!bookId) return;
+
+    // 1. Log book_opened activity once per book opening
+    if (lastOpenedBookIdRef.current !== bookId) {
+      lastOpenedBookIdRef.current = bookId;
+      
+      logActivityEvent("book_opened", {
+        book_id: bookId,
+        page_number: readerCurrentPage,
+        lang: translationLanguage
+      });
+
+      // Also upsert initial reading session
+      fetch("/api/reading-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          curriculumId: selectedBookReader.curriculum || selectedBookReader.curriculumId || "",
+          subjectId: selectedBookReader.subject || selectedBookReader.subjectId || "",
+          pageNumber: readerCurrentPage,
+          durationIncrement: 0
+        })
+      }).catch(e => console.warn("Failed to initialize reading session:", e));
+
+      lastHeartbeatTimeRef.current = Date.now();
+    }
+
+    // 2. Set up interval heartbeat
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diffSec = Math.round((now - lastHeartbeatTimeRef.current) / 1000);
+      if (diffSec <= 0) return;
+
+      lastHeartbeatTimeRef.current = now;
+
+      fetch("/api/reading-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          curriculumId: selectedBookReader.curriculum || selectedBookReader.curriculumId || "",
+          subjectId: selectedBookReader.subject || selectedBookReader.subjectId || "",
+          pageNumber: readerCurrentPage,
+          durationIncrement: diffSec
+        })
+      }).catch(e => console.warn("Failed to send heartbeat:", e));
+
+      // Log page_viewed activity periodically
+      logActivityEvent("page_viewed", {
+        book_id: bookId,
+        page_number: readerCurrentPage,
+        lang: translationLanguage
+      });
+
+    }, 20000); // every 20 seconds
+
+    return () => {
+      clearInterval(interval);
+      // Send final heartbeat for this page/book session segment
+      const now = Date.now();
+      const diffSec = Math.round((now - lastHeartbeatTimeRef.current) / 1000);
+      if (diffSec > 0) {
+        fetch("/api/reading-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookId,
+            curriculumId: selectedBookReader.curriculum || selectedBookReader.curriculumId || "",
+            subjectId: selectedBookReader.subject || selectedBookReader.subjectId || "",
+            pageNumber: readerCurrentPage,
+            durationIncrement: diffSec
+          })
+        }).catch(e => console.warn("Failed to send final heartbeat:", e));
+      }
+    };
+  }, [selectedBookReader, readerCurrentPage]);
 
   useEffect(() => {
     return () => {
@@ -1879,7 +2477,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       const allPages = getAllPages(selectedBookReader, loadedBookPages);
       const hasCover = !!selectedBookReader.coverUrl;
       const totalPages = hasCover ? allPages.length + 1 : allPages.length;
-      const isAr = translationLanguage === "ar";
+      const isAr = translationLanguage === "Original" ? (selectedBookReader.language === "ar") : (translationLanguage === "ar");
 
       if (e.key === "ArrowRight") {
         if (isAr) {
@@ -1924,7 +2522,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (touchStartX.current === null) return;
     const touchEndX = e.changedTouches[0].clientX;
     const diffX = touchStartX.current - touchEndX;
-    const isAr = translationLanguage === "ar";
+    const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
 
     if (Math.abs(diffX) > 50) {
       if (diffX > 0) {
@@ -2311,14 +2909,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       📄 {language === "ar" ? "الصفحات" : "Pages"}
                     </button>
                     <button
-                      onClick={() => setActiveSidebarTab("mindmap")}
+                      onClick={() => setActiveSidebarTab("toc")}
                       style={{
                         flex: 1,
                         padding: "6px 12px",
                         borderRadius: "8px",
                         border: "none",
-                        background: activeSidebarTab === "mindmap" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
-                        color: activeSidebarTab === "mindmap" ? "#ffffff" : "var(--foreground)",
+                        background: activeSidebarTab === "toc" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+                        color: activeSidebarTab === "toc" ? "#ffffff" : "var(--foreground)",
                         fontSize: "0.75rem",
                         fontWeight: 800,
                         cursor: "pointer",
@@ -2329,7 +2927,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         gap: "4px"
                       }}
                     >
-                      🧠 {language === "ar" ? "الخريطة الذهنية" : "Mind Map"}
+                      📖 {language === "ar" ? "جدول المحتويات" : "Table of Contents"}
                     </button>
                   </div>
 
@@ -2456,235 +3054,199 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       </div>
                     </>
                   ) : (
-                    /* Premium Interactive SVG Mind Map Tab */
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, position: "relative" }}>
-                      {(() => {
-                        const chaptersMap: Record<string, { title: string; titleAr: string; pages: any[] }> = {};
-                        allPages.forEach(p => {
-                          const chTitleEn = p.chapterTitleEn || "General";
-                          const chTitleAr = p.chapterTitleAr || "عام";
-                          const key = chTitleEn;
-                          if (!chaptersMap[key]) {
-                            chaptersMap[key] = { title: chTitleEn, titleAr: chTitleAr, pages: [] };
-                          }
-                          chaptersMap[key].pages.push(p);
-                        });
+                    /* Collapsible searchable TOC Accordion */
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1, position: "relative" }}>
+                      <input
+                        type="text"
+                        placeholder={language === "ar" ? "ابحث في جدول المحتويات..." : "Search Table of Contents..."}
+                        value={tocSearch}
+                        onChange={(e) => setTocSearch(e.target.value)}
+                        style={{
+                          padding: "0.45rem 0.75rem",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                          fontSize: "0.8rem",
+                          outline: "none",
+                          background: "#ffffff",
+                          fontFamily: "var(--font-sans)",
+                          width: "100%",
+                          boxSizing: "border-box"
+                        }}
+                      />
 
-                        const nodes: any[] = [];
-                        const links: any[] = [];
-
-                        let currentY = 75;
-                        const rootNode = { id: "root", type: "root", label: language === "ar" ? "الفهرس" : "Contents", x: 130, y: 30 };
-                        nodes.push(rootNode);
-
-                        const chaptersList = Object.values(chaptersMap);
-                        chaptersList.forEach((ch, chIdx) => {
-                          const chId = `ch-${chIdx}`;
-                          const chIsExpanded = expandedChapters[chId] !== false; // default to expanded
+                      <div style={{ 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        gap: "0.5rem", 
+                        overflowY: "auto", 
+                        maxHeight: "440px", 
+                        paddingRight: "4px" 
+                      }}>
+                        {(() => {
+                          const chapters = buildTOC();
+                          const searchQuery = tocSearch.trim().toLowerCase();
                           
-                          const chNode = {
-                            id: chId,
-                            type: "chapter",
-                            label: translationLanguage === "ar" ? ch.titleAr : ch.title,
-                            fullLabelEn: ch.title,
-                            fullLabelAr: ch.titleAr,
-                            x: 60,
-                            y: currentY,
-                            pagesCount: ch.pages.length,
-                            isExpanded: chIsExpanded
-                          };
-                          nodes.push(chNode);
-                          
-                          links.push({
-                            from: rootNode,
-                            to: chNode,
-                            type: "root-to-chapter"
-                          });
-                          
-                          if (chIsExpanded) {
-                            ch.pages.forEach((p) => {
-                              const pNodeId = `p-${p.pageNum}`;
-                              const pActive = p.pageNum === readerCurrentPage;
-                              const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                              
-                              const pNode = {
-                                id: pNodeId,
-                                type: "page",
-                                pageNum: p.pageNum,
-                                label: `${p.pageNum}`,
-                                fullLabel: pTitle,
-                                snippet: (translationLanguage === "ar" ? (p.contentAr || p.contentEn) : (p.contentEn || p.contentAr))?.slice(0, 80) + "...",
-                                active: pActive,
-                                x: 190,
-                                y: currentY
+                          const filteredChapters = chapters.map((ch: any) => {
+                            const isChMatch = ch.titleEn.toLowerCase().includes(searchQuery) || ch.titleAr.toLowerCase().includes(searchQuery);
+                            const matchingTopics = ch.topics.filter((top: any) => 
+                              top.titleEn.toLowerCase().includes(searchQuery) || top.titleAr.toLowerCase().includes(searchQuery)
+                            );
+                            
+                            if (isChMatch || matchingTopics.length > 0) {
+                              return {
+                                ...ch,
+                                topics: searchQuery ? matchingTopics : ch.topics,
+                                isMatch: true
                               };
-                              nodes.push(pNode);
-                              
-                              links.push({
-                                from: chNode,
-                                to: pNode,
-                                type: "chapter-to-page",
-                                active: pActive
-                              });
-                              
-                              currentY += 44; // Spacing between page nodes
-                            });
-                          } else {
-                            currentY += 54; // Spacing if chapter collapsed
+                            }
+                            return null;
+                          }).filter(Boolean) as any[];
+
+                          if (filteredChapters.length === 0) {
+                            return (
+                              <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
+                                🔍 {language === "ar" ? "لا توجد موضوعات مطابقة" : "No matching chapters or topics found"}
+                              </div>
+                            );
                           }
-                        });
 
-                        const svgHeight = Math.max(300, currentY + 30);
+                          return filteredChapters.map((ch) => {
+                            const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
+                            const chTitle = isAr ? ch.titleAr : ch.titleEn;
+                            const isExpanded = searchQuery ? true : (expandedChapters[ch.id] !== false);
+                            const isChActive = ch.topics.some((top: any) => top.pageNum === readerCurrentPage);
 
-                        return (
-                          <div style={{ position: "relative", width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "hidden", borderRadius: "12px", border: "1px solid rgba(16, 107, 163, 0.08)", background: "rgba(16, 107, 163, 0.01)" }}>
-                            <svg width="240" height={svgHeight} style={{ overflow: "visible" }}>
-                              <defs>
-                                <linearGradient id="grad-active-link" x1="0%" y1="0%" x2="100%" y2="0%">
-                                  <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.4" />
-                                  <stop offset="100%" stopColor="var(--secondary)" stopOpacity="1" />
-                                </linearGradient>
-                                <linearGradient id="grad-inactive-link" x1="0%" y1="0%" x2="100%" y2="0%">
-                                  <stop offset="0%" stopColor="rgba(16, 107, 163, 0.15)" />
-                                  <stop offset="100%" stopColor="rgba(16, 107, 163, 0.05)" />
-                                </linearGradient>
-                                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                                  <feGaussianBlur stdDeviation="3" result="blur" />
-                                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                </filter>
-                              </defs>
-
-                              {/* Render Bezier Curves */}
-                              {links.map((link, idx) => {
-                                const dx = link.to.x - link.from.x;
-                                const cx1 = link.from.x + dx * 0.5;
-                                const cy1 = link.from.y;
-                                const cx2 = link.from.x + dx * 0.5;
-                                const cy2 = link.to.y;
-                                const d = `M ${link.from.x} ${link.from.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${link.to.x} ${link.to.y}`;
-
-                                return (
-                                  <path
-                                    key={idx}
-                                    d={d}
-                                    fill="none"
-                                    stroke={link.active ? "url(#grad-active-link)" : "url(#grad-inactive-link)"}
-                                    strokeWidth={link.active ? 3 : 1.5}
-                                    strokeDasharray={link.type === "chapter-to-page" ? (link.active ? "none" : "3,3") : "none"}
-                                    style={{ transition: "all 0.3s ease" }}
-                                    filter={link.active ? "url(#glow)" : undefined}
-                                  />
-                                );
-                              })}
-
-                              {/* Render Nodes */}
-                              {nodes.map((node) => {
-                                const isRoot = node.type === "root";
-                                const isChapter = node.type === "chapter";
-                                const isPage = node.type === "page";
-
-                                return (
-                                  <g
-                                    key={node.id}
-                                    style={{ cursor: "pointer" }}
-                                    onClick={() => {
-                                      if (isPage) {
-                                        setReaderCurrentPage(node.pageNum);
-                                      } else if (isChapter) {
-                                        setExpandedChapters(prev => ({
-                                          ...prev,
-                                          [node.id]: !node.isExpanded
-                                        }));
-                                      }
-                                    }}
-                                    onMouseOver={() => setHoveredNode(node)}
-                                    onMouseOut={() => setHoveredNode(null)}
-                                  >
-                                    {isRoot && (
-                                      <>
-                                        <circle cx={node.x} cy={node.y} r="14" fill="var(--primary)" stroke="#ffffff" strokeWidth="2" filter="url(#glow)" />
-                                        <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900">🧠</text>
-                                      </>
-                                    )}
-
-                                    {isChapter && (
-                                      <>
-                                        <circle cx={node.x} cy={node.y} r="10" fill={node.isExpanded ? "var(--primary)" : "#6a7c88"} stroke="#ffffff" strokeWidth="1.5" />
-                                        <text x={node.x} y={node.y + 3} textAnchor="middle" fill="#ffffff" fontSize="8" fontWeight="800">
-                                          {node.isExpanded ? "−" : "+"}
-                                        </text>
-                                        <text x={node.x - 14} y={node.y + 3} textAnchor="end" fill="var(--foreground)" fontSize="9" fontWeight="700" style={{ maxWidth: "60px" }}>
-                                          {node.label.length > 8 ? node.label.slice(0, 7) + "..." : node.label}
-                                        </text>
-                                      </>
-                                    )}
-
-                                    {isPage && (
-                                      <>
-                                        {/* Active Pulse Glow circle */}
-                                        {node.active && (
-                                          <circle cx={node.x} cy={node.y} r="10" fill="none" stroke="var(--primary)" strokeWidth="1" className="active-node-pulse" style={{ animation: "activePulse 1.5s infinite" }} />
-                                        )}
-                                        <circle cx={node.x} cy={node.y} r="8" fill={node.active ? "var(--primary)" : "#ffffff"} stroke={node.active ? "var(--secondary)" : "rgba(16, 107, 163, 0.3)"} strokeWidth={node.active ? 2 : 1} />
-                                        <text x={node.x} y={node.y + 3} textAnchor="middle" fill={node.active ? "#ffffff" : "var(--primary)"} fontSize="8" fontWeight="900">
-                                          {node.label}
-                                        </text>
-                                      </>
-                                    )}
-                                  </g>
-                                );
-                              })}
-                            </svg>
-
-                            {/* Floating glassmorphic tooltip card inside Mind Map panel */}
-                            {hoveredNode && (
-                              <div style={{
-                                position: "absolute",
-                                bottom: "8px",
-                                left: "8px",
-                                right: "8px",
-                                background: "rgba(255, 255, 255, 0.95)",
-                                backdropFilter: "blur(12px)",
-                                border: "1px solid rgba(16, 107, 163, 0.15)",
+                            return (
+                              <div key={ch.id} style={{
                                 borderRadius: "10px",
-                                padding: "8px 12px",
-                                pointerEvents: "none",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                                transition: "all 0.2s ease-in-out",
-                                zIndex: 10
+                                border: "1px solid rgba(16, 107, 163, 0.08)",
+                                background: isChActive ? "rgba(16, 107, 163, 0.02)" : "rgba(255, 255, 255, 0.4)",
+                                overflow: "hidden",
+                                transition: "all 0.25s ease"
                               }}>
-                                {hoveredNode.type === "root" && (
-                                  <div>
-                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📖 {selectedBookReader.title}</div>
-                                    <div style={{ fontSize: "0.65rem", color: "#6a7c88", marginTop: "2px" }}>
-                                      {language === "ar" ? "الهيكل التنظيمي الكامل للفصول والمحتوى" : "Full structured course syllabus tree"}
-                                    </div>
+                                <button
+                                  onClick={() => {
+                                    if (!searchQuery) {
+                                      setExpandedChapters(prev => ({
+                                        ...prev,
+                                        [ch.id]: !isExpanded
+                                      }));
+                                    }
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    width: "100%",
+                                    padding: "10px 12px",
+                                    border: "none",
+                                    background: isChActive 
+                                      ? "linear-gradient(135deg, rgba(16, 107, 163, 0.06), rgba(16, 107, 163, 0.02))" 
+                                      : "transparent",
+                                    cursor: searchQuery ? "default" : "pointer",
+                                    textAlign: isAr ? "right" : "left",
+                                    direction: isAr ? "rtl" : "ltr",
+                                    fontFamily: isAr ? "Cairo, sans-serif" : "inherit"
+                                  }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <span style={{ fontSize: "1.1rem" }}>📁</span>
+                                    <span style={{
+                                      fontSize: "0.8rem",
+                                      fontWeight: isChActive ? 800 : 700,
+                                      color: isChActive ? "var(--primary)" : "var(--foreground)"
+                                    }}>
+                                      {chTitle}
+                                    </span>
                                   </div>
-                                )}
-                                {hoveredNode.type === "chapter" && (
-                                  <div>
-                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📂 {hoveredNode.fullLabelEn || hoveredNode.fullLabelAr}</div>
-                                    <div style={{ fontSize: "0.65rem", color: "#6a7c88", marginTop: "2px" }}>
-                                      {language === "ar" ? `يحتوي على ${hoveredNode.pagesCount} صفحات تفاعلية` : `Contains ${hoveredNode.pagesCount} interactive pages`}
-                                    </div>
-                                  </div>
-                                )}
-                                {hoveredNode.type === "page" && (
-                                  <div>
-                                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)" }}>📄 {language === "ar" ? `صفحة ${hoveredNode.pageNum}` : `Page ${hoveredNode.pageNum}`}</div>
-                                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--foreground)", marginTop: "1px" }}>{hoveredNode.fullLabel}</div>
-                                    {hoveredNode.snippet && (
-                                      <div style={{ fontSize: "0.6rem", color: "#6a7c88", marginTop: "3px", fontStyle: "italic", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                                        "{hoveredNode.snippet}"
-                                      </div>
-                                    )}
+                                  {!searchQuery && (
+                                    <span style={{
+                                      fontSize: "0.65rem",
+                                      color: "var(--primary)",
+                                      transition: "transform 0.2s ease",
+                                      transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)"
+                                    }}>
+                                      ▼
+                                    </span>
+                                  )}
+                                </button>
+
+                                {isExpanded && (
+                                  <div style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    padding: "4px 8px 8px 8px",
+                                    gap: "2px",
+                                    borderTop: "1px solid rgba(16, 107, 163, 0.04)"
+                                  }}>
+                                    {ch.topics.map((top: any) => {
+                                      const isTopActive = top.pageNum === readerCurrentPage;
+                                      const topTitle = isAr ? top.titleAr : top.titleEn;
+
+                                      return (
+                                        <button
+                                          key={top.id}
+                                          onClick={() => setReaderCurrentPage(top.pageNum)}
+                                          style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            padding: "6px 10px",
+                                            borderRadius: "6px",
+                                            border: "none",
+                                            background: isTopActive 
+                                              ? "linear-gradient(135deg, var(--primary), var(--secondary))" 
+                                              : "transparent",
+                                            color: isTopActive ? "#ffffff" : "var(--foreground)",
+                                            cursor: "pointer",
+                                            fontSize: "0.75rem",
+                                            fontWeight: isTopActive ? 800 : 500,
+                                            textAlign: isAr ? "right" : "left",
+                                            direction: isAr ? "rtl" : "ltr",
+                                            fontFamily: isAr ? "Cairo, sans-serif" : "inherit",
+                                            transition: "all 0.15s ease",
+                                            width: "100%"
+                                          }}
+                                          onMouseOver={(e) => {
+                                            if (!isTopActive) {
+                                              e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
+                                            }
+                                          }}
+                                          onMouseOut={(e) => {
+                                            if (!isTopActive) {
+                                              e.currentTarget.style.background = "transparent";
+                                            }
+                                          }}
+                                        >
+                                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                                            <span>📄</span>
+                                            <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                                              {topTitle}
+                                            </span>
+                                          </div>
+                                          <span style={{
+                                            fontSize: "0.65rem",
+                                            fontWeight: 800,
+                                            background: isTopActive ? "rgba(255,255,255,0.2)" : "rgba(16, 107, 163, 0.05)",
+                                            color: isTopActive ? "#ffffff" : "#6a7c88",
+                                            padding: "2px 6px",
+                                            borderRadius: "4px",
+                                            marginLeft: isAr ? "0" : "6px",
+                                            marginRight: isAr ? "6px" : "0",
+                                            whiteSpace: "nowrap"
+                                          }}>
+                                            {language === "ar" ? `ص ${top.pageNum}` : `p. ${top.pageNum}`}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+                            );
+                          });
+                        })()}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2695,23 +3257,46 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               {/* Textbook Viewer Panel */}
               <div 
                 className="panel-card" 
+                ref={viewerPanelRef}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={(e) => handleTouchEnd(e, totalPagesCount)}
                 onMouseUp={() => {
-                  const selection = window.getSelection();
-                  if (!selection) return;
-                  const text = selection.toString().trim();
-                  if (text.length > 5) {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    setBubbleCoords({
-                      x: rect.left + rect.width / 2 + window.scrollX,
-                      y: rect.top - 48 + window.scrollY
-                    });
-                    setSelectedText(text);
-                  } else {
-                    setBubbleCoords(null);
-                    setSelectedText("");
+                  if (viewerPanelRef.current) {
+                    const selection = window.getSelection();
+                    if (!selection) return;
+                    const text = selection.toString().trim();
+                    if (text.length > 5) {
+                      const range = selection.getRangeAt(0);
+                      const rect = range.getBoundingClientRect();
+                      const containerRect = viewerPanelRef.current.getBoundingClientRect();
+                      
+                      const relativeLeft = rect.left - containerRect.left;
+                      const relativeTop = rect.top - containerRect.top;
+                      
+                      const halfPopoverWidth = 90;
+                      const clampedX = Math.max(halfPopoverWidth, Math.min(containerRect.width - halfPopoverWidth, relativeLeft + rect.width / 2));
+                      
+                      const popoverHeight = 40;
+                      const margin = 8;
+                      const clampedY = (relativeTop > popoverHeight + margin)
+                        ? (relativeTop - popoverHeight - margin)
+                        : (relativeTop + rect.height + margin);
+
+                      setBubbleCoords({
+                        x: clampedX,
+                        y: clampedY
+                      });
+                      setSelectedText(text);
+
+                      logActivityEvent("explain_requested", {
+                        book_id: selectedBookReader._id || selectedBookReader.id,
+                        page_number: readerCurrentPage,
+                        text_selection: text.slice(0, 100)
+                      });
+                    } else {
+                      setBubbleCoords(null);
+                      setSelectedText("");
+                    }
                   }
                 }}
                 style={{
@@ -2749,86 +3334,62 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       const hasTranslation = !!translatedPages[pageKey];
 
                       return (
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
-                            🌐 {language === "ar" ? "وكيل الترجمة:" : "Translation Agent:"}
+                            🌐 {language === "ar" ? "اللغة:" : "Language:"}
                           </span>
-                          <button
-                            type="button"
+                          <select
                             disabled={isTranslating}
-                            onClick={() => {
-                              if (isTranslated) {
-                                setIsPageTranslated(prev => ({ ...prev, [pageKey]: false }));
-                              } else if (hasTranslation) {
-                                setIsPageTranslated(prev => ({ ...prev, [pageKey]: true }));
+                            value={translationLanguage}
+                            onChange={(e) => {
+                              const targetLang = e.target.value;
+                              if (targetLang === "Original") {
+                                setTranslationLanguage("Original");
                               } else {
-                                const originalText = activePage?.content || activePage?.contentEn || activePage?.contentAr || "";
-                                handleTranslatePage(originalText, pageKey, targetLang);
+                                handleLazyTranslate(targetLang);
                               }
                             }}
                             style={{
-                              padding: "4px 14px",
+                              padding: "4px 24px 4px 10px",
                               borderRadius: "18px",
-                              border: "none",
-                              background: isTranslated 
-                                ? "linear-gradient(135deg, #1b5e20, #2e7d32)" // Rich Forest Green
-                                : "linear-gradient(135deg, var(--primary), var(--secondary))",
-                              color: "#ffffff",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
+                              border: "1px solid rgba(16, 107, 163, 0.2)",
+                              background: "var(--background)",
+                              color: "var(--foreground)",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
                               cursor: "pointer",
-                              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.35rem",
-                              boxShadow: isTranslated 
-                                ? "0 2px 8px rgba(27, 94, 32, 0.3)" 
-                                : "0 2px 8px rgba(16, 107, 163, 0.25)"
-                            }}
-                            onMouseOver={(e) => {
-                              if (!isTranslating) {
-                                e.currentTarget.style.transform = "translateY(-1px)";
-                                e.currentTarget.style.boxShadow = isTranslated 
-                                  ? "0 4px 12px rgba(27, 94, 32, 0.4)" 
-                                  : "0 4px 12px rgba(16, 107, 163, 0.35)";
-                              }
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = isTranslated 
-                                ? "0 2px 8px rgba(27, 94, 32, 0.3)" 
-                                : "0 2px 8px rgba(16, 107, 163, 0.25)";
+                              outline: "none",
+                              fontFamily: language === "ar" ? "Cairo, sans-serif" : "inherit",
+                              appearance: "none",
+                              WebkitAppearance: "none",
+                              backgroundImage: `url("data:image/svg+xml;utf8,<svg fill='none' stroke='%23106ba3' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16' height='16' xmlns='http://www.w3.org/2000/svg'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: language === "ar" ? "left 8px center" : "right 8px center",
+                              paddingLeft: language === "ar" ? "24px" : "10px",
+                              paddingRight: language === "ar" ? "10px" : "24px",
+                              minWidth: "100px"
                             }}
                           >
-                            {isTranslating ? (
-                              <>
-                                <span style={{
-                                  display: "inline-block",
-                                  width: "10px",
-                                  height: "10px",
-                                  border: "2px solid rgba(255,255,255,0.3)",
-                                  borderTopColor: "#fff",
-                                  borderRadius: "50%",
-                                  animation: "spin 0.8s linear infinite"
-                                }}></span>
-                                <span>{language === "ar" ? "جاري الترجمة..." : "Translating..."}</span>
-                              </>
-                            ) : isTranslated ? (
-                              <>
-                                <span>↩️</span>
-                                <span>{language === "ar" ? "عرض النص الأصلي" : "Show Original"}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>✨</span>
-                                <span>
-                                  {language === "ar" 
-                                    ? `ترجمة إلى ${targetLang === "ar" ? "العربية" : "الإنجليزية"}`
-                                    : `Translate to ${targetLang === "ar" ? "Arabic" : "English"}`}
-                                </span>
-                              </>
-                            )}
-                          </button>
+                            <option value="Original">{language === "ar" ? "الأصلية" : "Original"}</option>
+                            <option value="en">English</option>
+                            <option value="ar">العربية (Arabic)</option>
+                            <option value="es">Español (Spanish)</option>
+                            <option value="fr">Français (French)</option>
+                            <option value="de">Deutsch (German)</option>
+                            <option value="zh">中文 (Chinese)</option>
+                            <option value="it">Italiano (Italian)</option>
+                          </select>
+                          {isTranslating && (
+                            <span style={{
+                              display: "inline-block",
+                              width: "12px",
+                              height: "12px",
+                              border: "2px solid rgba(16, 107, 163, 0.3)",
+                              borderTopColor: "var(--primary)",
+                              borderRadius: "50%",
+                              animation: "spin 0.8s linear infinite"
+                            }}></span>
+                          )}
                         </div>
                       );
                     })()}
@@ -3019,16 +3580,19 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     </div>
                   ) : (
                     (() => {
-                      const isAr = translationLanguage === "ar";
+                      const isAr = translationLanguage === "Original" ? (selectedBookReader.language === "ar") : (translationLanguage === "ar");
                       const pageKey = `${selectedBookReader._id || selectedBookReader.id || "default"}_${readerCurrentPage}`;
-                      const isPageTranslatedActive = !!isPageTranslated[pageKey];
-                      const translatedTextVal = translatedPages[pageKey];
-
-                      const activeContent = isPageTranslatedActive && translatedTextVal
-                        ? translatedTextVal
-                        : (isAr 
-                            ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
-                            : (activePage.contentEn || activePage.contentAr || activePage.content || ""));
+                      
+                      let activeContent = "";
+                      if (translationLanguage !== "Original" && activePage?.i18n && typeof activePage.i18n[translationLanguage] === "string") {
+                        activeContent = activePage.i18n[translationLanguage];
+                      } else if (isPageTranslated[pageKey] && translatedPages[pageKey]) {
+                        activeContent = translatedPages[pageKey];
+                      } else {
+                        activeContent = isAr 
+                          ? (activePage.contentAr || activePage.contentEn || activePage.content || "") 
+                          : (activePage.contentEn || activePage.contentAr || activePage.content || "");
+                      }
 
                       const actualIsAr = isTextArabic(activeContent);
 
@@ -3154,29 +3718,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                 </select>
                               </div>
 
-                              <label style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                                fontSize: "0.75rem",
-                                fontWeight: 700,
-                                color: "#4a5d68",
-                                cursor: "pointer",
-                                userSelect: "none"
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isContinuousListening}
-                                  onChange={(e) => setIsContinuousListening(e.target.checked)}
-                                  style={{
-                                    width: "14px",
-                                    height: "14px",
-                                    accentColor: "var(--primary)",
-                                    cursor: "pointer"
-                                  }}
-                                />
-                                <span>🔁 {language === "ar" ? "قراءة تلقائية مستمرة" : "Auto Continuous Play"}</span>
-                              </label>
+                              <div style={{ width: 1 }}></div>
                             </div>
                           </div>
 
@@ -3383,128 +3925,75 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         };
 
         const list: any[] = [];
-
-        // 1. moeIngestedBooks
-        if (moeIngestedBooks && moeIngestedBooks.length > 0) {
-          moeIngestedBooks.forEach((b: any) => {
-            const path = b.storage_path || b.storagePath || b.storageRef || "";
-            let category = "curriculum";
-            if (path.startsWith("user_uploads") || b.isUserUpload) {
-              category = "private";
-            } else if (path.startsWith("admin_uploads") || b.is_admin_upload || b.isAdminUpload) {
-              category = "curriculum";
-            } else if (path.startsWith("ellibrary_moe_gov_eg") || b.isMoeIngested) {
-              category = "curriculum";
-            }
-
-            list.push({
-              _id: b._id || b.id || `moe_${b.titleEn || b.titleAr || b.title}`,
-              titleEn: b.titleEn || b.title || "",
-              titleAr: b.titleAr || b.title_ar || b.title || "",
-              subject: mapSubjectToCategory(b.subject_id, b.subject || "Science"),
-              source_url: b.source_url || b.downloadUrl || b.downloadURL || "",
-              storagePath: path,
-              category,
-              isMoeIngested: b.isMoeIngested,
-              chapters: b.chapters || [],
-              language: b.language || "en",
-              coverUrl: b.coverUrl,
-              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
-              mindMap: b.mindMap || b.mind_map
+        
+        if (activeLibraryTab === "curriculum") {
+          curriculumSubjects.forEach((subj: any) => {
+            const subjectBooks = subj.books || [];
+            subjectBooks.forEach((b: any) => {
+              list.push({
+                ...b,
+                _id: b._id || b.id,
+                titleEn: b.title || b.titleEn || "",
+                titleAr: b.title_ar || b.titleAr || b.title || "",
+                subject: b.subject || subj.name,
+                subject_id: b.subject_id || subj._id,
+                subjectColor: b.subjectColor || subj.color,
+                subjectEmoji: b.subjectEmoji || subj.emoji,
+                subject_name_ar: subj.name_ar,
+                subject_name_en: subj.name,
+                category: "curriculum"
+              });
             });
           });
-        }
-
-        // 2. dynamicBooks (from database)
-        if (dynamicBooks && dynamicBooks.length > 0) {
-          dynamicBooks.forEach((b: any) => {
-            const path = b.storage_path || b.storagePath || b.storageRef || b.storage_ref || "";
-            let category = "curriculum";
-            if (path.startsWith("user_uploads") || b.isUserUpload || b.userId) {
-              category = "private";
-            } else if (path.startsWith("admin_uploads") || b.is_admin_upload || b.isAdminUpload) {
-              category = "curriculum";
-            }
-
-            list.push({
-              _id: b._id || b.id || `dyn_${b.title || b.titleEn}`,
-              titleEn: b.titleEn || b.title || "",
-              titleAr: b.titleAr || b.title_ar || b.title || "",
-              subject: mapSubjectToCategory(b.subject_id, b.subject),
-              source_url: b.source_url || b.downloadUrl || b.downloadURL || b.url || "",
-              storagePath: path,
-              category,
-              isMoeIngested: b.isMoeIngested || path.startsWith("ellibrary_moe_gov_eg") || path.startsWith("MOE Library"),
-              chapters: b.chapters || [],
-              language: b.language || "en",
-              coverUrl: b.coverUrl,
-              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
-              mindMap: b.mindMap || b.mind_map
+        } else {
+          if (customUploadedBooks && customUploadedBooks.length > 0) {
+            customUploadedBooks.forEach((b: any) => {
+              list.push({
+                ...b,
+                _id: b._id || b.id || `custom_${b.titleEn || b.titleAr || b.title}`,
+                titleEn: b.titleEn || b.title || "",
+                titleAr: b.titleAr || b.title_ar || b.title || "",
+                subject: b.subject || "Private Upload",
+                category: "private"
+              });
             });
-          });
-        }
-
-        // 3. customUploadedBooks (user vault)
-        if (customUploadedBooks && customUploadedBooks.length > 0) {
-          customUploadedBooks.forEach((b: any) => {
-            const path = b.storage_path || b.storagePath || b.storageRef || b.storage_ref || "";
-            let category = "private";
-            if (path.startsWith("admin_uploads") || b.is_admin_upload || b.isAdminUpload) {
-              category = "curriculum";
-            } else if (path.startsWith("ellibrary_moe_gov_eg") || b.isMoeIngested) {
-              category = "curriculum";
-            }
-
-            list.push({
-              _id: b._id || b.id || `custom_${b.titleEn || b.titleAr || b.title}`,
-              titleEn: b.titleEn || b.title || "",
-              titleAr: b.titleAr || b.title_ar || b.title || "",
-              subject: mapSubjectToCategory(b.subject_id, b.subject || "Science"),
-              source_url: b.source_url || b.downloadUrl || b.downloadURL || "",
-              storagePath: path,
-              category,
-              isMoeIngested: b.isMoeIngested,
-              chapters: b.chapters || [],
-              language: b.language || "en",
-              coverUrl: b.coverUrl,
-              coverThumbUrl: b.coverThumbUrl || b.cover_thumb_url,
-              mindMap: b.mindMap || b.mind_map
-            });
-          });
-        }
-
-        const seen = new Set();
-        const deduplicated: any[] = [];
-        list.forEach(b => {
-          if (b._id && !seen.has(b._id)) {
-            seen.add(b._id);
-            deduplicated.push(b);
           }
-        });
+        }
 
-        // Compute library-specific counts
-        const moeCount = deduplicated.filter(item => getBookLibraryId(item) === "moe" && item.category === "curriculum").length;
-        const openStaxCount = deduplicated.filter(item => getBookLibraryId(item) === "openstax" && item.category === "curriculum").length;
-        const generalCount = deduplicated.filter(item => getBookLibraryId(item) === "general" && item.category === "curriculum").length;
-        const allCount = moeCount + openStaxCount + generalCount;
-
-        // Apply filters
-        const filtered = deduplicated.filter(item => {
+        const filtered = list.filter(item => {
           if (item.category !== activeLibraryTab) return false;
 
-          // selectedLibraryId filter
-          if (activeLibraryTab === "curriculum" && selectedLibraryId !== "all") {
-            if (getBookLibraryId(item) !== selectedLibraryId) return false;
+          if (activeLibraryTab === "curriculum") {
+            if (librarySubject !== "all" && item.subject_id !== librarySubject && item.subject !== librarySubject) {
+              const itemSubject = (item.subject || "").toLowerCase();
+              const filterSubject = librarySubject.toLowerCase();
+              if (!itemSubject.includes(filterSubject)) {
+                return false;
+              }
+            }
+          } else {
+            if (librarySubject !== "all" && item.subject !== librarySubject) return false;
+            
+            const s = librarySearch.toLowerCase();
+            const titleMatch = (item.titleEn || "").toLowerCase().includes(s) || 
+                               (item.titleAr || "").toLowerCase().includes(s) ||
+                               (item.title || "").toLowerCase().includes(s);
+            if (!titleMatch) return false;
           }
 
-          if (librarySubject !== "all" && item.subject !== librarySubject) return false;
-
-          const s = librarySearch.toLowerCase();
-          const titleMatch = (item.titleEn || "").toLowerCase().includes(s) || 
-                             (item.titleAr || "").toLowerCase().includes(s) ||
-                             (item.title || "").toLowerCase().includes(s);
-          return titleMatch;
+          return true;
         });
+
+        const consolidatedLibraries = [
+          {
+            _id: "all",
+            logo: "📚",
+            name: "All Libraries",
+            name_ar: "جميع المكتبات",
+            source: "all"
+          },
+          ...libraries
+        ];
 
         return (
           /* Regular Library List & Personal Vault Layout */
@@ -3554,53 +4043,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 border: "1px solid rgba(16, 107, 163, 0.12)",
                 boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)"
               }}>
-                {[
-                  {
-                    id: "all",
-                    icon: "All",
-                    nameEn: "All Libraries",
-                    nameAr: "جميع المكتبات",
-                    descEn: "Consolidated digital library portal",
-                    descAr: "البوابة الرقمية الموحدة للمناهج والمرفوعات",
-                    url: null,
-                    count: allCount
-                  },
-                  {
-                    id: "moe",
-                    icon: "🏫",
-                    nameEn: "Ministry of Education",
-                    nameAr: "وزارة التربية والتعليم",
-                    descEn: "Official Egyptian education library",
-                    descAr: "المناهج المصرية الرسمية المعتمدة",
-                    url: "https://ellibrary.moe.gov.eg/",
-                    count: moeCount
-                  },
-                  {
-                    id: "openstax",
-                    icon: "📖",
-                    nameEn: "OpenStax Library",
-                    nameAr: "مكتبة أوبن ستاكس",
-                    descEn: "Peer-reviewed open textbooks",
-                    descAr: "كتب جامعية وأكاديمية مفتوحة المصدر",
-                    url: "https://openstax.org/",
-                    count: openStaxCount
-                  },
-                  {
-                    id: "general",
-                    icon: "🛡️",
-                    nameEn: "General Library",
-                    nameAr: "المكتبة العامة",
-                    descEn: "General research, administrative and reference uploads",
-                    descAr: "المصادر العامة والمرفوعات الإدارية",
-                    url: "https://fahem.app/general",
-                    count: generalCount
-                  }
-                ].map((lib) => {
-                  const isSelected = selectedLibraryId === lib.id;
+                {consolidatedLibraries.map((lib) => {
+                  const isSelected = selectedLibraryId === lib._id;
+                  const count = libraryCounts[lib._id] || 0;
+                  const description = getLibraryDescription(lib._id, lib.name, lib.name_ar, language);
                   return (
                     <div
-                      key={lib.id}
-                      onClick={() => setSelectedLibraryId(lib.id)}
+                      key={lib._id}
+                      onClick={() => setSelectedLibraryId(lib._id)}
                       style={{
                         padding: "1rem",
                         borderRadius: "18px",
@@ -3658,8 +4108,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           alignItems: "center",
                           justifyContent: "center",
                           fontWeight: "bold",
-                          color: "var(--primary)"
-                        }}>{lib.icon}</span>
+                          color: "var(--primary)",
+                          width: "2.2rem",
+                          height: "2.2rem",
+                          flexShrink: 0
+                        }}>
+                          {renderLibraryLogo(lib.logo, language === "ar" ? lib.name_ar : lib.name, isSelected)}
+                          <span className="logo-fallback" style={{ display: "none", fontSize: "1.2rem" }}>🏫</span>
+                        </span>
                         <div style={{ flex: 1 }}>
                           <h4 style={{
                             margin: 0,
@@ -3669,7 +4125,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             fontFamily: "Cairo, var(--font-sans), sans-serif",
                             textAlign: language === "ar" ? "right" : "left"
                           }}>
-                            {language === "ar" ? lib.nameAr : lib.nameEn}
+                            {language === "ar" ? lib.name_ar : lib.name}
                           </h4>
                           <p style={{
                             margin: "0.15rem 0 0 0",
@@ -3679,7 +4135,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             fontFamily: "Cairo, var(--font-sans), sans-serif",
                             textAlign: language === "ar" ? "right" : "left"
                           }}>
-                            {language === "ar" ? lib.descAr : lib.descEn}
+                            {description}
                           </p>
                         </div>
                       </div>
@@ -3692,9 +4148,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         paddingTop: "0.5rem",
                         marginTop: "0.25rem"
                       }}>
-                        {lib.url ? (
+                        {lib.source && lib.source !== "all" && lib.source !== "moe" && lib.source !== "openstax" && lib.source !== "general" ? (
+                          <span style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            color: "var(--primary)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.2rem"
+                          }}>
+                            🏛️ Custom
+                          </span>
+                        ) : lib.source === "moe" ? (
                           <a
-                            href={lib.url}
+                            href="https://ellibrary.moe.gov.eg/"
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -3708,12 +4175,31 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               gap: "0.2rem",
                               transition: "opacity 0.2s"
                             }}
-                            onMouseOver={(e) => e.currentTarget.style.opacity = "0.8"}
-                            onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
                           >
                             🔗 Portal
                           </a>
-                        ) : <span />}
+                        ) : lib.source === "openstax" ? (
+                          <a
+                            href="https://openstax.org/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              color: "var(--primary)",
+                              textDecoration: "none",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.2rem",
+                              transition: "opacity 0.2s"
+                            }}
+                          >
+                            🔗 Portal
+                          </a>
+                        ) : (
+                          <span />
+                        )}
                         <span style={{
                           fontSize: "0.72rem",
                           fontWeight: 800,
@@ -3722,7 +4208,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           padding: "2px 8px",
                           borderRadius: "10px"
                         }}>
-                          {lib.count} {language === "ar" ? "كتب" : "Books"}
+                          {count} {language === "ar" ? "كتب" : "Books"}
                         </span>
                       </div>
                     </div>
@@ -3731,6 +4217,105 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               </div>
             )}
 
+            {/* Dynamic Scope Filters Form */}
+            {activeLibraryTab === "curriculum" && activeLibrary && activeLibrary.scopeSchema && activeLibrary.scopeSchema.length > 0 && (
+              <div style={{
+                background: "rgba(255, 255, 255, 0.4)",
+                backdropFilter: "blur(12px)",
+                padding: "1.5rem",
+                borderRadius: "24px",
+                border: "1px solid rgba(16, 107, 163, 0.08)",
+                boxShadow: "0 10px 30px rgba(16, 107, 163, 0.02)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem"
+              }}>
+                <h4 style={{
+                  margin: 0,
+                  fontSize: "0.95rem",
+                  fontWeight: 800,
+                  color: "var(--primary)",
+                  fontFamily: "Cairo, var(--font-sans), sans-serif",
+                  textAlign: language === "ar" ? "right" : "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}>
+                  ⚙️ {language === "ar" ? "تخصيص نطاق البحث والتصفية" : "Customize Search Scope"}
+                </h4>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "1.25rem"
+                }}>
+                  {activeLibrary.scopeSchema.map((field: any) => {
+                    const label = language === "ar" ? field.label_ar : field.label;
+                    const currentValue = scopeValues[field.key] || "";
+                    
+                    return (
+                      <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                        <label style={{
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          color: "#475569",
+                          fontFamily: "Cairo, var(--font-sans), sans-serif",
+                          textAlign: language === "ar" ? "right" : "left"
+                        }}>
+                          {label}
+                        </label>
+                        {field.type === "enum" ? (
+                          <select
+                            value={currentValue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setScopeValues(prev => ({ ...prev, [field.key]: val }));
+                            }}
+                            style={{
+                              padding: "0.6rem 1rem",
+                              borderRadius: "12px",
+                              border: "1px solid rgba(16, 107, 163, 0.12)",
+                              backgroundColor: "#ffffff",
+                              fontSize: "0.82rem",
+                              color: "var(--foreground)",
+                              outline: "none",
+                              fontFamily: "Cairo, var(--font-sans), sans-serif",
+                              cursor: "pointer",
+                              transition: "all 0.2s"
+                            }}
+                          >
+                            <option value="">{language === "ar" ? "الكل" : "All"}</option>
+                            {(field.options || []).map((opt: string) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={currentValue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setScopeValues(prev => ({ ...prev, [field.key]: val }));
+                            }}
+                            placeholder={language === "ar" ? `ادخل ${label}...` : `Enter ${label}...`}
+                            style={{
+                              padding: "0.6rem 1rem",
+                              borderRadius: "12px",
+                              border: "1px solid rgba(16, 107, 163, 0.12)",
+                              backgroundColor: "#ffffff",
+                              fontSize: "0.82rem",
+                              color: "var(--foreground)",
+                              outline: "none",
+                              fontFamily: "Cairo, var(--font-sans), sans-serif",
+                              transition: "all 0.2s"
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Header search controls */}
             <div style={{
@@ -3740,25 +4325,42 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               border: "1px solid rgba(16, 107, 163, 0.08)"
             }}>
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                {["all", "Math", "Science", "Arabic", "Computer Science", "Business", "Social Sciences"].map((subject) => {
-                  const theme = getSubjectTheme(subject);
-                  return (
-                    <button
-                      key={subject}
-                      onClick={() => setLibrarySubject(subject)}
-                      style={{
-                        padding: "6px 14px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 700,
-                        cursor: "pointer", border: librarySubject === subject ? "none" : "1px solid var(--card-border)",
-                        background: librarySubject === subject ? theme.gradient : "#ffffff",
-                        color: librarySubject === subject ? "#ffffff" : "#475569",
-                        boxShadow: librarySubject === subject ? `0 4px 12px ${theme.glowColor}` : "none",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      {theme.emoji} {getSubjectNameLabel(subject, language)}
-                    </button>
-                  );
-                })}
+                {(() => {
+                  const availableSubjects = [
+                    { id: "all", name: "All Subjects", name_ar: "كل المواد", color: "var(--primary)", emoji: "📚" }
+                  ];
+                  curriculumSubjects.forEach(s => {
+                    if (s._id && !availableSubjects.some(item => item.id === s._id)) {
+                      availableSubjects.push({
+                        id: s._id,
+                        name: s.name,
+                        name_ar: s.name_ar,
+                        color: s.color,
+                        emoji: s.emoji
+                      });
+                    }
+                  });
+                  
+                  return availableSubjects.map((subject) => {
+                    const theme = getSubjectTheme(subject.color || subject.id, subject.emoji);
+                    return (
+                      <button
+                        key={subject.id}
+                        onClick={() => setLibrarySubject(subject.id)}
+                        style={{
+                          padding: "6px 14px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 700,
+                          cursor: "pointer", border: librarySubject === subject.id ? "none" : "1px solid var(--card-border)",
+                          background: librarySubject === subject.id ? theme.gradient : "#ffffff",
+                          color: librarySubject === subject.id ? "#ffffff" : "#475569",
+                          boxShadow: librarySubject === subject.id ? `0 4px 12px ${theme.glowColor}` : "none",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        {theme.emoji} {language === "ar" ? subject.name_ar : subject.name}
+                      </button>
+                    );
+                  });
+                })()}
               </div>
               <input
                 type="text"
@@ -3872,7 +4474,22 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     ? (item.titleAr || item.title || item.titleEn) 
                     : (item.titleEn || item.title || item.titleAr);
                   const isTitleAr = isTextArabic(title);
-                  const theme = getSubjectTheme(item.subject || "");
+                  const theme = getSubjectTheme(item.subjectColor || item.subject || "", item.subjectEmoji);
+                  const isBookSelected = selectedBookIds.has(item._id);
+
+                  const toggleBookSelection = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    const newSet = new Set(selectedBookIds);
+                    if (newSet.has(item._id)) {
+                      newSet.delete(item._id);
+                    } else {
+                      newSet.add(item._id);
+                    }
+                    setSelectedBookIds(newSet);
+                    sessionStorage.setItem("fahem_selected_book_ids", JSON.stringify(Array.from(newSet)));
+                    window.dispatchEvent(new CustomEvent("fahemRAGScopeChanged"));
+                  };
+
                   return (
                     <div 
                       key={item._id} 
@@ -3886,24 +4503,68 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         height: "auto", 
                         position: "relative", 
                         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                        background: "rgba(255, 255, 255, 0.45)",
+                        background: isBookSelected 
+                          ? "linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(16, 107, 163, 0.03))" 
+                          : "rgba(255, 255, 255, 0.45)",
                         backdropFilter: "blur(12px)",
-                        border: "1px solid rgba(16, 107, 163, 0.08)",
-                        borderTop: "4px solid " + theme.primary,
-                        boxShadow: "0 8px 32px rgba(16, 107, 163, 0.02)",
+                        border: isBookSelected ? `2px solid ${theme.primary}` : "1px solid rgba(16, 107, 163, 0.08)",
+                        borderTop: isBookSelected ? `4px solid ${theme.primary}` : "4px solid " + theme.primary,
+                        boxShadow: isBookSelected ? `0 10px 30px ${theme.glowColor}` : "0 8px 32px rgba(16, 107, 163, 0.02)",
                         borderRadius: "20px"
                       }} 
                       onMouseOver={(e) => {
                         e.currentTarget.style.transform = "translateY(-6px) scale(1.01)";
-                        e.currentTarget.style.borderColor = theme.primary;
-                        e.currentTarget.style.boxShadow = "0 12px 36px " + theme.glowColor;
+                        if (!isBookSelected) {
+                          e.currentTarget.style.borderColor = theme.primary;
+                          e.currentTarget.style.boxShadow = "0 12px 36px " + theme.glowColor;
+                        }
                       }} 
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = "translateY(0) scale(1)";
-                        e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)";
-                        e.currentTarget.style.boxShadow = "0 8px 32px rgba(16, 107, 163, 0.02)";
+                        if (!isBookSelected) {
+                          e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.08)";
+                          e.currentTarget.style.boxShadow = "0 8px 32px rgba(16, 107, 163, 0.02)";
+                        }
                       }}
                     >
+                      {/* Absolute-positioned circular checkbox overlay */}
+                      <div 
+                        onClick={toggleBookSelection}
+                        style={{
+                          position: "absolute",
+                          top: "12px",
+                          [language === "ar" ? "left" : "right"]: "12px",
+                          zIndex: 10,
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          border: isBookSelected ? "none" : "2px solid rgba(16, 107, 163, 0.2)",
+                          background: isBookSelected ? theme.gradient : "rgba(255, 255, 255, 0.8)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: isBookSelected ? `0 4px 10px ${theme.glowColor}` : "none",
+                          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
+                        }}
+                        onMouseOver={(e) => {
+                          if (!isBookSelected) {
+                            e.currentTarget.style.borderColor = theme.primary;
+                            e.currentTarget.style.transform = "scale(1.1)";
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isBookSelected) {
+                            e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.2)";
+                            e.currentTarget.style.transform = "none";
+                          }
+                        }}
+                      >
+                        {isBookSelected && (
+                          <span style={{ color: "#ffffff", fontSize: "0.75rem", fontWeight: "bold" }}>✓</span>
+                        )}
+                      </div>
+
                       <div>
                         {/* Badge line */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.3rem" }}>
@@ -3919,7 +4580,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             alignItems: "center",
                             gap: "0.25rem" 
                           }}>
-                            {theme.emoji} {getSubjectNameLabel(item.subject || "", language)}
+                            {theme.emoji} {getSubjectNameLabel(item.subjectColor || item.subject || "", language, item.subject_name_ar, item.subject_name_en)}
                           </span>
                           {item.category === "curriculum" && (
                             (() => {
@@ -4063,6 +4724,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             @keyframes fadeIn {
               from { opacity: 0; transform: translateY(4px); }
               to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes shimmer {
+              0% { left: -100%; }
+              100% { left: 100%; }
             }
           `}</style>
           <div style={{
