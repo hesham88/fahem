@@ -49,7 +49,7 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 | R4 | builder-1 | 0 | S0 | Mandatory logged-in E2E smoke test | spec-live-regressions.md @ R4 | done | yes | [scripts/run_e2e_smoke_test.py](file:///C:/Users/hesh1/Desktop/fahem/scripts/run_e2e_smoke_test.py) |
 | R6 | builder-1 | 5 | S1 | React #31 crash: object rendered as a child in Activity History | spec-live-regressions.md @ R6 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/home/page.tsx) |
 | R7 | builder-1 | 1 | S3 | Missing library logo assets: `/libs/*.svg` 404 | spec-live-regressions.md @ R7 | done | yes | [web/public/libs/](file:///C:/Users/hesh1/Desktop/fahem/web/public/libs) |
-| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | [7fe6de5](https://github.com/hesham88/fahem/commit/7fe6de5f269a239b33a59fa89ee21ffbbf63189d) |
+| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | [8c4329c](https://github.com/hesham88/fahem/commit/8c4329cf07f18457100a0c09e372e31365352af8) |
 | R11 | builder-1 | 6 | S1 | Owner/eval trap still live: demo entry sandboxes owner; sign-in routes to judge sandbox | spec-live-regressions.md @ R11 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) and [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/page.tsx) |
 | R12 | builder-2 | 4 | S2 | Companion emits its reply twice in one message | spec-live-regressions.md @ R12 | done | yes | [web/src/app/api/agent/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/agent/route.ts) |
 | R13 | builder-3 | 6 | S1 | Real onboarding + phone verification broken | spec-live-regressions.md @ R13 | done | yes | [web/src/app/[locale]/layout.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/layout.tsx) and [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) |
@@ -99,6 +99,7 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 - 2026-06-07T18:44:00+03:00 [builder-3] CLAIM+START R13 (S1): Claimed real onboarding + phone SMS OTP verification fix.
 - 2026-06-07T19:08:00+03:00 [builder-1] DONE R5, R11, ES-6: Completed full ES-6 database isolation for all Next.js API endpoints, verified R11 auth gates, successfully redeployed Python ADK microservice to Cloud Run, pushed frontend, and passed 100% of the mandatory R4 E2E logged-in smoke tests on fahem-agent.
 - 2026-06-07T19:20:00+03:00 [builder-1] DONE R12, R13, R14, R15, R16: Re-verified S1 and S2 owner re-test batch. Validated stream de-duplication (R12), phone onboarding SMS provider & container lifecycles (R13), Settings school selector pointer-blur resolution (R14), dynamic Subjects collection hierarchy (R15), and self-profile friendship filters (R16). Deployed production Cloud Run backend and App Hosting frontend successfully compiled, and 100% passed the mandatory R4 logged-in smoke tests under commit eee3d15.
+- 2026-06-07T20:10:00+03:00 [builder-1] DONE deployment: Pushed production build and successfully verified all five R4 E2E smoke test checks against the deployed backend endpoint with 100% success under commit 8c4329c.
 
 
 
