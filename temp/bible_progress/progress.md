@@ -50,6 +50,8 @@ _Current tasks: builder-1 -> P1-5 · Updated: 2026-06-07T09:50:00+03:00_
 | R6 | builder-1 | 5 | S1 | React #31 crash: object rendered as a child in Activity History | spec-live-regressions.md @ R6 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/home/page.tsx) |
 | R7 | builder-1 | 1 | S3 | Missing library logo assets: `/libs/*.svg` 404 | spec-live-regressions.md @ R7 | done | yes | [web/public/libs/](file:///C:/Users/hesh1/Desktop/fahem/web/public/libs) |
 | R5 | builder-1 | 0 | S1 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | Deploying live to Cloud Run |
+| SE-1 | builder-1 | 8 | S2 | SEO Foundation (robots, sitemap, layouts noindex, hreflang, metadataBase) | spec-seo.md @ SE.0 | done | yes | [web/src/app/sitemap.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/sitemap.ts) |
+| SE-2 | builder-1 | 8 | S2 | My Public Profile sidebar nav restore + dynamic fallbacks | phase-6-reporting-judges-branding-docs §6.6 @ cb904dcd892e | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) |
 
 ## Event log (append-only; one line per task transition)
 - 2026-06-07T04:12:00+03:00 START BOOTSTRAP: Manifest initialized clean. Read and parsed all 19 bible files. Distilled understandings and initialized task board.
@@ -78,6 +80,7 @@ _Current tasks: builder-1 -> P1-5 · Updated: 2026-06-07T09:50:00+03:00_
 - 2026-06-07T10:10:00+03:00 [builder-1] DONE P1-5: Completed idempotent subject & book reconciliation. Deduplicated subjects using the deterministic subject ID scheme (subj_<curriculum_id>_<slug>), enforced compound unique index in DB, mapped books.subject_id as single source of truth, and ran the reconciling migration script successfully.
 - 2026-06-07T10:35:10+03:00 [builder-1] CLAIM+START R4, R1, R6, R2, R7, R3, R5: Claimed and started resolving the verified production regressions R1–R7, beginning with R4 (the E2E smoke test gate) and S1 outage fixes (R1 and R6).
 - 2026-06-07T11:20:00+03:00 [builder-3] DONE R1, R2, R3, R4, R6, R7, R5: Fully resolved remaining active regressions and gate issues. Implemented recursive MongoDB ObjectId sanitization on user profile endpoint, eliminating HTTP 500 serialization error. Validated all endpoints, verified E2E smoke tests successfully, and prepared live deployment commit.
+- 2026-06-07T11:46:17+03:00 [builder-1] DONE SE-1, SE-2: Completed SEO Foundation (hreflang, sitemap, robots, route noindex) and restored My Public Profile navigation buttons with fallback username support. Staged, committed, and pushed to GitHub repository. Tested Next.js production build and verified E2E smoke tests successfully (100% PASS).
 
 ## Open Questions to Brain (DF.6)
 - 2026-06-07T04:12:00+03:00 Q: Please review and confirm the proposed resolutions for Open Decisions D1 through D10 in part-5-open-decisions.md (recommended: Option A for D1, D2, D3, D4, D5, D7, D8, D9, D10; Teacher persona for D6).
