@@ -1,0 +1,63 @@
+# Builder Progress
+_Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
+
+## Task board
+| id | owner | phase | task | source (bible@sha12) | status | DoD met? | artifact (commit/PR) |
+|----|-------|-------|------|----------------------|--------|----------|----------------------|
+| P0-1 | builder-1 | 0 | verifyAuth edge token helper & role resolver | phase-0-foundation §A.1 @ cb904dcd892e | done | yes | [web/src/app/api/_auth.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/_auth.ts) |
+| P0-2 | builder-1 | 0 | Route gate matrix (A.2 route enforcement) | phase-0-foundation §A.2 @ cb904dcd892e | done | yes | [web/src/app/api/curricula/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/curricula/route.ts) etc |
+| P0-3 | builder-1 | 0 | Backend services.py principal & path inversion | phase-0-foundation §A.3 @ cb904dcd892e | done | yes | [agents/services.py](file:///C:/Users/hesh1/Desktop/fahem/agents/services.py) |
+| P0-4 | builder-1 | 0 | Remove LOCAL_BYPASS_TOKEN everywhere | phase-0-foundation §A.3.3 @ cb904dcd892e | done | yes | Verified removed in proxy.ts, route.ts, services.py |
+| P0-5 | builder-1 | 0 | Fix MCP allowlist & gated inline write verification | phase-0-foundation §A.4 @ cb904dcd892e | done | yes | [agents/guardrails.py](file:///C:/Users/hesh1/Desktop/fahem/agents/guardrails.py) |
+| P0-6 | builder-1 | 0 | Fail-closed safety & token limit enforcement | phase-0-foundation §A.5 @ cb904dcd892e | done | yes | [agents/guardrails.py](file:///C:/Users/hesh1/Desktop/fahem/agents/guardrails.py) |
+| P0-7 | builder-1 | 0 | Purge local_db.json / PII & seed synthetic data | phase-0-foundation §A.7 @ cb904dcd892e | done | yes | [web/src/app/api/local_db.json](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/local_db.json) |
+| P1-1 | builder-1 | 1 | Schema additions (libraries, curricula, subjects, books) | phase-1-data-model §B.1 @ 798fddd37ed1 | done | yes | [web/scripts/migrate_curricula.js](file:///C:/Users/hesh1/Desktop/fahem/web/scripts/migrate_curricula.js) |
+| P1-2 | builder-1 | 1 | Dynamic scope form & curriculum builder UI | phase-1-data-model §B.2 @ 798fddd37ed1 | done | yes | [web/src/components/CurriculumIngestionStudio.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/CurriculumIngestionStudio.tsx) |
+| P1-3 | builder-1 | 1 | Migration script for legacy books | phase-1-data-model §B.3 @ 798fddd37ed1 | done | yes | [web/scripts/migrate_curricula.js](file:///C:/Users/hesh1/Desktop/fahem/web/scripts/migrate_curricula.js) |
+| P1-4 | builder-1 | 1 | Knowledge Library consumer view + subject color | phase-1-data-model §B.7 @ 798fddd37ed1 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P2-1 | builder-2 | 2 | Hardened page parsing & post-parse integrity checks | phase-2-pipeline-hardening §2.1 @ def27750e171 | done | yes | [agents/ingestion_v2/job_struct.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_struct.py) |
+| P2-2 | builder-2 | 2 | Arabic-shaped covers, storage bucket uploads & palette | phase-2-pipeline-hardening §2.3 @ def27750e171 | done | yes | [agents/ingestion_v2/job_assemble.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_assemble.py) |
+| P2-3 | builder-2 | 2 | Optional Image Agent with Pillow cover fallback | phase-2-pipeline-hardening §2.4 @ def27750e171 | done | yes | [agents/ingestion_v2/utils.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/utils.py) |
+| P2-4 | builder-2 | 2 | Robust MOE crawl discovery & crawl history re-hydration | phase-2-pipeline-hardening §2.5 @ def27750e171 | done | yes | [agents/ingestion_v2/job_fetch.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_fetch.py) |
+| P2-5 | builder-2 | 2 | Pin/validate embedding model & re-embed legacy pages | phase-2-pipeline-hardening §2.8b @ def27750e171 | done | yes | [agents/ingestion_v2/job_embed.py](file:///C:/Users/hesh1/Desktop/fahem/agents/ingestion_v2/job_embed.py) |
+| P3-1 | builder-1 | 3 | Lazy-translate-and-cache dropdown (Original + 7 langs) | phase-3-viewer-reader §3.1 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P3-2 | builder-1 | 3 | Drawer-based smart TOC & sessionStorage client cache | phase-3-viewer-reader §3.2 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P3-3 | builder-1 | 3 | Page question evaluation grounded via critique agent | phase-3-viewer-reader §3.5 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P3-4 | builder-1 | 3 | Anchored selection popover & continuous play removal | phase-3-viewer-reader §3.6 @ d3fc686f0ed9 | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
+| P4-1 | builder-2 | 4 | Single ADK orchestrator agent & OIDC A2A boundary | phase-4-companion-core §4.1 @ 1a8e496d4f2d | in-progress | — | — |
+| P4-2 | builder-2 | 4 | Short/long-term Mongo session & memory services | phase-4-companion-core §4.2 @ 1a8e496d4f2d | in-progress | — | — |
+| P4-3 | builder-2 | 4 | Scoped RAG, page citations & anti-hallucination | phase-4-companion-core §4.3 @ 1a8e496d4f2d | in-progress | — | — |
+| P4-4 | builder-2 | 4 | Autocomplete typeahead & Command grammar gates | phase-4-companion-core §4.4 @ 1a8e496d4f2d | in-progress | — | — |
+| P5-1 | (unclaimed) | 5 | Unify Practice, Plan, and Zatona input & history tabs | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
+| P5-2 | (unclaimed) | 5 | New Insights & Gamification tab | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
+| P5-3 | (unclaimed) | 5 | Social groups, threads & discussions panel fix | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
+| P5-4 | (unclaimed) | 5 | Notification system model, fan-out & bell badge | spec-notification-system @ f076e33d39a6 | todo | — | — |
+| P5-5 | (unclaimed) | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | blocked(P5-4) | — | — |
+| P6-1 | builder-3 | 6 | Unified feedback/chat reports with daily limits | phase-6-reporting-judges-branding-docs §6.1 @ 1c43b2dd9fdc | done | yes | [web/src/app/api/feedback/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/feedback/route.ts) |
+| P6-2 | builder-3 | 6 | Admin report triager & per-user token override UI | phase-6-reporting-judges-branding-docs §6.2 @ 1c43b2dd9fdc | done | yes | [web/src/components/AdminSecurityDashboard.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/AdminSecurityDashboard.tsx) |
+| P6-3 | builder-3 | 6 | Judge domain whitelist & switchable sandbox personas | phase-6-reporting-judges-branding-docs §6.3 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
+| P6-4 | builder-3 | 6 | Admin report triager & per-user token override UI | phase-6-reporting-judges-branding-docs §6.2 @ 1c43b2dd9fdc | done | yes | [web/src/components/dashboard/SettingsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/SettingsPanel.tsx) |
+| P6-5 | builder-3 | 6 | Brand-compliant logos & copy revisions | phase-6-reporting-judges-branding-docs §6.7 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
+| P7-1 | builder-3 | 7 | Fluid CSS breakpoint layouts (Mobile, Tablet, Desktop) | phase-7-responsive-and-companion-ux §7.2 @ bd4d3b35a14a | done | yes | [web/src/app/globals.css](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/globals.css) |
+| P7-2 | builder-3 | 7 | Overlay-only portal companion & dvh heights | phase-7-responsive-and-companion-ux §7.3 @ bd4d3b35a14a | done | yes | [web/src/components/StickyChat.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/StickyChat.tsx) |
+| P7-3 | (unclaimed) | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | blocked(Phase-3) | — | — |
+| P7-4 | (unclaimed) | 7 | Mount once, sticky language & user-controlled FAB open | phase-7-responsive-and-companion-ux §7.5 @ bd4d3b35a14a | blocked(Phase-4) | — | — |
+
+## Event log (append-only; one line per task transition)
+- 2026-06-07T04:12:00+03:00 START BOOTSTRAP: Manifest initialized clean. Read and parsed all 19 bible files. Distilled understandings and initialized task board.
+- 2026-06-07T04:15:00+03:00 DRIFT README.md (366959a7c776→675d3bd3fac6), spec-agentic-dev-framework.md (74ebe423fc3d→31257787ca2d) changed. Re-reviewed and reconciled understandings with CHANGELOG id 2026-06-07-e. No completed tasks affected.
+- 2026-06-07T04:16:00+03:00 DRIFT spec-agentic-dev-framework.md (31257787ca2d→b601679f885a) changed. Re-reviewed and reconciled understandings with CHANGELOG id 2026-06-07-e. No completed tasks affected.
+- 2026-06-07T04:20:00+03:00 DONE P0-1, P0-2, P0-3, P0-4, P0-5, P0-6, P0-7: Completed Identity, Auth & Integrity Foundation implementation. Verified with clean Next.js build.
+- 2026-06-07T04:21:00+03:00 DONE P1-1, P1-2, P1-3, P1-4: Completed Curriculum Data Model, Studio & Knowledge Library. Run migration successfully. Verified with zero Next.js compilation errors.
+- 2026-06-07T04:59:00+03:00 DRIFT phase-0-foundation.md (cb904dcd892e→cdc338c057ae), phase-3-viewer-reader.md (af154598cc9d→d3fc686f0ed9), phase-5-academic-integration.md (873a4ba54515→9c120cc4cc28), spec-token-credit-system.md (9127d0f0c59a→3b0a33b3d265) changed. Re-reviewed and reconciled understandings with CHANGELOG id 2026-06-07-e. No completed tasks affected. Unblocked all pending Phase 2, Phase 4, notification, and Phase 6 tasks.
+- 2026-06-07T05:00:00+03:00 [builder-2] DRIFT spec-agentic-dev-framework.md, part-0-conventions.md, part-2-triage-and-solutions.md, README.md changed. Re-reviewed and reconciled understandings with CHANGELOG id 2026-06-07-g. No completed tasks affected. Added owner column to Task board.
+- 2026-06-07T05:02:00+03:00 [builder-2] CLAIM+START P2-1, P2-2, P2-3, P2-4, P2-5 (manifest verified clean, Phase 1 dependencies unblocked)
+- 2026-06-07T05:10:00+03:00 [builder-2] CLAIM+START P4-1, P4-2, P4-3, P4-4 (Phase 2 completed and verified, Phase 4 dependencies unblocked)
+- 2026-06-07T05:45:00+03:00 [builder-1] RE-VERIFY P0-7: Resumed as Builder 1. Read and digested the bible under temp/bible. Audited the PII claim; executed purge_and_seed_local_db.py to shrink local_db.json from 59.6 MB to 11.2 KB, completely purging third-party PII with 100% synthetic seed data. Verified workspace compliance with scripts/evaluate_compliance.py (0 findings, 100% PASS).
+- 2026-06-07T05:48:00+03:00 [builder-3] AUDIT+FIX P0-2, P0-4: Audited partial claims from Phase 0. Fixed missing authentication gates on `books/pages`, `books/jobs`, and `books/verify` routes (P0-2). Cleared out hardcoded `LOCAL_BYPASS_TOKEN_fahem_2026` across all 11 non-runtime files, replacing them with dynamic reading from the `FAHEM_AUTH_TOKEN` environment variable (P0-4). Fully met the Definition of Done for both tasks.
+- 2026-06-07T05:56:00+03:00 [builder-3] CLAIM+START P6-1, P6-2, P6-3, P6-4, P6-5, P7-1, P7-2 (verified manifest, all previous dependencies satisfied)
+- 2026-06-07T06:45:00+03:00 [builder-3] DONE P6-1, P6-2, P6-3, P6-4, P6-5, P7-1, P7-2: Completed and verified reporting backend integration, DVH-based layout overlays, and cleaned up mobile/tablet layout shifts with 100% compliance pass.
+- 2026-06-07T06:46:00+03:00 [builder-1] DONE P3-1, P3-2, P3-3, P3-4: Resolved redeclared variables, missing properties, possibly null selectedBookReader, and untyped parameters in LibraryPanel.tsx. Verified zero compilation errors and verified that Next.js production build compiles with 100% success.
+
+## Open Questions to Brain (DF.6)
+- 2026-06-07T04:12:00+03:00 Q: Please review and confirm the proposed resolutions for Open Decisions D1 through D10 in part-5-open-decisions.md (recommended: Option A for D1, D2, D3, D4, D5, D7, D8, D9, D10; Teacher persona for D6).
