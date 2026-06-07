@@ -411,7 +411,8 @@ export async function POST(req: NextRequest) {
 
                   // 4. Content / Text Streaming
                   if (event.content?.parts) {
-                    if (event.partial === false && finalResponseText) {
+                    const isPartial = event.partial === true;
+                    if (!isPartial && finalResponseText) {
                       // Skip duplicate final consolidated events if we already streamed the partials
                     } else {
                       let textChunk = "";
@@ -461,7 +462,8 @@ export async function POST(req: NextRequest) {
             try {
               const event = JSON.parse(dataStr);
               if (event.content?.parts) {
-                if (event.partial === false && finalResponseText) {
+                const isPartial = event.partial === true;
+                if (!isPartial && finalResponseText) {
                   // Skip duplicate final consolidated events
                 } else {
                   let textChunk = "";

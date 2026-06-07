@@ -26,6 +26,13 @@ export async function POST(req: NextRequest) {
       userId = ctx.uid;
     }
 
+    if (userId === friendId) {
+      return new Response(JSON.stringify({ error: "Cannot add yourself as a friend" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     return await proxyRequest("/user/friend", "POST", { userId, friendId, action }, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {

@@ -286,20 +286,25 @@ export async function POST(req: NextRequest) {
 
                   // 4. Content / Text Streaming
                   if (event.content?.parts) {
-                    let textChunk = "";
-                    for (const part of event.content.parts) {
-                      if (part.text) {
-                        textChunk += part.text;
+                    const isPartial = event.partial === true;
+                    if (!isPartial && finalResponseText) {
+                      // Skip duplicate final consolidated events if we already streamed the partials
+                    } else {
+                      let textChunk = "";
+                      for (const part of event.content.parts) {
+                        if (part.text) {
+                          textChunk += part.text;
+                        }
                       }
-                    }
 
-                    if (textChunk) {
-                      if (!hasStartedFinalOutput) {
-                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-                        hasStartedFinalOutput = true;
+                      if (textChunk) {
+                        if (!hasStartedFinalOutput) {
+                          controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                          hasStartedFinalOutput = true;
+                        }
+                        finalResponseText += textChunk;
+                        controller.enqueue(encoder.encode(textChunk));
                       }
-                      finalResponseText += textChunk;
-                      controller.enqueue(encoder.encode(textChunk));
                     }
                   }
 
@@ -329,19 +334,24 @@ export async function POST(req: NextRequest) {
             try {
               const event = JSON.parse(dataStr);
               if (event.content?.parts) {
-                let textChunk = "";
-                for (const part of event.content.parts) {
-                  if (part.text) {
-                    textChunk += part.text;
+                const isPartial = event.partial === true;
+                if (!isPartial && finalResponseText) {
+                  // Skip duplicate final consolidated events
+                } else {
+                  let textChunk = "";
+                  for (const part of event.content.parts) {
+                    if (part.text) {
+                      textChunk += part.text;
+                    }
                   }
-                }
-                if (textChunk) {
-                  if (!hasStartedFinalOutput) {
-                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-                    hasStartedFinalOutput = true;
+                  if (textChunk) {
+                    if (!hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                      hasStartedFinalOutput = true;
+                    }
+                    finalResponseText += textChunk;
+                    controller.enqueue(encoder.encode(textChunk));
                   }
-                  finalResponseText += textChunk;
-                  controller.enqueue(encoder.encode(textChunk));
                 }
               }
             } catch (e) {}
