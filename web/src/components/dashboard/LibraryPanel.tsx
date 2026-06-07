@@ -2253,8 +2253,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           text: cleanedText,
           language: reqLang,
           voice: selectedVoice,
-          userId: user?.uid || "anonymous",
-          userEmail: user?.email || "anonymous@fahem.ai",
           bookId: selectedBookReader?._id || selectedBookReader?.id,
           pageNumber: readerCurrentPage
         })

@@ -15,11 +15,11 @@
       "books_count": 1
     },
     {
-      "_id": "subj_algebra_stats_secondary2_term1",
+      "_id": "subj_algebra_stats_secondary2_term1_secondary2_term1",
       "curriculum_id": "cur_moe_secondary2_term1_2026",
       "name": "Pure Mathematics",
       "name_ar": "الرياضيات العامة",
-      "color": "#1E96A0",
+      "color": "#E11D48",
       "emoji": "📐",
       "category": "Math",
       "core_book_ids": [
@@ -29,7 +29,7 @@
       "books_count": 1
     },
     {
-      "_id": "subj_biology_secondary2_term1",
+      "_id": "subj_biology_secondary2_term1_secondary2_term1",
       "curriculum_id": "cur_moe_secondary2_term1_2026",
       "name": "Physics & Chemistry",
       "name_ar": "العلوم والفيزياء",
@@ -46,7 +46,7 @@
   "books": [
     {
       "_id": "book_math_101",
-      "subject_id": "subj_algebra_stats_secondary2_term1",
+      "subject_id": "subj_algebra_stats_secondary2_term1_secondary2_term1",
       "title": "Introduction to Algebra",
       "title_ar": "مقدمة في الجبر",
       "author": "Fahem Academy",
@@ -63,7 +63,7 @@
     },
     {
       "_id": "book_science_201",
-      "subject_id": "subj_biology_secondary2_term1",
+      "subject_id": "subj_biology_secondary2_term1_secondary2_term1",
       "title": "Essentials of Physics",
       "title_ar": "أساسيات الفيزياء",
       "author": "Fahem Academy",
@@ -386,8 +386,8 @@
       "visibility": "public",
       "owner_uid": null,
       "created_by": "system",
-      "created_at": "2026-06-07T04:23:50.360Z",
-      "updated_at": "2026-06-07T04:23:50.362Z"
+      "created_at": "2026-06-07T04:34:30.398Z",
+      "updated_at": "2026-06-07T04:34:30.399Z"
     },
     {
       "_id": "cur_moe_secondary2_term1_2026",
@@ -400,15 +400,15 @@
         "year": "2026"
       },
       "subject_ids": [
-        "subj_algebra_stats_secondary2_term1",
-        "subj_biology_secondary2_term1"
+        "subj_algebra_stats_secondary2_term1_secondary2_term1",
+        "subj_biology_secondary2_term1_secondary2_term1"
       ],
       "status": "published",
       "visibility": "public",
       "owner_uid": null,
       "created_by": "system",
-      "created_at": "2026-06-07T04:23:50.362Z",
-      "updated_at": "2026-06-07T04:23:50.362Z"
+      "created_at": "2026-06-07T04:34:30.399Z",
+      "updated_at": "2026-06-07T04:34:30.399Z"
     }
   ]
 }

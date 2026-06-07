@@ -937,259 +937,202 @@ Examples:
           }
 
           // Initial terminal logs
-          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM] Initiating Native TypeScript ADK Orchestration...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM] Initiating Single-Agent ADK 2.0 Orchestrator...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
           // -------------------------------------------------------------
-          // STEP 0: Model Armor Pre-flight check
+          // Centralized Cloud Run SSE Streaming
           // -------------------------------------------------------------
-          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Model Armor\n"));
-          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running GCP Model Armor pre-flight safety filter...\n"));
-          const armorRes = await checkModelArmor(prompt);
-          if (armorRes.blocked) {
-            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] GCP Model Armor BLOCKED prompt: ${armorRes.reason}\n`));
-            controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-            controller.enqueue(encoder.encode(`DENIED: Security Policy Violation. Google Cloud Model Armor template flagged the query as unsafe. Please rephrase your query and try again.`));
-            controller.enqueue(encoder.encode("\n==========================\n"));
-            controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
-
-            if (userId && userEmail) {
-              await proxyRequest("/user/activity", "POST", {
-                userId,
-                userEmail,
-                action: "Standard Agent Query",
-                status: "BLOCKED",
-                details: "Blocked by GCP Model Armor: " + prompt.substring(0, 150)
-              }).catch(() => {});
-            }
-
-            safeClose();
-            return;
+          const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
+          if (!cloudRunUrl) {
+            throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
           }
-          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
 
-          // Initialize Gemini AI Client
-          const geminiApiKey = process.env.GEMINI_API_KEY;
-          if (!geminiApiKey) {
-            throw new Error("GEMINI_API_KEY environment variable is not configured.");
+          controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Connecting to Cloud Run Agent at ${cloudRunUrl}...\n`));
+
+          // Fetch GCP OIDC identity token for service-to-service authentication
+          let oidcToken = await getOidcToken();
+
+          const requestHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Verified-Principal": JSON.stringify({
+              uid: ctx.uid,
+              email: ctx.email,
+              role: ctx.role
+            })
+          };
+          if (oidcToken) {
+            requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
+          } else {
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running in local/dev environment mode. Identity forwarded securely.\n`));
           }
-          const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-          const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
-          // -------------------------------------------------------------
-          // STEP 1: Guardrail Gate
-          // -------------------------------------------------------------
-          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Guardrail Audit\n"));
-          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Running security and authentication guardrails...\n"));
-
-          const guardStart = performance.now();
-          const guardrailSystemInstruction = `
-You are the Fahem Security Guardrail Agent.
-Your sole role is to audit user prompts, queries, and user context to verify they are secure and authorized.
-
-You must perform these strict checks:
-1. **Authentication Gate**: Inspect if a valid 'user_email' or 'user_id' is provided. For standard inspections or queries (read-only), allow anonymous/unauthenticated access. For WRITE operations (inserting, updating, deleting, or reporting), a valid user email is STRICTLY REQUIRED. If empty or anonymous during a write operation, reject with 'UNAUTHORIZED: User must be signed-in to perform write operations'.
-2. **Administrative Lock**: Strictly reject any commands or tools starting with 'atlas-'. Standard users should never manage clusters or projects.
-3. **Injection and Drop Protection**: Block malicious injection payloads or destructive operations like dropping/deleting databases, unless it's a valid and authenticated report creation.
-4. **Data Context and Database Inspection Isolation**: Prevent standard users from listing database collections, examining/checking schemas, reading system/database statistics, or reading or querying profiles of other users. Standard users must never be allowed to access these technical database internals or telemetry. These features are strictly reserved for authorized administrators / superadmins. If a standard user attempts to run any database diagnostic, telemetry, schema check, collection listing, or searches for another user's profile, immediately deny the request with an appropriate message.
-
-If all criteria are fully met, respond exactly with "CONFIRMED: Authorized".
-If any criteria fail, respond with "DENIED: <clear explanation in the user's requested language>".
-`;
-
-          const reviewPayload = {
-            user_prompt: prompt,
-            user_email: userEmail || "",
-            user_id: userId || "",
-            language: language || "en"
+          const payload = {
+            app_name: "app",
+            user_id: userId || "anonymous",
+            session_id: activeSessionId,
+            new_message: {
+              role: "user",
+              parts: [{ text: prompt }]
+            },
+            streaming: true
           };
 
-          const guardrailResponse = await ai.models.generateContent({
-            model: modelName,
-            contents: JSON.stringify(reviewPayload),
-            config: {
-              systemInstruction: guardrailSystemInstruction
-            }
+          const sseResponse = await fetch(`${cloudRunUrl}/run_sse`, {
+            method: "POST",
+            headers: requestHeaders,
+            body: JSON.stringify(payload),
+            cache: "no-store",
+            next: { revalidate: 0 } as any
           });
 
-          const guardEnd = performance.now();
-          const guardDuration = ((guardEnd - guardStart) / 1000).toFixed(2);
-
-          const guardText = guardrailResponse.text ? guardrailResponse.text.trim() : "";
-          const isConfirmed = guardText.includes("CONFIRMED");
-
-          controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Guardrail check complete in ${guardDuration}s. Result: ${guardText}\n`));
-          controller.enqueue(encoder.encode(`[METADATA] Duration: Guardrail Audit: ${guardDuration}s\n`));
-
-          let databaseResults = "";
-          let executionSuccess = false;
-
-          if (isConfirmed) {
-            // -------------------------------------------------------------
-            // STEP 2: Database Engine (Cloud Run execution)
-            // -------------------------------------------------------------
-            controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Database Engine\n"));
-            const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
-            if (!cloudRunUrl) {
-              throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
-            }
-
-            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Sending query execution to Cloud Run Agent: ${cloudRunUrl}...\n`));
-
-            const dbStart = performance.now();
-
-            // Fetch GCP OIDC identity token for service-to-service authentication
-            let oidcToken = await getOidcToken();
-
-            const requestHeaders: Record<string, string> = {
-              "Content-Type": "application/json",
-              "X-Verified-Principal": JSON.stringify({
-                uid: ctx.uid,
-                email: ctx.email,
-                role: ctx.role
-              })
-            };
-            if (oidcToken) {
-              requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
-            } else {
-              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running in local/dev environment mode. Identity forwarded securely via principal.\n`));
-            }
-
-            // Enforce and pass structured context variables safely inside prompt text payload as JSON
-            const serializedContext = JSON.stringify({
-              prompt: prompt,
-              language: language || "en",
-              user_email: userEmail || "",
-              user_id: userId || "",
-              username: userEmail ? userEmail.split("@")[0] : "anonymous",
-              credits: 100 // Managed on-the-fly inside agent state
-            });
-
-            const payload = {
-              user_id: userId || "anonymous",
-              session_id: "fahem_microservice_session",
-              app_name: "app",
-              new_message: {
-                role: "user",
-                parts: [{ text: serializedContext }]
-              },
-              streaming: false
-            };
-
-            const response = await fetch(`${cloudRunUrl}/run`, {
-              method: "POST",
-              headers: requestHeaders,
-              body: JSON.stringify(payload),
-              cache: "no-store",
-              next: { revalidate: 0 } as any
-            });
-
-            const dbEnd = performance.now();
-            const dbDuration = ((dbEnd - dbStart) / 1000).toFixed(2);
-
-            if (response.ok) {
-              const resData: any = await response.json();
-              databaseResults = extractFinalAgentOutput(resData);
-              executionSuccess = true;
-              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Query executed successfully in ${dbDuration}s. Formatting results...\n`));
-              controller.enqueue(encoder.encode(`[METADATA] Duration: Database Engine: ${dbDuration}s\n`));
-            } else {
-              const errorText = await response.text();
-              throw new Error(`Microservice HTTP error: ${response.status} - ${errorText}`);
-            }
+          if (!sseResponse.ok) {
+            const errorText = await sseResponse.text();
+            throw new Error(`Cloud Run agent stream request failed (${sseResponse.status}): ${errorText}`);
           }
 
-          // -------------------------------------------------------------
-          // STEP 3: Orchestrator Presentation Phase
-          // -------------------------------------------------------------
-          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Orchestrator\n"));
-          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Presenting final output to user dashboard...\n"));
-
-          const orchestratorSystemInstruction = `
-You are the Fahem Multi-Agent Orchestrator.
-Your job is to receive, process, and beautifully format database operations or security alerts for the user dashboard.
-
-The user's selected preferred language is '${langName}' (one of the 7 supported languages: English, Arabic, French, German, Spanish, Italian, and Chinese).
-You MUST respond, present, and explain everything strictly and exclusively in '${langName}'.
-
-When compiling database output results:
-1. Avoid raw JSON or BSON dumps.
-2. Construct highly professional, premium Markdown tables, lists, or structured cards.
-3. Localize explanations, text, table headers, and statuses fully into the user's selected language: '${langName}'.
-4. Preserve technical names such as collection names, database names, or specific keys as-is.
-
-When presenting a security denial message:
-1. Explain politely in the user's selected language ('${langName}') that security guardrails blocked the execution.
-2. Highlight the active safety enforcement without releasing internal developer secrets.
-`;
-
-          let presentationPrompt = "";
-          if (isConfirmed && executionSuccess) {
-            presentationPrompt = `
-Format and present the following database results nicely in ${langName} for the user dashboard.
-Use clean Markdown tables, lists, or structured highlights.
-Ensure it feels extremely premium and clear.
-
-Raw Database Results:
-${databaseResults}
-`;
-          } else {
-            presentationPrompt = `
-Present a polite security denial message in ${langName} to the user explaining why their request was blocked.
-Highlight that security guardrails are active and administrative/unauthorized operations are blocked.
-
-Reason for denial:
-${guardText || "Access unauthorized"}
-`;
+          const reader = sseResponse.body?.getReader();
+          if (!reader) {
+            throw new Error("Failed to initialize stream reader from Cloud Run agent response.");
           }
 
-          const normalizedPrompt = prompt.toLowerCase();
-          const adminKeywords = ["database", "collection", "schema", "mongodb", "stats", "audit", "user profile", "retrieve user", "trend analysis", "diagnostics", "diagnostic report", "mcp"];
-          const arAdminKeywords = ["قاعدة بيانات", "مجموعات", "مجموعة", "مخطط", "احصائيات", "تقرير تشخيصي", "سجلات", "تشخيص"];
-          const isAdminQuery = adminKeywords.some(w => normalizedPrompt.includes(w)) || arAdminKeywords.some(w => normalizedPrompt.includes(w));
-
-          const orchStart = performance.now();
+          const decoder = new TextDecoder();
+          let lineBuffer = "";
           let finalResponseText = "";
+          let hasStartedFinalOutput = false;
+          let currentActiveAgent = "";
 
-          // Signal start of final output to the frontend parser
-          controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          if (isConfirmed && executionSuccess && !isAdminQuery) {
-            // Stream the academic tutor output directly to preserve natural human warmth and format
-            const chunkSize = 25;
-            for (let i = 0; i < databaseResults.length; i += chunkSize) {
-              const chunk = databaseResults.substring(i, i + chunkSize);
-              finalResponseText += chunk;
-              controller.enqueue(encoder.encode(chunk));
-              await new Promise(resolve => setTimeout(resolve, 8)); // dynamic streaming feel
-            }
-          } else {
-            // For admin queries or security denials, format via Orchestrator as usual
-            const responseStream = await ai.models.generateContentStream({
-              model: modelName,
-              contents: presentationPrompt,
-              config: {
-                systemInstruction: orchestratorSystemInstruction
-              }
-            });
+            const chunk = decoder.decode(value, { stream: true });
+            lineBuffer += chunk;
+            let lines = lineBuffer.split("\n");
+            lineBuffer = lines.pop() || ""; // keep partial last line
 
-            for await (const chunk of responseStream) {
-              if (chunk.text) {
-                finalResponseText += chunk.text;
-                controller.enqueue(encoder.encode(chunk.text));
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+
+              if (trimmed.startsWith("data: ")) {
+                const dataStr = trimmed.substring(6).trim();
+                if (dataStr === "[DONE]") {
+                  continue;
+                }
+
+                try {
+                  const event = JSON.parse(dataStr);
+
+                  // 1. Error check
+                  if (event.error_message) {
+                    if (hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n==========================\n"));
+                      hasStartedFinalOutput = false;
+                    }
+                    controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Error: ${event.error_message}\n`));
+                    
+                    // Show error in user output
+                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                    controller.enqueue(encoder.encode(`Error: ${event.error_message}`));
+                    controller.enqueue(encoder.encode("\n==========================\n"));
+                    continue;
+                  }
+
+                  // 2. Active Agent Metadata update
+                  if (event.node_info?.path && event.node_info.path !== currentActiveAgent) {
+                    currentActiveAgent = event.node_info.path;
+                    if (hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n==========================\n"));
+                      hasStartedFinalOutput = false;
+                    }
+                    controller.enqueue(encoder.encode(`[METADATA] ActiveAgent: ${currentActiveAgent}\n`));
+                  }
+
+                  // 3. Tool invocation logs
+                  if (event.content?.parts) {
+                    for (const part of event.content.parts) {
+                      if (part.functionCall || part.function_call) {
+                        const call = part.functionCall || part.function_call;
+                        if (hasStartedFinalOutput) {
+                          controller.enqueue(encoder.encode("\n==========================\n"));
+                          hasStartedFinalOutput = false;
+                        }
+                        controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running tool: ${call.name}...\n`));
+                      }
+                    }
+                  }
+
+                  // 4. Content / Text Streaming
+                  if (event.content?.parts) {
+                    let textChunk = "";
+                    for (const part of event.content.parts) {
+                      if (part.text) {
+                        textChunk += part.text;
+                      }
+                    }
+
+                    if (textChunk) {
+                      if (!hasStartedFinalOutput) {
+                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                        hasStartedFinalOutput = true;
+                      }
+                      finalResponseText += textChunk;
+                      controller.enqueue(encoder.encode(textChunk));
+                    }
+                  }
+
+                  // 5. Check if action has final output fallback
+                  if (event.actions?.stateDelta?.final_output && !finalResponseText) {
+                    const fallbackText = event.actions.stateDelta.final_output;
+                    if (fallbackText) {
+                      if (!hasStartedFinalOutput) {
+                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                        hasStartedFinalOutput = true;
+                      }
+                      finalResponseText += fallbackText;
+                      controller.enqueue(encoder.encode(fallbackText));
+                    }
+                  }
+
+                } catch (jsonErr) {
+                  console.warn("Failed to parse SSE JSON chunk:", dataStr, jsonErr);
+                }
               }
             }
           }
 
-          const orchEnd = performance.now();
-          const orchDuration = ((orchEnd - orchStart) / 1000).toFixed(2);
+          // Handle any remaining data in lineBuffer
+          if (lineBuffer.trim().startsWith("data: ")) {
+            const dataStr = lineBuffer.trim().substring(6).trim();
+            try {
+              const event = JSON.parse(dataStr);
+              if (event.content?.parts) {
+                let textChunk = "";
+                for (const part of event.content.parts) {
+                  if (part.text) {
+                    textChunk += part.text;
+                  }
+                }
+                if (textChunk) {
+                  if (!hasStartedFinalOutput) {
+                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                    hasStartedFinalOutput = true;
+                  }
+                  finalResponseText += textChunk;
+                  controller.enqueue(encoder.encode(textChunk));
+                }
+              }
+            } catch (e) {}
+          }
 
-          // Signal close of final output
-          controller.enqueue(encoder.encode("\n==========================\n"));
-          controller.enqueue(encoder.encode(`[METADATA] Duration: Orchestrator: ${orchDuration}s\n`));
+          // Close markers
+          if (hasStartedFinalOutput) {
+            controller.enqueue(encoder.encode("\n==========================\n"));
+          }
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
-          controller.enqueue(encoder.encode(`\n[CLOSE] Execution complete. Total time: ${(((performance.now() - guardStart)) / 1000).toFixed(2)}s\n`));
+          controller.enqueue(encoder.encode(`\n[CLOSE] Execution complete.\n`));
 
           // -------------------------------------------------------------
           // STEP 4: Session, Chat, Activity, and Token Logging
@@ -1221,7 +1164,7 @@ ${guardText || "Access unauthorized"}
             const newMessages = [
               ...existingMessages,
               { role: "user", content: prompt, timestamp: new Date().toISOString() },
-              { role: "assistant", content: finalResponseText, timestamp: new Date().toISOString() }
+              { role: "assistant", content: finalResponseText || "No response generated.", timestamp: new Date().toISOString() }
             ];
 
             const isNewSession = existingMessages.length === 0;
@@ -1271,13 +1214,8 @@ ${guardText || "Access unauthorized"}
             }
 
             // D. Log Token Usage
-            const guardPrompt = guardrailResponse.usageMetadata?.promptTokenCount || Math.ceil(JSON.stringify(reviewPayload).length / 4);
-            const guardComp = guardrailResponse.usageMetadata?.candidatesTokenCount || Math.ceil((guardrailResponse.text || "").length / 4);
-            const orchPrompt = Math.ceil(presentationPrompt.length / 4);
-            const orchComp = Math.ceil(finalResponseText.length / 4);
-
-            const promptTokens = guardPrompt + orchPrompt;
-            const completionTokens = guardComp + orchComp;
+            const promptTokens = Math.ceil(prompt.length / 4);
+            const completionTokens = Math.ceil((finalResponseText || "").length / 4);
             const totalTokens = promptTokens + completionTokens;
 
             try {
@@ -1287,8 +1225,8 @@ ${guardText || "Access unauthorized"}
                 promptTokens,
                 completionTokens,
                 totalTokens,
-                model: modelName,
-                type: isConfirmed ? "standard_orchestrator" : "guardrail_block"
+                model: process.env.GEMINI_MODEL || "gemini-3.1-flash-lite",
+                type: "standard_orchestrator"
               });
             } catch (err) {
               console.warn("Failed to log token telemetry:", err);
@@ -1299,9 +1237,9 @@ ${guardText || "Access unauthorized"}
               await proxyRequest("/user/activity", "POST", {
                 userId,
                 userEmail,
-                action: isConfirmed ? "Standard Agent Query" : "Standard Agent Query (Guardrail Blocked)",
-                status: isConfirmed ? "SUCCESS" : "BLOCKED",
-                details: isConfirmed ? prompt.substring(0, 150) : `Blocked prompt: ${prompt.substring(0, 100)}`
+                action: "Standard Agent Query",
+                status: "SUCCESS",
+                details: prompt.substring(0, 150)
               });
             } catch (err) {
               console.warn("Failed to log user activity:", err);

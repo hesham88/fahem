@@ -1283,8 +1283,6 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.uid,
-          userEmail: user.email || "student@fahem.edu",
           action: "space_history",
           status: "success",
           details: { actionEn, actionAr }
@@ -2317,8 +2315,6 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.uid,
-          userEmail: user.email || "",
           action,
           status,
           details
@@ -2346,7 +2342,6 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.uid,
           profile: updatedProfile
         })
       });
@@ -2917,7 +2912,6 @@ export default function Home() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              userId: user?.uid,
               profile: updatedProfile
             })
           });
@@ -3027,8 +3021,6 @@ export default function Home() {
         body: JSON.stringify({
           prompt: msgText,
           language,
-          userEmail: user.email || "",
-          userId: user.uid,
           sessionId: `onboarding_session_${user.uid}`,
           onboarding: true
         }),
@@ -3861,8 +3853,6 @@ export default function Home() {
         body: JSON.stringify({
           prompt: promptText,
           language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
-          userEmail: user?.email || "",
-          userId: user?.uid || "",
           sessionId: currentSessionId || undefined
         }),
       });
@@ -4117,8 +4107,6 @@ export default function Home() {
         body: JSON.stringify({
           prompt: queryText,
           language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
-          userEmail: user?.email || "",
-          userId: user?.uid || "",
           sessionId: currentSessionId || undefined
         }),
       });
@@ -4403,8 +4391,6 @@ export default function Home() {
         body: JSON.stringify({
           prompt: promptPayload,
           language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
-          userEmail: user?.email || "",
-          userId: user?.uid || "",
           sessionId: currentSessionId || undefined
         }),
       });
