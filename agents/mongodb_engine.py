@@ -308,6 +308,11 @@ class MongoDBEngine:
             
             self._db["subjects"].create_index("curriculum_id", background=True)
             self._db["subjects"].create_index("category", background=True)
+            self._db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True, background=True)
+            try:
+                self._db["subjects"].drop_index("name_1")
+            except Exception:
+                pass
             
             self._db["books"].create_index([("curriculum_id", 1), ("subject_id", 1), ("role", 1)], background=True)
             self._db["books"].create_index([("visibility", 1), ("owner_uid", 1)], background=True)

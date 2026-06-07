@@ -80,7 +80,13 @@ def build_indexes():
         
         subj_idx1 = db["subjects"].create_index([("curriculum_id", ASCENDING)], name="idx_subj_curriculumId")
         subj_idx2 = db["subjects"].create_index([("category", ASCENDING)], name="idx_subj_category")
-        print(f"Created indexes on 'subjects': {subj_idx1}, {subj_idx2}")
+        subj_idx3 = db["subjects"].create_index([("curriculum_id", ASCENDING), ("slug", ASCENDING)], unique=True, name="idx_subj_curriculum_slug_unique")
+        try:
+            db["subjects"].drop_index("name_1")
+            print("Dropped legacy non-unique index 'name_1' on 'subjects'")
+        except Exception:
+            pass
+        print(f"Created indexes on 'subjects': {subj_idx1}, {subj_idx2}, {subj_idx3}")
         
         book_idx1 = db["books"].create_index(
             [("curriculum_id", ASCENDING), ("subject_id", ASCENDING), ("role", ASCENDING)],

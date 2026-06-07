@@ -77,11 +77,20 @@ export async function GET(req: NextRequest) {
       let subjects = db.subjects || [];
 
       // Ensure both emoji and icon_emoji exist, and handle defaults
-      subjects = subjects.map(s => ({
-        ...s,
-        icon_emoji: s.icon_emoji || s.emoji || "📚",
-        emoji: s.emoji || s.icon_emoji || "📚"
-      }));
+      subjects = subjects.map(s => {
+        const booksCount = (db.books || []).filter((b: any) => b.subject_id === s._id).length;
+        const booksForSubject = (db.books || []).filter((b: any) => b.subject_id === s._id);
+        const core_book_ids = booksForSubject.filter((b: any) => b.role === "core").map((b: any) => b._id);
+        const supporting_book_ids = booksForSubject.filter((b: any) => b.role === "supporting").map((b: any) => b._id);
+        return {
+          ...s,
+          icon_emoji: s.icon_emoji || s.emoji || "📚",
+          emoji: s.emoji || s.icon_emoji || "📚",
+          books_count: booksCount,
+          core_book_ids,
+          supporting_book_ids
+        };
+      });
 
       if (curriculumId) {
         subjects = subjects.filter((s: any) => s.curriculum_id === curriculumId);
@@ -151,9 +160,14 @@ export async function POST(req: NextRequest) {
     // 1. Local environment check
     if (isLocalEnv()) {
       const db = getLocalDb();
-      const subjectId = "sub_" + name.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Date.now();
+      const currId = curriculum_id || "general";
+      const slug = (nameTranslations.en || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+      const subjectId = `subj_${currId}_${slug}`;
+
+      const existingIdx = db.subjects.findIndex(s => s._id === subjectId || (s.curriculum_id === currId && s.slug === slug));
       const newSubject = {
         _id: subjectId,
+        slug,
         name,
         name_ar,
         name_en: nameTranslations.en || name,
@@ -166,15 +180,25 @@ export async function POST(req: NextRequest) {
         category: category || "Science",
         icon_emoji: icon_emoji || "📚",
         emoji: icon_emoji || "📚", // Dual property compatibility
-        curriculum_id: curriculum_id || null,
+        curriculum_id: currId,
         color: color || "#1E96A0",
         core_book_ids: core_book_ids || [],
         supporting_book_ids: supporting_book_ids || [],
         books_count: 0
       };
-      db.subjects.push(newSubject);
+
+      if (existingIdx >= 0) {
+        db.subjects[existingIdx] = {
+          ...db.subjects[existingIdx],
+          ...newSubject,
+          books_count: db.subjects[existingIdx].books_count || 0
+        };
+      } else {
+        db.subjects.push(newSubject);
+      }
+
       saveLocalDb(db);
-      return new Response(JSON.stringify({ success: true, subject: newSubject }), {
+      return new Response(JSON.stringify({ success: true, subject: existingIdx >= 0 ? db.subjects[existingIdx] : newSubject }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
@@ -259,8 +283,15 @@ export async function PUT(req: NextRequest) {
           headers: { "Content-Type": "application/json" }
         });
       }
-      db.subjects[idx] = {
+      
+      const currId = curriculum_id !== undefined ? curriculum_id : db.subjects[idx].curriculum_id || "cur_general";
+      const slug = (nameTranslations.en || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+      const newSubjectId = `subj_${currId}_${slug}`;
+
+      const updatedSubject = {
         ...db.subjects[idx],
+        _id: newSubjectId,
+        slug,
         name,
         name_ar,
         name_en: nameTranslations.en || name,
@@ -273,13 +304,39 @@ export async function PUT(req: NextRequest) {
         category: category || "Science",
         icon_emoji: icon_emoji || db.subjects[idx].icon_emoji || db.subjects[idx].emoji || "📚",
         emoji: icon_emoji || db.subjects[idx].emoji || db.subjects[idx].icon_emoji || "📚", // Dual property compatibility
-        curriculum_id: curriculum_id !== undefined ? curriculum_id : db.subjects[idx].curriculum_id,
+        curriculum_id: currId,
         color: color !== undefined ? color : db.subjects[idx].color,
         core_book_ids: core_book_ids !== undefined ? core_book_ids : db.subjects[idx].core_book_ids,
         supporting_book_ids: supporting_book_ids !== undefined ? supporting_book_ids : db.subjects[idx].supporting_book_ids
       };
+
+      // Handle ID change (rename/re-curriculum) to preserve referential integrity
+      if (id !== newSubjectId) {
+        // 1. Reassign books pointing to the old ID
+        db.books = (db.books || []).map((b: any) => {
+          if (b.subject_id === id) {
+            return { ...b, subject_id: newSubjectId, curriculum_id: currId };
+          }
+          return b;
+        });
+
+        // 2. Remove the old subject document
+        db.subjects = db.subjects.filter(s => s._id !== id);
+
+        // 3. Insert or update the new subject document
+        const targetIdx = db.subjects.findIndex(s => s._id === newSubjectId);
+        if (targetIdx >= 0) {
+          db.subjects[targetIdx] = { ...db.subjects[targetIdx], ...updatedSubject };
+        } else {
+          db.subjects.push(updatedSubject);
+        }
+      } else {
+        db.subjects[idx] = updatedSubject;
+      }
+
       saveLocalDb(db);
-      return new Response(JSON.stringify({ success: true, subject: db.subjects[idx] }), {
+      const finalSubject = db.subjects.find(s => s._id === newSubjectId) || updatedSubject;
+      return new Response(JSON.stringify({ success: true, subject: finalSubject }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });

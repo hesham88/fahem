@@ -444,7 +444,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 db["question_bank"].replace_one({"_id": q["_id"]}, q, upsert=True)
                 
             # Create indexes for the new collections
-            db["subjects"].create_index([("name", 1)])
+            db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True)
             db["books"].create_index([("subject_id", 1)])
             db["question_bank"].create_index([("book_id", 1), ("chapter_id", 1)])
             
@@ -480,6 +480,15 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 if not isinstance(documents, list):
                     continue
                 
+                if col_name in ["libraries", "curricula", "subjects", "books"]:
+                    payload_ids = []
+                    for doc in documents:
+                        if isinstance(doc, dict):
+                            d_id = doc.get("_id") or doc.get("id") or doc.get("userId")
+                            if d_id:
+                                payload_ids.append(d_id)
+                    db[col_name].delete_many({"_id": {"$nin": payload_ids}})
+
                 inserted_count = 0
                 for doc in documents:
                     if not isinstance(doc, dict):
@@ -1090,7 +1099,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"success": False, "pages": [], "error": str(err)}
 
     @app.get("/user/subjects")
-    async def get_subjects_endpoint():
+    async def get_subjects_endpoint(request: fastapi.Request = None, curriculum_id: str = None):
         try:
             from tools import get_mongodb_uri
             from pymongo import MongoClient
@@ -1099,10 +1108,27 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = client["fahem"]
             
-            subjects = list(db["subjects"].find({}))
+            if request:
+                curriculum_id = request.query_params.get("curriculum_id") or curriculum_id
+
+            query = {}
+            if curriculum_id:
+                query["curriculum_id"] = curriculum_id
+                
+            subjects = list(db["subjects"].find(query))
             for s in subjects:
                 s["icon_emoji"] = s.get("icon_emoji") or s.get("emoji") or "📚"
                 s["emoji"] = s.get("emoji") or s.get("icon_emoji") or "📚"
+                subject_id = s["_id"]
+                books_count = db["books"].count_documents({"subject_id": subject_id})
+                core_books = list(db["books"].find({"subject_id": subject_id, "role": "core"}, {"_id": 1}))
+                supporting_books = list(db["books"].find({"subject_id": subject_id, "role": "supporting"}, {"_id": 1}))
+                
+                s["books_count"] = books_count
+                s["core_book_ids"] = [b["_id"] for b in core_books]
+                s["supporting_book_ids"] = [b["_id"] for b in supporting_books]
+                
+            client.close()
             return {"subjects": subjects}
         except Exception as err:
             logger.error(f"[services.py] Failed to get subjects: {err}", exc_info=True)
@@ -1481,7 +1507,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
         try:
             from tools import get_mongodb_uri
             from pymongo import MongoClient
-            import time
             import re
             
             data = await request.json()
@@ -1490,6 +1515,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
             grade_level = data.get("grade_level", "General")
             category = data.get("category", "Science")
             icon_emoji = data.get("icon_emoji", "📚")
+            curriculum_id = data.get("curriculum_id") or "cur_general"
+            color = data.get("color", "#1E96A0")
             
             if not name or not name_ar:
                 return fastapi.responses.JSONResponse(
@@ -1501,21 +1528,38 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = client["fahem"]
             
-            clean_name = re.sub(r'[^a-z0-9]', '_', name.lower())
-            subject_id = f"sub_{clean_name}_{int(time.time() * 1000)}"
+            name_en = data.get("name_en") or name
+            slug = re.sub(r'[^a-z0-9]+', '-', name_en.lower().strip()).strip('-')
+            subject_id = f"subj_{curriculum_id}_{slug}"
+            
+            # Rebuild count & book links
+            books_count = db["books"].count_documents({"subject_id": subject_id})
+            core_books = list(db["books"].find({"subject_id": subject_id, "role": "core"}, {"_id": 1}))
+            supporting_books = list(db["books"].find({"subject_id": subject_id, "role": "supporting"}, {"_id": 1}))
             
             new_subject = {
                 "_id": subject_id,
+                "curriculum_id": curriculum_id,
+                "slug": slug,
                 "name": name,
                 "name_ar": name_ar,
+                "name_en": name_en,
+                "name_es": data.get("name_es") or name,
+                "name_fr": data.get("name_fr") or name,
+                "name_de": data.get("name_de") or name,
+                "name_zh": data.get("name_zh") or name,
+                "name_it": data.get("name_it") or name,
                 "grade_level": grade_level,
                 "category": category,
                 "icon_emoji": icon_emoji,
                 "emoji": icon_emoji,
-                "books_count": 0
+                "color": color,
+                "books_count": books_count,
+                "core_book_ids": [b["_id"] for b in core_books],
+                "supporting_book_ids": [b["_id"] for b in supporting_books]
             }
             
-            db["subjects"].insert_one(new_subject)
+            db["subjects"].update_one({"_id": subject_id}, {"$set": new_subject}, upsert=True)
             client.close()
             return {"success": True, "subject": new_subject}
         except Exception as err:
@@ -1530,6 +1574,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
         try:
             from tools import get_mongodb_uri
             from pymongo import MongoClient
+            import re
             
             data = await request.json()
             subject_id = data.get("id") or data.get("_id")
@@ -1549,16 +1594,40 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = client["fahem"]
             
+            name_en = data.get("name_en") or name
+            slug = re.sub(r'[^a-z0-9]+', '-', name_en.lower().strip()).strip('-')
+            
+            books_count = db["books"].count_documents({"subject_id": subject_id})
+            core_books = list(db["books"].find({"subject_id": subject_id, "role": "core"}, {"_id": 1}))
+            supporting_books = list(db["books"].find({"subject_id": subject_id, "role": "supporting"}, {"_id": 1}))
+
+            update_data = {
+                "name": name,
+                "name_ar": name_ar,
+                "name_en": name_en,
+                "name_es": data.get("name_es") or name,
+                "name_fr": data.get("name_fr") or name,
+                "name_de": data.get("name_de") or name,
+                "name_zh": data.get("name_zh") or name,
+                "name_it": data.get("name_it") or name,
+                "slug": slug,
+                "grade_level": grade_level,
+                "category": category,
+                "icon_emoji": icon_emoji,
+                "emoji": icon_emoji,
+                "books_count": books_count,
+                "core_book_ids": [b["_id"] for b in core_books],
+                "supporting_book_ids": [b["_id"] for b in supporting_books]
+            }
+            
+            if "curriculum_id" in data:
+                update_data["curriculum_id"] = data["curriculum_id"]
+            if "color" in data:
+                update_data["color"] = data["color"]
+                
             res = db["subjects"].update_one(
                 {"_id": subject_id},
-                {"$set": {
-                    "name": name,
-                    "name_ar": name_ar,
-                    "grade_level": grade_level,
-                    "category": category,
-                    "icon_emoji": icon_emoji,
-                    "emoji": icon_emoji
-                }}
+                {"$set": update_data}
             )
             
             if res.matched_count == 0:
