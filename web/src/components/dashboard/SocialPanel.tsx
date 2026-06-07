@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { authedFetch } from "../../lib/authedFetch";
 import {
   FiShield,
   FiRefreshCw,
@@ -77,7 +78,65 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
   renderAvatar,
 }) => {
   // Navigation Tabs
-  const [activeSubTab, setActiveSubTab] = useState<"chat" | "assignments">("chat");
+  const [activeSubTab, setActiveSubTab] = useState<"chat" | "assignments" | "discussions">("chat");
+
+  const cameraFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtractingAI(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        try {
+          const res = await authedFetch("/api/assignments/ocr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: base64 })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              setAsgTitle(data.title || "");
+              setAsgTitleAr(data.title_ar || "");
+              setAsgQuestions(data.questions || []);
+            } else {
+              alert(language === "ar" ? `فشل استخراج الأسئلة: ${data.error}` : `Failed to extract questions: ${data.error}`);
+            }
+          } else {
+            const errData = await res.json();
+            alert(language === "ar" ? `خطأ الخادم: ${errData.error || res.statusText}` : `Server error: ${errData.error || res.statusText}`);
+          }
+        } catch (fetchErr: any) {
+          alert(language === "ar" ? `حدث خطأ أثناء الاتصال بالخادم: ${fetchErr.message}` : `Connection error: ${fetchErr.message}`);
+        } finally {
+          setExtractingAI(false);
+          if (cameraFileInputRef.current) cameraFileInputRef.current.value = "";
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("FileReader failed:", err);
+      setExtractingAI(false);
+    }
+  };
+
+  // Discussions states
+  const [threads, setThreads] = useState<any[]>([]);
+  const [loadingThreads, setLoadingThreads] = useState<boolean>(false);
+  const [activeThread, setActiveThread] = useState<any | null>(null);
+  const [threadReplies, setThreadReplies] = useState<any[]>([]);
+  const [loadingReplies, setLoadingReplies] = useState<boolean>(false);
+  
+  // Discussion Forms
+  const [newThreadTitle, setNewThreadTitle] = useState<string>("");
+  const [newThreadContent, setNewThreadContent] = useState<string>("");
+  const [newReplyContent, setNewReplyContent] = useState<string>("");
+  const [submittingThread, setSubmittingThread] = useState<boolean>(false);
+  const [submittingReply, setSubmittingReply] = useState<boolean>(false);
+  const [showNewThreadForm, setShowNewThreadForm] = useState<boolean>(false);
 
   // Groups and Academic states
   const [groups, setGroups] = useState<any[]>([]);
@@ -122,23 +181,121 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
 
   // Fetch groups and academic anchors on tab switch
   useEffect(() => {
-    if (activeSubTab === "assignments") {
+    if (activeSubTab === "assignments" || activeSubTab === "discussions") {
       fetchGroups();
       fetchAcademicAnchors();
     }
   }, [activeSubTab]);
 
-  // Fetch assignments when selected group changes
+  // Fetch assignments or threads when selected group changes
   useEffect(() => {
     if (selectedGroupId) {
-      fetchAssignments(selectedGroupId);
+      if (activeSubTab === "assignments") {
+        fetchAssignments(selectedGroupId);
+      } else if (activeSubTab === "discussions") {
+        fetchThreads(selectedGroupId);
+        setActiveThread(null); // Clear selected thread when switching groups
+      }
     }
-  }, [selectedGroupId]);
+  }, [selectedGroupId, activeSubTab]);
+
+  const fetchThreads = async (groupId: string) => {
+    setLoadingThreads(true);
+    try {
+      const res = await authedFetch(`/api/social/threads?group_id=${encodeURIComponent(groupId)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setThreads(data.threads || []);
+      }
+    } catch (err) {
+      console.error("Failed to load threads:", err);
+    } finally {
+      setLoadingThreads(false);
+    }
+  };
+
+  const fetchThreadDetail = async (threadId: string) => {
+    setLoadingReplies(true);
+    try {
+      const res = await authedFetch(`/api/social/threads?thread_id=${encodeURIComponent(threadId)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.thread) {
+          setActiveThread(data.thread);
+          setThreadReplies(data.thread.replies || []);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load thread details:", err);
+    } finally {
+      setLoadingReplies(false);
+    }
+  };
+
+  const handleCreateThread = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newThreadTitle.trim() || !newThreadContent.trim() || !selectedGroupId) return;
+    setSubmittingThread(true);
+    try {
+      const res = await authedFetch("/api/social/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_id: selectedGroupId,
+          title: newThreadTitle,
+          content: newThreadContent,
+          author_name: userProfile?.name || user?.displayName || user?.email?.split("@")[0] || "Member"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setNewThreadTitle("");
+          setNewThreadContent("");
+          setShowNewThreadForm(false);
+          fetchThreads(selectedGroupId);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to create thread:", err);
+    } finally {
+      setSubmittingThread(false);
+    }
+  };
+
+  const handleCreateReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReplyContent.trim() || !activeThread) return;
+    setSubmittingReply(true);
+    try {
+      const res = await authedFetch("/api/social/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reply",
+          thread_id: activeThread._id,
+          content: newReplyContent,
+          author_name: userProfile?.name || user?.displayName || user?.email?.split("@")[0] || "Member"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setNewReplyContent("");
+          fetchThreadDetail(activeThread._id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to post reply:", err);
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
 
   const fetchGroups = async () => {
     setLoadingLoadingGroups(true);
     try {
-      const res = await fetch("/api/social/groups", { cache: "no-store" });
+      const res = await authedFetch("/api/social/groups", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -157,12 +314,12 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
 
   const fetchAcademicAnchors = async () => {
     try {
-      const subRes = await fetch("/api/subjects", { cache: "no-store" });
+      const subRes = await authedFetch("/api/subjects", { cache: "no-store" });
       if (subRes.ok) {
         const data = await subRes.json();
         setSubjects(data.subjects || []);
       }
-      const bookRes = await fetch("/api/books", { cache: "no-store" });
+      const bookRes = await authedFetch("/api/books", { cache: "no-store" });
       if (bookRes.ok) {
         const data = await bookRes.json();
         setBooks(data.books || []);
@@ -175,7 +332,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
   const fetchAssignments = async (groupId: string) => {
     setLoadingAssignments(true);
     try {
-      const res = await fetch(`/api/assignments?group_id=${encodeURIComponent(groupId)}`, { cache: "no-store" });
+      const res = await authedFetch(`/api/assignments?group_id=${encodeURIComponent(groupId)}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -295,7 +452,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
     }
 
     try {
-      const res = await fetch("/api/assignments", {
+      const res = await authedFetch("/api/assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -339,7 +496,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
         answeredAt: Math.floor(Date.now() / 1000)
       }));
 
-      const res = await fetch("/api/assignments/submit", {
+      const res = await authedFetch("/api/assignments/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -439,9 +596,30 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
           <FiBookOpen />
           <span>{language === "ar" ? "الواجبات الجماعية المحددة بوقت" : "Group Assignments"}</span>
         </button>
+
+        <button
+          onClick={() => setActiveSubTab("discussions")}
+          style={{
+            background: "none",
+            border: "none",
+            fontSize: "1.05rem",
+            fontWeight: 800,
+            cursor: "pointer",
+            padding: "0.75rem 1rem",
+            color: activeSubTab === "discussions" ? "var(--primary)" : "#6a7c88",
+            borderBottom: activeSubTab === "discussions" ? "3px solid var(--primary)" : "3px solid transparent",
+            transition: "all 0.25s ease",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+        >
+          <FiUsers />
+          <span>{language === "ar" ? "حلقات النقاش والأسئلة" : "Discussion Forum"}</span>
+        </button>
       </div>
 
-      {activeSubTab === "chat" ? (
+      {activeSubTab === "chat" && (
         /* ==============================================================
            💬 MESSENGER & DIRECTORY TAB (EXISTING FAHEM SYSTEM CODES)
            ============================================================== */
@@ -1168,7 +1346,9 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeSubTab === "assignments" && (
         /* ==============================================================
            📝 TIMED ACADEMIC GROUP ASSIGNMENTS TAB (NEW FEATURE P5-5)
            ============================================================== */
@@ -1272,7 +1452,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
 
                 <button
                   type="button"
-                  onClick={simulateCameraCapture}
+                  onClick={() => cameraFileInputRef.current?.click()}
                   disabled={extractingAI}
                   className="btn btn-secondary"
                   style={{
@@ -1288,9 +1468,16 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                   <span>
                     {extractingAI
                       ? (language === "ar" ? "جاري الاستخراج بالذكاء الاصطناعي..." : "AI Vision Ingesting...")
-                      : (language === "ar" ? "استخراج من الكاميرا (محاكاة)" : "Capture from Camera (AI Mock)")}
+                      : (language === "ar" ? "التقاط أو استخراج من الكاميرا" : "Capture from Camera")}
                   </span>
                 </button>
+                <input
+                  type="file"
+                  ref={cameraFileInputRef}
+                  onChange={handleCameraCapture}
+                  accept="image/*"
+                  style={{ display: "none" }}
+                />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
@@ -2111,6 +2298,491 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
             </div>
           )}
 
+        </div>
+      )}
+
+      {activeSubTab === "discussions" && (
+        /* ==============================================================
+           💬 ACADEMIC DISCUSSION FORUMS & THREADS (NEW FEATURE P5-3)
+           ============================================================== */
+        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "1.5rem" }} className="responsive-discussions-layout">
+          {/* Left Column: Academic Groups / Clubs */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+              background: "rgba(255, 255, 255, 0.6)",
+              padding: "1.25rem",
+              borderRadius: "var(--border-radius-md)",
+              border: "1px solid var(--card-border)",
+              boxShadow: "var(--shadow-sm)",
+              alignSelf: "flex-start"
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 800,
+                margin: 0,
+                color: "var(--primary)",
+                borderBottom: "1px dashed var(--card-border)",
+                paddingBottom: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}
+            >
+              <FiUsers />
+              <span>{language === "ar" ? "المجموعات والأندية الأكاديمية" : "Academic Clubs"}</span>
+            </h3>
+
+            {loadingGroups ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88", padding: "1rem 0" }}>
+                <FiRefreshCw className="spinning-icon" />
+                <span style={{ fontSize: "0.85rem" }}>{language === "ar" ? "جاري التحميل..." : "Loading..."}</span>
+              </div>
+            ) : groups.length === 0 ? (
+              <div style={{ fontSize: "0.85rem", color: "#6a7c88", textAlign: "center", padding: "1rem 0" }}>
+                {language === "ar" ? "لا توجد مجموعات" : "No groups found"}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {groups.map((g) => {
+                  const isSelected = g._id === selectedGroupId;
+                  return (
+                    <button
+                      key={g._id}
+                      onClick={() => {
+                        setSelectedGroupId(g._id);
+                        setActiveThread(null);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.6rem",
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        borderRadius: "var(--border-radius-sm)",
+                        border: "1px solid " + (isSelected ? "var(--primary)" : "transparent"),
+                        background: isSelected ? "rgba(16, 107, 163, 0.06)" : "transparent",
+                        color: isSelected ? "var(--primary)" : "var(--foreground)",
+                        fontWeight: isSelected ? 800 : 600,
+                        fontSize: "0.9rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        textAlign: language === "ar" ? "right" : "left"
+                      }}
+                    >
+                      <span style={{ fontSize: "1.2rem" }}>{g.emoji || "🏫"}</span>
+                      <span>{language === "ar" ? g.name_ar : g.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Active Thread Detail or Thread List */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {activeThread ? (
+              /* ============================================
+                 1. THREAD DETAIL & REPLIES VIEW
+                 ============================================ */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Back button */}
+                <button
+                  onClick={() => setActiveThread(null)}
+                  style={{
+                    alignSelf: "flex-start",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--primary)",
+                    fontWeight: 700,
+                    fontSize: "0.9rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                    padding: 0
+                  }}
+                >
+                  <span>{language === "ar" ? "← العودة إلى المواضيع" : "← Back to Threads"}</span>
+                </button>
+
+                {/* Main Thread Card */}
+                <div
+                  className="panel-card"
+                  style={{
+                    padding: "1.5rem",
+                    background: "#ffffff",
+                    border: "1px solid var(--card-border)"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        background: "rgba(16, 107, 163, 0.06)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.25rem"
+                      }}
+                    >
+                      {activeThread.author_avatar || "👤"}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <strong style={{ fontSize: "0.95rem" }}>{activeThread.author_name}</strong>
+                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                        {new Date(activeThread.created_at).toLocaleString(language === "ar" ? "ar-EG" : "en-US")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h2 style={{ fontSize: "1.3rem", fontWeight: 800, margin: "0 0 0.75rem 0", color: "var(--foreground)" }}>
+                    {language === "ar" ? activeThread.title_ar : activeThread.title}
+                  </h2>
+                  <p style={{ margin: 0, color: "#4f6371", fontSize: "0.95rem", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                    {language === "ar" ? activeThread.content_ar : activeThread.content}
+                  </p>
+                </div>
+
+                {/* Replies Section */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
+                    💬 {language === "ar" ? "الردود والمناقشات" : "Discussion Replies"} ({threadReplies.length})
+                  </h3>
+
+                  {loadingReplies ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88", padding: "1rem" }}>
+                      <FiRefreshCw className="spinning-icon" />
+                      <span>{language === "ar" ? "جاري تحميل الردود..." : "Loading replies..."}</span>
+                    </div>
+                  ) : threadReplies.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "2rem",
+                        textAlign: "center",
+                        color: "#6a7c88",
+                        background: "rgba(255,255,255,0.4)",
+                        borderRadius: "var(--border-radius-md)",
+                        border: "1px dashed var(--card-border)"
+                      }}
+                    >
+                      {language === "ar" ? "لا توجد ردود بعد على هذا الموضوع. كن أول من يشارك!" : "No replies yet on this thread. Be the first to share!"}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                      {threadReplies.map((reply) => (
+                        <div
+                          key={reply._id}
+                          className="panel-card"
+                          style={{
+                            padding: "1.25rem",
+                            background: "rgba(255,255,255,0.8)",
+                            border: "1px solid var(--card-border)"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                background: "rgba(16, 107, 163, 0.06)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "1rem"
+                              }}
+                            >
+                              {reply.author_avatar || "👤"}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                              <strong style={{ fontSize: "0.9rem" }}>{reply.author_name}</strong>
+                              <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>
+                                {new Date(reply.created_at).toLocaleString(language === "ar" ? "ar-EG" : "en-US")}
+                              </span>
+                            </div>
+                          </div>
+                          <p style={{ margin: 0, color: "var(--foreground)", fontSize: "0.9rem", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
+                            {language === "ar" ? reply.content_ar : reply.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Post Reply Form */}
+                <form
+                  onSubmit={handleCreateReply}
+                  className="panel-card"
+                  style={{
+                    padding: "1.5rem",
+                    background: "rgba(255,255,255,0.9)",
+                    border: "1px solid var(--card-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1rem"
+                  }}
+                >
+                  <label style={{ fontWeight: 800, fontSize: "0.95rem" }}>
+                    {language === "ar" ? "أضف ردك الأكاديمي:" : "Post Academic Reply:"}
+                  </label>
+                  <textarea
+                    value={newReplyContent}
+                    onChange={(e) => setNewReplyContent(e.target.value)}
+                    required
+                    placeholder={language === "ar" ? "اكتب تعليقك أو شرحك المدعم بالمعلومات هنا..." : "Type your verified explanation or discussion post here..."}
+                    style={{
+                      width: "100%",
+                      minHeight: "100px",
+                      padding: "0.75rem 1rem",
+                      borderRadius: "var(--border-radius-sm)",
+                      border: "1px solid var(--card-border)",
+                      outline: "none",
+                      fontSize: "0.9rem",
+                      fontFamily: "var(--font-sans)",
+                      resize: "vertical"
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submittingReply || !newReplyContent.trim()}
+                    className="btn btn-primary"
+                    style={{
+                      alignSelf: "flex-end",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.5rem 1.5rem",
+                      fontSize: "0.85rem",
+                      fontWeight: 800
+                    }}
+                  >
+                    {submittingReply ? (
+                      <FiRefreshCw className="spinning-icon" />
+                    ) : (
+                      <>
+                        <FiSend />
+                        <span>{language === "ar" ? "إرسال الرد" : "Submit Reply"}</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              /* ============================================
+                 2. THREAD LIST & CREATE THREAD FORM
+                 ============================================ */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Create Thread toggle button */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
+                    📌 {language === "ar" ? "مواضيع النقاش المطروحة" : "Academic Discussion Threads"}
+                  </h3>
+
+                  <button
+                    onClick={() => setShowNewThreadForm(!showNewThreadForm)}
+                    className="btn btn-primary"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.5rem 1rem",
+                      fontSize: "0.85rem",
+                      fontWeight: 800
+                    }}
+                  >
+                    {showNewThreadForm ? <FiX /> : <FiPlus />}
+                    <span>{showNewThreadForm ? (language === "ar" ? "إلغاء" : "Cancel") : (language === "ar" ? "موضوع جديد" : "New Thread")}</span>
+                  </button>
+                </div>
+
+                {/* New Thread Form */}
+                {showNewThreadForm && (
+                  <form
+                    onSubmit={handleCreateThread}
+                    className="panel-card"
+                    style={{
+                      padding: "1.75rem",
+                      background: "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,245,235,0.9))",
+                      border: "1px solid var(--primary)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.25rem",
+                      boxShadow: "var(--shadow-md)"
+                    }}
+                  >
+                    <h4 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--primary)" }}>
+                      {language === "ar" ? "طرح موضوع نقاش أكاديمي جديد" : "Post a New Academic Topic"}
+                    </h4>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label style={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                        {language === "ar" ? "عنوان الموضوع:" : "Topic Title:"}
+                      </label>
+                      <input
+                        type="text"
+                        value={newThreadTitle}
+                        onChange={(e) => setNewThreadTitle(e.target.value)}
+                        required
+                        placeholder={language === "ar" ? "مثال: استفسار حول إثبات فيثاغورس" : "e.g. Question on Matrix determinant derivation"}
+                        style={{
+                          padding: "0.6rem 0.85rem",
+                          borderRadius: "var(--border-radius-sm)",
+                          border: "1px solid var(--card-border)",
+                          outline: "none",
+                          fontSize: "0.9rem"
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label style={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                        {language === "ar" ? "المحتوى أو السؤال بالتفصيل:" : "Content / Question Details:"}
+                      </label>
+                      <textarea
+                        value={newThreadContent}
+                        onChange={(e) => setNewThreadContent(e.target.value)}
+                        required
+                        placeholder={language === "ar" ? "اكتب هنا تفاصيل سؤالك أو مسألتك ليتم الرد عليها..." : "Provide the details of your question or debate topic..."}
+                        style={{
+                          width: "100%",
+                          minHeight: "120px",
+                          padding: "0.75rem 1rem",
+                          borderRadius: "var(--border-radius-sm)",
+                          border: "1px solid var(--card-border)",
+                          outline: "none",
+                          fontSize: "0.9rem",
+                          fontFamily: "var(--font-sans)",
+                          resize: "vertical"
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingThread || !newThreadTitle.trim() || !newThreadContent.trim()}
+                      className="btn btn-primary"
+                      style={{
+                        alignSelf: "flex-end",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        padding: "0.5rem 1.5rem",
+                        fontSize: "0.85rem",
+                        fontWeight: 800
+                      }}
+                    >
+                      {submittingThread ? (
+                        <FiRefreshCw className="spinning-icon" />
+                      ) : (
+                        <>
+                          <FiSend />
+                          <span>{language === "ar" ? "نشر الموضوع" : "Publish Topic"}</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+
+                {/* Thread List */}
+                {loadingThreads ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88", padding: "2rem" }}>
+                    <FiRefreshCw className="spinning-icon" />
+                    <span>{language === "ar" ? "جاري تحميل المناقشات..." : "Loading discussion list..."}</span>
+                  </div>
+                ) : threads.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "3rem 1.5rem",
+                      textAlign: "center",
+                      color: "#6a7c88",
+                      background: "rgba(255,255,255,0.4)",
+                      borderRadius: "var(--border-radius-md)",
+                      border: "1px dashed var(--card-border)"
+                    }}
+                  >
+                    {language === "ar" ? "لا توجد مناقشات في هذا النادي حالياً. كن أول من يطرح موضوعاً!" : "No discussions in this club yet. Be the first to start a thread!"}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {threads.map((t) => (
+                      <div
+                        key={t._id}
+                        onClick={() => fetchThreadDetail(t._id)}
+                        className="panel-card"
+                        style={{
+                          padding: "1.25rem",
+                          background: "#ffffff",
+                          border: "1px solid var(--card-border)",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.5rem"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "var(--primary)";
+                          e.currentTarget.style.boxShadow = "var(--shadow-md)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "var(--card-border)";
+                          e.currentTarget.style.boxShadow = "var(--shadow-sm)";
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <h4 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
+                            {language === "ar" ? t.title_ar : t.title}
+                          </h4>
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 800,
+                              background: "rgba(16, 107, 163, 0.08)",
+                              color: "var(--primary)",
+                              padding: "2px 8px",
+                              borderRadius: "8px"
+                            }}
+                          >
+                            💬 {t.replies_count || 0} {language === "ar" ? "ردود" : "replies"}
+                          </span>
+                        </div>
+
+                        <p
+                          style={{
+                            margin: "0.25rem 0",
+                            color: "#6a7c88",
+                            fontSize: "0.85rem",
+                            lineHeight: "1.5",
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            textOverflow: "ellipsis"
+                          }}
+                        >
+                          {language === "ar" ? t.content_ar : t.content}
+                        </p>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem", color: "#6a7c88", marginTop: "0.25rem" }}>
+                          <span>{t.author_avatar || "👤"}</span>
+                          <strong style={{ color: "var(--foreground)" }}>{t.author_name}</strong>
+                          <span>•</span>
+                          <span>{new Date(t.created_at).toLocaleDateString(language === "ar" ? "ar-EG" : "en-US")}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

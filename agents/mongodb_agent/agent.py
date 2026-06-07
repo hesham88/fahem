@@ -150,6 +150,8 @@ root_agent = Agent(
     on_tool_error_callback=on_tool_error_callback
 )
 
-# Expose both for compatibility
-mongodb_agent = root_agent
-app = root_agent
+# Commented out to prevent the agent loader from registering this as an active standalone agent.
+# Single brain architecture consolidation now runs all logic through fahem_companion in agents/agent.py.
+# mongodb_agent = root_agent
+# app = root_agent
+

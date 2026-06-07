@@ -208,7 +208,9 @@ orchestrator_workflow = Workflow(
     edges=edges
 )
 
-# Expose as 'orchestrator_agent' and 'app' to maintain 100% compatibility with agents/agent.py
-orchestrator_agent = orchestrator_workflow
-app = orchestrator_workflow
-root_agent = orchestrator_workflow
+# Commented out to prevent the agent loader from registering this as an active standalone agent.
+# Single brain architecture consolidation now runs all logic through fahem_companion in agents/agent.py.
+# orchestrator_agent = orchestrator_workflow
+# app = orchestrator_workflow
+# root_agent = orchestrator_workflow
+

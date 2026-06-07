@@ -20,6 +20,7 @@ import { TimetablePanel } from "../../../components/dashboard/TimetablePanel";
 import { ZatonaPanel } from "../../../components/dashboard/ZatonaPanel";
 import { SocialPanel } from "../../../components/dashboard/SocialPanel";
 import { SettingsPanel } from "../../../components/dashboard/SettingsPanel";
+import { InsightsPanel } from "../../../components/dashboard/InsightsPanel";
 
 import { 
   FiCpu, 
@@ -56,7 +57,8 @@ import {
   FiSend,
   FiUser,
   FiX,
-  FiMenu
+  FiMenu,
+  FiAward
 } from "react-icons/fi";
 
 interface PresetQuery {
@@ -5863,6 +5865,15 @@ export default function Home() {
               <span>{language === "ar" ? "الزتونة - ملخص وبحث" : "Zatona AI Research"}</span>
             </button>
 
+            <button
+              onClick={() => setActiveTab("insights")}
+              className={`sidebar-nav-btn ${activeTab === "insights" ? "active" : ""}`}
+              type="button"
+            >
+              <FiAward />
+              <span>{language === "ar" ? "تحليل الأداء والأوسمة" : "Insights & Achievements"}</span>
+            </button>
+
             <div style={{
               fontSize: "0.65rem",
               fontWeight: 800,
@@ -6202,7 +6213,13 @@ export default function Home() {
         ) : activeTab === "plan" ? (
           <StudyPlanPanel
             language={language}
+            dynamicBooks={dynamicBooks}
+            renderSpaceSelectorBar={renderSpaceSelectorBar}
+            renderSpaceHistory={renderSpaceHistory}
+            addSpaceHistory={addSpaceHistory}
+            renderPremiumContent={renderPremiumContent}
             t={t}
+            user={user}
           />
         ) : activeTab === "timetable" ? (
           <TimetablePanel
@@ -6222,9 +6239,29 @@ export default function Home() {
             setZatonaResult={setZatonaResult}
             zatonaLoading={zatonaLoading}
             setZatonaLoading={setZatonaLoading}
+            dynamicBooks={dynamicBooks}
             renderSpaceSelectorBar={renderSpaceSelectorBar}
             renderSpaceHistory={renderSpaceHistory}
+            addSpaceHistory={addSpaceHistory}
             renderPremiumContent={renderPremiumContent}
+            user={user}
+          />
+        ) : activeTab === "insights" ? (
+          <InsightsPanel
+            language={language}
+            dynamicBooks={dynamicBooks}
+            user={user}
+            authedFetch={authedFetch}
+            getLevelBadgeText={getLevelBadgeText}
+            activeLevel={activeLevel}
+            activeStreak={activeStreak}
+            xpProgressPercent={xpProgressPercent}
+            activeXp={activeXp}
+            nextLevelXp={nextLevelXp}
+            consumedClt={consumedClt}
+            totalAllocatedClt={totalAllocatedClt}
+            tokenProgressPercent={tokenProgressPercent}
+            t={t}
           />
         ) : activeTab === "social" ? (
           <SocialPanel

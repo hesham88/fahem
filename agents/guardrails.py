@@ -83,13 +83,13 @@ def check_model_armor_py(prompt: str) -> tuple[bool, str]:
         credentials.refresh(Request())
         token = credentials.token
     except Exception as auth_err:
-        logger.warning(f"Model Armor: Failed to acquire credentials inside callback: {auth_err}")
+        logger.error(f"[ALERT] SECURITY_DEGRADED: Model Armor credential acquisition failed: {auth_err}. Routing in degraded safety mode.")
         token = None
         
     if not token:
         if is_gcp:
-            logger.error("Model Armor: No GCP token available in production GCP environment! Failing closed.")
-            return True, "GCP Model Armor: Security credentials unavailable. Access denied."
+            logger.error("[ALERT] SECURITY_DEGRADED: No GCP credentials/token available in production GCP environment. Routing in degraded safety mode.")
+            return False, ""
         logger.info("Model Armor: No GCP token available for server-side validation. Skipping check locally.")
         return False, ""
         
@@ -110,20 +110,36 @@ def check_model_armor_py(prompt: str) -> tuple[bool, str]:
         }
         
         with httpx.Client() as client:
-            res = client.post(url, json=payload, headers=headers, timeout=10.0)
+            try:
+                res = client.post(url, json=payload, headers=headers, timeout=10.0)
+            except httpx.TimeoutException as timeout_err:
+                logger.error(f"Model Armor: Timeout occurred during sanitization check: {timeout_err}")
+                if is_gcp:
+                    return True, "GCP Model Armor: Sanitization check temporary error (timeout). Please retry."
+                return False, ""
+            except Exception as conn_err:
+                logger.error(f"[ALERT] SECURITY_DEGRADED: Model Armor network connection error: {conn_err}. Routing in degraded safety mode.")
+                return False, ""
+
             if res.status_code == 200:
                 data = res.json()
                 sanitization_result = data.get("sanitizationResult", {})
                 if sanitization_result.get("filterMatchState") == "MATCH_FOUND":
                     return True, "GCP Model Armor: Content flagged as unsafe or violating safety guidelines."
-            else:
-                logger.warning(f"Model Armor REST API returned error status {res.status_code}: {res.text}")
+            elif res.status_code in [401, 403, 404]:
+                logger.error(f"[ALERT] SECURITY_DEGRADED: Model Armor returned setup error status {res.status_code}: {res.text}. Routing in degraded safety mode.")
+                return False, ""
+            elif res.status_code >= 500:
+                logger.error(f"Model Armor returned transient error status {res.status_code}: {res.text}")
                 if is_gcp:
-                    return True, f"GCP Model Armor: Sanitization API error {res.status_code}. Access denied."
+                    return True, f"GCP Model Armor: Sanitization check transient server error ({res.status_code}). Please retry."
+                return False, ""
+            else:
+                logger.error(f"[ALERT] SECURITY_DEGRADED: Model Armor returned unexpected status {res.status_code}: {res.text}. Routing in degraded safety mode.")
+                return False, ""
     except Exception as err:
-        logger.error(f"Error executing server-side GCP Model Armor check: {err}")
-        if is_gcp:
-            return True, f"GCP Model Armor: Sanitization check failed due to error: {str(err)}. Access denied."
+        logger.error(f"[ALERT] SECURITY_DEGRADED: Error executing server-side GCP Model Armor check: {err}. Routing in degraded safety mode.")
+        return False, ""
     return False, ""
 
 def check_token_credits(uid: str, role: str) -> tuple[bool, str]:

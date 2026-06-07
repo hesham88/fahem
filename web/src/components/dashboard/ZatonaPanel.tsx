@@ -1,11 +1,20 @@
 "use client";
 
-import React from "react";
-import { FiRefreshCw } from "react-icons/fi";
+import React, { useState, useEffect } from "react";
+import { FiRefreshCw, FiBookOpen, FiActivity, FiFolder } from "react-icons/fi";
+import { authedFetch } from "../../lib/authedFetch";
 
-/**
- * Props for the ZatonaPanel component.
- */
+interface Book {
+  _id?: string;
+  id?: string;
+  title: string;
+  title_ar?: string;
+  titleEn?: string;
+  titleAr?: string;
+  subject?: string;
+  chapters?: any[];
+}
+
 interface ZatonaPanelProps {
   language: "ar" | "en";
   zatonaPrompt: string;
@@ -14,15 +23,18 @@ interface ZatonaPanelProps {
   setZatonaResult: (val: string) => void;
   zatonaLoading: boolean;
   setZatonaLoading: (val: boolean) => void;
+  dynamicBooks: Book[];
   renderSpaceSelectorBar: (tab: "practice" | "plan" | "timetable" | "zatona") => React.ReactNode;
   renderSpaceHistory: () => React.ReactNode;
+  addSpaceHistory: (actionEn: string, actionAr: string) => void;
   renderPremiumContent: (text: string) => React.ReactNode;
+  user: any;
 }
 
 /**
  * ZatonaPanel: A component representing the "Zatona AI Summary & Research Hub".
- * This is an AI summary engine that processes custom textbook excerpts or topics,
- * and extracts concise, high-yield digests with custom spatial support.
+ * This is an AI summary engine that processes custom textbook excerpts, general topics, or specific books,
+ * and extracts concise, high-yield digests with persistent history.
  */
 export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   language,
@@ -32,39 +44,138 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   setZatonaResult,
   zatonaLoading,
   setZatonaLoading,
+  dynamicBooks,
   renderSpaceSelectorBar,
   renderSpaceHistory,
+  addSpaceHistory,
   renderPremiumContent,
+  user,
 }) => {
-  
+  // Zatona Selector States
+  const [scopeType, setScopeType] = useState<"text" | "subject" | "book">("text");
+  const [selectedSubject, setSelectedSubject] = useState<string>("Math");
+  const [selectedBookId, setSelectedBookId] = useState<string>("");
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [customConcepts, setCustomConcepts] = useState<string>("");
+
+  // History States
+  const [zatonaHistoryList, setZatonaHistoryList] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+
+  // Initialize selectedBookId when dynamicBooks load
+  useEffect(() => {
+    if (dynamicBooks && dynamicBooks.length > 0 && !selectedBookId) {
+      setSelectedBookId(dynamicBooks[0]._id || dynamicBooks[0].id || "");
+    }
+  }, [dynamicBooks, selectedBookId]);
+
+  // Fetch persistent history
+  const fetchZatonaHistory = async () => {
+    if (!user?.uid) return;
+    setHistoryLoading(true);
+    try {
+      const res = await authedFetch("/api/activity");
+      if (res.ok) {
+        const data = await res.json();
+        const activities = data.activities || [];
+        const zatonaRuns = activities.filter((act: any) => act.action === "zatona_session");
+        setZatonaHistoryList(zatonaRuns);
+      }
+    } catch (err) {
+      console.error("Failed to fetch zatona history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchZatonaHistory();
+  }, [user]);
+
   /**
-   * Triggers the server endpoint to digest and summarize the user-provided textbook topic.
+   * Triggers the server endpoint to digest and summarize the user-provided textbook topic or textbook scope.
    */
   const handleDigestEssence = async () => {
-    if (!zatonaPrompt.trim() || zatonaLoading) return;
+    if (zatonaLoading) return;
+
+    // Compose custom concept prompt depending on target scope
+    let conceptQuery = "";
+    let materialDescEn = "";
+    let materialDescAr = "";
+
+    if (scopeType === "text") {
+      if (!zatonaPrompt.trim()) return;
+      conceptQuery = zatonaPrompt;
+      materialDescEn = "Pasted Custom Excerpt";
+      materialDescAr = "مقتطف دراسي مخصص";
+    } else if (scopeType === "subject") {
+      conceptQuery = `General academic subject: ${selectedSubject}. ${zatonaPrompt ? `Focus on: ${zatonaPrompt}` : ""}`;
+      materialDescEn = `General Subject (${selectedSubject})`;
+      materialDescAr = `مادة عامة (${selectedSubject})`;
+    } else if (scopeType === "book") {
+      const activeBook = dynamicBooks.find(b => (b._id || b.id) === selectedBookId);
+      const bookTitleEn = activeBook?.title || "Selected Book";
+      const bookTitleAr = activeBook?.titleAr || "الكتاب المحدد";
+      const chsStr = selectedChapters.length > 0 ? ` chapters: ${selectedChapters.join(", ")}` : "all chapters";
+      conceptQuery = `Textbook "${bookTitleEn}" (${chsStr}). ${customConcepts ? `Concepts to focus: ${customConcepts}.` : ""} ${zatonaPrompt ? `Instructions: ${zatonaPrompt}` : ""}`;
+      materialDescEn = `Textbook: ${bookTitleEn} (${selectedChapters.length > 0 ? selectedChapters.length + " chs" : "Full Book"})`;
+      materialDescAr = `كتاب: ${bookTitleAr} (${selectedChapters.length > 0 ? selectedChapters.length + " فصول" : "الكتاب كاملاً"})`;
+    }
 
     setZatonaLoading(true);
     setZatonaResult("");
 
     try {
-      const res = await fetch("/api/zatona", {
+      const res = await authedFetch("/api/zatona", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ concept: zatonaPrompt, language }),
+        body: JSON.stringify({ concept: conceptQuery, language }),
       });
 
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.report) {
           setZatonaResult(data.report);
+
+          // Persist the run in user activity history (fail-safe database-backed history)
+          await authedFetch("/api/activity", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "zatona_session",
+              status: "success",
+              details: {
+                scopeType,
+                subject: selectedSubject,
+                bookId: selectedBookId,
+                chapters: selectedChapters,
+                concepts: customConcepts,
+                prompt: zatonaPrompt,
+                result: data.report,
+                materialDescEn,
+                materialDescAr,
+                timestamp: new Date().toISOString()
+              }
+            })
+          });
+
+          // Refresh history and add to workspace audit log
+          fetchZatonaHistory();
+          addSpaceHistory(
+            `Digested high-yield Zatona summary for ${materialDescEn}`,
+            `تم عصر ملخص الزتونة لـ ${materialDescAr}`
+          );
         } else {
           setZatonaResult(
             language === "ar" ? "⚠️ حدث خطأ أثناء عصر الزتونة." : "⚠️ Error digesting textbook essence."
           );
         }
       } else {
+        const errJson = await res.json().catch(() => ({}));
         setZatonaResult(
-          language === "ar" ? "⚠️ فشل الاتصال بالخادم الذكي." : "⚠️ Server connection failed."
+          language === "ar" 
+            ? `⚠️ فشل الاتصال بالخادم الذكي: ${errJson.error || "خطأ غير معروف"}` 
+            : `⚠️ Server connection failed: ${errJson.error || "Unknown error"}`
         );
       }
     } catch (err) {
@@ -77,6 +188,26 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
     }
   };
 
+  // Open/Resume previous saved summary
+  const handleOpenPreviousSummary = (run: any) => {
+    const details = run.details || {};
+    setZatonaResult(details.result || "");
+    setScopeType(details.scopeType || "text");
+    if (details.scopeType === "book") {
+      setSelectedBookId(details.bookId || "");
+      setSelectedChapters(details.chapters || []);
+      setCustomConcepts(details.concepts || "");
+    } else if (details.scopeType === "subject") {
+      setSelectedSubject(details.subject || "Math");
+    }
+    setZatonaPrompt(details.prompt || "");
+
+    // Add activity trace to local workspace audit log
+    const descEn = details.materialDescEn || "Previous Summary";
+    const descAr = details.materialDescAr || "ملخص زتونة سابق";
+    addSpaceHistory(`Opened previous Zatona summary for ${descEn}`, `تم فتح ملخص الزتونة لـ ${descAr}`);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* Top Space Bar Swapper */}
@@ -84,7 +215,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
         
-        {/* Left Side: Summary prompt generator */}
+        {/* Left Side: Summary prompt generator & Material selectors */}
         <div
           className="panel-card"
           style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}
@@ -102,16 +233,193 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
           </h3>
           <p style={{ fontSize: "0.85rem", color: "#4f6371", margin: 0, lineHeight: "1.6" }}>
             {language === "ar"
-              ? "اكتب فكرة رئيسية أو الصق مقتطفاً من كتابك المدرسي، وسيقوم عميل فاهم الذكي بتحليله وإيجاز تفاصيله في تلخيص فائق التركيز يحتوي فقط على الفكرة والجوهر الدراسي المفيد."
-              : "Type a topic or paste a textbook section. Our AI will digest, extract, and present a warm, concise report containing only the pure essence and academic value."}
+              ? "اكتب فكرة، أو الصق مقتطفاً من كتابك، أو اختر كتاباً دراسياً كاملاً لتلخيصه. سيقوم عميل فاهم الذكي باستخراج الجوهر الصافي والدراسة المفيدة فوراً."
+              : "Paste text, choose a subject, or select a textbook scope. Our AI will digest, extract, and present a warm, concise report containing only the pure essence and academic value."}
           </p>
+
+          {/* Scope Selector Row: Text vs Subject vs Book */}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setScopeType("text")}
+              style={{
+                flex: 1,
+                padding: "0.5rem",
+                borderRadius: "6px",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                minWidth: "100px",
+                background: scopeType === "text" ? "var(--primary)" : "#f0f4f8",
+                color: scopeType === "text" ? "#ffffff" : "var(--foreground)",
+                border: "1px solid " + (scopeType === "text" ? "var(--primary)" : "var(--card-border)"),
+                transition: "all 0.2s",
+              }}
+            >
+              {language === "ar" ? "نص ملصق مخصص" : "Pasted Text"}
+            </button>
+            <button
+              onClick={() => setScopeType("subject")}
+              style={{
+                flex: 1,
+                padding: "0.5rem",
+                borderRadius: "6px",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                minWidth: "100px",
+                background: scopeType === "subject" ? "var(--primary)" : "#f0f4f8",
+                color: scopeType === "subject" ? "#ffffff" : "var(--foreground)",
+                border: "1px solid " + (scopeType === "subject" ? "var(--primary)" : "var(--card-border)"),
+                transition: "all 0.2s",
+              }}
+            >
+              {language === "ar" ? "مادة عامة" : "Umbrella Subject"}
+            </button>
+            <button
+              onClick={() => {
+                setScopeType("book");
+                if (dynamicBooks.length > 0 && !selectedBookId) {
+                  setSelectedBookId(dynamicBooks[0]._id || dynamicBooks[0].id || "");
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: "0.5rem",
+                borderRadius: "6px",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                minWidth: "100px",
+                background: scopeType === "book" ? "var(--primary)" : "#f0f4f8",
+                color: scopeType === "book" ? "#ffffff" : "var(--foreground)",
+                border: "1px solid " + (scopeType === "book" ? "var(--primary)" : "var(--card-border)"),
+                transition: "all 0.2s",
+              }}
+            >
+              {language === "ar" ? "كتاب مدرسي محدد" : "Specific Book"}
+            </button>
+          </div>
+
+          {/* Dynamic Selection Dropdowns */}
+          {scopeType === "subject" && (
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700, outline: "none" }}
+            >
+              <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
+              <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
+              <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
+              <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
+            </select>
+          )}
+
+          {scopeType === "book" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <select
+                value={selectedBookId}
+                onChange={(e) => {
+                  setSelectedBookId(e.target.value);
+                  setSelectedChapters([]);
+                }}
+                style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700, outline: "none" }}
+              >
+                {dynamicBooks.length > 0 ? (
+                  dynamicBooks.map((b: any) => (
+                    <option key={b._id || b.id} value={b._id || b.id}>
+                      {language === "ar" ? b.titleAr || b.title : b.titleEn || b.title}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">{language === "ar" ? "لا توجد كتب مضافة بعد" : "No textbooks ingested yet"}</option>
+                )}
+              </select>
+
+              {/* Multiple Chapter Selection list */}
+              {selectedBookId && (
+                (() => {
+                  const activeBook = dynamicBooks.find((b: any) => (b._id || b.id) === selectedBookId);
+                  const chapters = activeBook?.chapters || [];
+                  return (
+                    <div style={{
+                      marginTop: "0.25rem",
+                      padding: "1rem",
+                      borderRadius: "8px",
+                      background: "rgba(16, 107, 163, 0.03)",
+                      border: "1px solid rgba(16, 107, 163, 0.08)"
+                    }}>
+                      <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", display: "block", marginBottom: "0.5rem" }}>
+                        {language === "ar" ? "📍 حدد فصول الكتاب المستهدفة للتلخيص (خيارات متعددة):" : "📍 Select Target Chapters (Multiple Selection):"}
+                      </label>
+                      {chapters.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "150px", overflowY: "auto", paddingRight: "4px" }} className="custom-scrollbar">
+                          {chapters.map((ch: any, idx: number) => {
+                            const chTitle = language === "ar" ? (ch.title_ar || ch.title) : (ch.title || ch.title_ar);
+                            const isChecked = selectedChapters.includes(ch.title);
+                            return (
+                              <label key={idx} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setSelectedChapters(selectedChapters.filter(t => t !== ch.title));
+                                    } else {
+                                      setSelectedChapters([...selectedChapters, ch.title]);
+                                    }
+                                  }}
+                                  style={{ cursor: "pointer", accentColor: "var(--primary)" }}
+                                />
+                                <span>{chTitle}</span>
+                                <span style={{ fontSize: "0.7rem", color: "rgba(0,0,0,0.4)" }}>
+                                  ({language === "ar" ? `الصفحات: ${ch.start_page}-${ch.end_page}` : `Pages: ${ch.start_page}-${ch.end_page}`})
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.5)" }}>
+                          {language === "ar" ? "لا توجد فصول مسجلة لهذا الكتاب، سيتم تلخيص الكتاب كاملاً." : "No structured chapters recorded. Full textbook will be targeted."}
+                        </div>
+                      )}
+
+                      {/* Focus Concepts focus input */}
+                      <div style={{ marginTop: "0.8rem", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "0.8rem" }}>
+                        <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--foreground)", display: "block", marginBottom: "0.3rem" }}>
+                          {language === "ar" ? "🏷️ أدخل مفاهيم دراسية محددة لتركيز التلخيص عليها:" : "🏷️ Focus on specific concepts, titles, or tags:"}
+                        </label>
+                        <input
+                          type="text"
+                          value={customConcepts}
+                          onChange={(e) => setCustomConcepts(e.target.value)}
+                          placeholder={language === "ar" ? "اكتب المواضيع هنا تفصلها فواصل (مثال: الهضم)..." : "Type custom concepts separated by commas..."}
+                          style={{
+                            width: "100%",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--card-border)",
+                            fontSize: "0.8rem",
+                            outline: "none",
+                            background: "#ffffff"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          )}
+
+          {/* Text Prompt input */}
           <textarea
             value={zatonaPrompt}
             onChange={(e) => setZatonaPrompt(e.target.value)}
             placeholder={
-              language === "ar"
-                ? "الصق النص هنا أو اكتب الفكرة (مثال: قوانين الحركة لنيوتن)..."
-                : "Paste textbook text or type study topic (e.g., Newton's laws of motion)..."
+              scopeType === "text"
+                ? (language === "ar" ? "الصق النص أو المقتطف الدراسي هنا ليقوم المحرك بعصره واستخراج خلاصته الصافية..." : "Paste the custom textbook excerpt or text here to squeeze its essence...")
+                : (language === "ar" ? "اكتب توجيهات إضافية لتركيز ملخص الزتونة (اختياري)..." : "Type additional directions to guide your Zatona summary (optional)...")
             }
             style={{
               width: "100%",
@@ -125,8 +433,9 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
               resize: "none",
             }}
           />
+
           <button
-            disabled={zatonaLoading || !zatonaPrompt.trim()}
+            disabled={zatonaLoading || (scopeType === "text" && !zatonaPrompt.trim())}
             onClick={handleDigestEssence}
             className="btn btn-primary"
             style={{ padding: "10px", fontWeight: 700 }}
@@ -142,7 +451,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
           </button>
         </div>
 
-        {/* Right Side: Report Viewer */}
+        {/* Right Side: Report Presentation Viewer */}
         <div
           className="panel-card"
           style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}
@@ -158,7 +467,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
               border: "1px dashed var(--primary)",
               background: "#ffffff",
               overflowY: "auto",
-              minHeight: "150px",
+              minHeight: "350px",
             }}
             className="custom-scrollbar"
           >
@@ -177,19 +486,89 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                   color: "#6a7c88",
                   fontSize: "0.85rem",
                   gap: "0.5rem",
+                  padding: "2rem",
+                  textAlign: "center"
                 }}
               >
                 <span>🍋</span>
                 <span>
                   {language === "ar"
-                    ? "اكتب مادة دراسية على اليسار واضغط على زر عصر الزتونة"
-                    : "Enter topic details on the left to extract the pure essence"}
+                    ? "اختر النطاق التعليمي واضغط على زر عصر الزتونة الذكية لعرض الخلاصة"
+                    : "Select your study focus on the left and tap digest to squeeze its pure essence"}
                 </span>
               </div>
             )}
           </div>
         </div>
 
+      </div>
+
+      {/* Persistent History Panel */}
+      <div className="panel-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <h3 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 800, borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem" }}>
+          {language === "ar" ? "🗂️ ملخصات الزتونة السابقة" : "🗂️ Zatona Summary History"}
+        </h3>
+
+        {historyLoading && zatonaHistoryList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "1rem" }}>
+            <FiRefreshCw className="spinning-icon" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
+          </div>
+        ) : zatonaHistoryList.length === 0 ? (
+          <p style={{ fontSize: "0.85rem", color: "#6a7c88", margin: 0 }}>
+            {language === "ar" ? "لا توجد ملخصات زتونة محفوظة حالياً." : "No previously squeezed summaries found."}
+          </p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
+            {zatonaHistoryList.map((run, index) => {
+              const details = run.details || {};
+              const formattedDate = new Date(run.timestamp || Date.now()).toLocaleDateString(
+                language === "ar" ? "ar-EG" : "en-US",
+                { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+              );
+              return (
+                <div
+                  key={run._id || index}
+                  style={{
+                    padding: "1rem",
+                    borderRadius: "8px",
+                    border: "1px solid var(--card-border)",
+                    background: "#ffffff",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "0.75rem",
+                    transition: "all 0.15s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", background: "rgba(16, 107, 163, 0.05)", padding: "2px 8px", borderRadius: "10px" }}>
+                        {details.scopeType === "book" ? (language === "ar" ? "كتاب مدرسي" : "Book Digest") : (details.scopeType === "subject" ? (language === "ar" ? "مادة عامة" : "Subject Digest") : (language === "ar" ? "نص ملصق" : "Pasted Text"))}
+                      </span>
+                      <span style={{ fontSize: "0.7rem", color: "#8fa0ac" }}>{formattedDate}</span>
+                    </div>
+                    <h4 style={{ fontSize: "0.85rem", fontWeight: 700, margin: "0.25rem 0" }}>
+                      {language === "ar" ? details.materialDescAr : details.materialDescEn}
+                    </h4>
+                    {details.prompt && (
+                      <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        "{details.prompt}"
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleOpenPreviousSummary(run)}
+                    className="btn btn-outline"
+                    style={{ padding: "5px 10px", fontSize: "0.8rem", fontWeight: 700, alignSelf: "flex-end" }}
+                  >
+                    {language === "ar" ? "📂 عرض واستعادة الخلاصة" : "📂 Open Summary"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Workspace Activity logs */}

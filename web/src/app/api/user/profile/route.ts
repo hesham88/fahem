@@ -102,6 +102,54 @@ export async function POST(req: NextRequest) {
       targetUserId = ctx.uid; // Normal users can only write to their own profile
     }
 
+    const isUserExempt = ctx.role === "admin" || ctx.role === "super-admin";
+
+    if (!isUserExempt) {
+      // Check 30-day rate limit
+      let lastUpdatedAtStr: string | undefined;
+      let isOnboardingCompleted = false;
+      if (isLocalEnv()) {
+        const db = getLocalDb();
+        const existingUser = (db.users || []).find(u => u.userId === targetUserId);
+        lastUpdatedAtStr = existingUser?.profile_updated_at;
+        isOnboardingCompleted = !!existingUser?.onboardingCompleted;
+      } else {
+        const existingProfileRes = await proxyRequest(`/user/profile?userId=${targetUserId}`, "GET", undefined, ctx);
+        if (existingProfileRes.ok) {
+          try {
+            const existingProfileData = await existingProfileRes.json();
+            if (existingProfileData && existingProfileData.profile) {
+              lastUpdatedAtStr = existingProfileData.profile.profile_updated_at;
+              isOnboardingCompleted = !!existingProfileData.profile.onboardingCompleted;
+            }
+          } catch (e) {
+            console.error("Error reading existing profile for rate-limit check:", e);
+          }
+        }
+      }
+
+      // If onboarding is completed and lastUpdatedAtStr is set, check the 30-day window
+      if (isOnboardingCompleted && lastUpdatedAtStr) {
+        const lastUpdate = new Date(lastUpdatedAtStr);
+        const diffMs = Date.now() - lastUpdate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (diffDays < 30) {
+          const nextEligibleDate = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const formattedDate = nextEligibleDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+          return new Response(JSON.stringify({
+            status: "error",
+            error: `Rate limit: You can only update your profile once every 30 days. You will be eligible to update again on ${formattedDate}.`
+          }), {
+            status: 429,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+    }
+
+    // Set profile_updated_at
+    profile.profile_updated_at = new Date().toISOString();
+
     // Determine if requester is an admin that requires superadmin approval to modify another user's profile
     let needsApproval = false;
     if (targetUserId !== ctx.uid) {

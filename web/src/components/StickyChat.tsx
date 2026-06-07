@@ -481,6 +481,23 @@ const chatTranslations: Record<string, Record<string, string>> = {
 export default function StickyChat() {
   const [user, setUser] = useState<User | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Load initial isOpen state from sessionStorage after mount to avoid Next.js SSR hydration mismatch
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const persisted = sessionStorage.getItem("fahem_companion_is_open");
+      if (persisted === "true") {
+        setIsOpen(true);
+      }
+    }
+  }, []);
+
+  // Sync isOpen state to sessionStorage when changed
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("fahem_companion_is_open", isOpen ? "true" : "false");
+    }
+  }, [isOpen]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);

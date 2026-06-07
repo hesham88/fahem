@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { authedFetch } from "../lib/authedFetch";
 import { 
   FiCheckCircle, 
   FiLock, 
@@ -84,7 +85,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     setIsLoadingReports(true);
     setReportsError(null);
     try {
-      const response = await fetch("/api/admin/reports");
+      const response = await authedFetch("/api/admin/reports");
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.reports)) {
@@ -104,7 +105,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   const updateReportStatus = async (reportId: string, status: string) => {
     try {
-      const response = await fetch("/api/admin/reports", {
+      const response = await authedFetch("/api/admin/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportId, status })
@@ -124,7 +125,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const fetchUsersList = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await fetch("/api/user/list");
+      const response = await authedFetch("/api/user/list");
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.users)) {
@@ -144,7 +145,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     setPolicyActionError(null);
     setPolicyActionSuccess(null);
     try {
-      const response = await fetch(`/api/admin/user-token-policy?userId=${encodeURIComponent(userId)}`);
+      const response = await authedFetch(`/api/admin/user-token-policy?userId=${encodeURIComponent(userId)}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -193,7 +194,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
             reason: overrideReason || "admin override"
           };
 
-      const response = await fetch("/api/admin/user-token-policy", {
+      const response = await authedFetch("/api/admin/user-token-policy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -237,7 +238,10 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   // --- Admin Approval & Curriculum Ingestion States ---
   const [admins, setAdmins] = useState<any[]>([]);
+  const [userEmail, setUserEmail] = useState<string>(email || "");
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [isLoadingAdmins, setIsLoadingAdmins] = useState<boolean>(false);
   const [adminActionError, setAdminActionError] = useState<string | null>(null);
   const [adminActionSuccess, setAdminActionSuccess] = useState<string | null>(null);
@@ -247,10 +251,10 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [isLoadingChanges, setIsLoadingChanges] = useState<boolean>(false);
 
   const fetchPendingChanges = async () => {
-    if (!email) return;
+    if (!userEmail) return;
     setIsLoadingChanges(true);
     try {
-      const response = await fetch(`/api/admin/approve-changes?superadminEmail=${encodeURIComponent(email)}`);
+      const response = await authedFetch("/api/admin/approve-changes");
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.requests)) {
@@ -265,15 +269,14 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   };
 
   const handleApproveDenyChange = async (requestId: string, action: "approve" | "deny") => {
-    if (!email) return;
+    if (!userEmail) return;
     setAdminActionError(null);
     setAdminActionSuccess(null);
     try {
-      const res = await fetch("/api/admin/approve-changes", {
+      const res = await authedFetch("/api/admin/approve-changes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          superadminEmail: email,
           requestId,
           action
         })
@@ -337,10 +340,10 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [bookError, setBookError] = useState<string | null>(null);
 
   const fetchAdmins = async () => {
-    if (!email) return;
+    if (!userEmail) return;
     setIsLoadingAdmins(true);
     try {
-      const response = await fetch(`/api/admin/approve?superadminEmail=${encodeURIComponent(email)}`);
+      const response = await authedFetch("/api/admin/approve");
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.admins)) {
@@ -361,7 +364,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const fetchSubjects = async () => {
     setIsLoadingSubjects(true);
     try {
-      const response = await fetch("/api/subjects");
+      const response = await authedFetch("/api/subjects");
       if (response.ok) {
         const data = await response.json();
         if (data && Array.isArray(data.subjects)) {
@@ -379,18 +382,17 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   };
 
   const handleToggleAdminApproval = async (adminEmail: string, currentApproved: boolean) => {
-    if (!email) return;
+    if (!userEmail) return;
     setAdminActionError(null);
     setAdminActionSuccess(null);
 
     const action = currentApproved ? "revoke" : "approve";
 
     try {
-      const res = await fetch("/api/admin/approve", {
+      const res = await authedFetch("/api/admin/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          superadminEmail: email,
           adminEmail,
           action
         })
@@ -417,13 +419,13 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !subjName || !subjNameAr) return;
+    if (!userEmail || !subjName || !subjNameAr) return;
     setIsCreatingSubject(true);
     setSubjectSuccess(null);
     setSubjectError(null);
 
     try {
-      const res = await fetch("/api/subjects", {
+      const res = await authedFetch("/api/subjects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -431,8 +433,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           name_ar: subjNameAr,
           grade_level: subjGrade,
           category: subjCategory,
-          icon_emoji: subjEmoji,
-          requesterEmail: email
+          icon_emoji: subjEmoji
         })
       });
 
@@ -477,13 +478,13 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   const handleIngestBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !bookSubjId || !bookTitle || !bookTitleAr) return;
+    if (!userEmail || !bookSubjId || !bookTitle || !bookTitleAr) return;
     setIsIngestingBook(true);
     setBookSuccess(null);
     setBookError(null);
 
     try {
-      const res = await fetch("/api/books", {
+      const res = await authedFetch("/api/books", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -497,8 +498,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           book_type: bookType,
           source_url: bookSourceUrl,
           storage_path: bookStoragePath,
-          chapters: pendingChapters,
-          requesterEmail: email
+          chapters: pendingChapters
         })
       });
 
@@ -525,15 +525,14 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     setIsSavingConfigs(true);
     setConfigSaveSuccess(null);
     try {
-      const response = await fetch("/api/admin/config", {
+      const response = await authedFetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           isTokenControlActive,
           weeklyAllocationLimit,
           monthlyAllocationLimit,
-          maxUploadSize,
-          requesterEmail: email
+          maxUploadSize
         })
       });
       if (response.ok) {
@@ -632,12 +631,38 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   };
 
   useEffect(() => {
-    if (!email) return;
+    const checkAuth = async () => {
+      try {
+        const response = await authedFetch("/api/admin/check");
+        if (response.ok) {
+          const data = await response.json();
+          setIsAdmin(data.isAdmin);
+          setIsSuperadmin(data.isSuperadmin);
+          if (data.email) {
+            setUserEmail(data.email);
+          }
+        } else {
+          setIsAdmin(false);
+          setIsSuperadmin(false);
+        }
+      } catch (err) {
+        console.error("Failed to check admin status:", err);
+        setIsAdmin(false);
+        setIsSuperadmin(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    if (isCheckingAuth || !isAdmin) return;
 
     const fetchGlobalStats = async () => {
       setIsLoadingGlobal(true);
       try {
-        const response = await fetch(`/api/admin/activities?email=${encodeURIComponent(email)}`);
+        const response = await authedFetch("/api/admin/activities");
         if (response.ok) {
           const data = await response.json();
           if (data.tokenStats) {
@@ -668,7 +693,7 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
     const fetchConfigs = async () => {
       try {
-        const response = await fetch("/api/admin/config");
+        const response = await authedFetch("/api/admin/config");
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.config) {
@@ -697,7 +722,67 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [email]);
+  }, [isCheckingAuth, isAdmin, userEmail]);
+
+  if (isCheckingAuth) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "5rem 2rem",
+        gap: "1rem"
+      }}>
+        <FiRefreshCw className="spinning-icon" style={{ fontSize: "2rem", color: "var(--primary)" }} />
+        <p style={{ color: "#64748b", fontFamily: "Cairo, var(--font-sans)" }}>
+          {language === "ar" ? "جاري التحقق من صلاحيات المشرف..." : "Checking administrator authorization..."}
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div style={{
+        background: "rgba(220, 38, 38, 0.05)",
+        border: "1px solid rgba(220, 38, 38, 0.15)",
+        borderRadius: "12px",
+        padding: "3rem 2rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        gap: "1.5rem",
+        maxWidth: "600px",
+        margin: "4rem auto"
+      }}>
+        <div style={{
+          background: "rgba(220, 38, 38, 0.1)",
+          borderRadius: "50%",
+          width: "60px",
+          height: "60px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#ef4444"
+        }}>
+          <FiAlertTriangle style={{ fontSize: "2rem" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <h2 style={{ fontSize: "1.5rem", color: "#1e293b", margin: 0, fontFamily: "Cairo, var(--font-sans)" }}>
+            {language === "ar" ? "تم رفض الوصول" : "Access Denied"}
+          </h2>
+          <p style={{ color: "#64748b", fontSize: "0.95rem", margin: 0, fontFamily: "Cairo, var(--font-sans)" }}>
+            {language === "ar" 
+              ? "عذراً، هذا القسم مخصص للمشرفين المعتمدين فقط. إذا كنت تعتقد أنك يجب أن تمتلك صلاحيات الوصول، يرجى التواصل مع المسؤول الأكبر."
+              : "This dashboard is restricted to authorized administrators only. If you believe this is an error, please contact a super-administrator."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%" }}>

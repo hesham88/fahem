@@ -4,6 +4,48 @@ import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo } from "../l
 
 export const dynamic = "force-dynamic";
 
+export async function GET(req: NextRequest) {
+  try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
+    const uid = ctx.uid;
+    let sessions: any[] = [];
+    let mongoClient: any = null;
+
+    if (isLocalEnv()) {
+      const db = getLocalDb();
+      sessions = db.reading_sessions || [];
+      sessions = sessions.filter((s: any) => s.uid === uid);
+    } else {
+      try {
+        if (!shouldSkipDirectMongo()) {
+          const { MongoClient } = require("mongodb");
+          const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+          mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
+          await mongoClient.connect();
+          const db = mongoClient.db("fahem");
+          sessions = await db.collection("reading_sessions").find({ uid: uid }).toArray();
+          await mongoClient.close();
+        }
+      } catch (mongoErr) {
+        console.error("[api-reading-session GET] MongoDB connection failed:", mongoErr);
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, sessions }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err: any) {
+    console.error("[api-reading-session GET] Error:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireUser(req);

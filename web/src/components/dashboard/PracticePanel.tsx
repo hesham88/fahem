@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { FiCpu, FiClock, FiRefreshCw } from "react-icons/fi";
+import { authedFetch } from "../../lib/authedFetch";
 
 const SUBTOPIC_REGISTRY: { [subject: string]: string[] } = {
   Math: ["Matrices", "Determinants", "Cramer's Rule", "Probability", "Statistics", "Linear Algebra"],
@@ -110,7 +111,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     const toggleLock = async () => {
       const isActive = practiceGameState === "active";
       try {
-        await fetch("/api/practice/lock", {
+        await authedFetch("/api/practice/lock", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ active: isActive })
@@ -125,7 +126,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     return () => {
       const disableLockOnUnmount = async () => {
         try {
-          await fetch("/api/practice/lock", {
+          await authedFetch("/api/practice/lock", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ active: false })
@@ -142,7 +143,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     if (!user?.uid) return;
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/activity?userId=${encodeURIComponent(user.uid)}`);
+      const res = await authedFetch("/api/activity");
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];
@@ -383,15 +384,13 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
       const hasArabicChars = /[\u0600-\u06FF]/.test(cleanText);
       const reqLang = hasArabicChars ? "ar" : (language || "en");
 
-      const res = await fetch("/api/audio/tts", {
+      const res = await authedFetch("/api/audio/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: cleanText,
           language: reqLang,
-          voice: selectedVoice, // use user's selected voice dynamically!
-          userId: user?.uid || "anonymous",
-          userEmail: user?.email || "anonymous@fahem.ai"
+          voice: selectedVoice // use user's selected voice dynamically!
         })
       });
 
@@ -1011,7 +1010,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     `تم إطلاق غارة المراجعة النشطة (${practiceMode.toUpperCase()}) لمادة: ${targetSubject}`
                   );
 
-                  const res = await fetch("/api/practice/generate", {
+                  const res = await authedFetch("/api/practice/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1792,7 +1791,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
                     setPracticeLoading(true);
                     try {
-                      const res = await fetch("/api/practice/evaluate", {
+                      const res = await authedFetch("/api/practice/evaluate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -1848,12 +1847,10 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             const subtopic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
 
                             // Log standard session
-                            fetch("/api/activity", {
+                            authedFetch("/api/activity", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
-                                userId: user.uid,
-                                userEmail: user.email || "student@fahem.edu",
                                 action: "practice_session",
                                 status: data.isCorrect ? "correct" : "incorrect",
                                 details: {
@@ -1870,12 +1867,10 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             }).catch(err => console.error("Failed to save practice session activity:", err));
 
                             // Log specialized practice attempt for heatmap metrics
-                            fetch("/api/activity", {
+                            authedFetch("/api/activity", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
-                                userId: user.uid,
-                                userEmail: user.email || "student@fahem.edu",
                                 action: "practice_attempt",
                                 status: data.isCorrect ? "correct" : "incorrect",
                                 details: {
@@ -1947,7 +1942,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                           ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
                           : practiceSubject;
 
-                      const res = await fetch("/api/practice/generate", {
+                      const res = await authedFetch("/api/practice/generate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -2289,7 +2284,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
                       : practiceSubject;
 
-                  const res = await fetch("/api/practice/generate", {
+                  const res = await authedFetch("/api/practice/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

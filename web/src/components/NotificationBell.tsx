@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { authedFetch } from "../lib/authedFetch";
 import { 
   FiBell, 
   FiCheck, 
@@ -67,7 +68,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   const fetchCount = async () => {
     if (!user) return;
     try {
-      const res = await fetch("/api/notifications/count");
+      const res = await authedFetch("/api/notifications/count");
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -84,7 +85,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/notifications");
+      const res = await authedFetch("/api/notifications");
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -129,7 +130,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       e.stopPropagation(); // Prevent navigating when just checking read
     }
     try {
-      const res = await fetch("/api/notifications/read", {
+      const res = await authedFetch("/api/notifications/read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notification_ids: [id] })
@@ -153,7 +154,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
-      const res = await fetch("/api/notifications/read", {
+      const res = await authedFetch("/api/notifications/read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notification_ids: [] }) // Empty marks all

@@ -3,6 +3,7 @@
 import React from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
+import { authedFetch } from "../../lib/authedFetch";
 import {
   FiSettings,
   FiCheckCircle,
@@ -110,10 +111,62 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [tokenStats, setTokenStats] = React.useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = React.useState<boolean>(true);
 
+  const [placesResults, setPlacesResults] = React.useState<any[]>([]);
+  const [searchingPlaces, setSearchingPlaces] = React.useState<boolean>(false);
+  const placesSearchTimeoutRef = React.useRef<any>(null);
+  const placesAbortControllerRef = React.useRef<AbortController | null>(null);
+
+  const fetchPlaces = (query: string) => {
+    if (placesSearchTimeoutRef.current) {
+      clearTimeout(placesSearchTimeoutRef.current);
+    }
+
+    if (query.trim().length < 2) {
+      setPlacesResults([]);
+      setSearchingPlaces(false);
+      if (placesAbortControllerRef.current) {
+        placesAbortControllerRef.current.abort();
+        placesAbortControllerRef.current = null;
+      }
+      return;
+    }
+
+    setSearchingPlaces(true);
+
+    placesSearchTimeoutRef.current = setTimeout(async () => {
+      if (placesAbortControllerRef.current) {
+        placesAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      placesAbortControllerRef.current = controller;
+
+      try {
+        const countryParam = userProfile?.country || "Egypt";
+        const res = await authedFetch(`/api/places/search?query=${encodeURIComponent(query)}&country=${encodeURIComponent(countryParam)}`,
+          { signal: controller.signal }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setPlacesResults(data.results || []);
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Error searching places in SettingsPanel:", err);
+        }
+      } finally {
+        if (placesAbortControllerRef.current === controller) {
+          setSearchingPlaces(false);
+          placesAbortControllerRef.current = null;
+        }
+      }
+    }, 250);
+  };
+
   React.useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch("/api/user/token-stats");
+        const res = await authedFetch("/api/user/token-stats");
         if (res.ok) {
           const data = await res.json();
           if (data && data.success) {
@@ -164,11 +217,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setSettingsAvatar(downloadURL);
 
       // Immediate MongoDB Profile Sync
-      const res = await fetch("/api/user/profile", {
+      const res = await authedFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.uid,
           profile: {
             ...(userProfile || {}),
             avatar: downloadURL,
@@ -396,14 +448,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }} className="grid-cols-2">
           {/* School Preferences */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", position: "relative" }}>
             <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
               {language === "ar" ? "المدرسة أو المؤسسة التعليمية" : "School or Educational Institution"}
             </label>
             <input
               type="text"
               value={preferencesSchool}
-              onChange={(e) => setPreferencesSchool(e.target.value)}
+              onChange={(e) => {
+                setPreferencesSchool(e.target.value);
+                fetchPlaces(e.target.value);
+              }}
               placeholder={language === "ar" ? "أدخل اسم مدرستك" : "Enter your school name"}
               style={{
                 padding: "0.85rem 1.1rem",
@@ -416,9 +471,82 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
                 transition: "border-color 0.2s ease",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--card-border)")}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--primary)";
+                fetchPlaces(preferencesSchool);
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "var(--card-border)";
+                setTimeout(() => {
+                  setPlacesResults([]);
+                }, 200);
+              }}
             />
+            {searchingPlaces && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "absolute", right: language === "ar" ? undefined : "1rem", left: language === "ar" ? "1rem" : undefined, bottom: "0.85rem" }}>
+                <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600 }}>
+                  {language === "ar" ? "جاري البحث..." : "Searching..."}
+                </span>
+              </div>
+            )}
+            {placesResults.length > 0 && (
+              <div style={{
+                position: "absolute",
+                top: "105%",
+                left: 0,
+                right: 0,
+                zIndex: 1000,
+                background: "rgba(255, 255, 255, 0.98)",
+                backdropFilter: "blur(16px)",
+                border: "1px solid rgba(16, 107, 163, 0.15)",
+                borderRadius: "16px",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.12)",
+                maxHeight: "220px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                padding: "0.5rem"
+              }} className="custom-scroll-container">
+                {placesResults.map((place, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setPreferencesSchool(place.name);
+                      setPlacesResults([]);
+                    }}
+                    type="button"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.75rem 1rem",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      textAlign: language === "ar" ? "right" : "left",
+                      width: "100%",
+                      transition: "all 0.15s ease",
+                      direction: language === "ar" ? "rtl" : "ltr"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <span style={{ fontSize: "1.2rem" }}>
+                      {place.type === "university" ? "🎓" : "🏫"}
+                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start", textAlign: language === "ar" ? "right" : "left", flex: 1 }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>{place.name}</span>
+                      <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>{place.address}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Profile Visibility */}
