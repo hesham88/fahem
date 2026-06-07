@@ -1,18 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface Subject {
   _id: string;
   name: string;
   name_ar?: string;
   emoji?: string;
+  icon_emoji?: string;
+  color?: string;
 }
 
 interface Book {
   _id?: string;
   id?: string;
   title: string;
+  title_ar?: string;
+  titleEn?: string;
+  titleAr?: string;
   subject_id?: string;
   chapters?: any[];
 }
@@ -43,37 +48,70 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
 }) => {
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
 
+  // Auto-select first subject if selectedSubjectId is invalid or not in dynamicSubjects
+  useEffect(() => {
+    if (dynamicSubjects && dynamicSubjects.length > 0) {
+      const exists = dynamicSubjects.some((s: any) => s._id === selectedSubjectId);
+      if (!exists) {
+        setSelectedSubjectId(dynamicSubjects[0]._id);
+      }
+    }
+  }, [dynamicSubjects, selectedSubjectId, setSelectedSubjectId]);
+
+  if (!dynamicSubjects || dynamicSubjects.length === 0) {
+    return (
+      <div
+        className="panel-card"
+        style={{
+          padding: "3rem 1.5rem",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          gap: "1.25rem",
+          border: "1px dashed var(--card-border)",
+          background: "rgba(255, 255, 255, 0.4)",
+          borderRadius: "var(--border-radius-lg)",
+        }}
+      >
+        <span style={{ fontSize: "3.5rem" }}>📚</span>
+        <div>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: "0 0 0.5rem 0", color: "var(--foreground)" }}>
+            {language === "ar" ? "لا توجد مواد دراسية متاحة" : "No Subjects Available"}
+          </h3>
+          <p style={{ fontSize: "0.85rem", color: "var(--foreground-muted)", maxWidth: "400px", margin: "0 auto", lineHeight: 1.5 }}>
+            {language === "ar"
+              ? "يرجى تهيئة المناهج والمواد الدراسية في لوحة التحكم الإدارية أو مراجعة إعدادات الحساب."
+              : "Please configure your curricula and subjects in the Admin Dashboard or update your Account Settings."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const mappedSubjects = dynamicSubjects.map((subj: any) => {
+    const subjectColor = subj.color || "#ef6c00";
+    const subjectIcon = subj.emoji || subj.icon_emoji || "📚";
+    return {
+      _id: subj._id,
+      nameEn: subj.name || subj.name_en || "Unnamed Subject",
+      nameAr: subj.name_ar || subj.name || "مادة غير مسمى",
+      icon: subjectIcon,
+      color: subjectColor,
+    };
+  });
+
+  const selectedSubjectObj = mappedSubjects.find((s: any) => s._id === selectedSubjectId) || mappedSubjects[0];
+  const activeSubjectColor = selectedSubjectObj?.color || "#ef6c00";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem" }} className="grid-cols-1">
-        {/* Core subjects progress cards */}
+        
+        {/* Core subjects list cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {(dynamicSubjects && dynamicSubjects.length > 0
-            ? dynamicSubjects.map((subj: any) => {
-                const fallbackMeta =
-                  subj._id === "subj_algebra_stats"
-                    ? { nameEn: "Algebra & Statistics", nameAr: "الجبر والإحصاء", icon: "📊", color: "var(--primary)" }
-                    : subj._id === "subj_biology"
-                    ? { nameEn: "Biology", nameAr: "الأحياء", icon: "🧬", color: "#9c27b0" }
-                    : subj._id === "subj_arabic_grammar"
-                    ? { nameEn: "Arabic Grammar", nameAr: "النحو والصرف", icon: "📖", color: "#2e7d32" }
-                    : { nameEn: subj.name, nameAr: subj.name_ar || subj.name, icon: subj.emoji || "📚", color: "#ef6c00" };
-
-                return {
-                  _id: subj._id,
-                  nameEn: subj.name || fallbackMeta.nameEn,
-                  nameAr: subj.name_ar || fallbackMeta.nameAr,
-                  icon: subj.emoji || fallbackMeta.icon,
-                  color: fallbackMeta.color,
-                };
-              })
-            : [
-                { _id: "subj_algebra_stats", nameEn: "Pure Mathematics", nameAr: "الرياضيات العامة", icon: "📐", color: "var(--primary)" },
-                { _id: "subj_biology", nameEn: "Physics & Chemistry", nameAr: "العلوم والفيزياء", icon: "🧪", color: "#9c27b0" },
-                { _id: "subj_arabic_grammar", nameEn: "Arabic Grammar & Literature", nameAr: "اللغة العربية وآدابها", icon: "📚", color: "#2e7d32" },
-                { _id: "subj_history_geo", nameEn: "World History", nameAr: "التاريخ والجغرافيا", icon: "🌍", color: "#ef6c00" },
-              ]
-          ).map((item, idx) => {
+          {mappedSubjects.map((item, idx) => {
             const isSelected = selectedSubjectId === item._id;
             return (
               <div
@@ -86,11 +124,12 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                   alignItems: "center",
                   gap: "1rem",
                   cursor: "pointer",
-                  border: isSelected ? `2px solid ${item.color}` : "1px solid var(--card-border)",
+                  border: isSelected ? `2px solid var(--subject-color)` : "1px solid var(--card-border)",
                   transform: isSelected ? "scale(1.02)" : "scale(1)",
                   boxShadow: isSelected ? "0 8px 16px rgba(0,0,0,0.06)" : "none",
                   transition: "all 0.25s ease-in-out",
-                }}
+                  "--subject-color": item.color,
+                } as React.CSSProperties}
                 onMouseOver={(e) => {
                   if (!isSelected) {
                     e.currentTarget.style.borderColor = item.color;
@@ -112,7 +151,18 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                   {(() => {
                     const booksCount = dynamicBooks ? dynamicBooks.filter((b: any) => b.subject_id === item._id).length : 0;
                     return (
-                      <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 700, background: "rgba(16, 107, 163, 0.06)", padding: "4px 10px", borderRadius: "10px", display: "inline-block", marginTop: "0.25rem" }}>
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          color: item.color,
+                          fontWeight: 700,
+                          background: `color-mix(in srgb, ${item.color} 8%, transparent)`,
+                          padding: "4px 10px",
+                          borderRadius: "10px",
+                          display: "inline-block",
+                          marginTop: "0.25rem",
+                        }}
+                      >
                         {language === "ar"
                           ? `📚 ${booksCount} من الكتب`
                           : `📚 ${booksCount} ${booksCount === 1 ? 'Book' : 'Books'}`}
@@ -126,7 +176,14 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
         </div>
 
         {/* Module Accordion Workspace */}
-        <div className="panel-card" style={{ padding: "1.5rem" }}>
+        <div
+          className="panel-card"
+          style={{
+            padding: "1.5rem",
+            borderTop: `4px solid var(--subject-color)`,
+            "--subject-color": activeSubjectColor,
+          } as React.CSSProperties}
+        >
           <h3 style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800 }}>
             {language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}
           </h3>
@@ -146,13 +203,38 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
 
               return subjectBooks.map((book: any, bIdx: number) => {
                 const chapters = book.chapters || [];
+                const bookTitle = language === "ar"
+                  ? (book.title_ar || book.titleAr || book.title)
+                  : (book.title_en || book.titleEn || book.title);
+
                 return (
-                  <div key={bIdx} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", borderBottom: bIdx < subjectBooks.length - 1 ? "1px dashed rgba(0, 0, 0, 0.05)" : "none", paddingBottom: bIdx < subjectBooks.length - 1 ? "1.5rem" : "0" }}>
+                  <div
+                    key={bIdx}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.75rem",
+                      borderBottom: bIdx < subjectBooks.length - 1 ? "1px dashed rgba(0, 0, 0, 0.05)" : "none",
+                      paddingBottom: bIdx < subjectBooks.length - 1 ? "1.5rem" : "0",
+                      "--subject-color": activeSubjectColor,
+                    } as React.CSSProperties}
+                  >
                     {/* Book Subtitle */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(16, 107, 163, 0.04)", padding: "0.5rem 1rem", borderRadius: "10px", marginBottom: "0.25rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        background: `color-mix(in srgb, var(--subject-color) 8%, transparent)`,
+                        borderInlineStart: "4px solid var(--subject-color)",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "10px",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
                       <span style={{ fontSize: "1.2rem" }}>📖</span>
                       <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--foreground)" }}>
-                        {language === "ar" ? (book.titleAr || book.title) : (book.titleEn || book.title)}
+                        {bookTitle}
                       </span>
                     </div>
 
@@ -168,6 +250,53 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                           ? (ch.title_ar || ch.titleAr || ch.title || `الفصل ${cIdx + 1}`)
                           : (ch.titleEn || ch.title || `Chapter ${cIdx + 1}`);
                         const topics = ch.topics || [];
+
+                        // Fallback for missing topics: render the chapter heading as a direct link option
+                        if (topics.length === 0) {
+                          const startPage = ch.start_page || ch.startPage || 1;
+                          return (
+                            <div
+                              key={cIdx}
+                              style={{
+                                border: "1px solid var(--card-border)",
+                                borderRadius: "var(--border-radius-sm)",
+                                background: "#ffffff",
+                                overflow: "hidden",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "1rem",
+                              }}
+                            >
+                              <span style={{ fontWeight: 700, color: "var(--subject-color)", fontSize: "0.9rem" }}>
+                                {chapterTitle}
+                              </span>
+                              <button
+                                onClick={() => handleStartStudy(book, startPage)}
+                                style={{
+                                  padding: "6px 14px",
+                                  borderRadius: "6px",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  background: "var(--subject-color)",
+                                  color: "#ffffff",
+                                  fontSize: "0.75rem",
+                                  fontWeight: 700,
+                                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                                  transition: "all 0.2s",
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.opacity = "0.9";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.opacity = "1";
+                                }}
+                              >
+                                {language === "ar" ? "ابدأ الفصل" : "Study Chapter"}
+                              </button>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div
@@ -191,7 +320,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 fontWeight: 700,
-                                color: "var(--primary)",
+                                color: "var(--subject-color)",
                                 fontFamily: "var(--font-sans)",
                                 fontSize: "0.9rem",
                               }}
@@ -210,59 +339,53 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                                   gap: "0.5rem",
                                 }}
                               >
-                                {topics.length === 0 ? (
-                                  <div style={{ fontSize: "0.82rem", color: "#6a7c88", padding: "0.5rem", textAlign: "center" }}>
-                                    {language === "ar" ? "لا توجد موضوعات مضافة" : "No topics added"}
-                                  </div>
-                                ) : (
-                                  topics.map((top: any, tIdx: number) => {
-                                    const topicTitle = language === "ar"
-                                      ? (top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`)
-                                      : (top.titleEn || top.title || `Topic ${tIdx + 1}`);
-                                    const pageNum = top.pageNum || top.page_number || top.pageNumber || 1;
+                                {topics.map((top: any, tIdx: number) => {
+                                  const topicTitle = language === "ar"
+                                    ? (top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`)
+                                    : (top.titleEn || top.title || `Topic ${tIdx + 1}`);
+                                  const pageNum = top.pageNum || top.page_number || top.pageNumber || 1;
 
-                                    return (
-                                      <div
-                                        key={tIdx}
+                                  return (
+                                    <div
+                                      key={tIdx}
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: "0.5rem 0.75rem",
+                                        background: "#ffffff",
+                                        border: "1px solid rgba(0,0,0,0.03)",
+                                        borderRadius: "8px",
+                                        boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                                      }}
+                                    >
+                                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>📚 {topicTitle}</span>
+                                      <button
+                                        onClick={() => handleStartStudy(book, pageNum)}
                                         style={{
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          alignItems: "center",
-                                          padding: "0.5rem 0.75rem",
-                                          background: "#ffffff",
-                                          border: "1px solid rgba(0,0,0,0.03)",
-                                          borderRadius: "8px",
-                                          boxShadow: "0 1px 2px rgba(0,0,0,0.01)",
+                                          padding: "4px 12px",
+                                          borderRadius: "6px",
+                                          border: "none",
+                                          cursor: "pointer",
+                                          background: "var(--subject-color)",
+                                          color: "#ffffff",
+                                          fontSize: "0.75rem",
+                                          fontWeight: 700,
+                                          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                                          transition: "all 0.2s",
+                                        }}
+                                        onMouseOver={(e) => {
+                                          e.currentTarget.style.opacity = "0.9";
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.currentTarget.style.opacity = "1";
                                         }}
                                       >
-                                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>📚 {topicTitle}</span>
-                                        <button
-                                          onClick={() => handleStartStudy(book, pageNum)}
-                                          style={{
-                                            padding: "4px 12px",
-                                            borderRadius: "6px",
-                                            border: "none",
-                                            cursor: "pointer",
-                                            background: "var(--primary)",
-                                            color: "#ffffff",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 700,
-                                            boxShadow: "0 2px 4px rgba(16, 107, 163, 0.15)",
-                                            transition: "all 0.2s",
-                                          }}
-                                          onMouseOver={(e) => {
-                                            e.currentTarget.style.opacity = "0.9";
-                                          }}
-                                          onMouseOut={(e) => {
-                                            e.currentTarget.style.opacity = "1";
-                                          }}
-                                        >
-                                          {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
-                                        </button>
-                                      </div>
-                                    );
-                                  })
-                                )}
+                                        {language === "ar" ? "ابدأ الدرس" : "Study Lesson"}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

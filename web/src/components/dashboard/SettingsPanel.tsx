@@ -115,6 +115,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [searchingPlaces, setSearchingPlaces] = React.useState<boolean>(false);
   const placesSearchTimeoutRef = React.useRef<any>(null);
   const placesAbortControllerRef = React.useRef<AbortController | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const fetchPlaces = (query: string) => {
     if (placesSearchTimeoutRef.current) {
@@ -162,6 +163,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       }
     }, 250);
   };
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setPlacesResults([]);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   React.useEffect(() => {
     async function fetchStats() {
@@ -448,7 +461,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }} className="grid-cols-2">
           {/* School Preferences */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", position: "relative" }}>
+          <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", position: "relative" }}>
             <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
               {language === "ar" ? "المدرسة أو المؤسسة التعليمية" : "School or Educational Institution"}
             </label>
@@ -477,9 +490,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = "var(--card-border)";
-                setTimeout(() => {
-                  setPlacesResults([]);
-                }, 200);
               }}
             />
             {searchingPlaces && (

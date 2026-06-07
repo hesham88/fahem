@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
     if (curriculumId) {
       proxyPath += `?curriculum_id=${encodeURIComponent(curriculumId)}`;
     }
-    return await proxyRequest(proxyPath, "GET");
+    return await proxyRequest(proxyPath, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
