@@ -106,6 +106,38 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [allActivities, setAllActivities] = useState<any[]>([]);
   const [heatmapSubjectFilter, setHeatmapSubjectFilter] = useState<string>("All");
 
+  useEffect(() => {
+    const toggleLock = async () => {
+      const isActive = practiceGameState === "active";
+      try {
+        await fetch("/api/practice/lock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: isActive })
+        });
+      } catch (err) {
+        console.error("Failed to toggle practice lock:", err);
+      }
+    };
+    toggleLock();
+
+    // Clean up when unmounting
+    return () => {
+      const disableLockOnUnmount = async () => {
+        try {
+          await fetch("/api/practice/lock", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ active: false })
+          });
+        } catch (err) {
+          console.error("Failed to disable practice lock on unmount:", err);
+        }
+      };
+      disableLockOnUnmount();
+    };
+  }, [practiceGameState]);
+
   const fetchPracticeHistory = async () => {
     if (!user?.uid) return;
     setHistoryLoading(true);
