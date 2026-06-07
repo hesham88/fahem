@@ -4,7 +4,7 @@ from google.oauth2 import id_token
 import httpx
 import json
 
-cloud_run_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
+cloud_run_url = "https://fahem-agent-1061555578804.us-east4.run.app"
 url = f"{cloud_run_url}/user/list"
 
 print("Generating GCP identity token...")

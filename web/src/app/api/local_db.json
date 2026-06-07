@@ -1,77 +1,52 @@
 {
   "subjects": [
     {
-      "_id": "subj_cur_openstax_math_college_computer-science",
+      "_id": "sub_computer_science_1780535716963",
       "curriculum_id": "cur_openstax_math_college",
-      "slug": "computer-science",
       "name": "Computer Science",
       "name_ar": "علوم الحاسب",
-      "name_en": "Computer Science",
-      "name_es": "Computer Science",
-      "name_fr": "Computer Science",
-      "name_de": "Computer Science",
-      "name_zh": "Computer Science",
-      "name_it": "Computer Science",
-      "grade_level": "General",
-      "category": "Computer Science",
-      "icon_emoji": "💻",
-      "emoji": "💻",
       "color": "#6366F1",
-      "books_count": 0,
-      "core_book_ids": [],
-      "supporting_book_ids": []
+      "emoji": "💻",
+      "category": "Computer Science",
+      "core_book_ids": [
+        "book_introduction_to_python_programming_1780627757426"
+      ],
+      "supporting_book_ids": [],
+      "books_count": 1
     },
     {
-      "_id": "subj_cur_moe_secondary2_term1_2026_pure-mathematics",
+      "_id": "subj_cur_moe_secondary2_term1_2026_pure-mathematics_secondary2_term1",
       "curriculum_id": "cur_moe_secondary2_term1_2026",
-      "slug": "pure-mathematics",
       "name": "Pure Mathematics",
       "name_ar": "الرياضيات العامة",
-      "name_en": "Pure Mathematics",
-      "name_es": "Pure Mathematics",
-      "name_fr": "Pure Mathematics",
-      "name_de": "Pure Mathematics",
-      "name_zh": "Pure Mathematics",
-      "name_it": "Pure Mathematics",
-      "grade_level": "General",
-      "category": "Math",
-      "icon_emoji": "📐",
+      "color": "#E11D48",
       "emoji": "📐",
-      "color": "#1E96A0",
-      "books_count": 1,
+      "category": "Math",
       "core_book_ids": [
         "book_math_101"
       ],
-      "supporting_book_ids": []
+      "supporting_book_ids": [],
+      "books_count": 1
     },
     {
-      "_id": "subj_cur_moe_secondary2_term1_2026_physics-chemistry",
+      "_id": "subj_cur_moe_secondary2_term1_2026_physics-chemistry_secondary2_term1",
       "curriculum_id": "cur_moe_secondary2_term1_2026",
-      "slug": "physics-chemistry",
       "name": "Physics & Chemistry",
       "name_ar": "العلوم والفيزياء",
-      "name_en": "Physics & Chemistry",
-      "name_es": "Physics & Chemistry",
-      "name_fr": "Physics & Chemistry",
-      "name_de": "Physics & Chemistry",
-      "name_zh": "Physics & Chemistry",
-      "name_it": "Physics & Chemistry",
-      "grade_level": "General",
-      "category": "Science",
-      "icon_emoji": "🧪",
-      "emoji": "🧪",
       "color": "#E11D48",
-      "books_count": 1,
+      "emoji": "🧪",
+      "category": "Science",
       "core_book_ids": [
         "book_science_201"
       ],
-      "supporting_book_ids": []
+      "supporting_book_ids": [],
+      "books_count": 1
     }
   ],
   "books": [
     {
       "_id": "book_math_101",
-      "subject_id": "subj_cur_moe_secondary2_term1_2026_pure-mathematics",
+      "subject_id": "subj_cur_moe_secondary2_term1_2026_pure-mathematics_secondary2_term1",
       "title": "Introduction to Algebra",
       "title_ar": "مقدمة في الجبر",
       "author": "Fahem Academy",
@@ -88,7 +63,7 @@
     },
     {
       "_id": "book_science_201",
-      "subject_id": "subj_cur_moe_secondary2_term1_2026_physics-chemistry",
+      "subject_id": "subj_cur_moe_secondary2_term1_2026_physics-chemistry_secondary2_term1",
       "title": "Essentials of Physics",
       "title_ar": "أساسيات الفيزياء",
       "author": "Fahem Academy",
@@ -411,8 +386,8 @@
       "visibility": "public",
       "owner_uid": null,
       "created_by": "system",
-      "created_at": "2026-06-07T06:54:46.356Z",
-      "updated_at": "2026-06-07T06:54:46.357Z"
+      "created_at": "2026-06-07T07:58:20.932Z",
+      "updated_at": "2026-06-07T07:58:20.934Z"
     },
     {
       "_id": "cur_moe_secondary2_term1_2026",
@@ -425,15 +400,15 @@
         "year": "2026"
       },
       "subject_ids": [
-        "subj_algebra_stats_secondary2_term1",
-        "subj_biology_secondary2_term1"
+        "subj_cur_moe_secondary2_term1_2026_pure-mathematics_secondary2_term1",
+        "subj_cur_moe_secondary2_term1_2026_physics-chemistry_secondary2_term1"
       ],
       "status": "published",
       "visibility": "public",
       "owner_uid": null,
       "created_by": "system",
-      "created_at": "2026-06-07T06:54:46.358Z",
-      "updated_at": "2026-06-07T06:54:46.358Z"
+      "created_at": "2026-06-07T07:58:20.934Z",
+      "updated_at": "2026-06-07T07:58:20.934Z"
     }
   ]
 }

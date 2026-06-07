@@ -614,27 +614,32 @@ class MongoDBEngine:
         if self._db is None:
             raise RuntimeError("Database engine not connected.")
 
-        filt = {}
+        doc = None
         if user_id:
-            filt = {"userId": user_id}
-        elif email:
-            filt = {"email": email.strip().lower()}
-        elif username:
-            filt = {"username_clean": username.strip().lower()}
-        else:
-            return None
-
-        doc = self._db["users"].find_one(filt)
+            doc = self._db["users"].find_one({"userId": user_id})
         
-        # Fallback: if username was provided but no doc found, try searching by userId field directly
+        if not doc and email:
+            doc = self._db["users"].find_one({"email": email.strip().lower()})
+            if not doc:
+                doc = self._db["users"].find_one({"email": email.strip()})
+                
         if not doc and username:
-            doc = self._db["users"].find_one({"userId": username})
+            doc = self._db["users"].find_one({"username_clean": username.strip().lower()})
+            if not doc:
+                doc = self._db["users"].find_one({"userId": username})
 
         if not doc:
             return None
 
         doc.pop("_id", None)  # Strip Mongo Internal ID
+        if "userId" in doc and doc["userId"] is not None:
+            doc["userId"] = str(doc["userId"])
+        if "friends" in doc and isinstance(doc["friends"], list):
+            doc["friends"] = [str(f) for f in doc["friends"]]
+        if "groupsJoined" in doc and isinstance(doc["groupsJoined"], list):
+            doc["groupsJoined"] = [str(g) for g in doc["groupsJoined"]]
         return UserProfileSchema(**doc)
+
 
     async def check_username_availability(self, username: str, exclude_user_id: str = None) -> bool:
         """Determines username availability using clean, flat equality checks on username_clean, with regex fallback."""
@@ -742,6 +747,8 @@ class MongoDBEngine:
             users_list = []
             for doc in self._db["users"].find({}):
                 doc.pop("_id", None)
+                if "userId" in doc and doc["userId"] is not None:
+                    doc["userId"] = str(doc["userId"])
                 try:
                     users_list.append(UserProfileSchema(**doc))
                 except Exception as parse_err:
@@ -1082,6 +1089,8 @@ class MongoDBEngine:
             children = []
             for doc in self._db["users"].find({"parentEmail": parent_email.strip().lower()}):
                 doc.pop("_id", None)
+                if "userId" in doc and doc["userId"] is not None:
+                    doc["userId"] = str(doc["userId"])
                 children.append(UserProfileSchema(**doc))
             return children
         except Exception as e:

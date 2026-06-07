@@ -19,8 +19,29 @@ import subprocess
 import urllib.request
 import urllib.error
 
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # We target the primary deployed service URL
 BACKEND_URL = "https://fahem-agent-1061555578804.us-east4.run.app"
+
+def safe_print(*args, **kwargs):
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        new_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                new_args.append(arg.encode('ascii', errors='replace').decode('ascii'))
+            else:
+                new_args.append(arg)
+        try:
+            print(*new_args, **kwargs)
+        except Exception:
+            pass
 
 def get_oidc_token():
     print("[SMOKE TEST] Fetching OIDC Identity Token using gcloud...")
@@ -72,7 +93,7 @@ def run_smoke_test():
     check_url = f"{BACKEND_URL}/admin/check?email=hesham1988@gmail.com"
     code, res = make_request(check_url, headers=auth_header)
     print(f"Status Code: {code}")
-    print(f"Payload: {res}")
+    safe_print(f"Payload: {res}")
     if code == 200 and isinstance(res, dict) and res.get("isAdmin") is True:
         print("[SMOKE TEST][PASS] Admin check passed successfully!")
     else:
@@ -86,15 +107,15 @@ def run_smoke_test():
     principal_header = {
         **auth_header,
         "X-Verified-Principal": json.dumps({
-            "uid": "user_super_1",
+            "uid": "fDtKpvuKYuSgB3km8DRTRgOU3RH3",
             "email": "hesham1988@gmail.com",
             "role": "super-admin"
         })
     }
     code, res = make_request(profile_url, headers=principal_header)
     print(f"Status Code: {code}")
-    print(f"Payload: {res}")
-    if code == 200 and isinstance(res, dict) and "email" in res:
+    safe_print(f"Payload: {res}")
+    if code == 200 and isinstance(res, dict) and "profile" in res and "email" in res["profile"]:
         print("[SMOKE TEST][PASS] User profile loads correctly!")
     else:
         print("[SMOKE TEST][FAIL] User profile loading failed!")
@@ -114,7 +135,7 @@ def run_smoke_test():
             print("[SMOKE TEST][FAIL] Zero books returned from library!")
             all_passed = False
     else:
-        print(f"[SMOKE TEST][FAIL] Failed to retrieve library books. Response: {res}")
+        safe_print(f"[SMOKE TEST][FAIL] Failed to retrieve library books. Response: {res}")
         all_passed = False
         
     # --- Check 4: Companion replies to 'hi' (/run) ---
@@ -123,7 +144,7 @@ def run_smoke_test():
     chat_payload = {
         "user_id": "cli_user",
         "session_id": "smoke_test_session",
-        "app_name": "fahem",
+        "app_name": "app",
         "new_message": {
             "role": "user",
             "parts": [{"text": "hi"}]
@@ -138,14 +159,14 @@ def run_smoke_test():
         if content and "parts" in content:
             response_text = "".join([p.get("text", "") for p in content["parts"]])
         
-        print(f"Companion Response: '{response_text}'")
+        safe_print(f"Companion Response: '{response_text}'")
         if response_text and "DENIED" not in response_text and "Safety policy violation" not in response_text:
             print("[SMOKE TEST][PASS] Companion chat behaves correctly!")
         else:
             print("[SMOKE TEST][FAIL] Companion chat returned empty or blocked message!")
             all_passed = False
     else:
-        print(f"[SMOKE TEST][FAIL] Chat invocation failed. Response: {res}")
+        safe_print(f"[SMOKE TEST][FAIL] Chat invocation failed. Response: {res}")
         all_passed = False
         
     # --- Check 5: Security / Fail-Closed Checks ---

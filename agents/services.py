@@ -2365,14 +2365,37 @@ def register_telemetry_route(app: fastapi.FastAPI):
             )
 
     @app.get("/user/profile")
-    async def get_profile_endpoint(userId: str = None, username: str = None, email: str = None):
+    async def get_profile_endpoint(request: fastapi.Request, userId: str = None, username: str = None, email: str = None):
         try:
+            if not userId and not username and not email:
+                principal = getattr(request.state, "principal", None)
+                if principal:
+                    userId = principal.get("uid")
+                    email = principal.get("email")
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             from agent_communications import get_user_profile
             profile = await get_user_profile(user_id=userId, username=username, email=email)
-            return {"profile": profile}
+            
+            def sanitize_mongodb_objects(obj):
+                if isinstance(obj, dict):
+                    new_dict = {}
+                    for k, v in obj.items():
+                        if k == "_id":
+                            new_dict[k] = str(v)
+                        else:
+                            new_dict[k] = sanitize_mongodb_objects(v)
+                    return new_dict
+                elif isinstance(obj, list):
+                    return [sanitize_mongodb_objects(x) for x in obj]
+                elif type(obj).__name__ == "ObjectId":
+                    return str(obj)
+                else:
+                    return obj
+
+            sanitized_profile = sanitize_mongodb_objects(profile) if profile else {}
+            return {"profile": sanitized_profile}
         except Exception as err:
             logger.error(f"[services.py] Failed to get user profile: {err}", exc_info=True)
             return {"profile": {}, "error": str(err)}
@@ -3331,3 +3354,22 @@ def patch_server_class(ServerClass):
 
 patch_server_class(ApiServer)
 patch_server_class(DevServer)
+
+# 3. AgentLoader Monkeypatch to support "fahem" app_name mapping to "app" in single-agent environment
+try:
+    from google.adk.cli.utils import agent_loader
+    original_perform_load = agent_loader.AgentLoader._perform_load
+    def patched_perform_load(self, agent_name: str):
+        logger.info(f"[PATCH] Intercepted AgentLoader._perform_load for: {agent_name}")
+        if agent_name == "fahem":
+            logger.info("[PATCH] Mapping agent name 'fahem' to 'app' in single agent mode")
+            try:
+                return original_perform_load(self, "app")
+            except Exception as e:
+                logger.error(f"[PATCH] Error loading fallback 'app' agent: {e}")
+        return original_perform_load(self, agent_name)
+    agent_loader.AgentLoader._perform_load = patched_perform_load
+    logger.info("Successfully applied monkeypatch to AgentLoader._perform_load")
+except Exception as e:
+    logger.warning(f"Could not monkeypatch AgentLoader._perform_load: {e}")
+

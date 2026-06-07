@@ -348,14 +348,10 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
         const data = await response.json();
         if (data.success && Array.isArray(data.admins)) {
           setAdmins(data.admins);
-          setIsSuperadmin(true);
         }
-      } else {
-        setIsSuperadmin(false);
       }
     } catch (err) {
       console.error("Failed to fetch admin list:", err);
-      setIsSuperadmin(false);
     } finally {
       setIsLoadingAdmins(false);
     }
@@ -2019,11 +2015,16 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                   .filter((act) => {
                     if (!activitySearchQuery) return true;
                     const q = activitySearchQuery.toLowerCase();
+                    const detailsStr = act.details
+                      ? (typeof act.details === "object"
+                          ? (act.details.actionEn || act.details.actionAr || JSON.stringify(act.details))
+                          : String(act.details))
+                      : "";
                     return (
                       (act.userEmail || "").toLowerCase().includes(q) ||
                       (act.action || "").toLowerCase().includes(q) ||
                       (act.status || "").toLowerCase().includes(q) ||
-                      (act.details || "").toLowerCase().includes(q)
+                      detailsStr.toLowerCase().includes(q)
                     );
                   })
                   .slice(0, 100) // Show up to 100 entries
@@ -2041,6 +2042,12 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                       badgeBg = "rgba(220, 53, 69, 0.08)";
                       badgeColor = "#dc3545";
                     }
+
+                    const detailsStr = act.details
+                      ? (typeof act.details === "object"
+                          ? (act.details.actionEn || act.details.actionAr || JSON.stringify(act.details))
+                          : String(act.details))
+                      : "";
 
                     return (
                       <tr key={idx} style={{ borderBottom: "1px solid var(--card-border)", transition: "all 0.2s ease" }}>
@@ -2069,8 +2076,8 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                         <td style={{ padding: "0.75rem 1rem", color: "#6a7c88", fontSize: "0.8rem" }}>
                           {act.timestamp ? new Date(act.timestamp).toLocaleString(language === "ar" ? "ar-EG" : "en-US") : "N/A"}
                         </td>
-                        <td style={{ padding: "0.75rem 1rem", color: "#4f6371", maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={act.details}>
-                          {act.details}
+                        <td style={{ padding: "0.75rem 1rem", color: "#4f6371", maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={detailsStr}>
+                          {detailsStr}
                         </td>
                       </tr>
                     );

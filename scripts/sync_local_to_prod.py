@@ -2,110 +2,102 @@
 # -*- coding: utf-8 -*-
 
 """
-Fahem Database Sync Script.
-Reads local_db.json and securely sends all collections and documents to the 
-production Cloud Run API to sync/upsert them directly into the live MongoDB database.
+Synchronizes the local migrated database structures (libraries, curricula, subjects, books)
+to the production MongoDB Atlas instance via the secure administrative gated endpoint /admin/sync-db.
 """
 
 import os
 import json
+import sys
+import subprocess
 import urllib.request
 import urllib.error
-import subprocess
 
-# Resolve paths
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(SCRIPT_DIR)
-LOCAL_DB_PATH = os.path.join(ROOT_DIR, "web", "src", "app", "api", "local_db.json")
+LOCAL_DB_PATH = "C:/Users/hesh1/Desktop/fahem/web/src/app/api/local_db.json"
+BACKEND_URL = "https://fahem-agent-1061555578804.us-east4.run.app"
 
-# Support both candidate URLs
-PROD_URLS = [
-    "https://fahem-agent-sbqsl5tfga-uk.a.run.app/admin/sync-db",
-    "https://fahem-agent-1061555578804.us-east4.run.app/admin/sync-db"
-]
-
-def get_auth_token():
-    token = os.environ.get('FAHEM_AUTH_TOKEN')
-    if token:
-        print("[*] Using FAHEM_AUTH_TOKEN from environment.")
-        return f"Bearer {token}"
-    
-    print("[*] FAHEM_AUTH_TOKEN environment variable not found. Attempting to fetch identity token using gcloud...")
+def get_oidc_token():
+    print("[SYNC] Fetching OIDC Identity Token using gcloud...")
     try:
         token = subprocess.check_output(["gcloud", "auth", "print-identity-token"], shell=True).decode().strip()
-        print("[+] Successfully fetched identity token using gcloud.")
-        return f"Bearer {token}"
+        print(f"[SYNC] Successfully retrieved OIDC token (length: {len(token)}).")
+        return token
     except Exception as e:
-        print(f"[-] Error fetching identity token: {e}")
-        return "Bearer YOUR_FAHEM_AUTH_TOKEN"
+        print(f"[SYNC][-] Error retrieving OIDC token: {e}")
+        return None
 
-def sync_local_to_production():
-    print("--------------------------------------------------")
-    print("[SYNC] Fahem Database Synchronizer (Local -> Production Live)")
-    print("--------------------------------------------------")
+def make_request(url, method="POST", headers=None, body=None):
+    if headers is None:
+        headers = {}
+    
+    data = None
+    if body is not None:
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+        
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=60.0) as resp:
+            return resp.getcode(), json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as he:
+        try:
+            err_body = he.read().decode("utf-8")
+            return he.code, err_body
+        except Exception:
+            return he.code, None
+    except Exception as err:
+        return 0, str(err)
+
+def main():
+    print("==================================================")
+    print("[SYNC] Starting Local-to-Production Sync for R3 Data")
+    print("==================================================")
     
     if not os.path.exists(LOCAL_DB_PATH):
-        print(f"[-] Error: Local database file not found at: {LOCAL_DB_PATH}")
-        return False
+        print(f"[SYNC][FAIL] Local database file not found at: {LOCAL_DB_PATH}")
+        sys.exit(1)
         
-    print(f"[*] Reading local database state from: {LOCAL_DB_PATH}")
-    try:
-        with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
-            local_db = json.load(f)
-    except Exception as e:
-        print(f"[-] Error: Failed to parse local_db.json: {e}")
-        return False
-
-    print(f"[*] Local collections found: {list(local_db.keys())}")
-    for col, docs in local_db.items():
-        if isinstance(docs, list):
-            print(f"   * Collection '{col}': {len(docs)} documents")
-            
-    bypass_token = get_auth_token()
-    payload_data = json.dumps(local_db, ensure_ascii=False).encode("utf-8")
+    token = get_oidc_token()
+    if not token:
+        print("[SYNC][FAIL] Authentication token is missing. Ensure you are logged into gcloud.")
+        sys.exit(1)
+        
+    headers = {"Authorization": f"Bearer {token}"}
     
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": bypass_token
+    print(f"[SYNC] Reading local database from {LOCAL_DB_PATH}...")
+    with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
+        db = json.load(f)
+        
+    # We must synchronize: libraries, curricula, subjects, books
+    payload = {
+        "libraries": db.get("libraries", []),
+        "curricula": db.get("curricula", []),
+        "subjects": db.get("subjects", []),
+        "books": db.get("books", []),
+        "users": db.get("users", []),
+        "admins": db.get("admins", [])
     }
     
-    success = True
-    for prod_url in PROD_URLS:
-        print(f"\n[+] Sending sync payload to production API: {prod_url}...")
-        
-        req = urllib.request.Request(
-            prod_url,
-            data=payload_data,
-            headers=headers,
-            method="POST"
-        )
-        
-        try:
-            with urllib.request.urlopen(req, timeout=60.0) as response:
-                status_code = response.getcode()
-                response_body = response.read().decode("utf-8")
-                
-                print(f"[OK] Status Code: {status_code}")
-                try:
-                    parsed_res = json.loads(response_body)
-                    print(f"[SUCCESS] Sync Complete for {prod_url}! Production Response:")
-                    print(json.dumps(parsed_res, indent=2, ensure_ascii=False))
-                except Exception:
-                    print(f"\nResponse Body: {response_body}")
-                    
-        except urllib.error.HTTPError as he:
-            print(f"[ERROR] HTTP Error {he.code}: {he.reason} for {prod_url}")
-            try:
-                err_body = he.read().decode("utf-8")
-                print(f"   Error Body: {err_body}")
-            except Exception:
-                pass
-            success = False
-        except Exception as err:
-            print(f"[ERROR] Error triggering database synchronization for {prod_url}: {err}")
-            success = False
-            
-    return success
+    print(f"[SYNC] Local data counts:")
+    print(f"  - Libraries: {len(payload['libraries'])}")
+    print(f"  - Curricula: {len(payload['curricula'])}")
+    print(f"  - Subjects:  {len(payload['subjects'])}")
+    print(f"  - Books:     {len(payload['books'])}")
+    print(f"  - Users:     {len(payload['users'])}")
+    print(f"  - Admins:    {len(payload['admins'])}")
+    
+    sync_url = f"{BACKEND_URL}/admin/sync-db"
+    print(f"[SYNC] POSTing sync payload to {sync_url}...")
+    
+    code, res = make_request(sync_url, method="POST", headers=headers, body=payload)
+    print(f"Status Code: {code}")
+    print(f"Response: {res}")
+    
+    if code == 200 and isinstance(res, dict) and res.get("status") == "success":
+        print("[SYNC][SUCCESS] Database synchronized successfully to production MongoDB Atlas!")
+    else:
+        print("[SYNC][FAIL] Database synchronization failed!")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    sync_local_to_production()
+    main()

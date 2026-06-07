@@ -74,7 +74,11 @@ async function checkModelArmor(prompt: string): Promise<{ blocked: boolean; reas
       }
     } else {
       const errText = await res.text();
-      console.warn(`Model Armor API returned error status ${res.status}: ${errText}`);
+      if (res.status === 401 || res.status === 403 || res.status === 404) {
+        console.error(`[ALERT] SECURITY_DEGRADED: Model Armor returned setup error status ${res.status}: ${errText}. Routing in degraded safety mode.`);
+      } else {
+        console.warn(`Model Armor API returned transient error status ${res.status}: ${errText}`);
+      }
     }
   } catch (err: any) {
     console.error("Error calling GCP Model Armor:", err);
