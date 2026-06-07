@@ -49,8 +49,8 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 | R4 | builder-1 | 0 | S0 | Mandatory logged-in E2E smoke test | spec-live-regressions.md @ R4 | done | yes | [scripts/run_e2e_smoke_test.py](file:///C:/Users/hesh1/Desktop/fahem/scripts/run_e2e_smoke_test.py) |
 | R6 | builder-1 | 5 | S1 | React #31 crash: object rendered as a child in Activity History | spec-live-regressions.md @ R6 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/home/page.tsx) |
 | R7 | builder-1 | 1 | S3 | Missing library logo assets: `/libs/*.svg` 404 | spec-live-regressions.md @ R7 | done | yes | [web/public/libs/](file:///C:/Users/hesh1/Desktop/fahem/web/public/libs) |
-| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | claimed | — | — |
-| R11 | builder-1 | 6 | S1 | Owner/eval trap still live: demo entry sandboxes owner; sign-in routes to judge sandbox | spec-live-regressions.md @ R11 | in-progress | — | — |
+| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | [7fe6de5](https://github.com/hesham88/fahem/commit/7fe6de5f269a239b33a59fa89ee21ffbbf63189d) |
+| R11 | builder-1 | 6 | S1 | Owner/eval trap still live: demo entry sandboxes owner; sign-in routes to judge sandbox | spec-live-regressions.md @ R11 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) and [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/page.tsx) |
 | R12 | builder-2 | 4 | S2 | Companion emits its reply twice in one message | spec-live-regressions.md @ R12 | todo | — | — |
 | R13 | builder-3 | 6 | S1 | Real onboarding + phone verification broken | spec-live-regressions.md @ R13 | todo | — | — |
 | R14 | builder-3 | 6 | S2 | Settings school -> Google Maps Places autocomplete is non-interactive | spec-live-regressions.md @ R14 | todo | — | — |
@@ -63,7 +63,7 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 | ES-3 | builder-1 | 8 | S2 | Consolidated User Management sandbox live controls | spec-eval-sandbox-mode.md @ ES.7 | done | yes | [web/src/components/dashboard/UserAccountsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/UserAccountsPanel.tsx) |
 | ES-4 | builder-1 | 8 | S2 | Guided 7-step UI evaluation tutorial overlay walkthrough | spec-eval-sandbox-mode.md @ ES.3.2 | done | yes | [web/src/components/DemoTourGuide.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/DemoTourGuide.tsx) |
 | ES-5 | builder-1 | 8 | S2 | Persist tutorial steps & skip state in demo_sessions | spec-eval-sandbox-mode.md @ ES.7.1 | done | yes | [web/src/app/api/demo/tutorial/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/demo/tutorial/route.ts) |
-| ES-6 | builder-1 | 8 | S2 | Real Mongo fahem_sandbox DB + seed manifest (item 1) | spec-eval-sandbox-mode.md @ ES.6.1/6.1a | claimed | — | — |
+| ES-6 | builder-1 | 8 | S2 | Real Mongo fahem_sandbox DB + seed manifest (item 1) | spec-eval-sandbox-mode.md @ ES.6.1/6.1a | done | yes | [web/src/app/api/books/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/books/route.ts) etc |
 
 
 ## Event log (append-only; one line per task transition)
@@ -97,6 +97,8 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 - 2026-06-07T18:42:00+03:00 [builder-1] CLAIM+START R5 (GATE 0 - S0) & R11 (S1): Reopened R5 for real Firebase App Hosting + Cloud Run deployment. Claimed and started R11 owner/eval trap fix.
 - 2026-06-07T18:43:00+03:00 [builder-2] CLAIM+START R12 (S2): Claimed companion double-reply fix.
 - 2026-06-07T18:44:00+03:00 [builder-3] CLAIM+START R13 (S1): Claimed real onboarding + phone SMS OTP verification fix.
+- 2026-06-07T19:08:00+03:00 [builder-1] DONE R5, R11, ES-6: Completed full ES-6 database isolation for all Next.js API endpoints, verified R11 auth gates, successfully redeployed Python ADK microservice to Cloud Run, pushed frontend, and passed 100% of the mandatory R4 E2E logged-in smoke tests on fahem-agent.
+
 
 
 ## Open Questions to Brain (DF.6)

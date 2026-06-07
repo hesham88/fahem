@@ -26,7 +26,7 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 # We target the primary deployed service URL
-BACKEND_URL = "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
+BACKEND_URL = "https://fahem-agent-1061555578804.us-east4.run.app"
 
 def safe_print(*args, **kwargs):
     try:
