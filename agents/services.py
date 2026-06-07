@@ -254,13 +254,25 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "page_count": db["book_pages"].count_documents({"book_id": ob_id})
                 })
                 
+            # Fetch curricula and libraries for diagnostic linkage analysis
+            curricula = list(db["curricula"].find({}))
+            for c in curricula:
+                c["_id"] = str(c["_id"])
+                if "library_id" in c:
+                    c["library_id"] = str(c["library_id"])
+            libraries = list(db["libraries"].find({}))
+            for lib in libraries:
+                lib["_id"] = str(lib["_id"])
+
             client.close()
             return {
                 "status": "success",
                 "total_books": len(books),
                 "books": books,
                 "distinct_page_book_ids": distinct_page_book_ids,
-                "orphans": orphan_details
+                "orphans": orphan_details,
+                "curricula": curricula,
+                "libraries": libraries
             }
         except Exception as err:
             logger.error(f"[services.py] inspect_r17_data failed: {err}", exc_info=True)
