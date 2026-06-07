@@ -48,21 +48,31 @@ export default function LandingPage() {
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
   const [judgeEmail, setJudgeEmail] = useState("");
+  const [selectedPersona, setSelectedPersona] = useState<"student" | "teacher" | "admin">("student");
   const [bypassActive, setBypassActive] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
+
   useEffect(() => {
+    // 1. One-time boot purge of legacy bypass flags
+    if (typeof window !== "undefined") {
+      if (localStorage.getItem("judge_bypass_session") === "true") {
+        localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("judge_bypass_email");
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
-      if (currentUser || isJudgeBypass) {
-        const savedBypassEmail = typeof window !== "undefined" ? (localStorage.getItem("judge_bypass_email") || "judge.evaluation@fahem.edu") : "judge.evaluation@fahem.edu";
-        setUser(currentUser || ({
-          uid: "judge_evaluation_uid_01",
-          email: savedBypassEmail,
-          displayName: "⭐ JUDGE",
-          photoURL: "/avatars/golden_crown.svg",
-          phoneNumber: "+15555555555",
-        } as unknown as User));
+      const isDemoMode = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+      
+      if (currentUser || isDemoMode) {
+        if (currentUser) {
+          // Real Firebase user wins: clean up demo mode
+          localStorage.removeItem("app_mode");
+          localStorage.removeItem("demo_auth_token");
+        }
         router.push(`/${language}/home`);
       } else {
         setUser(null);
@@ -397,87 +407,168 @@ export default function LandingPage() {
 
             {/* Judge Evaluation Console Panel */}
             <form 
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const trimmedEmail = judgeEmail.trim().toLowerCase();
-                const domain = trimmedEmail.split("@")[1];
-                const isValidJudgeDomain = domain && ["google.com", "mongodb.com", "devpost.com"].includes(domain);
-                const isValidJudgeEmail = trimmedEmail === "judge.evaluation@fahem.edu" || trimmedEmail === "hesham1988@gmail.com" || isValidJudgeDomain;
-                
-                if (isValidJudgeEmail) {
+                try {
                   setBypassActive(true);
-                  if (typeof window !== "undefined") {
+                  setErrorMsg("");
+                  
+                  const trimmedEmail = judgeEmail.trim();
+
+                  // 1. Check eligibility server-side
+                  const eligResponse = await fetch("/api/eval/eligibility", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: trimmedEmail })
+                  });
+                  const eligData = await eligResponse.json();
+
+                  if (!eligResponse.ok || !eligData.eligible) {
+                    setErrorMsg(
+                      language === "ar" 
+                        ? "عذرًا، هذا البريد الإلكتروني غير مؤهل أو غير مسجل للتقييم." 
+                        : "Sorry, this email is not eligible or registered for evaluation."
+                    );
+                    setBypassActive(false);
+                    return;
+                  }
+
+                  // 2. Call /api/demo/enter
+                  const response = await fetch("/api/demo/enter", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      email: trimmedEmail,
+                      persona: selectedPersona
+                    })
+                  });
+                  const data = await response.json();
+                  
+                  if (response.ok && data.success) {
+                    const cleanToken = data.token.startsWith("demo-token:") 
+                      ? data.token.slice("demo-token:".length) 
+                      : data.token;
+                    
+                    localStorage.setItem("app_mode", "demo");
+                    localStorage.setItem("demo_auth_token", cleanToken);
                     localStorage.setItem("judge_bypass_session", "true");
                     localStorage.setItem("judge_bypass_email", trimmedEmail);
+                    router.push(`/${language}/home`);
+                  } else {
+                    setErrorMsg(data.error || (language === "ar" ? "فشل دخول البيئة التجريبية." : "Failed to enter sandbox mode."));
+                    setBypassActive(false);
                   }
-                  router.push(`/${language}/home`);
-                } else {
-                  setErrorMsg(language === "ar" ? "البريد الإلكتروني المدخل غير صحيح للمحكمين" : "Invalid email address for judge evaluation");
+                } catch (err) {
+                  setErrorMsg(language === "ar" ? "حدث خطأ في الاتصال بالخادم." : "Connection error occurred.");
+                  setBypassActive(false);
                 }
               }}
               style={{
                 width: "100%",
                 maxWidth: "340px",
-                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(249, 115, 22, 0.03))",
-                border: "1px solid rgba(218, 165, 32, 0.3)",
+                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.07), rgba(249, 115, 22, 0.05))",
+                border: "1px solid rgba(218, 165, 32, 0.4)",
                 borderRadius: "16px",
-                padding: "1rem",
-                boxShadow: "0 4px 15px rgba(218, 165, 32, 0.05)",
+                padding: "1.25rem",
+                boxShadow: "0 4px 20px rgba(218, 165, 32, 0.08)",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.75rem",
-                backdropFilter: "blur(10px)"
+                gap: "0.85rem",
+                backdropFilter: "blur(10px)",
+                textAlign: "start"
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span style={{ fontSize: "1.1rem", color: "#d4af37" }}>⭐</span>
                 <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#b8860b", letterSpacing: "0.5px" }}>
-                  {language === "ar" ? "منصة المحكمين المعتمدين" : "WHITELISTED JUDGE BYPASS"}
+                  {language === "ar" ? "البيئة التجريبية للمحكمين" : "EXPLORE DEMO SANDBOX"}
                 </span>
               </div>
-              <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0, textAlign: "start", lineHeight: 1.4 }}>
+              <p style={{ fontSize: "0.75rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
                 {language === "ar" 
-                  ? "أدخل البريد الإلكتروني للمحكم لتخطي reCAPTCHA ونظام OIDC المزدوج."
-                  : "Enter evaluator email to instantly skip phone SMS & recaptcha guards."
+                  ? "اختر دورك التجريبي وأدخل بريدًا إلكترونيًا اختياريًا لاستكشاف فاهم بأمان."
+                  : "Select your evaluation role and provide an optional email to explore."
                 }
               </p>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="email"
-                  placeholder="judge.evaluation@fahem.edu"
-                  value={judgeEmail}
-                  onChange={(e) => setJudgeEmail(e.target.value)}
+
+              {/* Persona Selector Dropdown */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                  {language === "ar" ? "الدور / الشخصية" : "CHOOSE PERSONA"}
+                </label>
+                <select
+                  value={selectedPersona}
+                  onChange={(e) => setSelectedPersona(e.target.value as any)}
                   style={{
-                    flex: 1,
-                    padding: "0.5rem 0.75rem",
+                    padding: "0.5rem",
                     borderRadius: "10px",
                     border: "1px solid rgba(218, 165, 32, 0.4)",
-                    background: "rgba(255, 255, 255, 0.8)",
+                    background: "rgba(255, 255, 255, 0.95)",
                     fontSize: "0.85rem",
                     color: "var(--foreground)",
                     outline: "none",
-                    transition: "border-color 0.2s"
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={bypassActive || !judgeEmail}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: "linear-gradient(135deg, #ffd700, #ffa500)",
-                    color: "#5c4033",
-                    fontWeight: 700,
-                    fontSize: "0.82rem",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(255, 215, 0, 0.2)",
-                    transition: "transform 0.1s"
+                    cursor: "pointer"
                   }}
                 >
-                  {bypassActive ? "..." : (language === "ar" ? "دخول" : "Bypass")}
-                </button>
+                  <option value="student">
+                    {language === "ar" ? "طالب (مساعد أكاديمي)" : "Student Persona"}
+                  </option>
+                  <option value="teacher">
+                    {language === "ar" ? "معلم (أدوات المدرسين)" : "Teacher Persona"}
+                  </option>
+                  <option value="admin">
+                    {language === "ar" ? "مدير (لوحة التحكم)" : "Admin Preview Persona"}
+                  </option>
+                </select>
               </div>
+
+              {/* Optional Email Input */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                  {language === "ar" ? "البريد الإلكتروني (اختياري)" : "EMAIL ADDRESS (OPTIONAL)"}
+                </label>
+                <input
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={judgeEmail}
+                  onChange={(e) => setJudgeEmail(e.target.value)}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(218, 165, 32, 0.4)",
+                    background: "rgba(255, 255, 255, 0.9)",
+                    fontSize: "0.85rem",
+                    color: "var(--foreground)",
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={bypassActive}
+                style={{
+                  padding: "0.6rem 1rem",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #ffd700, #ffa500)",
+                  color: "#5c4033",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(255, 215, 0, 0.3)",
+                  transition: "all 0.15s",
+                  marginTop: "0.25rem",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center"
+                }}
+              >
+                {bypassActive 
+                  ? (language === "ar" ? "جاري التحميل..." : "Entering...") 
+                  : (language === "ar" ? "دخول البيئة التجريبية" : "Enter Sandbox")
+                }
+              </button>
             </form>
           </div>
 

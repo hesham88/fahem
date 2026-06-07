@@ -37,7 +37,46 @@ def run_log_audit_task(category: str, agent: str, message: str, details: str = N
 import contextvars
 verified_principal_ctx = contextvars.ContextVar("verified_principal_ctx", default=None)
 
-ALLOWED_DATABASES = {"fahem"}
+ALLOWED_DATABASES = {"fahem", "fahem_sandbox"}
+
+def patch_pymongo():
+    try:
+        from pymongo.mongo_client import MongoClient
+        
+        orig_getitem = MongoClient.__getitem__
+        orig_getattr = MongoClient.__getattr__
+        
+        def patched_getitem(self, name):
+            if name == "fahem":
+                try:
+                    principal = verified_principal_ctx.get()
+                    if principal and isinstance(principal, dict):
+                        target = principal.get("db_target")
+                        if target in ["fahem", "fahem_sandbox"]:
+                            name = target
+                except Exception as e:
+                    logger.warning(f"Error in patched_getitem: {e}")
+            return orig_getitem(self, name)
+            
+        def patched_getattr(self, name):
+            if name == "fahem":
+                try:
+                    principal = verified_principal_ctx.get()
+                    if principal and isinstance(principal, dict):
+                        target = principal.get("db_target")
+                        if target in ["fahem", "fahem_sandbox"]:
+                            name = target
+                except Exception as e:
+                    logger.warning(f"Error in patched_getattr: {e}")
+            return orig_getattr(self, name)
+            
+        MongoClient.__getitem__ = patched_getitem
+        MongoClient.__getattr__ = patched_getattr
+        logger.info("[SANDBOX] Successfully monkeypatched pymongo.mongo_client.MongoClient for dynamic DB targeting")
+    except Exception as e:
+        logger.warning(f"[SANDBOX] Failed to monkeypatch pymongo: {e}")
+
+patch_pymongo()
 ALLOWED_COLLECTIONS = {
     "users", "user_profiles", "subjects", "books", "book_pages",
     "curricula", "libraries",                       # Phase 1

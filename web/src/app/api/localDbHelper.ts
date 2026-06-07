@@ -1,7 +1,21 @@
 import fs from "fs";
 import path from "path";
+import { AsyncLocalStorage } from "async_hooks";
 
-const LOCAL_DB_PATH = path.join(process.cwd(), "src/app/api/local_db.json");
+export const dbContextStorage = new AsyncLocalStorage<{ db_target: string }>();
+
+export function getDbTarget(): string {
+  const store = dbContextStorage.getStore();
+  return store?.db_target || "fahem";
+}
+
+export function getLocalDbPath(): string {
+  const dbTarget = getDbTarget();
+  if (dbTarget === "fahem_sandbox") {
+    return path.join(process.cwd(), "src/app/api/local_db_sandbox.json");
+  }
+  return path.join(process.cwd(), "src/app/api/local_db.json");
+}
 
 interface LocalDb {
   subjects: any[];
@@ -12,6 +26,9 @@ interface LocalDb {
     weeklyAllocationLimit: number;
     monthlyAllocationLimit: number;
     maxUploadSize: number; // in MB, e.g. 2 for 2MB
+    evalSandboxEnabled?: boolean;
+    evalWhitelist?: string[];
+    demoDomains?: string[];
   };
   social_groups?: any[];
   social_threads?: any[];
@@ -48,7 +65,10 @@ const DEFAULT_DB: LocalDb = {
     isTokenControlActive: true,
     weeklyAllocationLimit: 250000,
     monthlyAllocationLimit: 1000000,
-    maxUploadSize: 2 // 2MB
+    maxUploadSize: 2, // 2MB
+    evalSandboxEnabled: false,
+    evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+    demoDomains: ["google.com", "mongodb.com", "devpost.com"]
   },
   social_groups: [
     { _id: "group_math", name: "Pure Mathematics Club", name_ar: "نادي الرياضيات البحتة", description: "Math enthusiasts and algebra discussion.", description_ar: "مساحة مخصصة لعشاق الرياضيات ومناقشة المسائل الجبرية.", category: "Math", emoji: "📐", members_count: 12 },
@@ -116,17 +136,27 @@ export function shouldSkipDirectMongo(): boolean {
 }
 
 export function getLocalDb(): LocalDb {
+  const dbPath = getLocalDbPath();
   try {
-    if (!fs.existsSync(LOCAL_DB_PATH)) {
+    if (!fs.existsSync(dbPath)) {
+      let baseDb = DEFAULT_DB;
+      const mainPath = path.join(process.cwd(), "src/app/api/local_db.json");
+      if (fs.existsSync(mainPath)) {
+        try {
+          baseDb = JSON.parse(fs.readFileSync(mainPath, "utf8"));
+        } catch (e) {
+          console.error("[localDbHelper] Failed to read main local DB for clone:", e);
+        }
+      }
       // Ensure directory exists
-      const dir = path.dirname(LOCAL_DB_PATH);
+      const dir = path.dirname(dbPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
-      return DEFAULT_DB;
+      fs.writeFileSync(dbPath, JSON.stringify(baseDb, null, 2), "utf8");
+      return baseDb;
     }
-    const data = fs.readFileSync(LOCAL_DB_PATH, "utf8");
+    const data = fs.readFileSync(dbPath, "utf8");
     const db = JSON.parse(data) as LocalDb;
     
     // Ensure social keys are initialized if they don't exist in existing JSON file
@@ -232,12 +262,13 @@ export function checkFocusLockLocal(uid: string, role: string): { locked: boolea
 }
 
 export function saveLocalDb(db: LocalDb): boolean {
+  const dbPath = getLocalDbPath();
   try {
-    const dir = path.dirname(LOCAL_DB_PATH);
+    const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(db, null, 2), "utf8");
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf8");
     return true;
   } catch (err) {
     console.error("[localDbHelper] Error writing to local DB:", err);

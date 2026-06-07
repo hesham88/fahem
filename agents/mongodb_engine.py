@@ -228,6 +228,9 @@ class BookSchema(BaseModel):
         extra = "allow"
 
 
+import contextvars
+db_target_var = contextvars.ContextVar("db_target", default="fahem")
+
 # =====================================================================
 # PYMONGO ENGINE (DIRECT HIGH-PERFORMANCE DATA LAYER WITH SCHEMAS)
 # =====================================================================
@@ -235,13 +238,24 @@ class BookSchema(BaseModel):
 class MongoDBEngine:
     _instance = None
     _client = None
-    _db = None
     _initialized = False
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(MongoDBEngine, cls).__new__(cls)
         return cls._instance
+
+    @property
+    def _db(self):
+        if self._client is None:
+            return None
+        target = db_target_var.get()
+        return self._client[target]
+
+    @_db.setter
+    def _db(self, value):
+        # Allow assignment in constructor but ignore since we resolve dynamically via contextvar
+        pass
 
     def __init__(self, database_name: str = "fahem"):
         if self._initialized:
@@ -254,8 +268,7 @@ class MongoDBEngine:
         try:
             from pymongo import MongoClient
             self._client = MongoClient(self.uri, serverSelectionTimeoutMS=5000)
-            self._db = self._client[self.database_name]
-            logger.info(f"[MongoDBEngine] Successfully connected direct MongoClient client to '{self.database_name}'")
+            logger.info(f"[MongoDBEngine] Successfully connected direct MongoClient client. Dynamic targeting active.")
             
             # Run startup auto-healing collection initializations and index tuning
             self.ensure_schema_and_indexes()
@@ -264,7 +277,6 @@ class MongoDBEngine:
         except Exception as e:
             logger.error(f"[MongoDBEngine] Direct MongoClient initialization failed: {e}", exc_info=True)
             self._client = None
-            self._db = None
 
     def ensure_schema_and_indexes(self):
         """Preemptively boots up collections and strictly applies unique constraints & index-tuning."""

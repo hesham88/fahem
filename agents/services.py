@@ -99,6 +99,22 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as ctx_err:
             logger.warning(f"Failed to import/set verified_principal_ctx: {ctx_err}")
 
+        db_target_ctx = None
+        try:
+            db_target = "fahem"
+            if principal and isinstance(principal, dict):
+                db_target = principal.get("db_target") or "fahem"
+            
+            try:
+                from agents.mongodb_engine import db_target_var
+            except ImportError:
+                from mongodb_engine import db_target_var
+                
+            db_target_ctx = db_target_var.set(db_target)
+            logger.info(f"[DB TARGET] ContextVar db_target set globally to: {db_target}")
+        except Exception as e:
+            logger.warning(f"Failed to set db_target_var ContextVar: {e}")
+
         try:
             return await call_next(request)
         finally:
@@ -106,6 +122,15 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 try:
                     from guardrails import verified_principal_ctx
                     verified_principal_ctx.reset(token_ctx)
+                except Exception:
+                    pass
+            if db_target_ctx is not None:
+                try:
+                    try:
+                        from agents.mongodb_engine import db_target_var
+                    except ImportError:
+                        from mongodb_engine import db_target_var
+                    db_target_var.reset(db_target_ctx)
                 except Exception:
                     pass
 
@@ -1497,6 +1522,88 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"success": True, "message": f"Successfully {action}d admin {admin_email}"}
         except Exception as err:
             logger.error(f"[services.py] Failed to update admin: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.get("/admin/config")
+    async def admin_get_config_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            config_doc = db["config"].find_one({})
+            if not config_doc:
+                # Insert default config
+                default_config = {
+                    "isTokenControlActive": True,
+                    "weeklyAllocationLimit": 250000,
+                    "monthlyAllocationLimit": 1000000,
+                    "maxUploadSize": 2,
+                    "evalSandboxEnabled": False,
+                    "evalWhitelist": ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+                    "demoDomains": ["google.com", "mongodb.com", "devpost.com"]
+                }
+                db["config"].insert_one(default_config)
+                config_doc = default_config
+            
+            # Remove _id for JSON serialization
+            if "_id" in config_doc:
+                config_doc["_id"] = str(config_doc["_id"])
+                
+            client.close()
+            return {"success": True, "config": config_doc}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get config: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/admin/config")
+    async def admin_post_config_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            data = await request.json()
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            # Prepare update fields
+            update_fields = {}
+            if "isTokenControlActive" in data:
+                update_fields["isTokenControlActive"] = bool(data["isTokenControlActive"])
+            if "weeklyAllocationLimit" in data:
+                update_fields["weeklyAllocationLimit"] = int(data["weeklyAllocationLimit"])
+            if "monthlyAllocationLimit" in data:
+                update_fields["monthlyAllocationLimit"] = int(data["monthlyAllocationLimit"])
+            if "maxUploadSize" in data:
+                update_fields["maxUploadSize"] = int(data["maxUploadSize"])
+            if "evalSandboxEnabled" in data:
+                update_fields["evalSandboxEnabled"] = bool(data["evalSandboxEnabled"])
+            if "evalWhitelist" in data:
+                update_fields["evalWhitelist"] = [str(x).strip().lower() for x in data["evalWhitelist"] if x]
+            if "demoDomains" in data:
+                update_fields["demoDomains"] = [str(x).strip().lower() for x in data["demoDomains"] if x]
+                
+            db["config"].update_one({}, {"$set": update_fields}, upsert=True)
+            
+            # Fetch latest
+            config_doc = db["config"].find_one({})
+            if "_id" in config_doc:
+                config_doc["_id"] = str(config_doc["_id"])
+                
+            client.close()
+            return {"success": True, "config": config_doc}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to update config: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"error": str(err)},
                 status_code=500

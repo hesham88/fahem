@@ -11,27 +11,32 @@ export async function authedFetch(path: string, init: RequestInit = {}): Promise
   let token: string | null = null;
 
   if (typeof window !== "undefined") {
-    const isJudgeBypass = localStorage.getItem("judge_bypass_session") === "true";
-    if (isJudgeBypass) {
-      const savedBypassEmail = localStorage.getItem("judge_bypass_email") || "judge.evaluation@fahem.edu";
-      token = `judge-mock:${savedBypassEmail}`;
-    } else if (process.env.NODE_ENV === "development") {
-      // Support testing various personas offline/locally
-      const mockToken = sessionStorage.getItem("mock_auth_token");
-      if (mockToken) {
-        token = mockToken;
-      }
-    }
-  }
-
-  // If no mock token is active, acquire the real Firebase ID token
-  if (!token) {
+    // Precedence inversion: a real Firebase ID token always wins!
     const currentUser = auth.currentUser;
     if (currentUser) {
       try {
         token = await currentUser.getIdToken();
+        // Clear bypass flags if a real user is successfully authenticated
+        localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("app_mode");
       } catch (err) {
         console.error("[authedFetch] Failed to retrieve Firebase ID token:", err);
+      }
+    }
+
+    if (!token) {
+      const isDemoMode = localStorage.getItem("app_mode") === "demo";
+      if (isDemoMode) {
+        const demoToken = localStorage.getItem("demo_auth_token");
+        if (demoToken) {
+          token = `demo-token:${demoToken}`;
+        }
+      } else if (process.env.NODE_ENV === "development") {
+        // Support testing various personas offline/locally
+        const mockToken = sessionStorage.getItem("mock_auth_token");
+        if (mockToken) {
+          token = mockToken;
+        }
       }
     }
   }

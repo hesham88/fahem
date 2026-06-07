@@ -125,7 +125,8 @@ export async function proxyRequest(
       headers["X-Verified-Principal"] = JSON.stringify({
         uid: ctx.uid,
         email: ctx.email,
-        role: ctx.role
+        role: ctx.role,
+        db_target: ctx.db_target || "fahem"
       });
     }
 

@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
           isTokenControlActive: true,
           weeklyAllocationLimit: 250000,
           monthlyAllocationLimit: 1000000,
-          maxUploadSize: 2
+          maxUploadSize: 2,
+          evalSandboxEnabled: false,
+          evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+          demoDomains: ["google.com", "mongodb.com", "devpost.com"]
         };
         saveLocalDb(db);
       }
@@ -44,7 +47,10 @@ export async function GET(req: NextRequest) {
         isTokenControlActive: true,
         weeklyAllocationLimit: 250000,
         monthlyAllocationLimit: 1000000,
-        maxUploadSize: 2
+        maxUploadSize: 2,
+        evalSandboxEnabled: false,
+        evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+        demoDomains: ["google.com", "mongodb.com", "devpost.com"]
       };
       saveLocalDb(db);
     }
@@ -68,7 +74,15 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize } = body;
+    const { 
+      isTokenControlActive, 
+      weeklyAllocationLimit, 
+      monthlyAllocationLimit, 
+      maxUploadSize,
+      evalSandboxEnabled,
+      evalWhitelist,
+      demoDomains
+    } = body;
 
     // Determine if requester is an admin that requires superadmin approval
     const isSuper = ctx.role === "super-admin";
@@ -81,7 +95,15 @@ export async function POST(req: NextRequest) {
         id: requestId,
         requesterEmail: ctx.email,
         actionType: "update_config",
-        payload: { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize },
+        payload: { 
+          isTokenControlActive, 
+          weeklyAllocationLimit, 
+          monthlyAllocationLimit, 
+          maxUploadSize,
+          evalSandboxEnabled,
+          evalWhitelist,
+          demoDomains
+        },
         status: "pending",
         createdAt: new Date().toISOString()
       };
@@ -101,7 +123,10 @@ export async function POST(req: NextRequest) {
         isTokenControlActive: isTokenControlActive !== undefined ? !!isTokenControlActive : true,
         weeklyAllocationLimit: Number(weeklyAllocationLimit) || 250000,
         monthlyAllocationLimit: Number(monthlyAllocationLimit) || 1000000,
-        maxUploadSize: Number(maxUploadSize) || 2
+        maxUploadSize: Number(maxUploadSize) || 2,
+        evalSandboxEnabled: evalSandboxEnabled !== undefined ? !!evalSandboxEnabled : false,
+        evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+        demoDomains: Array.isArray(demoDomains) ? demoDomains : ["google.com", "mongodb.com", "devpost.com"]
       };
       saveLocalDb(db);
       return new Response(JSON.stringify({ success: true, config: db.config }), {
@@ -111,7 +136,15 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const proxyRes = await proxyRequest("/admin/config", "POST", { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize }, ctx);
+      const proxyRes = await proxyRequest("/admin/config", "POST", { 
+        isTokenControlActive, 
+        weeklyAllocationLimit, 
+        monthlyAllocationLimit, 
+        maxUploadSize,
+        evalSandboxEnabled,
+        evalWhitelist,
+        demoDomains
+      }, ctx);
       if (proxyRes.ok) {
         return proxyRes;
       }
@@ -124,7 +157,10 @@ export async function POST(req: NextRequest) {
       isTokenControlActive: isTokenControlActive !== undefined ? !!isTokenControlActive : true,
       weeklyAllocationLimit: Number(weeklyAllocationLimit) || 250000,
       monthlyAllocationLimit: Number(monthlyAllocationLimit) || 1000000,
-      maxUploadSize: Number(maxUploadSize) || 2
+      maxUploadSize: Number(maxUploadSize) || 2,
+      evalSandboxEnabled: evalSandboxEnabled !== undefined ? !!evalSandboxEnabled : false,
+      evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+      demoDomains: Array.isArray(demoDomains) ? demoDomains : ["google.com", "mongodb.com", "devpost.com"]
     };
     saveLocalDb(db);
     return new Response(JSON.stringify({ success: true, config: db.config }), {

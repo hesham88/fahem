@@ -53,13 +53,25 @@ def get_db_client() -> Optional[MongoClient]:
 # -------------------------------------------------------------
 # 1. MongoSessionService Implementation
 # -------------------------------------------------------------
-class MongoSessionService(BaseSessionService):
-    """A persistent, MongoDB-backed session service for ADK 2.0 with InMemory fallback."""
+    @property
+    def db_name(self) -> str:
+        try:
+            from agents.mongodb_engine import db_target_var
+            return db_target_var.get()
+        except ImportError:
+            try:
+                from mongodb_engine import db_target_var
+                return db_target_var.get()
+            except ImportError:
+                return "fahem"
+
+    @db_name.setter
+    def db_name(self, value):
+        pass
 
     def __init__(self, client: Optional[MongoClient] = None, database_name: str = "fahem"):
         super().__init__()
         self.client = client or get_db_client()
-        self.db_name = database_name
         self.fallback_service = InMemorySessionService()
 
     def _get_user_state(self, app_name: str, user_id: str) -> dict:
@@ -325,10 +337,25 @@ class MongoSessionService(BaseSessionService):
 class MongoMemoryService(BaseMemoryService):
     """A persistent, MongoDB-backed memory service for ADK 2.0 with InMemory fallback."""
 
+    @property
+    def db_name(self) -> str:
+        try:
+            from agents.mongodb_engine import db_target_var
+            return db_target_var.get()
+        except ImportError:
+            try:
+                from mongodb_engine import db_target_var
+                return db_target_var.get()
+            except ImportError:
+                return "fahem"
+
+    @db_name.setter
+    def db_name(self, value):
+        pass
+
     def __init__(self, client: Optional[MongoClient] = None, database_name: str = "fahem"):
         super().__init__()
         self.client = client or get_db_client()
-        self.db_name = database_name
         self.fallback_service = InMemoryMemoryService()
 
     @override
