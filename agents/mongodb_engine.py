@@ -627,6 +627,8 @@ class MongoDBEngine:
             doc = self._db["users"].find_one({"username_clean": username.strip().lower()})
             if not doc:
                 doc = self._db["users"].find_one({"userId": username})
+            if not doc:
+                doc = self._db["users"].find_one({"email": {"$regex": f"^{re.escape(username.strip().lower())}@", "$options": "i"}})
 
         if not doc:
             return None

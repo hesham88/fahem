@@ -969,6 +969,24 @@ async def get_user_profile(user_id: str = None, username: str = None, email: str
             if docs_fallback and len(docs_fallback) > 0:
                 return docs_fallback[0]
 
+            # Fallback 2: check if email prefix matches username
+            import re
+            res_fallback_email = await _run_mcp_tool("find", {
+                "database": "fahem",
+                "collection": "users",
+                "filter": {"email": {"$regex": f"^{re.escape(username.strip().lower())}@", "$options": "i"}}
+            })
+            docs_fallback_email = []
+            if isinstance(res_fallback_email, list):
+                docs_fallback_email = res_fallback_email
+            elif isinstance(res_fallback_email, dict) and "documents" in res_fallback_email:
+                docs_fallback_email = res_fallback_email["documents"]
+            elif isinstance(res_fallback_email, dict) and "result" in res_fallback_email:
+                docs_fallback_email = res_fallback_email["result"]
+
+            if docs_fallback_email and len(docs_fallback_email) > 0:
+                return docs_fallback_email[0]
+
         return {}
     except Exception as err:
         logger.error(f"Error fetching user profile for {user_id or username or email}: {err}", exc_info=True)

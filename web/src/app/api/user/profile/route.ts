@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       const userList = db.users || [];
       const user = userList.find(u => 
         (userId && u.userId === userId) ||
-        (username && u.username === username) ||
+        (username && (u.username === username || (u.email && u.email.split("@")[0].toLowerCase() === username.toLowerCase()))) ||
         (email && u.email?.toLowerCase() === email.toLowerCase())
       );
       if (user) {

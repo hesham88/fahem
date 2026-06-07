@@ -94,7 +94,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title: t.title,
     description: t.description,
     keywords: t.keywords,
-    metadataBase: new URL("https://fahem-88d40.web.app"),
+    metadataBase: new URL("https://fahem.pro"),
     robots: {
       index: true,
       follow: true,
@@ -187,7 +187,7 @@ export default async function LocaleLayout({
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": locale === "ar" ? "فاهم" : "Fahem",
-    "url": `https://fahem-88d40.web.app/${locale}`,
+    "url": `https://fahem.pro/${locale}`,
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "All",
     "description": activeDescription,

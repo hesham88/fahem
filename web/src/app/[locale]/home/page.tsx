@@ -5901,9 +5901,12 @@ export default function Home() {
               <span>{language === "ar" ? "التواصل والدردشة" : "Social Network"}</span>
             </button>
 
-            {userProfile?.username && (
+            {userProfile && (
               <button
-                onClick={() => router.push(`/${language}/profile/${userProfile.username}`)}
+                onClick={() => {
+                  const targetUsername = userProfile.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
+                  router.push(`/${language}/profile/${targetUsername}`);
+                }}
                 className="sidebar-nav-btn"
                 type="button"
               >
@@ -5963,9 +5966,8 @@ export default function Home() {
             <div 
               className="sidebar-user-card" 
               onClick={() => {
-                if (userProfile?.username) {
-                  router.push(`/${language}/profile/${userProfile.username}`);
-                }
+                const targetUsername = userProfile?.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
+                router.push(`/${language}/profile/${targetUsername}`);
               }}
               style={{ cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => {
