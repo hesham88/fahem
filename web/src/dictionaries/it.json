@@ -164,5 +164,11 @@
   "session_expired": "Sessione scaduta. Invia nuovamente il codice.",
   "phone_send_failed": "Impossibile inviare il codice SMS. Assicurati che reCAPTCHA sia completato.",
   "code_verify_failed": "Codice errato. Riprova.",
-  "phone_back": "Indietro / Ricomincia"
+  "phone_back": "Indietro / Ricomincia",
+  "notification_center": "Notification Center",
+  "notifications_empty": "You have no notifications",
+  "notifications_all_caught_up": "You're all caught up!",
+  "notifications_mark_all_read": "Mark all as read",
+  "notifications_view_all": "View all",
+  "notifications_unread": "Unread"
 }

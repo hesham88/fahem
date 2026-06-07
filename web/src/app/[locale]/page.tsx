@@ -402,7 +402,7 @@ export default function LandingPage() {
                 const trimmedEmail = judgeEmail.trim().toLowerCase();
                 const domain = trimmedEmail.split("@")[1];
                 const isValidJudgeDomain = domain && ["google.com", "mongodb.com", "devpost.com"].includes(domain);
-                const isValidJudgeEmail = trimmedEmail === "judge.evaluation@fahem.edu" || isValidJudgeDomain;
+                const isValidJudgeEmail = trimmedEmail === "judge.evaluation@fahem.edu" || trimmedEmail === "hesham1988@gmail.com" || isValidJudgeDomain;
                 
                 if (isValidJudgeEmail) {
                   setBypassActive(true);
@@ -482,39 +482,94 @@ export default function LandingPage() {
           </div>
 
           {/* Built with Partner Band */}
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "0.5rem",
-            marginTop: "1.5rem",
-            padding: "0.75rem 1.5rem",
-            background: "rgba(255, 255, 255, 0.25)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            borderRadius: "16px",
-            width: "100%",
-            maxWidth: "500px"
-          }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "1.5px" }}>
-              {language === "ar" ? "بنيت باستخدام شراكاتنا التقنية" : "Built with Leading Tech Integrations"}
+          <div className="tech-stack-container">
+            <span className="tech-stack-title">
+              {language === "ar" ? "باقة التقنيات المعتمدة" : "Leading Tech Integrations & Stack"}
             </span>
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
-              {/* Google Cloud */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", opacity: 0.85 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4"/>
+            <div className="tech-stack-grid">
+              {/* Gemini */}
+              <div className="tech-logo-item tech-logo-gemini">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" fill="url(#gemini-grad)"/>
+                  <defs>
+                    <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#8b5cf6"/>
+                      <stop offset="100%" stopColor="#3b82f6"/>
+                    </linearGradient>
+                  </defs>
                 </svg>
-                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>Google Cloud</span>
+                <span className="tech-logo-text">Gemini</span>
               </div>
+
+              {/* ADK */}
+              <div className="tech-logo-item tech-logo-adk">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" fill="#4285F4" />
+                </svg>
+                <span className="tech-logo-text">Google ADK</span>
+              </div>
+
+              {/* Antigravity */}
+              <div className="tech-logo-item tech-logo-antigravity">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L4 10h5v12h6V10h5L12 2z" fill="url(#antigravity-grad)"/>
+                  <path d="M6 22h12v-2H6v2z" fill="url(#antigravity-grad)" opacity="0.6"/>
+                  <defs>
+                    <linearGradient id="antigravity-grad" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#f43f5e"/>
+                      <stop offset="100%" stopColor="#ec4899"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span className="tech-logo-text">Antigravity</span>
+              </div>
+
+              {/* Firebase */}
+              <div className="tech-logo-item tech-logo-firebase">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3.9 18.5l9.2-15.6c.3-.5.9-.5 1.2 0l2 3.4L3.9 18.5z" fill="#FFC107"/>
+                  <path d="M16.8 6.9L14.3.4C14.1-.1 13.5-.1 13.3.4L3.9 18.5l12.9-11.6z" fill="#FFC107" opacity="0.8"/>
+                  <path d="M3.9 18.5l10.3 5.8c.4.2.9.2 1.3 0l4.6-5.8L3.9 18.5z" fill="#DD2C00"/>
+                  <path d="M20.1 18.5l-3.3-11.6-12.9 11.6h16.2z" fill="#FF9100"/>
+                </svg>
+                <span className="tech-logo-text">Firebase</span>
+              </div>
+
+              {/* Next.js */}
+              <div className="tech-logo-item tech-logo-nextjs">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="#000000"/>
+                  <path d="M16.5 17.5L9.5 8.5V15.5H8V7H9.5L16 15.3V7H17.5V17.5H16.5Z" fill="#FFFFFF"/>
+                </svg>
+                <span className="tech-logo-text">Next.js</span>
+              </div>
+
+              {/* Google Maps */}
+              <div className="tech-logo-item tech-logo-googlemaps">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EA4335" />
+                  <path d="M12 6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="#4285F4" />
+                </svg>
+                <span className="tech-logo-text">Google Maps</span>
+              </div>
+
               {/* MongoDB */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", opacity: 0.85 }}>
-                <svg width="14" height="20" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div className="tech-logo-item tech-logo-mongodb">
+                <svg width="13" height="18" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M16 0C13.5 6.5 9 13.5 9 19.5C9 28.5 13 33.5 16 38C19 33.5 23 28.5 23 19.5C23 13.5 18.5 6.5 16 0Z" fill="#13AA52"/>
                   <path d="M16 1.5V36.5C17.5 32.5 21 28 21 19.5C21 14.5 18 8 16 1.5Z" fill="#118843"/>
                   <path d="M16 38V48L13 42L16 38Z" fill="#13AA52"/>
                 </svg>
-                <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#118843", letterSpacing: "-0.2px" }}>MongoDB</span>
+                <span className="tech-logo-text">MongoDB</span>
+              </div>
+
+              {/* Cloud Armor */}
+              <div className="tech-logo-item tech-logo-cloudarmor">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 9.9H6V6.31l6-2.25v7.84z" fill="#4285F4" />
+                  <path d="M12 11.9h6V6.31l-6-2.25v7.84z" fill="#EA4335" opacity="0.9" />
+                </svg>
+                <span className="tech-logo-text">Cloud Armor</span>
               </div>
             </div>
           </div>

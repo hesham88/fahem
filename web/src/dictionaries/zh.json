@@ -164,5 +164,11 @@
   "session_expired": "会话已过期。请重新发送验证码。",
   "phone_send_failed": "发送短信验证码失败。请确保已完成 reCAPTCHA 验证。",
   "code_verify_failed": "验证码错误。请重试。",
-  "phone_back": "返回 / 重新开始"
+  "phone_back": "返回 / 重新开始",
+  "notification_center": "Notification Center",
+  "notifications_empty": "You have no notifications",
+  "notifications_all_caught_up": "You're all caught up!",
+  "notifications_mark_all_read": "Mark all as read",
+  "notifications_view_all": "View all",
+  "notifications_unread": "Unread"
 }

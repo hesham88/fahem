@@ -64,6 +64,9 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 - 2026-06-07T07:25:30+03:00 [builder-1] DONE P4-1, P4-2, P4-3, P4-4: Verified fully integrated Companion Core, persistent MongoDB sessions and memory services, scoped RAG, and OIDC A2A boundary. Unblocked remaining Phase 5 and Phase 7 tasks. Completed Schedule panel implementation in TimetablePanel.tsx.
 - 2026-06-07T08:52:00+03:00 [builder-4] DRIFT: Reconciled bible manifest with CHANGELOG 2026-06-07-k. CLAIM+START P5-1, P5-2, P5-3, P7-4.
 - 2026-06-07T08:55:00+03:00 [builder-4] DONE P5-1, P5-2, P5-3, P7-4: Verified components (Practice, Plan, Zatona history unification, Insights, Social panel repairs, StickyChat open state sessionStorage persistence, sticky language & mount stability). All compile checks pass successfully.
+- 2026-06-07T09:05:00+03:00 [builder-1] DONE Case 46: Completed Premium Styling of Curriculum Ingestion Studio with deep glassmorphism and real DevOps telemetry console terminal styles.
+- 2026-06-07T09:12:00+03:00 [builder-1] DONE Case 47: Updated landing page hero-card text to student benefits-first copy across English and Arabic, and built a high-premium horizontal tech stack logo section containing Gemini, ADK, Antigravity, Firebase, Next.js, Google Maps, MongoDB, and Cloud Armor logos with CSS hover glow animations.
+
 
 
 ## Open Questions to Brain (DF.6)

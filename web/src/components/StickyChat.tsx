@@ -886,6 +886,13 @@ export default function StickyChat() {
     }
   }, [language, messages.length]);
 
+  // Automatically trigger dynamic capabilities-grounded streaming welcome message
+  useEffect(() => {
+    if (user && messages.length === 1 && messages[0]?.id === "welcome") {
+      triggerDynamicWelcome(language);
+    }
+  }, [user, language]);
+
   // Sync authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -1225,6 +1232,140 @@ export default function StickyChat() {
     }
   }
 
+  const triggerDynamicWelcome = async (lang: string) => {
+    if (!user) return;
+    try {
+      const promptPayload = `Please provide an engaging welcome introduction outlining your actual capabilities as the Fahem AI Companion (such as book reading, smart study schedules, oral practice, adaptive quizzes, page-cited answers, and research node). Keep it friendly and concise, in the user's language: ${lang === "ar" ? "Arabic" : "English"}. Do not use markdown headers of level 1 or 2, use list bullet-points or emojis instead. Keep it extremely welcoming and premium.`;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === "welcome" ? { ...msg, text: "" } : msg
+        )
+      );
+
+      const response = await authedFetch("/api/agent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: promptPayload,
+          language: lang,
+        }),
+      });
+
+      if (!response.body) {
+        throw new Error("No readable stream in response");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedText = "";
+      let chunkBuffer = "";
+      let inFinalOutput = false;
+
+      while (!done) {
+        const { value, done: isDone } = await reader.read();
+        done = isDone;
+        let chunk = "";
+        if (value) {
+          chunk = decoder.decode(value, { stream: true });
+        } else if (done) {
+          chunk = decoder.decode();
+        }
+        chunkBuffer += chunk;
+
+        let processed = true;
+        while (processed && chunkBuffer.length > 0) {
+          processed = false;
+
+          if (!inFinalOutput) {
+            const nlIdx = chunkBuffer.indexOf("\n");
+            if (nlIdx !== -1) {
+              const line = chunkBuffer.substring(0, nlIdx);
+              chunkBuffer = chunkBuffer.substring(nlIdx + 1);
+              processed = true;
+
+              const trimmedLine = line.trim();
+              if (trimmedLine) {
+                if (trimmedLine.includes("=== Agent Final Output ===")) {
+                  inFinalOutput = true;
+                }
+              }
+            }
+          } else {
+            const boundaryIdx = chunkBuffer.indexOf("==========================");
+            if (boundaryIdx !== -1) {
+              const textBefore = chunkBuffer.substring(0, boundaryIdx);
+              chunkBuffer = chunkBuffer.substring(boundaryIdx + "==========================".length);
+              inFinalOutput = false;
+              processed = true;
+
+              if (textBefore) {
+                accumulatedText += textBefore;
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === "welcome" ? { ...msg, text: accumulatedText.trim() } : msg
+                  )
+                );
+              }
+            } else if (chunkBuffer.length > 30) {
+              const safeLen = chunkBuffer.length - 30;
+              const safeText = chunkBuffer.substring(0, safeLen);
+              chunkBuffer = chunkBuffer.substring(safeLen);
+              processed = true;
+
+              accumulatedText += safeText;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === "welcome" ? { ...msg, text: accumulatedText.trim() } : msg
+                )
+              );
+            }
+          }
+        }
+
+        if (done && chunkBuffer.length > 0) {
+          if (inFinalOutput) {
+            let cleanText = chunkBuffer;
+            const bIdx = cleanText.indexOf("==========================");
+            if (bIdx !== -1) {
+              cleanText = cleanText.substring(0, bIdx);
+            }
+            if (cleanText) {
+              accumulatedText += cleanText;
+            }
+          } else {
+            const trimmedLine = chunkBuffer.trim();
+            if (trimmedLine && !trimmedLine.includes("==========================") && !trimmedLine.includes("[CLOSE]")) {
+              if (!trimmedLine.startsWith("[METADATA]") &&
+                  !trimmedLine.startsWith("[Unknown]") &&
+                  !trimmedLine.startsWith("[Fahem Agent]") &&
+                  !trimmedLine.startsWith("[Sub-Agent:") &&
+                  !trimmedLine.startsWith("Prompt:")) {
+                accumulatedText += chunkBuffer + "\n";
+              }
+            }
+          }
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === "welcome" ? { ...msg, text: accumulatedText.trim() } : msg
+            )
+          );
+          chunkBuffer = "";
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching dynamic welcome message:", err);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === "welcome" ? { ...msg, text: ct("welcome") } : msg
+        )
+      );
+    }
+  };
+
   const startNewChat = () => {
     setCurrentSessionId("");
     setMessages([
@@ -1237,6 +1378,9 @@ export default function StickyChat() {
     ]);
     setSessionLogs([]);
     setShowHistory(false);
+    if (user) {
+      triggerDynamicWelcome(language);
+    }
   };
 
   const getMentionOptions = () => {
@@ -1689,76 +1833,7 @@ export default function StickyChat() {
       return;
     }
 
-    const isCapabilityTrigger = (
-      /what\s+(can\s+you|can\s+it|do\s+you|are\s+your)\s+(do|help|features|capabilities)/i.test(queryText) ||
-      /how\s+(to\s+use|do\s+i\s+use|can\s+you\s+help)/i.test(queryText) ||
-      /\b(help|features|capabilities)\b/i.test(queryText) ||
-      /ماذا\s+(يمكنك|تفعل|تستطيع|هي\s+مميزاتك|تعرف)/i.test(queryText) ||
-      /كيف\s+(تساعدني|أستخدم|استخدم|تشتغل)/i.test(queryText) ||
-      /(ايش|وش|شو)\s+(تسوي|تسوين|تعرف|مساعدتك)/i.test(queryText) ||
-      /\b(مساعدة|المساعدة|مميزات|مزايا|خصائص|وظائفك|عملك)\b/i.test(queryText) ||
-      /zatoona|zatona|الزتونة|زتونة|research\s+node/i.test(queryText)
-    );
 
-    if (isCapabilityTrigger) {
-      const userMsgId = `msg-${Date.now()}-user`;
-      const assistantMsgId = `msg-${Date.now()}-assistant`;
-      setMessages((prev) => [
-        ...prev,
-        { id: userMsgId, role: "user", text: queryText, timestamp: new Date() }
-      ]);
-      setIsSending(true);
-      setTimeout(() => {
-        const arabicText = `أنا **مُساعد فاهِم الذكي 🎓**، رفيقك الأكاديمي الشخصي المصمم لمساعدتك في رحلتك التعليمية بأفضل الطرق الممكنة!
-
-إليك ما يمكنني القيام به من أجلك:
-
-#### 1. 📚 رفيق الدراسة الذكي (Research Node)
-أنا متصل بالكامل بصفحات كتبك ومناهجك الدراسية النشطة! عندما تتصفح أي كتاب أو مستند في المنصة:
-* **شرح السياق الحالي:** يمكنك سؤالي عن أي جزء في الصفحة المفتوحة وسأقوم بتبسيط المفاهيم الصعبة فوراً.
-* **حل المعادلات الرياضية:** أستطيع تفكيك وشرح المسائل الرياضية أو الأكواد البرمجية خطوة بخطوة.
-* **الاستدعاء النشط (Active Recall):** اطلب مني اختبارك في الصفحة الحالية وسأقوم بتوليد أسئلة تفاعلية ذكية بناءً على محتوى الدرس المفتوح لتنشيط ذاكرتك.
-* **ملخصات سريعة:** سأقوم بتلخيص أي صفحة دراسية على شكل نقاط واضحة ومباشرة.
-
-#### 2. 🧠 أداة "الزتونة" للبحث الأكاديمي (Zatona AI Research)
-هل تحتاج إلى بحث أكاديمي عميق وشامل؟ يمكنك استخدام **قسم "الزتونة" (Zatona - AI Summary & Research Hub)** في لوحة التحكم الخاصة بك:
-* **تقارير بحثية عميقة:** بضغطة زر واحدة، تولّد "الزتونة" تقريراً أكاديمياً فائق الدقة ومتعدد الفصول حول أي موضوع علمي أو مفهوم تريده.
-* **خلاصات الكتب والمسارات:** تمنحك خلاصة مركزة لأي موضوع دراسي مع تفكيك شامل ومحاذاة المناهج الأكاديمية لتوفير وقتك وجهدك.
-
----
-💡 **هل تريد تجربة شيء الآن؟** 
-يمكنك أن تسألني: *"اشرح لي مفهوم التمثيل الضوئي"* أو *"اختبرني في الصفحة الحالية"*، أو اذهب إلى **لوحة تحكم "الزتونة"** لبدء بحث أكاديمي شامل!`;
-
-        const englishText = `I am the **Fahem AI Companion 🎓**, your personalized academic study partner designed to supercharge your learning journey!
-
-Here is what I can do for you:
-
-#### 1. 📚 Personalized Study Guide (Research Node)
-I am fully connected to your active textbooks and learning materials! As you browse any book:
-* **Context-Aware Explanations:** Ask me about any concept on your active textbook page, and I will explain it simply and clearly.
-* **Step-by-Step Breakdowns:** I can solve complex math formulas or explain code snippets step-by-step.
-* **Active Recall Practice:** Ask me to test your knowledge on the current page, and I will generate interactive, concept-check questions to challenge you.
-* **Instant Summaries:** Get quick, bullet-point summaries of the page to review the main takeaways.
-
-#### 2. 🧠 Zatona AI Research Tool (Zatona - AI Summary & Research Hub)
-Need a deep dive into an academic topic? Explore the **Zatona Research Tool** in your dashboard:
-* **Multi-Chapter Research Reports:** Generate extremely comprehensive, high-yield research papers on any educational topic or complex concept instantly.
-* **Curriculum Digests:** Get streamlined textbook summaries and conceptual breakdowns to digest heavy academic material in seconds.
-
----
-💡 **Want to try it now?**
-Ask me to *"Summarize this page"* or *"Create a quick quiz on the current topic"*, or head over to the **Zatona Hub** in your dashboard to generate a full research report!`;
-
-        const responseText = language === "ar" ? arabicText : englishText;
-
-        setMessages((prev) => [
-          ...prev,
-          { id: assistantMsgId, role: "assistant", text: responseText, timestamp: new Date() }
-        ]);
-        setIsSending(false);
-      }, 800);
-      return;
-    }
 
     const userMsgId = `msg-${Date.now()}-user`;
     const assistantMsgId = `msg-${Date.now()}-assistant`;

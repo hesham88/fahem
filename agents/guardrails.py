@@ -391,22 +391,41 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
     principal = verified_principal_ctx.get()
     
     is_write = any(kw in tool_name.lower() for kw in ["insert", "update", "delete", "drop", "write", "create"])
-    if is_write:
+    
+    # Treat social_tool write actions as write-capable operations
+    if tool_name == "social_tool":
+        action = tool_args.get("action")
+        if action in ["create_thread", "create_reply"]:
+            is_write = True
+            
+    if is_write or tool_name in ["admin_tool", "vault_tool"]:
         if not principal:
-            logger.warning("[SECURITY] Write operation rejected: User is not authenticated or lacks active session.")
-            raise PermissionError("Access Denied: Write operations require an active, authenticated user session.")
+            logger.warning(f"[SECURITY] Tool {tool_name} rejected: User is not authenticated or lacks active session.")
+            raise PermissionError(f"Access Denied: {tool_name} operations require an active, authenticated user session.")
             
         role = principal.get("role")
         email = principal.get("email") or "anonymous@fahem.app"
         uid = principal.get("uid")
         
+        # Strict role gating for admin_tool
+        if tool_name == "admin_tool":
+            if role not in ["admin", "super-admin"]:
+                logger.warning(f"[SECURITY] admin_tool access blocked: User '{email}' with role '{role}' is not authorized.")
+                raise PermissionError("Access Denied: Administrative operations require verified Admin privileges.")
+                
+        # Strict uid gating for vault_tool
+        if tool_name == "vault_tool":
+            if not uid or uid == "anonymous":
+                logger.warning("[SECURITY] vault_tool access blocked: Anonymous or missing user UID.")
+                raise PermissionError("Access Denied: Vault operations require a valid, registered user ID.")
+                
         # 4. Credits/Quota check (Persisted Credits)
         blocked, reason = check_token_credits(uid, role)
         if blocked:
             logger.warning(f"[SECURITY] Write operation rejected: User {email} has exceeded token limits: {reason}")
             raise PermissionError(f"Access Denied: Token allocation reached. {reason}")
             
-        logger.info(f"[AUDIT] Verified delegated write authorization for user: {email} (Role: {role})")
+        logger.info(f"[AUDIT] Verified delegated tool authorization for user: {email} (Role: {role}) in tool: {tool_name}")
         
     return None
 

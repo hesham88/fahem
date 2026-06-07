@@ -164,5 +164,11 @@
   "session_expired": "Sitzung abgelaufen. Bitte senden Sie den Code erneut.",
   "phone_send_failed": "SMS-Code konnte nicht gesendet werden. Stellen Sie sicher, dass reCAPTCHA abgeschlossen ist.",
   "code_verify_failed": "Ungültiger Code. Bitte versuchen Sie es erneut.",
-  "phone_back": "Zurück / Zurücksetzen"
+  "phone_back": "Zurück / Zurücksetzen",
+  "notification_center": "Notification Center",
+  "notifications_empty": "You have no notifications",
+  "notifications_all_caught_up": "You're all caught up!",
+  "notifications_mark_all_read": "Mark all as read",
+  "notifications_view_all": "View all",
+  "notifications_unread": "Unread"
 }

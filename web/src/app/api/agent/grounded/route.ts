@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
-import { proxyRequest } from "../../proxy";
+import { proxyRequest, getOidcToken } from "../../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { requireUser } from "../../_auth";
 
@@ -92,6 +91,7 @@ export async function POST(req: NextRequest) {
     const { prompt, language, sessionId } = body;
     const userId = ctx.uid;
     const userEmail = ctx.email || "anonymous@fahem.ai";
+
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
           // Stream the active session id to the frontend right away
           controller.enqueue(encoder.encode(`[METADATA] SessionId: ${activeSessionId}\n`));
 
-          controller.enqueue(encoder.encode("[System] Spawning Orchestrator for Grounded Multi-Agent test...\n"));
+          controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM] Initiating Single-Agent Grounded Search Orchestrator...\n"));
           controller.enqueue(encoder.encode(`Prompt: ${prompt} (Language: ${langName})\n\n`));
 
           // -------------------------------------------------------------
@@ -152,91 +152,202 @@ export async function POST(req: NextRequest) {
           }
           controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] GCP Model Armor pre-flight check passed.\n"));
 
-          // Initialize Gemini AI Client
-          const geminiApiKey = process.env.GEMINI_API_KEY;
-          if (!geminiApiKey) {
-            throw new Error("GEMINI_API_KEY environment variable is not configured.");
+          // -------------------------------------------------------------
+          // Centralized Cloud Run SSE Streaming pointing to Python /run_sse
+          // -------------------------------------------------------------
+          const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
+          if (!cloudRunUrl) {
+            throw new Error("MONGODB_AGENT_URL environment variable is not configured.");
           }
-          const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-          const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-          // -------------------------------------------------------------
-          // STEP 1: Grounded Search Sub-agent
-          // -------------------------------------------------------------
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Grounded Search\n"));
-          controller.enqueue(encoder.encode("[Sub-Agent: Grounded Search] Starting web-grounded research...\n"));
-          controller.enqueue(encoder.encode("[Sub-Agent: Grounded Search] Querying live Google Search indices for real-time, accurate facts...\n"));
+          controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Connecting to Cloud Run Agent at ${cloudRunUrl}...\n`));
 
-          const searchStart = performance.now();
-          const searchInstruction = `
-You are the Fahem Grounded Search Sub-agent.
-Your goal is to use Google Search grounding to retrieve extremely accurate, real-world, up-to-date facts to answer the user's prompt.
-Provide precise citations, dates, prices, or numbers. Keep your tone highly informative and objective.
-Please compile your final facts in ${langName}.
-`;
+          let oidcToken = await getOidcToken();
 
-          const searchResponse = await ai.models.generateContent({
-            model: modelName,
-            contents: prompt,
-            config: {
-              systemInstruction: searchInstruction,
-              tools: [{ googleSearch: {} }] // Native Google Search Grounding!
-            }
+          const requestHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Verified-Principal": JSON.stringify({
+              uid: ctx.uid,
+              email: ctx.email,
+              role: ctx.role
+            })
+          };
+          if (oidcToken) {
+            requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
+          } else {
+            controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running in local/dev environment mode. Identity forwarded securely.\n`));
+          }
+
+          // Prepend [Grounded Web Search Request] prefix to inform the single orchestrator brain
+          const groundedPrompt = `[Grounded Web Search Request] ${prompt}`;
+
+          const payload = {
+            app_name: "app",
+            user_id: userId || "anonymous",
+            session_id: activeSessionId,
+            new_message: {
+              role: "user",
+              parts: [{ text: groundedPrompt }]
+            },
+            streaming: true
+          };
+
+          const sseResponse = await fetch(`${cloudRunUrl}/run_sse`, {
+            method: "POST",
+            headers: requestHeaders,
+            body: JSON.stringify(payload),
+            cache: "no-store",
+            next: { revalidate: 0 } as any
           });
 
-          const searchEnd = performance.now();
-          const searchDuration = ((searchEnd - searchStart) / 1000).toFixed(2);
+          if (!sseResponse.ok) {
+            const errorText = await sseResponse.text();
+            throw new Error(`Cloud Run agent stream request failed (${sseResponse.status}): ${errorText}`);
+          }
 
-          const rawFacts = searchResponse.text || "No facts found.";
-          controller.enqueue(encoder.encode(`[Sub-Agent: Grounded Search] Research complete in ${searchDuration}s. Facts compiled successfully (${rawFacts.length} chars).\n`));
-          controller.enqueue(encoder.encode(`[METADATA] Duration: Grounded Search: ${searchDuration}s\n`));
+          const reader = sseResponse.body?.getReader();
+          if (!reader) {
+            throw new Error("Failed to initialize stream reader from Cloud Run agent response.");
+          }
 
-          // -------------------------------------------------------------
-          // STEP 2: Format and Stylizer Sub-agent
-          // -------------------------------------------------------------
-          controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Stylizer\n"));
-          controller.enqueue(encoder.encode("[Sub-Agent: Stylizer] Handing off research to Stylizer agent...\n"));
-          controller.enqueue(encoder.encode("[Sub-Agent: Stylizer] Applying custom layout structure, markdown grids, and visual hierarchy...\n"));
-
-          const stylizerStart = performance.now();
-          const stylizerInstruction = `
-You are the Fahem Format and Stylizer Sub-agent.
-Your sole job is to take raw, search-grounded research facts and turn them into a premium, stunning presentation.
-Use rich markdown tables, structured sections, highlight blocks, and relevant emojis.
-Make sure the final output feels premium, executive-grade, and beautifully structured in ${langName}.
-`;
-
-          const stylizerPrompt = `
-Format and stylize the following search-grounded research facts into a premium markdown document in ${langName}:
-
-${rawFacts}
-`;
-
-          controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
-
-          const responseStream = await ai.models.generateContentStream({
-            model: modelName,
-            contents: stylizerPrompt,
-            config: {
-              systemInstruction: stylizerInstruction
-            }
-          });
-
+          const responseDecoder = new TextDecoder();
+          let lineBuffer = "";
           let finalResponseText = "";
-          for await (const chunk of responseStream) {
-            if (chunk.text) {
-              finalResponseText += chunk.text;
-              controller.enqueue(encoder.encode(chunk.text));
+          let hasStartedFinalOutput = false;
+          let currentActiveAgent = "Grounded Search";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = responseDecoder.decode(value, { stream: true });
+            lineBuffer += chunk;
+            let lines = lineBuffer.split("\n");
+            lineBuffer = lines.pop() || ""; // keep partial last line
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+
+              if (trimmed.startsWith("data: ")) {
+                const dataStr = trimmed.substring(6).trim();
+                if (dataStr === "[DONE]") {
+                  continue;
+                }
+
+                try {
+                  const event = JSON.parse(dataStr);
+
+                  // 1. Error check
+                  if (event.error_message) {
+                    if (hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n==========================\n"));
+                      hasStartedFinalOutput = false;
+                    }
+                    controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Error: ${event.error_message}\n`));
+                    
+                    // Show error in user output
+                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                    controller.enqueue(encoder.encode(`Error: ${event.error_message}`));
+                    controller.enqueue(encoder.encode("\n==========================\n"));
+                    continue;
+                  }
+
+                  // 2. Active Agent Metadata update
+                  if (event.node_info?.path && event.node_info.path !== currentActiveAgent) {
+                    currentActiveAgent = event.node_info.path;
+                    if (hasStartedFinalOutput) {
+                      controller.enqueue(encoder.encode("\n==========================\n"));
+                      hasStartedFinalOutput = false;
+                    }
+                    controller.enqueue(encoder.encode(`[METADATA] ActiveAgent: ${currentActiveAgent}\n`));
+                  }
+
+                  // 3. Tool invocation logs
+                  if (event.content?.parts) {
+                    for (const part of event.content.parts) {
+                      if (part.functionCall || part.function_call) {
+                        const call = part.functionCall || part.function_call;
+                        if (hasStartedFinalOutput) {
+                          controller.enqueue(encoder.encode("\n==========================\n"));
+                          hasStartedFinalOutput = false;
+                        }
+                        controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running tool: ${call.name}...\n`));
+                      }
+                    }
+                  }
+
+                  // 4. Content / Text Streaming
+                  if (event.content?.parts) {
+                    let textChunk = "";
+                    for (const part of event.content.parts) {
+                      if (part.text) {
+                        textChunk += part.text;
+                      }
+                    }
+
+                    if (textChunk) {
+                      if (!hasStartedFinalOutput) {
+                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                        hasStartedFinalOutput = true;
+                      }
+                      finalResponseText += textChunk;
+                      controller.enqueue(encoder.encode(textChunk));
+                    }
+                  }
+
+                  // 5. Check if action has final output fallback
+                  if (event.actions?.stateDelta?.final_output && !finalResponseText) {
+                    const fallbackText = event.actions.stateDelta.final_output;
+                    if (fallbackText) {
+                      if (!hasStartedFinalOutput) {
+                        controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                        hasStartedFinalOutput = true;
+                      }
+                      finalResponseText += fallbackText;
+                      controller.enqueue(encoder.encode(fallbackText));
+                    }
+                  }
+
+                } catch (jsonErr) {
+                  console.warn("Failed to parse SSE JSON chunk:", dataStr, jsonErr);
+                }
+              }
             }
           }
 
-          const stylizerEnd = performance.now();
-          const stylizerDuration = ((stylizerEnd - stylizerStart) / 1000).toFixed(2);
+          // Handle any remaining data in lineBuffer
+          if (lineBuffer.trim().startsWith("data: ")) {
+            const dataStr = lineBuffer.trim().substring(6).trim();
+            try {
+              const event = JSON.parse(dataStr);
+              if (event.content?.parts) {
+                let textChunk = "";
+                for (const part of event.content.parts) {
+                  if (part.text) {
+                    textChunk += part.text;
+                  }
+                }
+                if (textChunk) {
+                  if (!hasStartedFinalOutput) {
+                    controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+                    hasStartedFinalOutput = true;
+                  }
+                  finalResponseText += textChunk;
+                  controller.enqueue(encoder.encode(textChunk));
+                }
+              }
+            } catch (e) {}
+          }
 
-          controller.enqueue(encoder.encode("\n==========================\n"));
-          controller.enqueue(encoder.encode(`[METADATA] Duration: Stylizer: ${stylizerDuration}s\n`));
+          // Close markers
+          if (hasStartedFinalOutput) {
+            controller.enqueue(encoder.encode("\n==========================\n"));
+          }
           controller.enqueue(encoder.encode("[METADATA] ActiveAgent: Done\n"));
-          controller.enqueue(encoder.encode(`\n[CLOSE] Grounded search execution complete. Total time: ${(((performance.now() - searchStart)) / 1000).toFixed(2)}s\n`));
+          controller.enqueue(encoder.encode(`\n[CLOSE] Execution complete.\n`));
 
           // -------------------------------------------------------------
           // STEP 3: Session, Chat, Activity, and Token Logging
@@ -268,7 +379,7 @@ ${rawFacts}
             const newMessages = [
               ...existingMessages,
               { role: "user", content: prompt, timestamp: new Date().toISOString() },
-              { role: "assistant", content: finalResponseText, timestamp: new Date().toISOString() }
+              { role: "assistant", content: finalResponseText || "No response generated.", timestamp: new Date().toISOString() }
             ];
 
             const isNewSession = existingMessages.length === 0;
@@ -318,13 +429,8 @@ ${rawFacts}
             }
 
             // D. Log Token Usage
-            const searchPromptTokens = searchResponse.usageMetadata?.promptTokenCount || Math.ceil(prompt.length / 4);
-            const searchCompTokens = searchResponse.usageMetadata?.candidatesTokenCount || Math.ceil(rawFacts.length / 4);
-            const stylPromptTokens = Math.ceil(stylizerPrompt.length / 4);
-            const stylCompTokens = Math.ceil(finalResponseText.length / 4);
-
-            const promptTokens = searchPromptTokens + stylPromptTokens;
-            const completionTokens = searchCompTokens + stylCompTokens;
+            const promptTokens = Math.ceil(prompt.length / 4);
+            const completionTokens = Math.ceil((finalResponseText || "").length / 4);
             const totalTokens = promptTokens + completionTokens;
 
             try {
@@ -334,7 +440,7 @@ ${rawFacts}
                 promptTokens,
                 completionTokens,
                 totalTokens,
-                model: modelName,
+                model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
                 type: "grounded_search"
               });
             } catch (err) {
