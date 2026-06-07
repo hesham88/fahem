@@ -1,20 +1,40 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
-import { checkIsAdmin, checkIsSuperadmin } from "../../admin/helper";
+import { verifyAuth } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    let userId = searchParams.get("userId");
     const username = searchParams.get("username");
     const email = searchParams.get("email");
 
+    // If no specific identifier is provided, default to the authenticated user's profile
     if (!userId && !username && !email) {
-      return new Response(JSON.stringify({ error: "userId, username or email is required" }), {
-        status: 400,
+      userId = ctx.uid;
+    }
+
+    // IDOR Protection: Standard users can only fetch their own profile.
+    const isSelf = 
+      (userId && userId === ctx.uid) ||
+      (email && email.toLowerCase().trim() === ctx.email?.toLowerCase().trim());
+    
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+
+    if (!isSelf && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view this profile" }), {
+        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -44,7 +64,7 @@ export async function GET(req: NextRequest) {
     if (username) params.append("username", username);
     if (email) params.append("email", email);
 
-    return await proxyRequest(`/user/profile?${params.toString()}`, "GET");
+    return await proxyRequest(`/user/profile?${params.toString()}`, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -55,21 +75,37 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { userId, profile, requesterEmail } = body;
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
-    if (!userId || !profile) {
-      return new Response(JSON.stringify({ error: "userId and profile are required" }), {
+    const body = await req.json();
+    const { profile } = body;
+    let targetUserId = body.userId;
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: "Profile content is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // Determine if requester is an admin that requires superadmin approval
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    const isSuper = ctx.role === "super-admin";
+
+    // Enforce target user ownership
+    if (!targetUserId || !isAdmin) {
+      targetUserId = ctx.uid; // Normal users can only write to their own profile
+    }
+
+    // Determine if requester is an admin that requires superadmin approval to modify another user's profile
     let needsApproval = false;
-    if (requesterEmail) {
-      const isAdmin = await checkIsAdmin(requesterEmail);
-      const isSuper = await checkIsSuperadmin(requesterEmail);
+    if (targetUserId !== ctx.uid) {
+      // Standard admin modifying another profile requires superadmin approval
       needsApproval = isAdmin && !isSuper;
     }
 
@@ -79,9 +115,9 @@ export async function POST(req: NextRequest) {
       const requestId = "req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
       const changeRequest = {
         id: requestId,
-        requesterEmail,
+        requesterEmail: ctx.email,
         actionType: "update_user_profile",
-        payload: { userId, profile },
+        payload: { userId: targetUserId, profile },
         status: "pending",
         createdAt: new Date().toISOString()
       };
@@ -98,15 +134,16 @@ export async function POST(req: NextRequest) {
     if (isLocalEnv()) {
       const db = getLocalDb();
       db.users = db.users || [];
-      const idx = db.users.findIndex(u => u.userId === userId);
+      const idx = db.users.findIndex(u => u.userId === targetUserId);
       if (idx >= 0) {
         db.users[idx] = {
           ...db.users[idx],
-          ...profile
+          ...profile,
+          userId: targetUserId // Ensure userId is never mutated
         };
       } else {
         db.users.push({
-          userId,
+          userId: targetUserId,
           ...profile
         });
       }
@@ -117,7 +154,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return await proxyRequest("/user/profile", "POST", { userId, profile });
+    return await proxyRequest("/user/profile", "POST", { userId: targetUserId, profile }, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -125,3 +162,4 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getOidcToken } from "../proxy";
-import { checkIsAdmin } from "../admin/helper";
+import { requireAdmin } from "../_auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,34 +8,9 @@ export async function GET(req: NextRequest) {
   const defaultDbName = "fahem";
   const cloudRunUrl = (process.env.MONGODB_AGENT_URL || "").trim();
 
-  // 1. Super Admin Validation Guardrail Engine via centralized helper
-  const { searchParams } = new URL(req.url);
-  const email = searchParams.get("email");
-
-  if (!email) {
-    return new Response(
-      JSON.stringify({
-        error: "Access Denied: Authentication context is missing. Please sign in."
-      }),
-      {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
-  }
-
-  const isAdmin = await checkIsAdmin(email);
-  if (!isAdmin) {
-    return new Response(
-      JSON.stringify({
-        error: "Forbidden: Only designated Admins are allowed to inspect database configurations and metadata."
-      }),
-      {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
-  }
+  // 1. Super Admin Validation Guardrail Engine via centralized requireAdmin helper
+  const ctx = await requireAdmin(req);
+  if (ctx instanceof Response) return ctx;
 
   // 2. Strict Agent-Only Connection (Proxy to Cloud Run inside VPC)
   if (!cloudRunUrl) {
@@ -59,12 +34,14 @@ export async function GET(req: NextRequest) {
     console.log(`[db-metadata] Attempting to proxy DB metadata query through Cloud Run Agent: ${cloudRunUrl}...`);
 
     let oidcToken = await getOidcToken();
-    if (!oidcToken) {
-      oidcToken = "LOCAL_BYPASS_TOKEN_fahem_2026";
-    }
 
     const requestHeaders: Record<string, string> = {
-      "Accept": "application/json"
+      "Accept": "application/json",
+      "X-Verified-Principal": JSON.stringify({
+        uid: ctx.uid,
+        email: ctx.email,
+        role: ctx.role
+      })
     };
 
     if (oidcToken) {

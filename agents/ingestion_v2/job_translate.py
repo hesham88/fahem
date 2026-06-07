@@ -96,8 +96,13 @@ def call_gemini_translation(blocks, api_key, model, target_lang):
         if not json_text:
             return None
 
-        if json_text.strip().startswith("```"):
-            json_text = json_text.strip().strip("```").strip("json").strip()
+        import re
+        pattern = re.compile(r'^```(?:json)?\s*(.*?)\s*```$', re.DOTALL | re.IGNORECASE)
+        match = pattern.match(json_text.strip())
+        if match:
+            json_text = match.group(1).strip()
+        else:
+            json_text = json_text.strip()
 
         result = Translation.model_validate_json(json_text)
         

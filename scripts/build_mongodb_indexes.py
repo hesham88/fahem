@@ -69,11 +69,42 @@ def build_indexes():
         telemetry_idx = db["token_telemetry"].create_index([("userId", ASCENDING)], name="idx_telemetry_userId")
         print(f"Created index on 'token_telemetry': {telemetry_idx}")
         
+        print("\n--- 6. Tuning Phase 1 Curriculum Collections Indexes ---")
+        lib_idx = db["libraries"].create_index([("_id", ASCENDING)], unique=True, name="idx_lib_id")
+        print(f"Created unique index on 'libraries' (_id): {lib_idx}")
+        
+        cur_idx1 = db["curricula"].create_index([("library_id", ASCENDING)], name="idx_cur_libraryId")
+        cur_idx2 = db["curricula"].create_index([("scope.grade", ASCENDING), ("scope.term", ASCENDING)], name="idx_cur_scope_grade_term")
+        cur_idx3 = db["curricula"].create_index([("visibility", ASCENDING), ("owner_uid", ASCENDING)], name="idx_cur_visibility_owner")
+        print(f"Created indexes on 'curricula': {cur_idx1}, {cur_idx2}, {cur_idx3}")
+        
+        subj_idx1 = db["subjects"].create_index([("curriculum_id", ASCENDING)], name="idx_subj_curriculumId")
+        subj_idx2 = db["subjects"].create_index([("category", ASCENDING)], name="idx_subj_category")
+        print(f"Created indexes on 'subjects': {subj_idx1}, {subj_idx2}")
+        
+        book_idx1 = db["books"].create_index(
+            [("curriculum_id", ASCENDING), ("subject_id", ASCENDING), ("role", ASCENDING)],
+            name="idx_book_curriculum_subject_role"
+        )
+        book_idx2 = db["books"].create_index([("visibility", ASCENDING), ("owner_uid", ASCENDING)], name="idx_book_visibility_owner")
+        book_idx3 = db["books"].create_index([("subject_id", ASCENDING)], name="idx_book_subjectId")
+        print(f"Created indexes on 'books': {book_idx1}, {book_idx2}, {book_idx3}")
+        
+        pages_idx = db["book_pages"].create_index([("book_id", ASCENDING), ("page_number", ASCENDING)], name="idx_pages_book_number")
+        print(f"Created index on 'book_pages' (book_id + page_number): {pages_idx}")
+        
         print("\n=== INDEX TUNING SUMMARY ===")
-        for col in ["users", "messages", "chat_sessions", "user_activities", "token_telemetry"]:
+        target_cols = [
+            "users", "messages", "chat_sessions", "user_activities", "token_telemetry",
+            "libraries", "curricula", "subjects", "books", "book_pages"
+        ]
+        for col in target_cols:
             print(f"Indexes on '{col}':")
-            for index in db[col].list_indexes():
-                print(f"  - {index['name']}: {index['key'].to_dict()}")
+            if col in db.list_collection_names():
+                for index in db[col].list_indexes():
+                    print(f"  - {index['name']}: {index['key'].to_dict()}")
+            else:
+                print("  - [Collection not created yet]")
                 
         print("\nDatabase Schema Index Tuning completed successfully! 🚀")
         

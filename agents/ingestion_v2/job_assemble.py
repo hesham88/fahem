@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageColor
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH,
-    make_progress_bar
+    make_progress_bar, get_gemini_config, generate_gemini_image
 )
 
 def compile_chapters_and_toc(book_id, total_pages, is_local, pdf_toc=None):
@@ -237,9 +237,215 @@ def build_mind_map(chapters):
         "links": links
     }
 
-def generate_book_cover(book_id, subject_id, title, grade, term):
+def load_subject_metadata(subject_id, is_local):
     """
-    Pillow image drawing logic to build premium glassmorphic covers.
+    Dynamically loads the subject metadata (color and name/name_ar) from the database or local fallback.
+    """
+    color_hex = "#19203c" # Default deep dark blue
+    name_en = "Curriculum Textbook"
+    name_ar = "كتاب منهجي"
+    
+    if is_local or not is_mongodb_enabled():
+        if os.path.exists(LOCAL_DB_PATH):
+            try:
+                with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
+                    db = json.load(f)
+                subjects = db.get("subjects", [])
+                for s in subjects:
+                    if s.get("_id") == subject_id:
+                        if s.get("color"):
+                            color_hex = s["color"]
+                        if s.get("name"):
+                            name_en = s["name"]
+                        if s.get("name_ar"):
+                            name_ar = s["name_ar"]
+                        break
+            except Exception:
+                pass
+    if is_mongodb_enabled():
+        try:
+            from pymongo import MongoClient
+            client = MongoClient(get_mongodb_uri())
+            db = client["fahem"]
+            subject = db["subjects"].find_one({"_id": subject_id})
+            if subject:
+                if subject.get("color"):
+                    color_hex = subject["color"]
+                if subject.get("name"):
+                    name_en = subject["name"]
+                if subject.get("name_ar"):
+                    name_ar = subject["name_ar"]
+            client.close()
+        except Exception:
+            pass
+    return color_hex, name_en, name_ar
+
+def hex_to_rgb(hex_str):
+    hex_str = hex_str.lstrip('#')
+    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+def ensure_arabic_font():
+    """
+    Downloads and caches NotoNaskhArabic-Medium.ttf locally if not already present.
+    """
+    import requests
+    fonts_dir = os.path.join(ROOT_DIR, "agents", "fonts")
+    os.makedirs(fonts_dir, exist_ok=True)
+    font_path = os.path.join(fonts_dir, "NotoNaskhArabic-Medium.ttf")
+    
+    if os.path.exists(font_path):
+        return font_path
+        
+    font_url = "https://github.com/google/fonts/raw/main/ofl/notonaskharabic/static/NotoNaskhArabic-Medium.ttf"
+    print(f"[Fonts] Downloading Noto Naskh Arabic font from {font_url}...", flush=True)
+    try:
+        response = requests.get(font_url, timeout=30)
+        if response.status_code == 200:
+            with open(font_path, "wb") as f:
+                f.write(response.content)
+            print(f"[Fonts] Font cached successfully at {font_path}", flush=True)
+            return font_path
+        else:
+            print(f"[Fonts Warning] Font download returned status code {response.status_code}. Using system default.", file=sys.stderr)
+    except Exception as e:
+        print(f"[Fonts Warning] Failed to download Arabic font: {e}. Using system default.", file=sys.stderr)
+    return None
+
+def has_arabic(text):
+    if not text:
+        return False
+    return any('\u0600' <= char <= '\u06FF' or '\u0750' <= char <= '\u077F' or '\u08A0' <= char <= '\u08FF' or '\uFB50' <= char <= '\uFDFF' or '\uFE70' <= char <= '\uFEFF' for char in text)
+
+def wrap_text(text, font, max_width, max_lines=4):
+    """
+    Wraps text to fit within max_width using the specified font, limiting to max_lines.
+    """
+    words = text.split()
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        try:
+            bbox = font.getbbox(test_line)
+            width = bbox[2] - bbox[0]
+        except AttributeError:
+            width = font.getsize(test_line)[0]
+            
+        if width <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+                if len(lines) >= max_lines:
+                    break
+            else:
+                lines.append(word)
+                current_line = []
+                if len(lines) >= max_lines:
+                    break
+    if len(lines) < max_lines and current_line:
+        lines.append(' '.join(current_line))
+        
+    if len(lines) >= max_lines:
+        last_line = lines[-1]
+        if not last_line.endswith("..."):
+            lines[-1] = last_line + "..."
+    return lines
+
+def draw_premium_text(draw, text, x, y, font, fill, max_width, is_arabic=False):
+    """
+    Draws text with support for wrapping and Arabic shaping.
+    """
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+
+    if is_arabic:
+        lines = wrap_text(text, font, max_width)
+        shaped_lines = []
+        for line in lines:
+            try:
+                reshaped = arabic_reshaper.reshape(line)
+                bidi_line = get_display(reshaped)
+                shaped_lines.append(bidi_line)
+            except Exception:
+                shaped_lines.append(line)
+        
+        current_y = y
+        for line in shaped_lines:
+            draw.text((x, current_y), line, fill=fill, font=font)
+            try:
+                bbox = font.getbbox(line)
+                line_height = (bbox[3] - bbox[1]) + 8
+            except AttributeError:
+                line_height = font.getsize(line)[1] + 8
+            current_y += line_height
+    else:
+        lines = wrap_text(text, font, max_width)
+        current_y = y
+        for line in lines:
+            draw.text((x, current_y), line, fill=fill, font=font)
+            try:
+                bbox = font.getbbox(line)
+                line_height = (bbox[3] - bbox[1]) + 8
+            except AttributeError:
+                line_height = font.getsize(line)[1] + 8
+            current_y += line_height
+
+def get_storage_bucket_name():
+    """
+    Dynamically loads the storage bucket name from firebase_secrets.json or storage_secrets.json.
+    """
+    firebase_secrets_path = os.path.join(ROOT_DIR, "ignore", "firebase_secrets.json")
+    if os.path.exists(firebase_secrets_path):
+        try:
+            with open(firebase_secrets_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                bucket = data.get("storageBucket")
+                if bucket:
+                    return bucket
+        except Exception:
+            pass
+            
+    storage_secrets_path = os.path.join(ROOT_DIR, "ignore", "storage_secrets.json")
+    if os.path.exists(storage_secrets_path):
+        try:
+            with open(storage_secrets_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                secret = data.get("storageSecret")
+                if secret:
+                    if secret.startswith("gs://"):
+                        secret = secret[5:]
+                    return secret
+        except Exception:
+            pass
+            
+    return "fahem-88d40.firebasestorage.app"
+
+def upload_cover_to_bucket(local_file_path, bucket_name, destination_blob_name):
+    """
+    Attempts to upload a local file to GCS/Firebase Storage.
+    Returns the public URL if successful, or None if offline or failed.
+    """
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+        blob.upload_from_filename(local_file_path)
+        
+        import urllib.parse
+        encoded_blob = urllib.parse.quote(destination_blob_name, safe='')
+        public_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{encoded_blob}?alt=media"
+        print(f"[Storage] Successfully uploaded {local_file_path} to gs://{bucket_name}/{destination_blob_name}. URL: {public_url}", flush=True)
+        return public_url
+    except Exception as e:
+        print(f"[Storage Warning] Direct GCS upload failed or offline: {e}. Serving via local fallback.", file=sys.stderr, flush=True)
+        return None
+
+def generate_book_cover(book_id, subject_id, title, title_ar, grade, term, is_local=True):
+    """
+    Pillow image drawing logic to build premium glassmorphic covers with Arabic shaping support and dynamic palettes.
     """
     covers_dir = os.path.join(ROOT_DIR, "web", "public", "book_covers")
     if not os.path.exists(os.path.join(ROOT_DIR, "web")):
@@ -249,72 +455,131 @@ def generate_book_cover(book_id, subject_id, title, grade, term):
     full_path = os.path.join(covers_dir, f"{book_id}_full.png")
     thumb_path = os.path.join(covers_dir, f"{book_id}_thumb.jpg")
     
-    # Establish subject-based palettes
-    if subject_id == "subj_algebra_stats":
-        c1, c2 = (15, 32, 67), (30, 150, 160)
-        subj_label = "PURE MATHEMATICS"
-    elif subject_id == "subj_biology":
-        c1, c2 = (10, 24, 50), (120, 40, 200)
-        subj_label = "LIFE SCIENCES"
-    elif subject_id == "subj_arabic_grammar":
-        c1, c2 = (80, 12, 24), (180, 120, 20)
-        subj_label = "ARABIC CLASSICS"
-    else:
-        c1, c2 = (25, 35, 60), (80, 120, 170)
-        subj_label = "CURRICULUM TEXTBOOK"
-        
-    width, height = 800, 1200
-    base = Image.new("RGBA", (width, height), (255, 255, 255, 255))
-    draw = ImageDraw.Draw(base)
+    # Establish subject-based dynamic palettes
+    color_hex, subj_name_en, subj_name_ar = load_subject_metadata(subject_id, is_local)
+    c2 = hex_to_rgb(color_hex)
+    c1 = (max(10, int(c2[0] * 0.15)), max(10, int(c2[1] * 0.15)), max(10, int(c2[2] * 0.15)))
     
-    # Render gradient
-    for y in range(height):
-        ratio = y / height
-        r = int(c1[0] * (1 - ratio) + c2[0] * ratio)
-        g = int(c1[1] * (1 - ratio) + c2[1] * ratio)
-        b = int(c1[2] * (1 - ratio) + c2[2] * ratio)
-        draw.line([(0, y), (width, y)], fill=(r, g, b, 255))
-        
-    # Vector designs
-    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    overlay_draw.ellipse([50, 150, 750, 850], fill=(255, 255, 255, 12))
-    overlay_draw.ellipse([150, 350, 850, 1050], fill=(255, 255, 255, 8))
+    is_ar = has_arabic(title_ar) or has_arabic(title)
+    subj_label = subj_name_ar if is_ar else subj_name_en
+    active_title = title_ar if (title_ar and is_ar) else title
     
-    img = Image.alpha_composite(base, overlay)
-    
-    # Draw glassmorphic overlay
-    card = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    card_draw = ImageDraw.Draw(card)
-    card_draw.rounded_rectangle([80, 320, 720, 880], radius=28, fill=(255, 255, 255, 32), outline=(255, 255, 255, 75), width=3)
-    img = Image.alpha_composite(img, card)
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Text drawing
-    # Safely load default font to avoid system font path issues
+    # Text drawing with proper Arabic fonts and shaping
+    font_path = ensure_arabic_font()
     try:
-        font_title = ImageFont.truetype("arial.ttf", 46)
-        font_sub = ImageFont.truetype("arial.ttf", 24)
+        if font_path and os.path.exists(font_path):
+            font_title = ImageFont.truetype(font_path, 42)
+            font_sub = ImageFont.truetype(font_path, 22)
+        else:
+            font_title = ImageFont.truetype("arial.ttf", 42)
+            font_sub = ImageFont.truetype("arial.ttf", 22)
     except Exception:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
-        
-    # Write text
-    draw.text((120, 420), subj_label, fill=(255, 255, 255, 180), font=font_sub)
-    draw.text((120, 480), title[:25], fill=(255, 255, 255, 255), font=font_title)
-    draw.text((120, 580), f"Grade: {grade} • {term}", fill=(255, 255, 255, 220), font=font_sub)
+
+    # 1. Attempt Image Agent Base Generation
+    image_agent_success = False
+    api_key, _ = get_gemini_config()
     
-    # Save files
-    img.save(full_path, "PNG")
+    if api_key:
+        prompt = f"A premium, professional, modern and beautiful textbook cover for subject '{subj_label}' with title '{active_title}'. Modern graphical layout, minimalist background, glassmorphism design, highly engaging educational theme."
+        print(f"[ASSEMBLE] Calling Gemini Image Agent to generate base background cover...", flush=True)
+        try:
+            image_agent_success = generate_gemini_image(prompt, api_key, full_path)
+            if image_agent_success and os.path.exists(full_path):
+                print(f"[ASSEMBLE] Image agent successfully generated base. Composite card overlay will be applied...", flush=True)
+                # Load the generated image and apply the premium glassmorphic overlay + text on top
+                img = Image.open(full_path).convert("RGBA")
+                if img.size != (800, 1200):
+                    img = img.resize((800, 1200), Image.Resampling.LANCZOS)
+                
+                card = Image.new("RGBA", (800, 1200), (0, 0, 0, 0))
+                card_draw = ImageDraw.Draw(card)
+                # A beautiful semi-transparent glass overlay card (slightly dark to let white text pop on any generated background)
+                card_draw.rounded_rectangle([80, 320, 720, 880], radius=28, fill=(15, 23, 42, 160), outline=(255, 255, 255, 75), width=3)
+                img = Image.alpha_composite(img, card)
+                draw = ImageDraw.Draw(img)
+                
+                # Write top subject label
+                draw_premium_text(draw, subj_label, 120, 360, font_sub, (255, 255, 255, 180), 560, is_arabic=is_ar)
+                # Write main title
+                draw_premium_text(draw, active_title, 120, 420, font_title, (255, 255, 255, 255), 560, is_arabic=is_ar)
+                
+                # Write grade and term
+                grade_term_text = f"Grade: {grade} • {term}"
+                if is_ar:
+                    term_ar = "الفصل الأول" if "Term 1" in term else ("الفصل الثاني" if "Term 2" in term else term)
+                    grade_term_text = f"الصف: {grade} • {term_ar}"
+                draw_premium_text(draw, grade_term_text, 120, 720, font_sub, (255, 255, 255, 220), 560, is_arabic=is_ar)
+                
+                img.save(full_path, "PNG")
+        except Exception as img_err:
+            print(f"[ASSEMBLE Warning] Gemini Image Agent failed: {img_err}. Falling back to Pillow vector design.", file=sys.stderr, flush=True)
+            image_agent_success = False
+
+    if not image_agent_success:
+        print("[ASSEMBLE] Image agent unavailable or failed → used vector cover", flush=True)
+        width, height = 800, 1200
+        base = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+        draw = ImageDraw.Draw(base)
+        
+        # Render gradient background
+        for y in range(height):
+            ratio = y / height
+            r = int(c1[0] * (1 - ratio) + c2[0] * ratio)
+            g = int(c1[1] * (1 - ratio) + c2[1] * ratio)
+            b = int(c1[2] * (1 - ratio) + c2[2] * ratio)
+            draw.line([(0, y), (width, y)], fill=(r, g, b, 255))
+            
+        # Vector designs
+        overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        overlay_draw.ellipse([50, 150, 750, 850], fill=(255, 255, 255, 12))
+        overlay_draw.ellipse([150, 350, 850, 1050], fill=(255, 255, 255, 8))
+        
+        img = Image.alpha_composite(base, overlay)
+        
+        # Draw glassmorphic overlay
+        card = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        card_draw = ImageDraw.Draw(card)
+        card_draw.rounded_rectangle([80, 320, 720, 880], radius=28, fill=(255, 255, 255, 32), outline=(255, 255, 255, 75), width=3)
+        img = Image.alpha_composite(img, card)
+        
+        draw = ImageDraw.Draw(img)
+        
+        # Write text with wrap and bidi-shaping support
+        draw_premium_text(draw, subj_label, 120, 360, font_sub, (255, 255, 255, 180), 560, is_arabic=is_ar)
+        draw_premium_text(draw, active_title, 120, 420, font_title, (255, 255, 255, 255), 560, is_arabic=is_ar)
+        
+        grade_term_text = f"Grade: {grade} • {term}"
+        if is_ar:
+            term_ar = "الفصل الأول" if "Term 1" in term else ("الفصل الثاني" if "Term 2" in term else term)
+            grade_term_text = f"الصف: {grade} • {term_ar}"
+            
+        draw_premium_text(draw, grade_term_text, 120, 720, font_sub, (255, 255, 255, 220), 560, is_arabic=is_ar)
+        
+        # Save vector file locally
+        img.save(full_path, "PNG")
     
     # Convert to thumbnail
-    img_rgb = img.convert("RGB")
+    img_rgb = Image.open(full_path).convert("RGB")
     img_rgb.thumbnail((240, 360))
     img_rgb.save(thumb_path, "JPEG", quality=85)
     
-    # Return virtual public URLs
-    return f"/book_covers/{book_id}_full.png", f"/book_covers/{book_id}_thumb.jpg"
+    # Upload to storage bucket
+    bucket_name = get_storage_bucket_name()
+    destination_full = f"book_covers/{book_id}_full.png"
+    destination_thumb = f"book_covers/{book_id}_thumb.jpg"
+    
+    bucket_full_url = upload_cover_to_bucket(full_path, bucket_name, destination_full)
+    bucket_thumb_url = upload_cover_to_bucket(thumb_path, bucket_name, destination_thumb)
+    
+    if bucket_full_url and bucket_thumb_url:
+        return bucket_full_url, bucket_thumb_url
+    else:
+        if not is_local:
+            raise RuntimeError(f"Failed to upload covers to Firebase Storage bucket '{bucket_name}' in production!")
+        return f"/book_covers/{book_id}_full.png", f"/book_covers/{book_id}_thumb.jpg"
 
 def main():
     try:
@@ -345,7 +610,7 @@ def main():
     grade = payload.get("grade", "General")
     term = payload.get("term", "Term 1")
     logs.append(f"[{time.strftime('%H:%M:%S')}] [ASSEMBLE] Generating premium professional book cover...")
-    cover_url, cover_thumb_url = generate_book_cover(book_id, subject_id, title, grade, term)
+    cover_url, cover_thumb_url = generate_book_cover(book_id, subject_id, title, payload.get("title_ar"), grade, term, is_local=is_local)
     bar_cover = make_progress_bar(83.0, width=20)
     log_msg_cover = f"{bar_cover} Premium Book Covers generated successfully."
     print(f"[JOB 4: ASSEMBLE] {log_msg_cover}", flush=True)

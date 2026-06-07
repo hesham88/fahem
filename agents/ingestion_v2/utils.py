@@ -19,6 +19,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # ROOT_DIR points to fahem project root C:\Users\hesh1\Desktop\fahem
 ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "gemini-embedding-2")
+EMBED_DIM = int(os.environ.get("EMBED_DIM", "3072"))
+
+
 LOCAL_DB_PATH = os.path.join(ROOT_DIR, "web", "src", "app", "api", "local_db.json")
 if not os.path.exists(LOCAL_DB_PATH):
     LOCAL_DB_PATH = os.path.join(ROOT_DIR, "src", "app", "api", "local_db.json")
@@ -98,23 +102,31 @@ def execute_with_retry(func, *args, max_retries=5, base_delay=2.0, **kwargs):
     Helper function to run functions with exponential backoff and jitter.
     """
     delay = base_delay
+    last_exception = None
     for attempt in range(max_retries):
         try:
             result = func(*args, **kwargs)
             if result is not None:
                 return result
+            raise ValueError(f"Function {func.__name__} returned None")
         except Exception as e:
+            last_exception = e
             print(f"[RETRY] Error in {func.__name__} (attempt {attempt+1}/{max_retries}): {e}", file=sys.stderr)
+            if attempt == max_retries - 1:
+                raise e
         
         sleep_time = delay + random.uniform(0.5, 1.5)
         print(f"[RETRY] Sleeping for {sleep_time:.2f} seconds before retry...", file=sys.stderr)
         time.sleep(sleep_time)
         delay *= 2.0
+    
+    if last_exception:
+        raise last_exception
     return None
 
 def get_gemini_embedding_v2(text, api_key):
     """
-    Fetches 3072-dimensional embeddings using the official google-genai SDK.
+    Fetches embeddings using the official google-genai SDK.
     """
     try:
         from google import genai
@@ -124,7 +136,7 @@ def get_gemini_embedding_v2(text, api_key):
             client = genai.Client()
 
         resp = client.models.embed_content(
-            model="gemini-embedding-2",
+            model=EMBED_MODEL,
             contents=text,
         )
         if resp and resp.embeddings:
@@ -134,14 +146,7 @@ def get_gemini_embedding_v2(text, api_key):
         print(f"[Embedding Error] {e}", file=sys.stderr)
         raise RuntimeError(f"Gemini embedding API call failed: {e}")
 
-def get_fallback_embedding(text, dimensions=3072):
-    """
-    Generates deterministic pseudo-embedding vector of 'dimensions' size.
-    """
-    h = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    seed = int(h[:8], 16)
-    r = random.Random(seed)
-    return [r.uniform(-0.15, 0.15) for _ in range(dimensions)]
+
 
 def generate_gemini_image(prompt, api_key, output_path):
     """

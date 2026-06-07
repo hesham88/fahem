@@ -11,7 +11,12 @@ import {
   FiTrendingUp,
   FiUsers,
   FiCheck,
-  FiX
+  FiX,
+  FiSliders,
+  FiMessageSquare,
+  FiAlertTriangle,
+  FiInfo,
+  FiUser
 } from "react-icons/fi";
 
 export default function AdminSecurityDashboard({ language, email }: { language: string; email?: string }) {
@@ -44,6 +49,191 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [isTokenControlActive, setIsTokenControlActive] = useState<boolean>(true);
   const [isSavingConfigs, setIsSavingConfigs] = useState<boolean>(false);
   const [configSaveSuccess, setConfigSaveSuccess] = useState<string | null>(null);
+
+  // --- Admin Sub-Tab & Custom States (P6-2 & P6-4 Integration) ---
+  const [activeSubTab, setActiveSubTab] = useState<"security" | "limits" | "reports">("security");
+
+  // Reports state
+  const [reports, setReports] = useState<any[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState<boolean>(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+
+  // User limits override state
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string>("");
+  const [selectedUserName, setSelectedUserName] = useState<string>("");
+  const [selectedUserPolicy, setSelectedUserPolicy] = useState<any>(null);
+  const [selectedUserUsed, setSelectedUserUsed] = useState<any>({ daily: 0, weekly: 0, monthly: 0, total: 0 });
+  const [isLoadingPolicy, setIsLoadingPolicy] = useState<boolean>(false);
+  const [isSavingPolicy, setIsSavingPolicy] = useState<boolean>(false);
+  const [policyActionSuccess, setPolicyActionSuccess] = useState<string | null>(null);
+  const [policyActionError, setPolicyActionError] = useState<string | null>(null);
+
+  // Policy editor inputs
+  const [overrideEnabled, setOverrideEnabled] = useState<boolean>(true);
+  const [overrideWeeklyLimit, setOverrideWeeklyLimit] = useState<number>(250000);
+  const [overrideMonthlyLimit, setOverrideMonthlyLimit] = useState<number>(1000000);
+  const [overrideReason, setOverrideReason] = useState<string>("");
+
+  const fetchReports = async () => {
+    setIsLoadingReports(true);
+    setReportsError(null);
+    try {
+      const response = await fetch("/api/admin/reports");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.reports)) {
+          setReports(data.reports);
+        } else {
+          setReportsError(data.error || "Failed to fetch reports.");
+        }
+      } else {
+        setReportsError(`Failed to fetch reports (HTTP ${response.status})`);
+      }
+    } catch (err: any) {
+      setReportsError(err.message || "An unexpected error occurred while fetching reports.");
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
+  const updateReportStatus = async (reportId: string, status: string) => {
+    try {
+      const response = await fetch("/api/admin/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId, status })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        fetchReports();
+      } else {
+        alert(data.error || "Failed to update report status.");
+      }
+    } catch (err: any) {
+      console.error("Failed to update report status:", err);
+      alert(err.message || "Network error occurred.");
+    }
+  };
+
+  const fetchUsersList = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const response = await fetch("/api/user/list");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.users)) {
+          setUsersList(data.users);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch users list:", err);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const fetchUserPolicy = async (userId: string) => {
+    if (!userId) return;
+    setIsLoadingPolicy(true);
+    setPolicyActionError(null);
+    setPolicyActionSuccess(null);
+    try {
+      const response = await fetch(`/api/admin/user-token-policy?userId=${encodeURIComponent(userId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setSelectedUserEmail(data.email || "");
+          setSelectedUserName(data.name || "");
+          setSelectedUserPolicy(data.tokenPolicy);
+          setSelectedUserUsed(data.used || { daily: 0, weekly: 0, monthly: 0, total: 0 });
+
+          if (data.tokenPolicy) {
+            setOverrideEnabled(!!data.tokenPolicy.enabled);
+            setOverrideWeeklyLimit(data.tokenPolicy.weeklyLimit || 250000);
+            setOverrideMonthlyLimit(data.tokenPolicy.monthlyLimit || 1000000);
+            setOverrideReason(data.tokenPolicy.reason || "");
+          } else {
+            setOverrideEnabled(true);
+            setOverrideWeeklyLimit(250000);
+            setOverrideMonthlyLimit(1000000);
+            setOverrideReason("");
+          }
+        } else {
+          setPolicyActionError(data.error || "Failed to load policy.");
+        }
+      } else {
+        setPolicyActionError(`Failed to load policy (HTTP ${response.status})`);
+      }
+    } catch (err: any) {
+      setPolicyActionError(err.message || "Failed to load policy.");
+    } finally {
+      setIsLoadingPolicy(false);
+    }
+  };
+
+  const handleSaveUserPolicy = async (clearPolicy: boolean = false) => {
+    if (!selectedUserId) return;
+    setIsSavingPolicy(true);
+    setPolicyActionError(null);
+    setPolicyActionSuccess(null);
+    try {
+      const payload = clearPolicy 
+        ? { userId: selectedUserId, clearPolicy: true }
+        : {
+            userId: selectedUserId,
+            enabled: overrideEnabled,
+            weeklyLimit: overrideWeeklyLimit,
+            monthlyLimit: overrideMonthlyLimit,
+            reason: overrideReason || "admin override"
+          };
+
+      const response = await fetch("/api/admin/user-token-policy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setPolicyActionSuccess(
+          language === "ar"
+            ? (clearPolicy ? "تم إلغاء السياسة المخصصة بنجاح!" : "تم حفظ وتطبيق السياسة المخصصة بنجاح!")
+            : (clearPolicy ? "User policy cleared successfully!" : "User policy saved and applied successfully!")
+        );
+        fetchUserPolicy(selectedUserId);
+        fetchUsersList();
+      } else {
+        setPolicyActionError(data.error || "Failed to save user policy.");
+      }
+    } catch (err: any) {
+      setPolicyActionError(err.message || "Failed to contact server.");
+    } finally {
+      setIsSavingPolicy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === "reports") {
+      fetchReports();
+    } else if (activeSubTab === "limits") {
+      fetchUsersList();
+    }
+  }, [activeSubTab]);
+
+  useEffect(() => {
+    if (selectedUserId) {
+      fetchUserPolicy(selectedUserId);
+    } else {
+      setSelectedUserPolicy(null);
+      setSelectedUserUsed({ daily: 0, weekly: 0, monthly: 0, total: 0 });
+    }
+  }, [selectedUserId]);
 
   // --- Admin Approval & Curriculum Ingestion States ---
   const [admins, setAdmins] = useState<any[]>([]);
@@ -511,10 +701,82 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%" }}>
-      
+      {/* Sub-Tab Switcher */}
+      <div style={{
+        display: "flex",
+        gap: "1rem",
+        borderBottom: "2px solid var(--card-border)",
+        paddingBottom: "0.5rem",
+        marginBottom: "1rem",
+        flexWrap: "wrap"
+      }}>
+        <button
+          onClick={() => setActiveSubTab("security")}
+          style={{
+            padding: "0.75rem 1.5rem",
+            background: activeSubTab === "security" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+            color: activeSubTab === "security" ? "#fff" : "#64748b",
+            border: "none",
+            borderRadius: "8px",
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            transition: "all 0.3s ease",
+            boxShadow: activeSubTab === "security" ? "var(--shadow-md)" : "none"
+          }}
+        >
+          <FiLock />
+          <span>{language === "ar" ? "الأمان والسياسات العامة" : "Security & Global Config"}</span>
+        </button>
 
+        <button
+          onClick={() => setActiveSubTab("limits")}
+          style={{
+            padding: "0.75rem 1.5rem",
+            background: activeSubTab === "limits" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+            color: activeSubTab === "limits" ? "#fff" : "#64748b",
+            border: "none",
+            borderRadius: "8px",
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            transition: "all 0.3s ease",
+            boxShadow: activeSubTab === "limits" ? "var(--shadow-md)" : "none"
+          }}
+        >
+          <FiSliders />
+          <span>{language === "ar" ? "حدود وتجاوزات الطلاب" : "Student Limits & Overrides"}</span>
+        </button>
 
-      {/* A. Superadmin Admin Approval Console */}
+        <button
+          onClick={() => setActiveSubTab("reports")}
+          style={{
+            padding: "0.75rem 1.5rem",
+            background: activeSubTab === "reports" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
+            color: activeSubTab === "reports" ? "#fff" : "#64748b",
+            border: "none",
+            borderRadius: "8px",
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            transition: "all 0.3s ease",
+            boxShadow: activeSubTab === "reports" ? "var(--shadow-md)" : "none"
+          }}
+        >
+          <FiMessageSquare />
+          <span>{language === "ar" ? "التقارير والملاحظات" : "Reports & Feedback"}</span>
+        </button>
+      </div>
+
+      {activeSubTab === "security" && (
+        <>
+          {/* A. Superadmin Admin Approval Console */}
       <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
         <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <FiUsers style={{ color: "var(--primary)" }} />
@@ -1733,8 +1995,431 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           </table>
         </div>
       </section>
+        </>
+      )}
 
+      {/* 6. Reports and Feedback Panel (activeSubTab === "reports") */}
+      {activeSubTab === "reports" && (
+        <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+            <div>
+              <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <FiMessageSquare style={{ color: "var(--primary)" }} />
+                <span>{language === "ar" ? "تقارير المستخدمين والملاحظات" : "User Reports & Feedback Triager"}</span>
+              </h2>
+              <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
+                {language === "ar"
+                  ? "مراجعة تقارير المشاكل العلمية أو التقنية المرسلة من قبل الطلاب وإدارتها باستخدام نظام الحالات الذكي."
+                  : "Review, triage, and resolve student-submitted academic or technical reports using our state machine."}
+              </p>
+            </div>
+            <button 
+              onClick={fetchReports}
+              disabled={isLoadingReports}
+              className="action-btn"
+              style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem", background: "var(--primary)", border: "none", color: "#fff", borderRadius: "6px", cursor: "pointer" }}
+            >
+              {language === "ar" ? "تحديث التقارير" : "Refresh Reports"}
+            </button>
+          </div>
 
+          {reportsError && (
+            <div style={{ padding: "0.75rem", background: "rgba(211, 47, 47, 0.1)", border: "1px solid rgba(211, 47, 47, 0.2)", borderRadius: "6px", color: "#f87171", fontSize: "0.85rem", marginBottom: "1rem" }}>
+              {reportsError}
+            </div>
+          )}
+
+          {/* Filter Bar */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>
+                {language === "ar" ? "تصفية حسب الحالة" : "Filter by Status"}
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#fff", color: "var(--foreground)", fontSize: "0.85rem", minWidth: "150px" }}
+              >
+                <option value="all">{language === "ar" ? "الكل" : "All Statuses"}</option>
+                <option value="new">{language === "ar" ? "جديد" : "New"}</option>
+                <option value="triaged">{language === "ar" ? "قيد المراجعة" : "Triaged"}</option>
+                <option value="resolved">{language === "ar" ? "تم الحل" : "Resolved"}</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>
+                {language === "ar" ? "تصفية حسب المصدر" : "Filter by Source"}
+              </label>
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#fff", color: "var(--foreground)", fontSize: "0.85rem", minWidth: "150px" }}
+              >
+                <option value="all">{language === "ar" ? "الكل" : "All Sources"}</option>
+                <option value="chat">{language === "ar" ? "المحادثة" : "Chat Panel"}</option>
+                <option value="footer">{language === "ar" ? "تذييل الصفحة" : "Footer"}</option>
+              </select>
+            </div>
+          </div>
+
+          {isLoadingReports ? (
+            <div style={{ padding: "4rem", textAlign: "center", color: "var(--primary)", fontWeight: 600 }}>
+              {language === "ar" ? "جاري تحميل التقارير..." : "Loading reports list..."}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {reports.length === 0 ? (
+                <div style={{ padding: "3rem", textAlign: "center", background: "rgba(16, 107, 163, 0.02)", borderRadius: "8px", border: "1px solid var(--card-border)", color: "#6a7c88" }}>
+                  {language === "ar" ? "لا توجد تقارير مطابقة حالياً." : "No user-submitted reports found."}
+                </div>
+              ) : (
+                reports
+                  .filter((rep) => {
+                    const statusMatch = statusFilter === "all" || rep.status === statusFilter;
+                    const sourceMatch = sourceFilter === "all" || rep.source === sourceFilter;
+                    return statusMatch && sourceMatch;
+                  })
+                  .map((rep) => {
+                    const isExpanded = expandedReportId === rep._id;
+                    const statusColor = rep.status === "resolved" 
+                      ? "var(--accent-green)" 
+                      : rep.status === "triaged" 
+                      ? "var(--accent-orange)" 
+                      : "#dc3545";
+
+                    return (
+                      <div 
+                        key={rep._id} 
+                        style={{ 
+                          border: "1px solid var(--card-border)", 
+                          borderRadius: "8px", 
+                          background: "rgba(255,255,255,0.7)", 
+                          padding: "1rem",
+                          transition: "all 0.2s ease",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                              <span style={{ 
+                                padding: "0.2rem 0.5rem", 
+                                borderRadius: "4px", 
+                                background: rep.source === "chat" ? "rgba(16,107,163,0.08)" : "rgba(139,92,246,0.08)", 
+                                color: rep.source === "chat" ? "var(--primary)" : "#8b5cf6", 
+                                fontSize: "0.75rem", 
+                                fontWeight: 700,
+                                textTransform: "uppercase"
+                              }}>
+                                {rep.source || "footer"}
+                              </span>
+                              <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                                {new Date(rep.createdAt || Date.now()).toLocaleString(language === "ar" ? "ar-EG" : "en-US")}
+                              </span>
+                            </div>
+                            <h3 style={{ fontSize: "1.1rem", margin: "0.5rem 0 0.25rem 0", color: "var(--foreground)", fontWeight: 700 }}>
+                              {rep.title || (language === "ar" ? "تقرير بلا عنوان" : "Untitled Report")}
+                            </h3>
+                            <p style={{ margin: 0, fontSize: "0.85rem", color: "#4f6371" }}>
+                              <strong>{language === "ar" ? "المستعلم:" : "Reporter UID:"}</strong> <code style={{ fontFamily: "var(--font-mono)" }}>{rep.userId}</code>
+                            </p>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            {/* Status State Machine */}
+                            <select
+                              value={rep.status || "new"}
+                              onChange={(e) => updateReportStatus(rep._id, e.target.value)}
+                              style={{ 
+                                padding: "0.3rem 0.5rem", 
+                                borderRadius: "6px", 
+                                border: `1px solid ${statusColor}`, 
+                                background: "#fff", 
+                                color: statusColor, 
+                                fontSize: "0.8rem", 
+                                fontWeight: 700 
+                              }}
+                            >
+                              <option value="new" style={{ color: "#dc3545" }}>{language === "ar" ? "جديد" : "New"}</option>
+                              <option value="triaged" style={{ color: "var(--accent-orange)" }}>{language === "ar" ? "قيد المراجعة" : "Triaged"}</option>
+                              <option value="resolved" style={{ color: "var(--accent-green)" }}>{language === "ar" ? "تم الحل" : "Resolved"}</option>
+                            </select>
+
+                            <button
+                              onClick={() => setExpandedReportId(isExpanded ? null : rep._id)}
+                              style={{ 
+                                background: "none", 
+                                border: "none", 
+                                color: "var(--primary)", 
+                                fontSize: "0.85rem", 
+                                cursor: "pointer", 
+                                fontWeight: 600,
+                                padding: "0.25rem 0.5rem",
+                                borderRadius: "4px"
+                              }}
+                            >
+                              {isExpanded 
+                                ? (language === "ar" ? "إخفاء التفاصيل" : "Collapse") 
+                                : (language === "ar" ? "عرض التفاصيل" : "Expand")}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px dashed var(--card-border)" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
+                              <div>
+                                <h4 style={{ fontSize: "0.9rem", margin: "0 0 0.25rem 0", color: "var(--foreground)" }}>
+                                  {language === "ar" ? "فئة التقرير:" : "Category:"}
+                                </h4>
+                                <span style={{ padding: "0.2rem 0.5rem", background: "rgba(0,0,0,0.04)", borderRadius: "4px", fontSize: "0.8rem", color: "var(--foreground)" }}>
+                                  {rep.category || "General"}
+                                </span>
+                              </div>
+
+                              <div>
+                                <h4 style={{ fontSize: "0.9rem", margin: "0 0 0.25rem 0", color: "var(--foreground)" }}>
+                                  {language === "ar" ? "نص التقرير والمشكلة:" : "Report Body:"}
+                                </h4>
+                                <div style={{ background: "rgba(0,0,0,0.02)", border: "1px solid var(--card-border)", borderRadius: "6px", padding: "0.75rem", fontSize: "0.85rem", color: "var(--foreground)", whiteSpace: "pre-wrap" }}>
+                                  {rep.body || "No report body text."}
+                                </div>
+                              </div>
+
+                              {rep.context && Object.keys(rep.context).length > 0 && (
+                                <div>
+                                  <h4 style={{ fontSize: "0.9rem", margin: "0 0 0.25rem 0", color: "var(--foreground)" }}>
+                                    {language === "ar" ? "بيانات السياق الإضافية:" : "Contextual Telemetry metadata:"}
+                                  </h4>
+                                  <pre style={{ margin: 0, padding: "0.75rem", background: "var(--bg-light)", border: "1px solid var(--card-border)", borderRadius: "6px", fontSize: "0.8rem", overflowX: "auto", fontFamily: "var(--font-mono)" }}>
+                                    {JSON.stringify(rep.context, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 7. Student Quota Limits & Overrides Panel (activeSubTab === "limits") */}
+      {activeSubTab === "limits" && (
+        <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+            <div>
+              <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <FiSliders style={{ color: "var(--secondary)" }} />
+                <span>{language === "ar" ? "لوحة تعديل وتجاوز حصص الطلاب" : "Student Token Limits & Overrides"}</span>
+              </h2>
+              <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
+                {language === "ar"
+                  ? "تجاوز الحدود العامة وتخصيص استهلاك رموز الذكاء الاصطناعي لحسابات الطلاب الموثقين والحكام الفاحصين."
+                  : "Override global token budgets and customize AI allocations for whitelisted judges or individual accounts."}
+              </p>
+            </div>
+          </div>
+
+          {policyActionSuccess && (
+            <div style={{ padding: "0.75rem", background: "rgba(40, 167, 69, 0.1)", border: "1px solid rgba(40, 167, 69, 0.2)", borderRadius: "6px", color: "var(--accent-green)", fontSize: "0.85rem", marginBottom: "1rem" }}>
+              {policyActionSuccess}
+            </div>
+          )}
+          {policyActionError && (
+            <div style={{ padding: "0.75rem", background: "rgba(211, 47, 47, 0.1)", border: "1px solid rgba(211, 47, 47, 0.2)", borderRadius: "6px", color: "#f87171", fontSize: "0.85rem", marginBottom: "1rem" }}>
+              {policyActionError}
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem" }}>
+            {/* Left Box: Student Selector */}
+            <div style={{ background: "rgba(16, 107, 163, 0.02)", border: "1px solid var(--card-border)", borderRadius: "8px", padding: "1.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem", color: "var(--foreground)" }}>
+                {language === "ar" ? "اختر حساب الطالب أو الفاحص:" : "Select Student or Judge Account:"}
+              </label>
+              
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#fff", color: "var(--foreground)", fontSize: "0.9rem", marginBottom: "1.5rem" }}
+              >
+                <option value="">-- {language === "ar" ? "اختر طالباً..." : "Choose student..."} --</option>
+                {usersList.map((user) => (
+                  <option key={user.uid} value={user.uid}>
+                    {user.email} ({user.name || user.uid.substring(0, 8)})
+                  </option>
+                ))}
+              </select>
+
+              {isLoadingUsers && (
+                <p style={{ fontSize: "0.85rem", color: "var(--primary)" }}>{language === "ar" ? "جاري جلب قائمة المستخدمين..." : "Fetching system users list..."}</p>
+              )}
+
+              {selectedUserId ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div style={{ paddingBottom: "1rem", borderBottom: "1px solid var(--card-border)" }}>
+                    <h3 style={{ fontSize: "1rem", margin: "0 0 0.5rem 0", fontWeight: 700, color: "var(--primary)" }}>
+                      {language === "ar" ? "الملف التعريفي النشط:" : "Active Profile Details:"}
+                    </h3>
+                    <p style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}>
+                      <strong>{language === "ar" ? "الاسم:" : "Name:"}</strong> {selectedUserName || "N/A"}
+                    </p>
+                    <p style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}>
+                      <strong>{language === "ar" ? "البريد:" : "Email:"}</strong> {selectedUserEmail}
+                    </p>
+                    <p style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}>
+                      <strong>{language === "ar" ? "المعرف:" : "UID:"}</strong> <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>{selectedUserId}</code>
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 style={{ fontSize: "1rem", margin: "0 0 0.75rem 0", fontWeight: 700, color: "var(--primary)" }}>
+                      {language === "ar" ? "مؤشر استهلاك الرموز الحالي:" : "Current Student Usage Meter:"}
+                    </h3>
+                    
+                    {/* User usage breakdown metrics */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.75rem" }}>
+                          <span>{language === "ar" ? "الرموز المستهلكة اليوم" : "Daily Tokens Used"}</span>
+                          <span style={{ fontWeight: 700 }}>{selectedUserUsed.daily?.toLocaleString() || 0}</span>
+                        </div>
+                        <div style={{ width: "100%", height: "4px", background: "rgba(0,0,0,0.05)", borderRadius: "50px", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(100, ((selectedUserUsed.daily || 0) / 25000) * 100)}%`, height: "100%", background: "var(--primary)" }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.75rem" }}>
+                          <span>{language === "ar" ? "الرموز المستهلكة هذا الأسبوع" : "Weekly Tokens Used"}</span>
+                          <span style={{ fontWeight: 700 }}>{selectedUserUsed.weekly?.toLocaleString() || 0}</span>
+                        </div>
+                        <div style={{ width: "100%", height: "4px", background: "rgba(0,0,0,0.05)", borderRadius: "50px", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(100, ((selectedUserUsed.weekly || 0) / (selectedUserPolicy?.weeklyLimit || 250000)) * 100)}%`, height: "100%", background: "var(--secondary)" }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.75rem" }}>
+                          <span>{language === "ar" ? "الرموز المستهلكة هذا الشهر" : "Monthly Tokens Used"}</span>
+                          <span style={{ fontWeight: 700 }}>{selectedUserUsed.monthly?.toLocaleString() || 0}</span>
+                        </div>
+                        <div style={{ width: "100%", height: "4px", background: "rgba(0,0,0,0.05)", borderRadius: "50px", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(100, ((selectedUserUsed.monthly || 0) / (selectedUserPolicy?.monthlyLimit || 1000000)) * 100)}%`, height: "100%", background: "var(--accent-orange)" }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", color: "#6a7c88", padding: "2rem 0", fontSize: "0.85rem" }}>
+                  {language === "ar" ? "يرجى تحديد مستخدم من القائمة لمشاهدة تفاصيل استهلاكه وتجاوز حدوده." : "Please choose an account to inspect usage and override boundaries."}
+                </div>
+              )}
+            </div>
+
+            {/* Right Box: Policy Overrides Form */}
+            {selectedUserId ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", border: "1px solid var(--card-border)", borderRadius: "8px", padding: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <input
+                    type="checkbox"
+                    id="overrideEnabled"
+                    checked={overrideEnabled}
+                    onChange={(e) => setOverrideEnabled(e.target.checked)}
+                    style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                  />
+                  <label htmlFor="overrideEnabled" style={{ fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", color: "var(--foreground)" }}>
+                    {language === "ar" ? "تفعيل سياسة التجاوز المخصصة" : "Enable Custom Override Policy"}
+                  </label>
+                </div>
+
+                <div style={{ opacity: overrideEnabled ? 1 : 0.5, transition: "opacity 0.2s ease" }}>
+                  {/* Slider 1: Weekly Limit */}
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                      <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد الأسبوعي المخصص" : "Override Weekly Token Limit"}</span>
+                      <span style={{ color: "var(--secondary)", fontWeight: 700, fontFamily: "monospace" }}>{overrideWeeklyLimit.toLocaleString()} tokens</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="50000"
+                      max="1000000"
+                      step="50000"
+                      disabled={!overrideEnabled}
+                      value={overrideWeeklyLimit}
+                      onChange={(e) => setOverrideWeeklyLimit(Number(e.target.value))}
+                      style={{ width: "100%", accentColor: "var(--secondary)", cursor: "pointer" }}
+                    />
+                  </div>
+
+                  {/* Slider 2: Monthly Limit */}
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                      <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{language === "ar" ? "الحد الشهري المخصص" : "Override Monthly Token Limit"}</span>
+                      <span style={{ color: "var(--accent-orange)", fontWeight: 700, fontFamily: "monospace" }}>{overrideMonthlyLimit.toLocaleString()} tokens</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="200000"
+                      max="5000000"
+                      step="100000"
+                      disabled={!overrideEnabled}
+                      value={overrideMonthlyLimit}
+                      onChange={(e) => setOverrideMonthlyLimit(Number(e.target.value))}
+                      style={{ width: "100%", accentColor: "var(--accent-orange)", cursor: "pointer" }}
+                    />
+                  </div>
+
+                  {/* Reason textarea */}
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem", color: "var(--foreground)" }}>
+                      {language === "ar" ? "سبب منح التجاوز (مثال: فاحص جوجل، حكم مسابقة):" : "Reason for Override (e.g. Google Judge, Devpost evaluator):"}
+                    </label>
+                    <textarea
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      disabled={!overrideEnabled}
+                      placeholder={language === "ar" ? "اكتب تفاصيل التجاوز هنا..." : "Enter details for granting limit override..."}
+                      style={{ width: "100%", height: "60px", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--card-border)", outline: "none", fontSize: "0.85rem", color: "var(--foreground)", resize: "none" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+                  <button
+                    onClick={() => handleSaveUserPolicy(false)}
+                    disabled={isSavingPolicy}
+                    style={{ flex: 1, padding: "0.6rem 1rem", fontSize: "0.85rem", fontWeight: 700, background: "linear-gradient(135deg, var(--primary), var(--secondary))", border: "none", color: "#fff", borderRadius: "6px", cursor: "pointer" }}
+                  >
+                    {isSavingPolicy ? (language === "ar" ? "جاري الحفظ..." : "Saving...") : (language === "ar" ? "حفظ وتطبيق السياسة" : "Save Policy")}
+                  </button>
+
+                  {selectedUserPolicy && (
+                    <button
+                      onClick={() => handleSaveUserPolicy(true)}
+                      disabled={isSavingPolicy}
+                      style={{ padding: "0.6rem 1rem", fontSize: "0.85rem", fontWeight: 700, background: "rgba(220, 53, 69, 0.08)", border: "1px solid rgba(220,53,69,0.2)", color: "#dc3545", borderRadius: "6px", cursor: "pointer" }}
+                    >
+                      {language === "ar" ? "إلغاء التخصيص" : "Clear Policy"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ border: "1px dashed var(--card-border)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "250px", color: "#6a7c88" }}>
+                {language === "ar" ? "لم يتم تحديد حساب مستخدم لتعديله." : "No user account has been selected yet."}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <style jsx>{`
         .dag-node-btn:hover {

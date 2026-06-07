@@ -52,6 +52,8 @@ class FlatBlock(BaseModel):
     prompt: Optional[str] = Field(default=None, description="question stem")
     options: Optional[List[str]] = Field(default=None, description="MCQ choices")
     answer: Optional[str] = Field(default=None, description="correct answer, if shown on the page")
+    dir: Optional[str] = Field(default=None, description="Block-level direction: 'rtl' or 'ltr'. Falls back to page dir.")
+
 
 
 class PageStructure(BaseModel):

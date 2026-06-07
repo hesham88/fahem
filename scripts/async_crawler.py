@@ -461,17 +461,51 @@ async def discover_moe(
         "ExamSpecifications/books.json",
     ]
     rows: list[tuple[dict, str]] = []
+    errors = []
+    
     for path in catalog_paths:
+        full_url = urljoin(base_url, path)
         try:
-            r = await client.get(urljoin(base_url, path), headers={"User-Agent": USER_AGENT}, follow_redirects=True)
-            if r.status_code == 200:
-                data = r.json()
-                if isinstance(data, list) and data:
-                    src_dir = path.rsplit("/", 1)[0] if "/" in path else "root"
-                    rows.extend((it, src_dir) for it in data)
-                    emit("log", {"text": f"{path}: +{len(data)} rows", "level": "info"})
-        except Exception:
-            pass
+            emit("log", {"text": f"Fetching MOE catalog path: {path} ...", "level": "info"})
+            r = await client.get(full_url, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
+            
+            status = r.status_code
+            content_type = r.headers.get("content-type", "unknown")
+            content_len = len(r.content)
+            
+            diagnostic_msg = f"{path} -> HTTP {status} | Content-Type: {content_type} | Length: {content_len} bytes"
+            emit("log", {"text": diagnostic_msg, "level": "info"})
+            
+            if status != 200:
+                errors.append(f"Failed to fetch {path}: HTTP {status}")
+                continue
+                
+            data = r.json()
+            src_dir = path.rsplit("/", 1)[0] if "/" in path else "root"
+            
+            # Support both top-level list and dict-wrapped formats (like {"books": [...]}, {"items": [...]})
+            items_list = None
+            if isinstance(data, list):
+                items_list = data
+            elif isinstance(data, dict):
+                items_list = data.get("books") or data.get("items") or data.get("data")
+                
+            if items_list and isinstance(items_list, list):
+                rows.extend((it, src_dir) for it in items_list if isinstance(it, dict))
+                emit("log", {"text": f"✓ {path} loaded successfully: +{len(items_list)} items found.", "level": "ok"})
+            else:
+                warn_msg = f"Catalog {path} was not a list and did not contain 'books'/'items' arrays."
+                emit("log", {"text": warn_msg, "level": "warning"})
+                errors.append(f"{path}: Invalid JSON catalog payload format.")
+                
+        except Exception as err:
+            err_msg = f"Error fetching or parsing catalog {path}: {err}"
+            emit("log", {"text": err_msg, "level": "error"})
+            errors.append(f"{path}: Exception: {err}")
+
+    # If all catalog paths failed, raise a loud exception instead of returning empty results silently!
+    if not rows and errors:
+        raise RuntimeError(f"All MOE e-library catalog path fetches failed! Crawl aborted. Diagnostics: {'; '.join(errors)}")
 
     books: list[BookRef] = []
     seen: set[str] = set()

@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { requireUser } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const { searchParams } = new URL(req.url);
     const groupId = searchParams.get("group_id");
     const threadId = searchParams.get("thread_id");
@@ -50,7 +54,7 @@ export async function GET(req: NextRequest) {
     } else if (groupId) {
       path += `?group_id=${groupId}`;
     }
-    return await proxyRequest(path, "GET");
+    return await proxyRequest(path, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -61,12 +65,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const body = await req.json();
-    const { action, group_id, thread_id, title, title_ar, content, content_ar, author_id, author_name, author_avatar } = body;
+    const { action, group_id, thread_id, title, title_ar, content, content_ar, author_name, author_avatar } = body;
+
+    // Force author_id strictly to verified caller session
+    const author_id = ctx.uid;
 
     if (action === "reply") {
-      if (!thread_id || !content || !author_id) {
-        return new Response(JSON.stringify({ error: "Missing required fields for reply: thread_id, content, author_id" }), {
+      if (!thread_id || !content) {
+        return new Response(JSON.stringify({ error: "Missing required fields for reply: thread_id, content" }), {
           status: 400,
           headers: { "Content-Type": "application/json" }
         });
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
           content,
           content_ar: content_ar || content,
           author_id,
-          author_name: author_name || "Anonymous Member",
+          author_name: author_name || ctx.email?.split("@")[0] || "Anonymous Member",
           author_avatar: author_avatar || "👤",
           created_at: new Date().toISOString()
         };
@@ -105,12 +115,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Proxy to Cloud Run Agent
-      return await proxyRequest("/social/threads", "POST", body);
+      return await proxyRequest("/social/threads", "POST", { ...body, author_id, author_name: author_name || ctx.email?.split("@")[0] }, ctx);
     }
 
     // Default: Create a new thread
-    if (!group_id || !title || !content || !author_id) {
-      return new Response(JSON.stringify({ error: "Missing required fields for thread: group_id, title, content, author_id" }), {
+    if (!group_id || !title || !content) {
+      return new Response(JSON.stringify({ error: "Missing required fields for thread: group_id, title, content" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
@@ -127,7 +137,7 @@ export async function POST(req: NextRequest) {
         content,
         content_ar: content_ar || content,
         author_id,
-        author_name: author_name || "Anonymous Member",
+        author_name: author_name || ctx.email?.split("@")[0] || "Anonymous Member",
         author_avatar: author_avatar || "👤",
         created_at: new Date().toISOString(),
         likes_count: 0,
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest("/social/threads", "POST", body);
+    return await proxyRequest("/social/threads", "POST", { ...body, author_id, author_name: author_name || ctx.email?.split("@")[0] }, ctx);
 
   } catch (err: any) {
     console.error("[api-social-threads-post] failed:", err);
@@ -154,3 +164,4 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+

@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
 
+import { requireUser } from "../../_auth";
+
 export const dynamic = "force-dynamic";
 
 function pcmToWav(pcmBuffer: Buffer, sampleRate: number = 24000, numChannels: number = 1, bitsPerSample: number = 16): Buffer {
@@ -39,8 +41,11 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate: number = 24000, numChannels: nu
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const body = await req.json();
-    const { text, language, voice } = body;
+    const { text, language, voice, bookId, pageNumber } = body;
 
     if (!text) {
       return new Response(JSON.stringify({ error: "Text is required" }), { status: 400 });
@@ -118,13 +123,13 @@ export async function POST(req: NextRequest) {
     const completionTokens = usageMetadata?.candidatesTokenCount || 0;
     const totalTokens = usageMetadata?.totalTokenCount || 0;
 
-    const targetUserId = body.userId || "anonymous";
-    const targetUserEmail = body.userEmail || "anonymous@fahem.ai";
+    const targetUserId = ctx.uid;
+    const targetUserEmail = ctx.email || "anonymous@fahem.ai";
 
     // A. Log Token Usage Telemetry
     if (totalTokens > 0) {
       try {
-        await proxyRequest("/user/token-usage", "POST", {
+        const tokenUsagePayload: any = {
           userId: targetUserId,
           userEmail: targetUserEmail,
           promptTokens: Number(promptTokens),
@@ -132,7 +137,15 @@ export async function POST(req: NextRequest) {
           totalTokens: Number(totalTokens),
           model: modelName,
           type: "audio_text_to_speech"
-        });
+        };
+        if (bookId && pageNumber !== undefined) {
+          tokenUsagePayload.context = {
+            book_id: bookId,
+            page: Number(pageNumber),
+            feature: "audio"
+          };
+        }
+        await proxyRequest("/user/token-usage", "POST", tokenUsagePayload);
       } catch (err) {
         console.warn("[api-audio-tts] Failed to log token usage:", err);
       }

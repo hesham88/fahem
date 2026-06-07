@@ -1,6 +1,7 @@
 import httpx
 import json
 import sys
+import os
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -8,10 +9,12 @@ if hasattr(sys.stdout, "reconfigure"):
 cloud_run_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
 url = f"{cloud_run_url}/run"
 
+token = os.environ.get("FAHEM_AUTH_TOKEN", "YOUR_FAHEM_AUTH_TOKEN")
+
 headers = {
     "Accept": "application/json",
     "Content-Type": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": f"Bearer {token}"
 }
 
 payload = {

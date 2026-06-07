@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin } from "../../admin/helper";
+import { requireAdmin } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { spawn } from "child_process";
@@ -18,26 +18,21 @@ if (!global.activeBookJobs) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { bookId, jobId, action, requesterEmail } = await req.json();
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!bookId || !action || !requesterEmail) {
-      return new Response(JSON.stringify({ error: "Missing required fields: bookId, action, requesterEmail" }), {
+    const { bookId, jobId, action } = await req.json();
+    const requesterEmail = ctx.email || "anonymous@fahem.app";
+
+    if (!bookId || !action) {
+      return new Response(JSON.stringify({ error: "Missing required fields: bookId, action" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // Verify admin/superadmin permission
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Administrative authorization required." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
     if (!isLocalEnv()) {
-      return await proxyRequest("/user/books/control", "POST", { bookId, jobId, action, requesterEmail });
+      return await proxyRequest("/user/books/control", "POST", { bookId, jobId, action, requesterEmail }, ctx);
     }
 
     const resolvedJobId = jobId || `job_${bookId}`;

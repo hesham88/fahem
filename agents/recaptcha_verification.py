@@ -123,10 +123,20 @@ def verify_recaptcha_token_safely(token: str, action: str) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"[reCAPTCHA Server-Side] Error during Google API assessment: {e}. Failing open to maintain service availability.")
-        return {
-            "success": True,
-            "status": "fail_open_bypass",
-            "error": str(e),
-            "score": 1.0
-        }
+        is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+        if is_gcp:
+            logger.error(f"[reCAPTCHA Server-Side] Error during Google API assessment in GCP env: {e}. Failing CLOSED.")
+            return {
+                "success": False,
+                "status": "error",
+                "error": str(e),
+                "score": 0.0
+            }
+        else:
+            logger.warning(f"[reCAPTCHA Server-Side] Error during Google API assessment: {e}. Failing open locally.")
+            return {
+                "success": True,
+                "status": "fail_open_bypass",
+                "error": str(e),
+                "score": 1.0
+            }

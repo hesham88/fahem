@@ -22,9 +22,9 @@ import threading
 
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
-    get_gemini_config, get_gemini_embedding_v2, get_fallback_embedding,
+    get_gemini_config, get_gemini_embedding_v2,
     is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH, atomic_write_json,
-    make_progress_bar
+    make_progress_bar, EMBED_MODEL, EMBED_DIM
 )
 
 db_write_lock = threading.Lock()
@@ -160,10 +160,26 @@ def main():
     actual_pages_count = len(translated_pages) if translated_pages else 1
 
     api_key, _ = get_gemini_config()
-    if api_key:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Loaded Gemini API credentials. Triggering 3072-dimensional vector search mappings.")
-    else:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] API credentials omitted. Utilizing 3072-dimensional deterministic offline hashing.")
+    
+    # --- Startup Verification Probe ---
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Initiating startup verification probe for model '{EMBED_MODEL}' (expecting {EMBED_DIM} dimensions)...")
+    try:
+        probe_vector = get_gemini_embedding_v2("Fahem embedding startup validation probe.", api_key)
+        if not probe_vector:
+            raise ValueError("Probe returned empty embedding vector.")
+        if len(probe_vector) != EMBED_DIM:
+            raise ValueError(f"Embedding dimension mismatch: expected {EMBED_DIM}, got {len(probe_vector)}")
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Startup verification probe passed. Model is online and matches EMBED_DIM.")
+    except Exception as probe_err:
+        err_msg = f"Startup verification probe failed: {probe_err}. Ingestion job aborted to prevent silent embedding failures."
+        print(f"[JOB 5: EMBED] [CRITICAL] {err_msg}", file=sys.stderr, flush=True)
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] {err_msg}")
+        update_job_status(
+            job_id, "failed", "embed", 86, logs,
+            processed_pages=0, total_pages=total_pages,
+            is_completed=True, is_local=is_local, **metadata
+        )
+        sys.exit(1)
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -197,15 +213,27 @@ def main():
         heading_path = get_heading_path(blocks)
         final_embedding_text = f"{heading_path}{raw_joined_text}" if raw_joined_text else f"Page {p_doc.get('page_number')}"
         
-        # 3. Call gemini-embedding-2 to get 3072-dim vector representation with safe fallback
+        # 3. Call gemini-embedding-2 API to get high-fidelity vector representation
+        vector = None
         try:
             vector = get_gemini_embedding_v2(final_embedding_text, api_key)
+            if not vector or len(vector) != EMBED_DIM:
+                raise ValueError(f"Received invalid or mismatching embedding vector dimensions from API.")
+            p_doc["embedding"] = vector
+            p_doc["status"] = "embedded"
+            p_doc["embed_model"] = EMBED_MODEL
+            p_doc["embed_dim"] = EMBED_DIM
+            p_doc["embed_provenance"] = "api"
         except Exception as api_err:
-            warn_msg = f"Page {p_doc.get('page_number')} failed Gemini API call: {api_err}. Falling back to deterministic pseudo-embedding."
-            print(f"[Embedding Warning] {warn_msg}", file=sys.stderr, flush=True)
+            err_msg = f"Page {p_doc.get('page_number')} failed embedding generation: {api_err}. Page marked as 'embed_failed' and excluded from active index."
+            print(f"[JOB 5: EMBED] [CRITICAL] {err_msg}", file=sys.stderr, flush=True)
             with state_lock:
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [WARNING] {warn_msg}")
-            vector = get_fallback_embedding(final_embedding_text, dimensions=3072)
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] {err_msg}")
+            p_doc["embedding"] = []
+            p_doc["status"] = "embed_failed"
+            p_doc["embed_model"] = EMBED_MODEL
+            p_doc["embed_dim"] = EMBED_DIM
+            p_doc["embed_provenance"] = "failed"
         
         # 4. Extract page concepts and formulas from structured blocks
         concepts_found = []
@@ -229,8 +257,6 @@ def main():
 
         p_doc["concepts"] = list(dict.fromkeys(concepts_found))[:5]
         p_doc["formulas"] = list(dict.fromkeys(formulas_found))[:5]
-        p_doc["embedding"] = vector
-        p_doc["status"] = "embedded"
         
         with state_lock:
             embedded_count += 1
@@ -238,7 +264,7 @@ def main():
             pct = 86 + int((current_embedded / actual_pages_count) * 12)  # Range 86% - 98%
             sub_pct = (current_embedded / actual_pages_count) * 100.0
             bar = make_progress_bar(sub_pct, width=20)
-            log_msg = f"{bar} Vector Embedded Page {p_doc.get('page_number')}/{actual_pages_count}."
+            log_msg = f"{bar} Processed page {p_doc.get('page_number')}/{actual_pages_count} (Status: {p_doc['status']})."
             print(f"[JOB 5: EMBED] {log_msg}", flush=True)
             logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
         

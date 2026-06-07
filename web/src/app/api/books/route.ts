@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkIsAdmin, checkIsSuperadmin } from "../admin/helper";
 import { proxyRequest } from "../proxy";
+import { verifyAuth } from "../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
@@ -94,9 +95,19 @@ if (!global.activeBookJobs) {
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const subjectId = searchParams.get("subjectId");
     const bookId = searchParams.get("bookId");
+
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
 
     // 1. Local environment check
     if (isLocalEnv()) {
@@ -110,6 +121,13 @@ export async function GET(req: NextRequest) {
             headers: { "Content-Type": "application/json" }
           });
         }
+        // IDOR Protection: Standard users cannot view other users' private uploads
+        if (book.userId && book.userId !== ctx.uid && !isAdmin) {
+          return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view this book" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
         return new Response(JSON.stringify({ success: true, book }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
@@ -117,6 +135,8 @@ export async function GET(req: NextRequest) {
       }
 
       let filteredBooks = db.books || [];
+      // Filter out other users' private books
+      filteredBooks = filteredBooks.filter((b: any) => !b.userId || b.userId === ctx.uid || isAdmin);
       if (subjectId) {
         filteredBooks = filteredBooks.filter((b: any) => b.subject_id === subjectId);
       }
@@ -146,6 +166,13 @@ export async function GET(req: NextRequest) {
             headers: { "Content-Type": "application/json" }
           });
         }
+        // IDOR Protection
+        if (book.userId && book.userId !== ctx.uid && !isAdmin) {
+          return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view this book" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
         return new Response(JSON.stringify({ success: true, book }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
@@ -161,7 +188,7 @@ export async function GET(req: NextRequest) {
     if (subjectId) params.append("subject_id", subjectId);
     if (bookId) params.append("book_id", bookId);
 
-    return await proxyRequest(`/user/books?${params.toString()}`, "GET");
+    return await proxyRequest(`/user/books?${params.toString()}`, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -172,6 +199,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const body = await req.json();
     const {
       subject_id,
@@ -185,8 +220,6 @@ export async function POST(req: NextRequest) {
       source_url,
       storage_path,
       chapters,
-      requesterEmail,
-      userId,
       storagePath,
       downloadUrl,
       sizeBytes,
@@ -194,8 +227,15 @@ export async function POST(req: NextRequest) {
       forceReindex = false
     } = body;
 
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    const isSuper = ctx.role === "super-admin";
+
+    // Standard users can ONLY perform private uploads. Admins can perform standard ingestion.
+    const isPrivate = !isAdmin || !!body.userId;
+    const userId = isPrivate ? (isAdmin ? (body.userId || ctx.uid) : ctx.uid) : null;
+    const requesterEmail = ctx.email || "anonymous@fahem.app";
+
     // Harmonize fields
-    const isPrivate = !!userId;
     const resolvedSubjectId = subject_id || "subj_user_uploads";
     const resolvedTitle = title || "Untitled Document";
     const resolvedTitleAr = title_ar || title || "مستند شخصي";
@@ -203,20 +243,10 @@ export async function POST(req: NextRequest) {
     const resolvedStoragePath = storage_path || storagePath || "";
     const resolvedSizeBytes = Number(sizeBytes || 0);
 
-    // Bypass checkIsAdmin audit if it is a private student upload
     if (!isPrivate) {
-      if (!requesterEmail || !resolvedSubjectId || !resolvedTitle || !resolvedTitleAr) {
-        return new Response(JSON.stringify({ error: "Missing required fields: requesterEmail, subject_id, title, title_ar" }), {
+      if (!resolvedSubjectId || !resolvedTitle || !resolvedTitleAr) {
+        return new Response(JSON.stringify({ error: "Missing required fields: subject_id, title, title_ar" }), {
           status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      // Verify requester is admin/superadmin
-      const isAdmin = await checkIsAdmin(requesterEmail);
-      if (!isAdmin) {
-        return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized administrator." }), {
-          status: 403,
           headers: { "Content-Type": "application/json" }
         });
       }
@@ -230,7 +260,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine if superadmin approval is required (only for standard admin actions)
-    const isSuper = await checkIsSuperadmin(requesterEmail || "");
     const needsApproval = !isPrivate && !isSuper;
 
     // Generate a unique bookId
@@ -310,7 +339,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!isLocalEnv()) {
-      return await proxyRequest("/user/books", "POST", proxyPayload);
+      return await proxyRequest("/user/books", "POST", proxyPayload, ctx);
     }
 
     // 1. Local environment check
@@ -548,6 +577,23 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: "Access Denied: Requester is not authorized." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const body = await req.json();
     const {
       id,
       subject_id,
@@ -560,21 +606,14 @@ export async function PUT(req: NextRequest) {
       book_type,
       source_url,
       storage_path,
-      chapters,
-      requesterEmail
-    } = await req.json();
+      chapters
+    } = body;
 
-    if (!requesterEmail || !id || !subject_id || !title || !title_ar) {
-      return new Response(JSON.stringify({ error: "Missing required fields: requesterEmail, id, subject_id, title, title_ar" }), {
+    const requesterEmail = ctx.email || "anonymous@fahem.app";
+
+    if (!id || !subject_id || !title || !title_ar) {
+      return new Response(JSON.stringify({ error: "Missing required fields: id, subject_id, title, title_ar" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not authorized." }), {
-        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -690,7 +729,7 @@ export async function PUT(req: NextRequest) {
       source_url,
       storage_path,
       chapters
-    });
+    }, ctx);
 
   } catch (err: any) {
     console.error("[api-books-put] failed:", err);
@@ -703,24 +742,25 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const requesterEmail = searchParams.get("requesterEmail");
 
-    if (!id || !requesterEmail) {
-      return new Response(JSON.stringify({ error: "Missing id or requesterEmail parameter" }), {
+    if (!id) {
+      return new Response(JSON.stringify({ error: "Missing id parameter" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not authorized." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
 
     if (isLocalEnv()) {
       const db = getLocalDb() as any;
@@ -728,6 +768,22 @@ export async function DELETE(req: NextRequest) {
       if (idx < 0) {
         return new Response(JSON.stringify({ error: "Book not found locally" }), {
           status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const book = db.books[idx];
+      // IDOR Protection: Standard users cannot delete other users' private books
+      if (book.userId && book.userId !== ctx.uid && !isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden: You do not own this book" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      // Public books can only be deleted by admin
+      if (!book.userId && !isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden: Admin access required to delete public books" }), {
+          status: 403,
           headers: { "Content-Type": "application/json" }
         });
       }
@@ -759,7 +815,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest(`/user/books?id=${id}`, "DELETE");
+    return await proxyRequest(`/user/books?id=${id}`, "DELETE", undefined, ctx);
 
   } catch (err: any) {
     console.error("[api-books-delete] failed:", err);

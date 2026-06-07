@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { logInfo, logError } from "@/lib/logger";
+import { authedFetch } from "@/lib/authedFetch";
 
 interface InlineFeedbackCardProps {
   language: string;
@@ -183,10 +184,10 @@ const InlineFeedbackCard: React.FC<InlineFeedbackCardProps> = ({
 
     setLoading(true);
     try {
-      const response = await fetch("/api/feedback", {
+      const response = await authedFetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, feedback, category })
+        body: JSON.stringify({ name, email, feedback, category, source: "chat" })
       });
       if (response.ok) {
         setSubmitted(true);

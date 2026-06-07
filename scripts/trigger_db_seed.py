@@ -1,10 +1,12 @@
 import urllib.request
 import json
+import os
 
 url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/admin/seed-db"
+token = os.environ.get("FAHEM_AUTH_TOKEN", "YOUR_FAHEM_AUTH_TOKEN")
 headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": f"Bearer {token}"
 }
 
 req = urllib.request.Request(url, data=b"{}", headers=headers, method="POST")

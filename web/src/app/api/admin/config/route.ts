@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
-import { checkIsAdmin, checkIsSuperadmin } from "../helper";
+import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
     if (isLocalEnv()) {
       const db = getLocalDb();
       if (!db.config) {
@@ -27,7 +30,7 @@ export async function GET(req: NextRequest) {
     // In production, we fallback to local DB config as well if proxy fails, or we can proxy
     // Let's try proxying first
     try {
-      const proxyRes = await proxyRequest("/admin/config", "GET");
+      const proxyRes = await proxyRequest("/admin/config", "GET", undefined, ctx);
       if (proxyRes.ok) {
         return proxyRes;
       }
@@ -61,23 +64,22 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
     const body = await req.json();
-    const { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize, requesterEmail } = body;
+    const { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize } = body;
 
     // Determine if requester is an admin that requires superadmin approval
-    let needsApproval = false;
-    if (requesterEmail) {
-      const isAdmin = await checkIsAdmin(requesterEmail);
-      const isSuper = await checkIsSuperadmin(requesterEmail);
-      needsApproval = isAdmin && !isSuper;
-    }
+    const isSuper = ctx.role === "super-admin";
+    const needsApproval = !isSuper;
 
     if (needsApproval) {
       const db = getLocalDb();
       const requestId = "req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
       const changeRequest = {
         id: requestId,
-        requesterEmail,
+        requesterEmail: ctx.email,
         actionType: "update_config",
         payload: { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize },
         status: "pending",
@@ -109,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const proxyRes = await proxyRequest("/admin/config", "POST", body);
+      const proxyRes = await proxyRequest("/admin/config", "POST", { isTokenControlActive, weeklyAllocationLimit, monthlyAllocationLimit, maxUploadSize }, ctx);
       if (proxyRes.ok) {
         return proxyRes;
       }

@@ -85,7 +85,11 @@ PAGE_STRUCTURE_SCHEMA = {
             "type": "ARRAY",
             "items": {"type": "STRING"}
           },
-          "answer": {"type": "STRING"}
+          "answer": {"type": "STRING"},
+          "dir": {
+            "type": "STRING",
+            "enum": ["rtl", "ltr"]
+          }
         },
         "required": ["id", "parent", "type"]
       }
@@ -161,6 +165,73 @@ def parse_salvaged_json(json_str):
         
     return None
 
+import re
+
+def _has_arabic(text: str) -> bool:
+    if not text:
+        return False
+    for char in text:
+        if ('\u0600' <= char <= '\u06FF' or 
+            '\u0750' <= char <= '\u077F' or 
+            '\u08A0' <= char <= '\u08FF' or 
+            '\uFB50' <= char <= '\uFDFF' or 
+            '\uFE70' <= char <= '\uFEFF'):
+            return True
+    return False
+
+def get_block_text_for_dir(b):
+    parts = []
+    is_dict = isinstance(b, dict)
+    text = b.get("text") if is_dict else getattr(b, "text", None)
+    term = b.get("term") if is_dict else getattr(b, "term", None)
+    prompt = b.get("prompt") if is_dict else getattr(b, "prompt", None)
+    label = b.get("label") if is_dict else getattr(b, "label", None)
+    title = b.get("title") if is_dict else getattr(b, "title", None)
+    items = b.get("items") if is_dict else getattr(b, "items", None)
+    
+    if text: parts.append(text)
+    if term: parts.append(term)
+    if prompt: parts.append(prompt)
+    if label: parts.append(label)
+    if title: parts.append(title)
+    if items:
+        for item in items:
+            if item: parts.append(item)
+    return " ".join(parts)
+
+def verify_blocks_integrity(blocks, page_num):
+    parents = set()
+    for b in blocks:
+        parent_val = b.get("parent") if isinstance(b, dict) else getattr(b, "parent", "")
+        if parent_val:
+            parents.add(parent_val)
+            
+    for b in blocks:
+        b_id = b.get("id") if isinstance(b, dict) else getattr(b, "id", "")
+        b_type = b.get("type") if isinstance(b, dict) else getattr(b, "type", None)
+        if hasattr(b_type, "value"):
+            b_type = b_type.value
+            
+        if b_type in ["callout", "example"]:
+            if b_id not in parents:
+                raise ValueError(f"Hollow container block: '{b_type}' block '{b_id}' on page {page_num} has no child blocks pointing to it.")
+        elif b_type == "code":
+            text_val = b.get("text") if isinstance(b, dict) else getattr(b, "text", "")
+            if not text_val or not text_val.strip():
+                raise ValueError(f"Empty code block: 'code' block '{b_id}' on page {page_num} text payload is missing or empty.")
+        elif b_type == "list":
+            items_val = b.get("items") if isinstance(b, dict) else getattr(b, "items", [])
+            if not items_val or len(items_val) == 0:
+                raise ValueError(f"Empty list block: 'list' block '{b_id}' on page {page_num} has no list items.")
+
+def strip_markdown_json(text):
+    text = text.strip()
+    pattern = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL | re.IGNORECASE)
+    match = pattern.search(text)
+    if match:
+        return match.group(1).strip()
+    return text
+
 def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
     """
     Call Gemini LLM via official google-genai SDK, passing the image bytes,
@@ -193,21 +264,33 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
         
         json_text = resp.text
         if not json_text:
-            return None
+            raise ValueError(f"Gemini structuring API returned empty response text for Page {page_num}")
             
-        if json_text.strip().startswith("```"):
-            json_text = json_text.strip().strip("```").strip("json").strip()
+        json_text = strip_markdown_json(json_text)
             
         parsed_struct = PageStructure.model_validate_json(json_text)
         
-        # Defensive: force page-scoped, collision-free ids even if the model drifts.
+        blocks_dict_list = []
         for i, b in enumerate(parsed_struct.blocks):
             if not b.id:
                 b.id = f"p{page_num}-b{i}"
+            b_dict = b.model_dump(exclude_none=True)
+            
+            # Script-based block-level dir detection
+            b_text = get_block_text_for_dir(b_dict)
+            if b_text.strip():
+                b_dict["dir"] = "rtl" if _has_arabic(b_text) else "ltr"
+            else:
+                b_dict["dir"] = parsed_struct.dir
+                
+            blocks_dict_list.append(b_dict)
+            
+        # Verify block integrity
+        verify_blocks_integrity(blocks_dict_list, page_num)
                 
         return {
             "dir": parsed_struct.dir,
-            "blocks": [b.model_dump(exclude_none=True) for b in parsed_struct.blocks]
+            "blocks": blocks_dict_list
         }
     except Exception as e:
         print(f"[Vision call Exception] {e}", file=sys.stderr)
@@ -215,16 +298,28 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
         try:
             if 'resp' in locals() and resp and resp.text:
                 json_text = resp.text
-                if json_text.strip().startswith("```"):
-                    json_text = json_text.strip().strip("```").strip("json").strip()
+                json_text = strip_markdown_json(json_text)
                 parsed = parse_salvaged_json(json_text)
                 if parsed:
-                    print(f"[Vision call Exception] Successfully salvaged partial response for Page {page_num}", file=sys.stderr)
+                    salvaged_blocks = parsed.get("blocks", [])
+                    for b_dict in salvaged_blocks:
+                        b_text = get_block_text_for_dir(b_dict)
+                        if b_text.strip():
+                            b_dict["dir"] = "rtl" if _has_arabic(b_text) else "ltr"
+                        else:
+                            b_dict["dir"] = parsed.get("dir", "rtl")
+                    verify_blocks_integrity(salvaged_blocks, page_num)
+                    print(f"[Vision call Exception] Successfully salvaged and verified partial response for Page {page_num}", file=sys.stderr)
                     return parsed
+                else:
+                    raise ValueError(f"JSON salvage returned empty parsing result for Page {page_num}")
+            else:
+                raise ValueError(f"No response text available for JSON salvage on Page {page_num}")
         except Exception as salvage_err:
             print(f"[Vision call Exception] Salvage attempt failed: {salvage_err}", file=sys.stderr)
-            
-    return None
+            raise RuntimeError(f"Vision call and salvage both failed. Original error: {e}. Salvage error: {salvage_err}") from e
+        
+        raise RuntimeError(f"Vision call failed: {e}")
 
 def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload):
     """

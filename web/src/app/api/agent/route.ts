@@ -4,6 +4,7 @@ import { GoogleAuth } from "google-auth-library";
 import { proxyRequest, getOidcToken } from "../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath, shouldSkipDirectMongo } from "../localDbHelper";
 import { checkIsSuperadmin, checkIsAdmin } from "../admin/helper";
+import { requireUser } from "../_auth";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -172,7 +173,13 @@ async function checkModelArmor(prompt: string): Promise<{ blocked: boolean; reas
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, language, userEmail, userId, sessionId, onboarding, recaptchaToken } = await req.json();
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
+    const body = await req.json();
+    const { prompt, language, sessionId, onboarding, recaptchaToken } = body;
+    const userId = ctx.uid;
+    const userEmail = ctx.email || "anonymous@fahem.ai";
     if (recaptchaToken) {
       console.log(`[reCAPTCHA Enterprise Server-Side] Received action protection token: ${recaptchaToken.substring(0, 15)}...`);
       try {
@@ -242,8 +249,8 @@ export async function POST(req: NextRequest) {
           // -------------------------------------------------------------
           // Secret Superadmin Ingestion Commands Interception
           // -------------------------------------------------------------
-          const isAdmin = userEmail ? await checkIsAdmin(userEmail) : false;
-          const isSuper = userEmail ? await checkIsSuperadmin(userEmail) : false;
+          const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+          const isSuper = ctx.role === "super-admin";
           
           const urlRegex = /(?:^|\s|\/)?ingest\s+url\s+(https?:\/\/\S+)/i;
           const pdfRegex = /(?:^|\s|\/)?ingest\s+(?:pdf|uploaded\s+pdf|file)\s+(\S+)/i;
@@ -1009,24 +1016,20 @@ If any criteria fail, respond with "DENIED: <clear explanation in the user's req
 
             // Fetch GCP OIDC identity token for service-to-service authentication
             let oidcToken = await getOidcToken();
-            let isLocalBypass = false;
-            if (!oidcToken) {
-              oidcToken = "LOCAL_BYPASS_TOKEN_fahem_2026";
-              isLocalBypass = true;
-            }
 
             const requestHeaders: Record<string, string> = {
-              "Content-Type": "application/json"
+              "Content-Type": "application/json",
+              "X-Verified-Principal": JSON.stringify({
+                uid: ctx.uid,
+                email: ctx.email,
+                role: ctx.role
+              })
             };
             if (oidcToken) {
               requestHeaders["Authorization"] = `Bearer ${oidcToken}`;
-              if (isLocalBypass) {
-                controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured local development bypass credentials.\n`));
-              } else {
-                controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
-              }
+              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Secured authenticated GCP ID token.\n`));
             } else {
-              controller.enqueue(encoder.encode("[Fahem Agent] [SYSTEM LOG] Warning: No GCP ID token secured. Continuing unauthenticated.\n"));
+              controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running in local/dev environment mode. Identity forwarded securely via principal.\n`));
             }
 
             // Enforce and pass structured context variables safely inside prompt text payload as JSON

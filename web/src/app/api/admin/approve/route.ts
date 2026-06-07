@@ -1,39 +1,15 @@
 import { NextRequest } from "next/server";
+import { requireSuperadmin } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
-function getSuperadmins(): string[] {
-  let raw = process.env.SUPERADMIN_USER || "";
-  // Strip outer quotes if any (common in Secret Manager values)
-  raw = raw.trim().replace(/^['"]|['"]$/g, "");
-  const envSuperadmins = raw
-    ? raw.split(",").map((addr) => addr.trim().toLowerCase().replace(/^['"]|['"]$/g, ""))
-    : [];
-  return envSuperadmins;
-}
-
 // GET: Retrieve list of all administrators and standard users with role "admin"
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const superadminEmail = searchParams.get("superadminEmail")?.toLowerCase().trim();
-
-    if (!superadminEmail) {
-      return new Response(JSON.stringify({ error: "Superadmin email is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const superadmins = getSuperadmins();
-    if (!superadmins.includes(superadminEmail)) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized superadmin." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
     // 1. Local environment check
     if (isLocalEnv()) {
@@ -72,7 +48,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Production: Proxy to GCP Agent
-    const proxyRes = await proxyRequest("/admin/approve", "GET");
+    const proxyRes = await proxyRequest("/admin/approve", "GET", undefined, ctx);
     return proxyRes;
 
   } catch (err: any) {
@@ -87,29 +63,24 @@ export async function GET(req: NextRequest) {
 // POST: Approve or Revoke an administrator candidate
 export async function POST(req: NextRequest) {
   try {
-    const { superadminEmail, adminEmail, action } = await req.json();
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!superadminEmail || !adminEmail || !action) {
-      return new Response(JSON.stringify({ error: "Missing required parameters: superadminEmail, adminEmail, action" }), {
+    const body = await req.json();
+    const { adminEmail, action } = body;
+
+    if (!adminEmail || !action) {
+      return new Response(JSON.stringify({ error: "Missing required parameters: adminEmail, action" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const superadmins = getSuperadmins();
-    const cleanSuperadmin = superadminEmail.toLowerCase().trim();
     const cleanAdmin = adminEmail.toLowerCase().trim();
 
-    if (!superadmins.includes(cleanSuperadmin)) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized superadmin." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
     // Protect superadmins from being revoked or altered via this endpoint
-    if (superadmins.includes(cleanAdmin)) {
-      return new Response(JSON.stringify({ error: "Access Denied: Cannot modify superadmin status from database admin controls." }), {
+    if (ctx.email && cleanAdmin === ctx.email.toLowerCase().trim()) {
+      return new Response(JSON.stringify({ error: "Access Denied: Cannot modify your own superadmin status." }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
@@ -138,7 +109,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Production: Proxy to GCP Agent
-    const proxyRes = await proxyRequest("/admin/approve", "POST", { adminEmail, action });
+    const proxyRes = await proxyRequest("/admin/approve", "POST", { adminEmail, action }, ctx);
     return proxyRes;
 
   } catch (err: any) {

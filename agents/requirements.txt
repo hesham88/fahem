@@ -7,3 +7,6 @@ requests
 pymupdf
 google-genai
 pydantic
+arabic-reshaper
+python-bidi
+google-cloud-storage

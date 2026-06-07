@@ -32,10 +32,21 @@ def run_log_audit_task(category: str, agent: str, message: str, details: str = N
         logger.warning(f"Could not log audit task asynchronously: {e}")
 
 # =================================----------------------------
-# CONSTANTS & WHITELISTS
+# CONSTANTS, WHITELISTS & CONTEXT
 # =================================----------------------------
-ALLOWED_DATABASES = {"fahem", "sample_mflix"}
-ALLOWED_COLLECTIONS = {"users", "movies", "reports", "comments"}
+import contextvars
+verified_principal_ctx = contextvars.ContextVar("verified_principal_ctx", default=None)
+
+ALLOWED_DATABASES = {"fahem"}
+ALLOWED_COLLECTIONS = {
+    "users", "user_profiles", "subjects", "books", "book_pages",
+    "curricula", "libraries",                       # Phase 1
+    "crawl_jobs", "ingestion_jobs",
+    "chat_sessions", "companion_sessions",          # Phase 4
+    "social_groups", "social_threads", "social_replies",
+    "reports", "feedback", "user_activities", "token_telemetry", "audit_logs",
+    "reading_sessions"
+}
 MAX_RETURN_RECORDS = 50
 
 # =================================----------------------------
@@ -55,9 +66,12 @@ def sanitize_text(text: str) -> str:
 import httpx
 
 def check_model_armor_py(prompt: str) -> tuple[bool, str]:
-    """Pre-flight safety filtration via GCP Model Armor REST API."""
+    """Pre-flight safety filtration via GCP Model Armor REST API with fail-closed production protection."""
     if not prompt:
         return False, ""
+    
+    is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+    
     try:
         import google.auth
         from google.auth.transport.requests import Request
@@ -72,7 +86,10 @@ def check_model_armor_py(prompt: str) -> tuple[bool, str]:
         token = None
         
     if not token:
-        logger.info("Model Armor: No GCP token available for server-side validation. Skipping check.")
+        if is_gcp:
+            logger.error("Model Armor: No GCP token available in production GCP environment! Failing closed.")
+            return True, "GCP Model Armor: Security credentials unavailable. Access denied."
+        logger.info("Model Armor: No GCP token available for server-side validation. Skipping check locally.")
         return False, ""
         
     try:
@@ -100,10 +117,85 @@ def check_model_armor_py(prompt: str) -> tuple[bool, str]:
                     return True, "GCP Model Armor: Content flagged as unsafe or violating safety guidelines."
             else:
                 logger.warning(f"Model Armor REST API returned error status {res.status_code}: {res.text}")
+                if is_gcp:
+                    return True, f"GCP Model Armor: Sanitization API error {res.status_code}. Access denied."
     except Exception as err:
         logger.error(f"Error executing server-side GCP Model Armor check: {err}")
-        
+        if is_gcp:
+            return True, f"GCP Model Armor: Sanitization check failed due to error: {str(err)}. Access denied."
     return False, ""
+
+def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
+    """
+    Checks if the user has exceeded their token credits.
+    Returns (is_blocked, message).
+    """
+    if role in ["admin", "super-admin", "superadmin", "judge"]:
+        return False, ""
+        
+    try:
+        from pymongo import MongoClient
+        from datetime import datetime, timedelta
+        
+        uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+        db = client["fahem"]
+        
+        # 1. Load System Config defaults
+        config_doc = db["config"].find_one() or {}
+        is_token_control_active = config_doc.get("isTokenControlActive", True)
+        weekly_allocation_limit = config_doc.get("weeklyAllocationLimit", 250000)
+        monthly_allocation_limit = config_doc.get("monthlyAllocationLimit", 1000000)
+        
+        # 2. Load User Profile
+        user_prof = db["user_profiles"].find_one({"userId": uid}) or {}
+        token_policy = user_prof.get("tokenPolicy") or {}
+        
+        # Determine effective active state & limits (override-then-default)
+        control_active = token_policy.get("enabled", is_token_control_active)
+        
+        if not control_active:
+            client.close()
+            return False, ""
+            
+        weekly_limit = token_policy.get("weeklyLimit", weekly_allocation_limit)
+        monthly_limit = token_policy.get("monthlyLimit", monthly_allocation_limit)
+        
+        # 3. Compute consumed tokens from token_telemetry
+        now = datetime.utcnow()
+        seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
+        thirty_days_ago = (now - timedelta(days=30)).isoformat() + "Z"
+        
+        # Fetch token telemetry documents for this user
+        telemetry_cursor = db["token_telemetry"].find({"userId": uid})
+        
+        weekly_used = 0
+        monthly_used = 0
+        
+        for doc in telemetry_cursor:
+            tt = int(doc.get("totalTokens", 0))
+            ts = doc.get("timestamp") or doc.get("createdAt") or ""
+            if ts:
+                if ts >= seven_days_ago:
+                    weekly_used += tt
+                if ts >= thirty_days_ago:
+                    monthly_used += tt
+                    
+        client.close()
+        
+        if weekly_used >= weekly_limit:
+            return True, f"weekly token allocation reached: used {weekly_used}/{weekly_limit} tokens."
+        if monthly_used >= monthly_limit:
+            return True, f"monthly token allocation reached: used {monthly_used}/{monthly_limit} tokens."
+            
+        return False, ""
+        
+    except Exception as err:
+        logger.warning(f"Error checking token credits: {err}")
+        is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+        if is_gcp:
+            return True, "Security Gate: Token allocation check failed. Access denied (fail-closed)."
+        return False, ""
 
 def before_agent_callback(*args, **kwargs) -> Optional[Content]:
     """Before Agent Callback: Detects jailbreak signatures or injection patterns in the user prompt.
@@ -164,6 +256,21 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
     
     logger.info(f"[AUDIT] Agent {agent_name} invoked by user_id={user_id} (Prompt Size: {len(prompt_text)})")
     run_log_audit_task("INFO", agent_name, f"Agent {agent_name} invoked by user_id={user_id}", f"Prompt size: {len(prompt_text)}")
+    
+    # Enforce two-tier Token Credit System rolling allocation check
+    principal = verified_principal_ctx.get()
+    uid = principal.get("uid") if principal else (os.environ.get("USER_ID") or user_id)
+    role = principal.get("role") if principal else "user"
+    
+    blocked, reason = check_token_credits(uid, role)
+    if blocked:
+        logger.warning(f"[SECURITY] Token allocation limit hit for user {uid}: {reason}")
+        run_log_audit_task("SECURITY", "Guardrail", f"OPERATION BLOCKED: {reason}", f"User UID: {uid}")
+        return Content(
+            role="model",
+            parts=[Part.from_text(text=f"DENIED: Token allocation limit reached. {reason}")]
+        )
+
     
     if prompt_text:
         # Run local heuristics first
@@ -252,7 +359,7 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
         raise PermissionError(f"Access Denied: Administrative command '{tool_name}' is strictly unauthorized.")
         
     # 2. Namespace Whitelisting: Verify accessed database and collection against strict allowlists
-    db_param = tool_args.get("db") or tool_args.get("database") or tool_args.get("databaseName")
+    db_param = tool_args.get("db") or tool_args.get("database") or tool_args.get("databaseName") or "fahem"
     collection_param = tool_args.get("collection") or tool_args.get("collectionName")
     
     if db_param and db_param not in ALLOWED_DATABASES:
@@ -263,55 +370,26 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
         logger.warning(f"[SECURITY] Blocked unauthorized Collection access: {collection_param}")
         raise PermissionError(f"Access Denied: Collection '{collection_param}' is not whitelisted.")
         
-    # 3. Delegated Authorization & Principle of Least Privilege: Force session checks and credits check for mutations
-    credits = 100
-    user_email = ""
-    username = "anonymous"
-    user_id = ""
+    # 3. Delegated Authorization: Read identity strictly from thread-safe verified_principal_ctx
+    principal = verified_principal_ctx.get()
     
-    if tool_context and hasattr(tool_context, "state") and tool_context.state:
-        try:
-            state = tool_context.state
-            if hasattr(state, "get"):
-                credits = state.get("credits", 100)
-                user_email = state.get("user_email", "")
-                username = state.get("username", "anonymous")
-                user_id = state.get("user_id", "")
-            else:
-                credits = getattr(state, "credits", 100)
-                user_email = getattr(state, "user_email", "")
-                username = getattr(state, "username", "anonymous")
-                user_id = getattr(state, "user_id", "")
-        except Exception as state_err:
-            logger.warning(f"Failed to extract state in before_tool_callback: {state_err}")
-            
-    # Fallback to environment variables if state didn't provide them
-    if not user_email:
-        user_email = os.environ.get("USER_EMAIL", "")
-        
-    # Extra robust extraction from tool arguments or documents for insert/update/delete operations
-    if not user_email and tool_args:
-        user_email = tool_args.get("email") or tool_args.get("user_email") or tool_args.get("user_id") or tool_args.get("userId") or ""
-        if not user_email:
-            docs = tool_args.get("documents", [])
-            if isinstance(docs, list) and docs:
-                for doc in docs:
-                    if isinstance(doc, dict):
-                        user_email = doc.get("email") or doc.get("user_email") or doc.get("userId") or doc.get("userId") or ""
-                        if user_email:
-                            break
-                            
     is_write = any(kw in tool_name.lower() for kw in ["insert", "update", "delete", "drop", "write", "create"])
     if is_write:
-        if not user_email:
+        if not principal:
             logger.warning("[SECURITY] Write operation rejected: User is not authenticated or lacks active session.")
             raise PermissionError("Access Denied: Write operations require an active, authenticated user session.")
             
-        if credits <= 0:
-            logger.warning(f"[SECURITY] Write operation rejected: User {user_email or username} has insufficient credits ({credits}).")
-            raise PermissionError(f"Access Denied: Insufficient credits. Active balance is {credits}. Mutation blocked.")
+        role = principal.get("role")
+        email = principal.get("email") or "anonymous@fahem.app"
+        uid = principal.get("uid")
+        
+        # 4. Credits/Quota check (Persisted Credits)
+        blocked, reason = check_token_credits(uid, role)
+        if blocked:
+            logger.warning(f"[SECURITY] Write operation rejected: User {email} has exceeded token limits: {reason}")
+            raise PermissionError(f"Access Denied: Token allocation reached. {reason}")
             
-        logger.info(f"[AUDIT] Verified delegated write authorization for user: {user_email} (Credits: {credits})")
+        logger.info(f"[AUDIT] Verified delegated write authorization for user: {email} (Role: {role})")
         
     return None
 
@@ -367,23 +445,55 @@ def after_tool_callback(*args, **kwargs) -> Optional[dict]:
     tool_name = getattr(tool, "name", "unknown_tool")
     logger.info(f"[AUDIT] Tool succeeded: '{tool_name}'")
     
-    # Decrement credits on-the-fly inside agent state for successful tool executions
+    # Enforce and calculate dynamic remaining weekly token quota percentage inside after_tool_callback
     if tool_context and hasattr(tool_context, "state") and tool_context.state:
         try:
+            principal = verified_principal_ctx.get()
+            uid = principal.get("uid") if principal else "local_dev_uid"
+            role = principal.get("role") if principal else "user"
+            
+            remaining = 100
+            if role not in ["admin", "super-admin", "superadmin", "judge"]:
+                try:
+                    from pymongo import MongoClient
+                    from datetime import datetime, timedelta
+                    uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
+                    client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+                    db = client["fahem"]
+                    config_doc = db["config"].find_one() or {}
+                    weekly_limit = config_doc.get("weeklyAllocationLimit", 250000)
+                    user_prof = db["user_profiles"].find_one({"userId": uid}) or {}
+                    token_policy = user_prof.get("tokenPolicy") or {}
+                    effective_weekly_limit = token_policy.get("weeklyLimit", weekly_limit)
+                    
+                    now = datetime.utcnow()
+                    seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
+                    telemetry_cursor = db["token_telemetry"].find({"userId": uid})
+                    weekly_used = sum(int(doc.get("totalTokens", 0)) for doc in telemetry_cursor if (doc.get("timestamp") or doc.get("createdAt") or "") >= seven_days_ago)
+                    client.close()
+                    
+                    if effective_weekly_limit > 0:
+                        used_ratio = weekly_used / effective_weekly_limit
+                        remaining = max(0, int((1.0 - used_ratio) * 100))
+                    else:
+                        remaining = 0
+                except Exception:
+                    pass
+            else:
+                remaining = 999
+                
+            # Update agent state so successive steps have the right credits context
             state = tool_context.state
             if hasattr(state, "get"):
-                current_credits = state.get("credits", 100)
-                new_credits = max(0, current_credits - 1)
-                state["credits"] = new_credits
+                state["credits"] = remaining
             else:
-                current_credits = getattr(state, "credits", 100)
-                new_credits = max(0, current_credits - 1)
-                state.credits = new_credits
+                state.credits = remaining
+                
             # Write to stdout using the standard format that Next.js stream can log
-            print(f"[METADATA] Credits: {new_credits}", flush=True)
-            logger.info(f"[AUDIT] Decremented credits. Balance: {new_credits}")
+            print(f"[METADATA] Credits: {remaining}", flush=True)
+            logger.info(f"[AUDIT] Calculated remaining weekly token quota: {remaining}%")
         except Exception as e:
-            logger.error(f"Error decrementing credits in after_tool_callback: {e}")
+            logger.error(f"Error computing remaining token quota inside after_tool_callback: {e}")
             
     if not tool_response:
         return None

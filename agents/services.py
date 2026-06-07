@@ -13,30 +13,30 @@ def register_telemetry_route(app: fastapi.FastAPI):
         if hasattr(route, "path") and route.path == "/db-metadata":
             return
 
-    # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment
+    # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment with Fail-Closed defaults
     @app.middleware("http")
     async def oidc_security_middleware(request: fastapi.Request, call_next):
-        secured_paths = [
-            "/db-metadata", "/audit-logs", "/user/activity", "/user/chat-session",
-            "/user/token-usage", "/user/token-stats", "/admin/global-stats",
-            "/user/profile", "/user/account", "/user/list", "/user/friend",
-            "/chat/message", "/parent/children", "/parent/approve", "/admin/seed-db",
-            "/admin/sync-db", "/admin/mcp-tool", "/admin/crawl"
-        ]
-        
+        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha"}
         path = request.url.path
-        is_secured = any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in secured_paths)
+        is_secured = path not in PUBLIC_PATHS and not any(path.startswith(p + "/") for p in PUBLIC_PATHS if p != "/")
         
+        principal = None
+        
+        # Parse X-Verified-Principal header if present
+        verified_principal_header = request.headers.get("X-Verified-Principal")
+        if verified_principal_header:
+            try:
+                principal = json.loads(verified_principal_header)
+                logger.info(f"[PRINCIPAL] Parsed principal from X-Verified-Principal: {principal}")
+            except Exception as pe:
+                logger.warning(f"[PRINCIPAL] Failed to parse X-Verified-Principal: {pe}")
+
         if is_secured:
             is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
             auth_header = request.headers.get("Authorization")
             
-            # Allow local Next.js environment to bypass OIDC using a pre-shared local secret
-            if auth_header == "Bearer LOCAL_BYPASS_TOKEN_fahem_2026":
-                logger.info(f"[OIDC BYPASS via SECRET] Request to {path} permitted via shared secret.")
-                request.state.verified_email = "local_dev_bypass@fahem.app"
-                return await call_next(request)
-
+            # LOCAL_BYPASS_TOKEN_fahem_2026 is fully removed and purged!
+            
             token = None
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header[7:]
@@ -56,6 +56,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     email = id_info.get("email")
                     logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
                     request.state.verified_email = email
+                    
+                    if not principal:
+                        principal = {
+                            "uid": id_info.get("sub", "unknown_gcp_uid"),
+                            "email": email,
+                            "role": "super-admin" if email == "hesham1988@gmail.com" else "user"
+                        }
                 except Exception as err:
                     logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
                     if is_gcp:
@@ -72,8 +79,35 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     )
                 else:
                     logger.info(f"[OIDC BYPASS] Local request to {path} permitted without OIDC token.")
-                    
-        return await call_next(request)
+                    if not principal:
+                        principal = {
+                            "uid": "local_dev_uid",
+                            "email": "local_dev@fahem.app",
+                            "role": "super-admin"
+                        }
+        
+        # Propagate principal to request state and contextvar
+        request.state.principal = principal
+        if principal:
+            request.state.verified_email = principal.get("email")
+            
+        token_ctx = None
+        try:
+            from guardrails import verified_principal_ctx
+            if verified_principal_ctx is not None and principal:
+                token_ctx = verified_principal_ctx.set(principal)
+        except Exception as ctx_err:
+            logger.warning(f"Failed to import/set verified_principal_ctx: {ctx_err}")
+
+        try:
+            return await call_next(request)
+        finally:
+            if token_ctx is not None:
+                try:
+                    from guardrails import verified_principal_ctx
+                    verified_principal_ctx.reset(token_ctx)
+                except Exception:
+                    pass
 
 
     @app.get("/db-metadata")
@@ -505,14 +539,28 @@ def register_telemetry_route(app: fastapi.FastAPI):
     async def get_crawl_job(request: fastapi.Request):
         try:
             job_id = request.query_params.get("jobId")
-            if not job_id:
-                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing jobId parameter"})
-                
+            
             from pymongo import MongoClient
             from tools import get_mongodb_uri
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=2000)
             db = client["fahem"]
+
+            if not job_id:
+                # Retrieve all crawl jobs, sorted by creation time descending, limited to 50
+                jobs = list(db["crawl_jobs"].find({}).sort("created_at", -1).limit(50))
+                client.close()
+                # Ensure all jobs have a string _id and serialize safely
+                for j in jobs:
+                    if "_id" in j and not isinstance(j["_id"], str):
+                        j["_id"] = str(j["_id"])
+                    if "created_at" not in j:
+                        j["created_at"] = 0
+                return {
+                    "success": True,
+                    "jobs": jobs
+                }
+                
             job = db["crawl_jobs"].find_one({"_id": job_id})
             client.close()
             
@@ -1059,6 +1107,240 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to get subjects: {err}", exc_info=True)
             return {"subjects": [], "error": str(err)}
+
+    @app.get("/user/libraries")
+    async def get_libraries_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            libraries = list(db["libraries"].find({}))
+            for lib in libraries:
+                if "_id" in lib:
+                    lib["_id"] = str(lib["_id"])
+            return {"success": True, "libraries": libraries}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get libraries: {err}", exc_info=True)
+            return {"success": False, "libraries": [], "error": str(err)}
+
+    @app.post("/user/libraries")
+    async def post_libraries_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            body = await request.json()
+            lib_id = body.get("_id")
+            name = body.get("name")
+            name_ar = body.get("name_ar")
+            source = body.get("source")
+            logo = body.get("logo") or f"/libs/{source}.svg"
+            scopeSchema = body.get("scopeSchema")
+            status = body.get("status") or "active"
+
+            if not lib_id or not name or not name_ar or not source or scopeSchema is None:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Missing required fields: _id, name, name_ar, source, scopeSchema"},
+                    status_code=400
+                )
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            library_doc = {
+                "_id": lib_id,
+                "name": name,
+                "name_ar": name_ar,
+                "source": source,
+                "logo": logo,
+                "scopeSchema": scopeSchema,
+                "status": status
+            }
+
+            db["libraries"].replace_one({"_id": lib_id}, library_doc, upsert=True)
+            return {"success": True, "library": library_doc}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post library: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+    @app.get("/user/curricula")
+    async def get_curricula_endpoint(request: fastapi.Request, library_id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            principal = getattr(request.state, "principal", None)
+            role = principal.get("role") if principal else "anonymous"
+            uid = principal.get("uid") if principal else None
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            query = {}
+            if library_id:
+                query["library_id"] = library_id
+
+            is_admin_or_judge = role in ["admin", "super-admin", "judge"]
+            if not is_admin_or_judge:
+                query["$or"] = [
+                    {"visibility": "public"},
+                    {"visibility": "private", "owner_uid": uid}
+                ]
+
+            curricula = list(db["curricula"].find(query))
+            for cur in curricula:
+                if "_id" in cur:
+                    cur["_id"] = str(cur["_id"])
+            return {"success": True, "curricula": curricula}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get curricula: {err}", exc_info=True)
+            return {"success": False, "curricula": [], "error": str(err)}
+
+    @app.post("/user/curricula")
+    async def post_curricula_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import datetime
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            body = await request.json()
+            curr_id = body.get("_id")
+            library_id = body.get("library_id")
+            title = body.get("title")
+            title_ar = body.get("title_ar")
+            scope = body.get("scope")
+            subject_ids = body.get("subject_ids") or []
+            status = body.get("status") or "published"
+            visibility = body.get("visibility") or "public"
+
+            if not library_id or not title or not title_ar or not scope:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Missing required fields: library_id, title, title_ar, scope"},
+                    status_code=400
+                )
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            library = db["libraries"].find_one({"_id": library_id})
+            if not library:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Library '{library_id}' not found"},
+                    status_code=404
+                )
+
+            scope_schema = library.get("scopeSchema", [])
+            schema_keys = [s.get("key") for s in scope_schema]
+            for k in scope.keys():
+                if k not in schema_keys:
+                    return fastapi.responses.JSONResponse(
+                        content={"success": False, "error": f"Scope validation failed: Invalid scope key '{k}'"},
+                        status_code=422
+                    )
+
+            for schema_item in scope_schema:
+                key = schema_item.get("key")
+                val = scope.get(key)
+                if schema_item.get("type") == "enum" and val:
+                    options = schema_item.get("options", [])
+                    if val not in options:
+                        return fastapi.responses.JSONResponse(
+                            content={"success": False, "error": f"Scope validation failed: Invalid value '{val}' for key '{key}'"},
+                            status_code=422
+                        )
+
+            if not curr_id:
+                curr_id = f"cur_{library_id.replace('lib_', '')}_{int(datetime.datetime.utcnow().timestamp())}"
+
+            now_str = datetime.datetime.utcnow().isoformat()
+            
+            curriculum_doc = {
+                "_id": curr_id,
+                "library_id": library_id,
+                "title": title,
+                "title_ar": title_ar,
+                "scope": scope,
+                "subject_ids": subject_ids,
+                "status": status,
+                "visibility": visibility,
+                "owner_uid": principal.get("uid") if visibility == "private" else None,
+                "created_by": principal.get("uid"),
+                "created_at": now_str,
+                "updated_at": now_str
+            }
+
+            db["curricula"].replace_one({"_id": curr_id}, curriculum_doc, upsert=True)
+            return {"success": True, "curriculum": curriculum_doc}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post curriculum: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+    @app.patch("/user/curricula/{id}")
+    async def patch_curricula_endpoint(id: str, request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import datetime
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            body = await request.json()
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            
+            curr = db["curricula"].find_one({"_id": id})
+            if not curr:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Curriculum with ID '{id}' not found"},
+                    status_code=404
+                )
+
+            body["updated_at"] = datetime.datetime.utcnow().isoformat()
+            db["curricula"].update_one({"_id": id}, {"$set": body})
+            
+            updated_curr = db["curricula"].find_one({"_id": id})
+            updated_curr["_id"] = str(updated_curr["_id"])
+            return {"success": True, "curriculum": updated_curr}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to patch curriculum: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
 
     @app.get("/admin/check")
     async def admin_check_endpoint(email: str):
@@ -2372,7 +2654,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return res
         except Exception as err:
             logger.error(f"[services.py] Failed to verify recaptcha: {err}", exc_info=True)
-            return {"success": True, "status": "fail_open_bypass", "error": str(err), "score": 1.0}
+            return {"success": False, "status": "error", "error": str(err), "score": 0.0}
 
     logger.info("Mounted custom database, logging, activity, session, token, and recaptcha routes onto FastAPI application.")
 

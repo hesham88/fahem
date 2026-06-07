@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin } from "../../admin/helper";
+import { requireAdmin } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 
@@ -7,31 +7,16 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
     const { searchParams } = new URL(req.url);
     const bookId = searchParams.get("bookId");
-
-    const body = await req.json();
-    const { requesterEmail } = body;
+    const requesterEmail = ctx.email || "anonymous@fahem.app";
 
     if (!bookId) {
       return new Response(JSON.stringify({ error: "Missing bookId parameter" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    if (!requesterEmail) {
-      return new Response(JSON.stringify({ error: "Missing requesterEmail parameter" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Verify admin privileges
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied" }), {
-        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -52,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isLocalEnv()) {
-      return await proxyRequest("/user/books/cancel", "POST", { bookId, requesterEmail });
+      return await proxyRequest("/user/books/cancel", "POST", { bookId, requesterEmail }, ctx);
     }
 
     // 2. Persist cancellation in Local DB

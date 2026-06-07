@@ -1,23 +1,38 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin } from "../helper";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
 import { spawn } from "child_process";
 import path from "path";
 import { proxyRequest } from "../../proxy";
+import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 // GET handler to poll the status, progress, logs and discovered items of a crawl job
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get("jobId");
 
     if (!jobId) {
-      return new Response(JSON.stringify({ error: "Missing jobId parameter" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      // Fetch from local environment fallback
+      if (isLocalEnv()) {
+        const db = getLocalDb() as any;
+        const crawlJobs = db.crawl_jobs || [];
+        const sortedJobs = [...crawlJobs].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0));
+        return new Response(JSON.stringify({
+          success: true,
+          jobs: sortedJobs
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      // Fetch from Cloud Run Agent in Production
+      return await proxyRequest("/admin/crawl", "GET", undefined, ctx);
     }
 
     // 1. Fetch from local environment fallback
@@ -86,7 +101,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Fetch from Cloud Run Agent in Production
-    return await proxyRequest(`/admin/crawl?jobId=${jobId}`, "GET");
+    return await proxyRequest(`/admin/crawl?jobId=${jobId}`, "GET", undefined, ctx);
 
   } catch (err: any) {
     console.error("[crawl-status-api] failed:", err);
@@ -100,7 +115,11 @@ export async function GET(req: NextRequest) {
 // POST handler to trigger a crawl job asynchronously
 export async function POST(req: NextRequest) {
   try {
-    const { url, maxDepth = 3, requesterEmail } = await req.json();
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
+    const body = await req.json();
+    const { url, maxDepth = 3 } = body;
 
     if (!url) {
       return new Response(JSON.stringify({ error: "Missing crawl URL" }), {
@@ -109,21 +128,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!requesterEmail) {
-      return new Response(JSON.stringify({ error: "Missing requesterEmail parameter" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Verify requester is admin
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const requesterEmail = ctx.email || "";
 
     let targetUrl = url.trim();
     if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
@@ -132,7 +137,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Production routing via secure Cloud Run proxy helper
     if (!isLocalEnv()) {
-      return await proxyRequest("/admin/crawl", "POST", { url: targetUrl, maxDepth, requesterEmail });
+      return await proxyRequest("/admin/crawl", "POST", { url: targetUrl, maxDepth, requesterEmail }, ctx);
     }
 
     // Generate a unique jobId

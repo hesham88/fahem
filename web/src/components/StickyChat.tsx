@@ -817,6 +817,37 @@ export default function StickyChat() {
 
   const { language, dir, t } = useTranslation();
 
+  const [selectedBookIds, setSelectedBookIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("fahem_selected_book_ids");
+        return stored ? JSON.parse(stored) : [];
+      } catch (err) {
+        console.error("Failed to parse fahem_selected_book_ids:", err);
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    const syncSelectedBooks = () => {
+      try {
+        const stored = sessionStorage.getItem("fahem_selected_book_ids");
+        setSelectedBookIds(stored ? JSON.parse(stored) : []);
+      } catch (err) {
+        console.error("Failed to sync fahem_selected_book_ids:", err);
+      }
+    };
+
+    window.addEventListener("fahemRAGScopeChanged", syncSelectedBooks);
+    syncSelectedBooks();
+
+    return () => {
+      window.removeEventListener("fahemRAGScopeChanged", syncSelectedBooks);
+    };
+  }, []);
+
   const ct = (key: string): string => {
     return chatTranslations[language]?.[key] || chatTranslations["en"]?.[key] || key;
   };
@@ -861,10 +892,10 @@ export default function StickyChat() {
       const detail = (e as CustomEvent).detail;
       if (detail) {
         setBookContext(detail);
-        setIsOpen(true);
-        setLayoutMode("side"); // Auto-expand to premium side-by-side mode!
         
         if (detail.autoExplainText) {
+          setIsOpen(true);
+          setLayoutMode("side"); // Auto-expand to premium side-by-side mode!
           const autoExplainPrompt = `${ct("auto_explain_prompt")}"${detail.autoExplainText}"`;
           setTimeout(() => {
             if (sendMessageRef.current) {
@@ -1762,10 +1793,11 @@ User Question: ${queryText}`;
         },
         body: JSON.stringify({
           prompt: promptPayload,
-          language,
+          language: (bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language,
           userEmail: activeUser.email || "",
           userId: activeUser.uid || "",
-          sessionId: currentSessionId || undefined
+          sessionId: currentSessionId || undefined,
+          selected_book_ids: selectedBookIds
         }),
       });
 
@@ -1984,7 +2016,7 @@ User Question: ${queryText}`;
             : (layoutMode === "fullscreen" ? "-100vw" : layoutMode === "side" ? "-540px" : "-460px"),
           width: layoutMode === "fullscreen" ? "100vw" : layoutMode === "side" ? "480px" : "400px",
           maxWidth: layoutMode === "fullscreen" ? "100%" : "calc(100vw - 1rem)",
-          height: layoutMode === "compact" ? "calc(100vh - 3rem)" : "100vh",
+          height: layoutMode === "compact" ? "calc(100dvh - 3rem)" : "100dvh",
           backgroundColor: "rgba(253, 251, 247, 0.95)",
           backdropFilter: "blur(24px) saturate(190%)",
           WebkitBackdropFilter: "blur(24px) saturate(190%)",
@@ -2483,10 +2515,10 @@ User Question: ${queryText}`;
             flexDirection: "column",
             gap: "1.25rem",
             maxHeight: layoutMode === "fullscreen" 
-              ? "calc(100vh - 12rem)" 
+              ? "calc(100dvh - 12rem)" 
               : layoutMode === "side" 
-                ? "calc(100vh - 10rem)" 
-                : "calc(100vh - 15rem)"
+                ? "calc(100dvh - 10rem)" 
+                : "calc(100dvh - 15rem)"
           }}
           className="custom-scrollbar"
         >
@@ -2763,6 +2795,7 @@ User Question: ${queryText}`;
             borderTop: "1px dashed var(--card-border)",
             backgroundColor: "rgba(255,255,255,0.45)",
             display: "flex",
+            flexDirection: "column",
             gap: "0.5rem",
             position: "relative"
           }}
@@ -2812,88 +2845,160 @@ User Question: ${queryText}`;
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={toggleSpeechRecognition}
-            style={{
-              width: "2.5rem",
-              height: "2.5rem",
-              borderRadius: "50%",
-              backgroundColor: isListeningChat ? "#ef4444" : "rgba(16, 107, 163, 0.08)",
-              color: isListeningChat ? "#ffffff" : "var(--primary)",
-              border: "none",
+          {/* Premium Active Scoping Badge */}
+          {selectedBookIds.length > 0 && (
+            <div style={{
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              boxShadow: isListeningChat ? "0 0 12px rgba(239, 68, 68, 0.4)" : "none",
-            }}
-            title={ct("voice_dictation")}
-            className={isListeningChat ? "pulse-icon" : ""}
-          >
-            {isListeningChat ? <FiMicOff style={{ fontSize: "1.1rem" }} /> : <FiMic style={{ fontSize: "1.1rem" }} />}
-          </button>
+              justifyContent: "space-between",
+              backgroundColor: "rgba(16, 107, 163, 0.05)",
+              border: "1px dashed rgba(16, 107, 163, 0.3)",
+              borderRadius: "14px",
+              padding: "0.5rem 0.8rem",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color: "var(--primary)",
+              direction: dir,
+              animation: "fadeIn 0.25s ease-out",
+              width: "100%",
+              boxSizing: "border-box"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  backgroundColor: "#106ba3",
+                  boxShadow: "0 0 8px #106ba3",
+                }}></span>
+                <span>
+                  {language === "ar" 
+                    ? `تحديد نطاق البحث نشط: ${selectedBookIds.length} من الكتب المحددة` 
+                    : `Active RAG Scoping: ${selectedBookIds.length} selected books`
+                  }
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBookIds([]);
+                  sessionStorage.removeItem("fahem_selected_book_ids");
+                  window.dispatchEvent(new CustomEvent("fahemRAGScopeChanged"));
+                }}
+                style={{
+                  background: "rgba(239, 68, 68, 0.08)",
+                  border: "none",
+                  color: "#ef4444",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0.3rem",
+                  borderRadius: "50%",
+                  width: "1.6rem",
+                  height: "1.6rem",
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+                  e.currentTarget.style.transform = "scale(1.1)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.08)";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+                title={language === "ar" ? "مسح التحديد" : "Clear scope"}
+              >
+                <FiX style={{ fontSize: "0.95rem" }} />
+              </button>
+            </div>
+          )}
 
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => {
-              const val = e.target.value;
-              setInputValue(val);
-              const words = val.split(/\s+/);
-              const lastWord = words[words.length - 1];
-              if (lastWord && lastWord.startsWith("@")) {
-                setMentionType("subject");
-                setMentionQuery(lastWord.slice(1));
-                setShowMentionsDropdown(true);
-              } else if (lastWord && lastWord.startsWith("#")) {
-                setMentionType("book");
-                setMentionQuery(lastWord.slice(1));
-                setShowMentionsDropdown(true);
-              } else if (lastWord && lastWord.startsWith("/")) {
-                setMentionType("command");
-                setMentionQuery(lastWord.slice(1));
-                setShowMentionsDropdown(true);
-              } else {
-                setShowMentionsDropdown(false);
-                setMentionType(null);
-                setMentionQuery("");
-              }
-            }}
-            disabled={isSending}
-            placeholder={ct("input_placeholder")}
-            style={{
-              flex: 1,
-              padding: "0.75rem 1rem",
-              border: "1px solid var(--card-border)",
-              borderRadius: "20px",
-              fontSize: "0.85rem",
-              fontFamily: "var(--font-sans)",
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-              outline: "none"
-            }}
-          />
-          <button
-            type="submit"
-            disabled={isSending || !inputValue.trim()}
-            style={{
-              width: "2.5rem",
-              height: "2.5rem",
-              borderRadius: "50%",
-              backgroundColor: isSending || !inputValue.trim() ? "#e2decb" : "var(--primary)",
-              color: "#ffffff",
-              border: "none",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              cursor: isSending || !inputValue.trim() ? "not-allowed" : "pointer",
-              boxShadow: isSending || !inputValue.trim() ? "none" : "0 4px 10px rgba(16, 107, 163, 0.15)",
-              transition: "all 0.2s"
-            }}
-          >
-            <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", width: "100%", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={toggleSpeechRecognition}
+              style={{
+                width: "2.5rem",
+                height: "2.5rem",
+                borderRadius: "50%",
+                backgroundColor: isListeningChat ? "#ef4444" : "rgba(16, 107, 163, 0.08)",
+                color: isListeningChat ? "#ffffff" : "var(--primary)",
+                border: "none",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                boxShadow: isListeningChat ? "0 0 12px rgba(239, 68, 68, 0.4)" : "none",
+              }}
+              title={ct("voice_dictation")}
+              className={isListeningChat ? "pulse-icon" : ""}
+            >
+              {isListeningChat ? <FiMicOff style={{ fontSize: "1.1rem" }} /> : <FiMic style={{ fontSize: "1.1rem" }} />}
+            </button>
+
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInputValue(val);
+                const words = val.split(/\s+/);
+                const lastWord = words[words.length - 1];
+                if (lastWord && lastWord.startsWith("@")) {
+                  setMentionType("subject");
+                  setMentionQuery(lastWord.slice(1));
+                  setShowMentionsDropdown(true);
+                } else if (lastWord && lastWord.startsWith("#")) {
+                  setMentionType("book");
+                  setMentionQuery(lastWord.slice(1));
+                  setShowMentionsDropdown(true);
+                } else if (lastWord && lastWord.startsWith("/")) {
+                  setMentionType("command");
+                  setMentionQuery(lastWord.slice(1));
+                  setShowMentionsDropdown(true);
+                } else {
+                  setShowMentionsDropdown(false);
+                  setMentionType(null);
+                  setMentionQuery("");
+                }
+              }}
+              disabled={isSending}
+              placeholder={ct("input_placeholder")}
+              style={{
+                flex: 1,
+                padding: "0.75rem 1rem",
+                border: "1px solid var(--card-border)",
+                borderRadius: "20px",
+                fontSize: "0.85rem",
+                fontFamily: "var(--font-sans)",
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                outline: "none"
+              }}
+            />
+            <button
+              type="submit"
+              disabled={isSending || !inputValue.trim()}
+              style={{
+                width: "2.5rem",
+                height: "2.5rem",
+                borderRadius: "50%",
+                backgroundColor: isSending || !inputValue.trim() ? "#e2decb" : "var(--primary)",
+                color: "#ffffff",
+                border: "none",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                cursor: isSending || !inputValue.trim() ? "not-allowed" : "pointer",
+                boxShadow: isSending || !inputValue.trim() ? "none" : "0 4px 10px rgba(16, 107, 163, 0.15)",
+                transition: "all 0.2s"
+              }}
+            >
+              <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />
+            </button>
+          </div>
         </form>
         </div>
       </div>

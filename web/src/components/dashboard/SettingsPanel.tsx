@@ -107,6 +107,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   renderAvatar,
 }) => {
 
+  const [tokenStats, setTokenStats] = React.useState<any>(null);
+  const [isLoadingStats, setIsLoadingStats] = React.useState<boolean>(true);
+
+  React.useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/user/token-stats");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            setTokenStats(data);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching token stats in SettingsPanel:", err);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
   /**
    * Handles dynamic profile picture upload to Firebase Storage and immediately syncs the download URL to MongoDB.
    */
@@ -579,51 +601,207 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
 
-          {/* Cognitive Tokens Card */}
+          {/* Cognitive Tokens Card - Dynamic Private Student Quota Meter */}
           <div
             style={{
-              padding: "1.25rem",
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, rgba(13, 148, 136, 0.05), rgba(16, 107, 163, 0.05))",
-              border: "1px solid rgba(13, 148, 136, 0.08)",
+              padding: "1.5rem",
+              borderRadius: "20px",
+              background: "linear-gradient(135deg, rgba(15, 23, 42, 0.03), rgba(16, 107, 163, 0.04))",
+              border: "1px solid rgba(16, 107, 163, 0.12)",
               textAlign: "start",
+              boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.04)",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-              <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
-                🧠 {language === "ar" ? "رصيد الرموز المعرفية (CLT)" : "Cognitive Token Credit Balance"}
+            {/* Background glowing indicator */}
+            <div 
+              style={{
+                position: "absolute",
+                top: "-10%",
+                right: "-10%",
+                width: "150px",
+                height: "150px",
+                background: "radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, rgba(13, 148, 136, 0) 70%)",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <span style={{ fontWeight: 850, fontSize: "0.95rem", color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                🧠 {language === "ar" ? "مؤشرات استهلاك الرموز المعرفية (CLT)" : "Cognitive Token Quotas (CLT)"}
               </span>
-              <span
-                style={{
-                  background: "rgba(13, 148, 136, 0.15)",
-                  color: "var(--accent-green)",
-                  fontSize: "0.75rem",
-                  fontWeight: 800,
-                  padding: "4px 8px",
-                  borderRadius: "8px",
-                }}
-              >
-                {language === "ar" ? "متاح" : "Freemium Unlimited"}
-              </span>
-            </div>
-            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
-              {consumedClt.toLocaleString()} / {totalAllocatedClt.toLocaleString()}{" "}
-              <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#6a7c88" }}>CLT Tokens</span>
-            </div>
-            <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
-              ⚡ {language === "ar" ? "تم التحسين لحمل الذاكرة العاملة" : "Cognitive Load Optimized System"}
+              
+              {isLoadingStats ? (
+                <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600 }}>
+                  {language === "ar" ? "جاري التحميل..." : "Loading stats..."}
+                </span>
+              ) : tokenStats?.enabled === false ? (
+                <span
+                  style={{
+                    background: "rgba(212, 175, 55, 0.15)",
+                    border: "1px solid rgba(212, 175, 55, 0.3)",
+                    color: "#b45309",
+                    fontSize: "0.7rem",
+                    fontWeight: 900,
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    boxShadow: "0 2px 10px rgba(212, 175, 55, 0.1)",
+                    animation: "pulse 2s infinite",
+                  }}
+                >
+                  👑 {language === "ar" ? "غير محدود (حساب محكم/VIP)" : "Override Active (Unlimited)"}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    background: "rgba(13, 148, 136, 0.12)",
+                    border: "1px solid rgba(13, 148, 136, 0.2)",
+                    color: "var(--accent-green)",
+                    fontSize: "0.7rem",
+                    fontWeight: 800,
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                  }}
+                >
+                  ⚡ {language === "ar" ? "نظام الحماية المعرفية نشط" : "Cognitive Safety Shield Active"}
+                </span>
+              )}
             </div>
 
-            {/* Token progress bar */}
-            <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
-              <div style={{ width: `${tokenProgressPercent}%`, height: "100%", background: "linear-gradient(90deg, var(--accent-green), var(--primary))", borderRadius: "10px" }}></div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
-              <span>{language === "ar" ? `مستهلك: ${tokenProgressPercent}%` : `Allocated: ${tokenProgressPercent}%`}</span>
-              <span>
-                {remainingClt.toLocaleString()} {language === "ar" ? "رمز متبقي" : "Remaining CLT"}
-              </span>
-            </div>
+            {isLoadingStats ? (
+              /* Pulse skeleton loader for limits card */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.4rem", animation: "pulse 1.5s infinite" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <div style={{ width: "80px", height: "12px", background: "rgba(0,0,0,0.06)", borderRadius: "4px" }}></div>
+                      <div style={{ width: "40px", height: "12px", background: "rgba(0,0,0,0.06)", borderRadius: "4px" }}></div>
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(0,0,0,0.04)", borderRadius: "10px" }}></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Full Localized Premium Bar Graphs */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                
+                {/* 1. Daily usage metric */}
+                {(() => {
+                  const dailyUsed = tokenStats?.used?.daily ?? 0;
+                  const dailyLimit = Math.round((tokenStats?.limit?.weekly ?? 250000) / 7);
+                  const dailyPct = Math.min(100, Math.round((dailyUsed / Math.max(1, dailyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          🌅 {language === "ar" ? "البصمة المعرفية اليومية" : "Daily Cognitive Footprint"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {dailyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {dailyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden", position: "relative" }}>
+                        <div 
+                          style={{ 
+                            width: `${dailyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #10b981, #0d9488)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `مستهلك: ${dailyPct}%` : `Daily Consumption: ${dailyPct}%`}</span>
+                        <span>{language === "ar" ? "إعادة التعيين عند منتصف الليل" : "Resets at midnight"}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Weekly quota metric */}
+                {(() => {
+                  const weeklyUsed = tokenStats?.used?.weekly ?? 0;
+                  const weeklyLimit = tokenStats?.limit?.weekly ?? 250000;
+                  const weeklyPct = Math.min(100, Math.round((weeklyUsed / Math.max(1, weeklyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          📅 {language === "ar" ? "الحصة المعرفية الأسبوعية" : "Weekly Cognitive Quota"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {weeklyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {weeklyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden" }}>
+                        <div 
+                          style={{ 
+                            width: `${weeklyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #0d9488, #106ba3)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `نسبة الاستهلاك: ${weeklyPct}%` : `Weekly Quota Spent: ${weeklyPct}%`}</span>
+                        <span>
+                          {language === "ar" ? `${(weeklyLimit - weeklyUsed).toLocaleString()} رمز متبقي` : `${(weeklyLimit - weeklyUsed).toLocaleString()} CLT remaining`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 3. Monthly quota metric */}
+                {(() => {
+                  const monthlyUsed = tokenStats?.used?.monthly ?? 0;
+                  const monthlyLimit = tokenStats?.limit?.monthly ?? 1000000;
+                  const monthlyPct = Math.min(100, Math.round((monthlyUsed / Math.max(1, monthlyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          🌌 {language === "ar" ? "الحجم المعرفي الشهري الكلي" : "Monthly Cognitive Volume"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {monthlyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {monthlyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden" }}>
+                        <div 
+                          style={{ 
+                            width: `${monthlyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #106ba3, #4f46e5)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `مستهلك موازنة الشهر: ${monthlyPct}%` : `Monthly Volume Spent: ${monthlyPct}%`}</span>
+                        <span>
+                          {language === "ar" ? `${(monthlyLimit - monthlyUsed).toLocaleString()} رمز متبقي` : `${(monthlyLimit - monthlyUsed).toLocaleString()} CLT remaining`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
           </div>
         </div>
 

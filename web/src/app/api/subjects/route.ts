@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin, checkIsSuperadmin } from "../admin/helper";
 import { proxyRequest } from "../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
+import { requireUser, requireAdmin } from "../_auth";
 
 export const dynamic = "force-dynamic";
 
@@ -66,20 +66,38 @@ Only output the JSON object, do NOT include markdown syntax (e.g. \`\`\`json) or
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
+    const { searchParams } = new URL(req.url);
+    const curriculumId = searchParams.get("curriculum_id");
+
     if (isLocalEnv()) {
       const db = getLocalDb();
-      // Ensure both emoji and icon_emoji exist
-      const subjects = db.subjects.map(s => ({
+      let subjects = db.subjects || [];
+
+      // Ensure both emoji and icon_emoji exist, and handle defaults
+      subjects = subjects.map(s => ({
         ...s,
         icon_emoji: s.icon_emoji || s.emoji || "📚",
         emoji: s.emoji || s.icon_emoji || "📚"
       }));
+
+      if (curriculumId) {
+        subjects = subjects.filter((s: any) => s.curriculum_id === curriculumId);
+      }
+
       return new Response(JSON.stringify({ success: true, subjects }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
-    return await proxyRequest("/user/subjects", "GET");
+
+    let proxyPath = "/user/subjects";
+    if (curriculumId) {
+      proxyPath += `?curriculum_id=${encodeURIComponent(curriculumId)}`;
+    }
+    return await proxyRequest(proxyPath, "GET");
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -90,26 +108,22 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, name_ar, grade_level, category, icon_emoji, requesterEmail } = await req.json();
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!requesterEmail || !name || !name_ar) {
-      return new Response(JSON.stringify({ error: "Missing required fields: requesterEmail, name, name_ar" }), {
+    const payload = await req.json();
+    const { name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+
+    if (!name || !name_ar) {
+      return new Response(JSON.stringify({ error: "Missing required fields: name, name_ar" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // Verify requester is admin/superadmin
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized administrator." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(requesterEmail);
-    const needsApproval = isAdmin && !isSuper;
+    const requesterEmail = ctx.email || "anonymous@fahem.ai";
+    const isSuper = ctx.role === "super-admin";
+    const needsApproval = !isSuper;
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -118,7 +132,7 @@ export async function POST(req: NextRequest) {
         id: requestId,
         requesterEmail,
         actionType: "create_subject",
-        payload: { name, name_ar, grade_level, category, icon_emoji },
+        payload: { name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids },
         status: "pending",
         createdAt: new Date().toISOString()
       };
@@ -152,6 +166,10 @@ export async function POST(req: NextRequest) {
         category: category || "Science",
         icon_emoji: icon_emoji || "📚",
         emoji: icon_emoji || "📚", // Dual property compatibility
+        curriculum_id: curriculum_id || null,
+        color: color || "#1E96A0",
+        core_book_ids: core_book_ids || [],
+        supporting_book_ids: supporting_book_ids || [],
         books_count: 0
       };
       db.subjects.push(newSubject);
@@ -174,7 +192,11 @@ export async function POST(req: NextRequest) {
       name_it: nameTranslations.it || name,
       grade_level,
       category,
-      icon_emoji
+      icon_emoji,
+      curriculum_id,
+      color,
+      core_book_ids,
+      supporting_book_ids
     });
 
   } catch (err: any) {
@@ -188,26 +210,22 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { id, name, name_ar, grade_level, category, icon_emoji, requesterEmail } = await req.json();
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!requesterEmail || !id || !name || !name_ar) {
-      return new Response(JSON.stringify({ error: "Missing required fields: requesterEmail, id, name, name_ar" }), {
+    const payload = await req.json();
+    const { id, name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+
+    if (!id || !name || !name_ar) {
+      return new Response(JSON.stringify({ error: "Missing required fields: id, name, name_ar" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // Verify requester is admin
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not authorized." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(requesterEmail);
-    const needsApproval = isAdmin && !isSuper;
+    const requesterEmail = ctx.email || "anonymous@fahem.ai";
+    const isSuper = ctx.role === "super-admin";
+    const needsApproval = !isSuper;
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -216,7 +234,7 @@ export async function PUT(req: NextRequest) {
         id: requestId,
         requesterEmail,
         actionType: "update_subject",
-        payload: { id, name, name_ar, grade_level, category, icon_emoji },
+        payload: { id, name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids },
         status: "pending",
         createdAt: new Date().toISOString()
       };
@@ -254,7 +272,11 @@ export async function PUT(req: NextRequest) {
         grade_level: grade_level || "General",
         category: category || "Science",
         icon_emoji: icon_emoji || db.subjects[idx].icon_emoji || db.subjects[idx].emoji || "📚",
-        emoji: icon_emoji || db.subjects[idx].emoji || db.subjects[idx].icon_emoji || "📚" // Dual property compatibility
+        emoji: icon_emoji || db.subjects[idx].emoji || db.subjects[idx].icon_emoji || "📚", // Dual property compatibility
+        curriculum_id: curriculum_id !== undefined ? curriculum_id : db.subjects[idx].curriculum_id,
+        color: color !== undefined ? color : db.subjects[idx].color,
+        core_book_ids: core_book_ids !== undefined ? core_book_ids : db.subjects[idx].core_book_ids,
+        supporting_book_ids: supporting_book_ids !== undefined ? supporting_book_ids : db.subjects[idx].supporting_book_ids
       };
       saveLocalDb(db);
       return new Response(JSON.stringify({ success: true, subject: db.subjects[idx] }), {
@@ -276,7 +298,11 @@ export async function PUT(req: NextRequest) {
       name_it: nameTranslations.it || name,
       grade_level,
       category,
-      icon_emoji
+      icon_emoji,
+      curriculum_id,
+      color,
+      core_book_ids,
+      supporting_book_ids
     });
 
   } catch (err: any) {
@@ -290,27 +316,22 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const ctx = await requireAdmin(req);
+    if (ctx instanceof Response) return ctx;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const requesterEmail = searchParams.get("requesterEmail");
 
-    if (!id || !requesterEmail) {
-      return new Response(JSON.stringify({ error: "Missing id or requesterEmail parameter" }), {
+    if (!id) {
+      return new Response(JSON.stringify({ error: "Missing id parameter" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const isAdmin = await checkIsAdmin(requesterEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not authorized." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(requesterEmail);
-    const needsApproval = isAdmin && !isSuper;
+    const requesterEmail = ctx.email || "anonymous@fahem.ai";
+    const isSuper = ctx.role === "super-admin";
+    const needsApproval = !isSuper;
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -364,4 +385,3 @@ export async function DELETE(req: NextRequest) {
     });
   }
 }
-

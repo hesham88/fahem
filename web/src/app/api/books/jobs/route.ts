@@ -1,11 +1,20 @@
 import { NextRequest } from "next/server";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
+import { verifyAuth } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const bookId = searchParams.get("bookId");
     const jobId = searchParams.get("jobId") || (bookId ? `job_${bookId}` : null);
@@ -14,7 +23,7 @@ export async function GET(req: NextRequest) {
       const params = new URLSearchParams();
       if (bookId) params.append("bookId", bookId);
       if (jobId) params.append("jobId", jobId);
-      return await proxyRequest(`/user/books/jobs?${params.toString()}`, "GET");
+      return await proxyRequest(`/user/books/jobs?${params.toString()}`, "GET", null, ctx);
     }
 
     if (isLocalEnv()) {

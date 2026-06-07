@@ -1,9 +1,14 @@
 import { NextRequest } from "next/server";
+import { requireUser } from "../_auth";
+import { proxyRequest } from "../proxy";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const body = await req.json();
     const { text, targetLanguage } = body;
 
@@ -63,6 +68,28 @@ MANDATORY RULES:
     const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!responseText) {
       return new Response(JSON.stringify({ error: "Empty response from translation agent" }), { status: 500 });
+    }
+
+    // Log Token Usage Telemetry
+    const usageMetadata = resJson.usageMetadata;
+    const promptTokens = usageMetadata?.promptTokenCount || 0;
+    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = usageMetadata?.totalTokenCount || 0;
+
+    if (totalTokens > 0) {
+      try {
+        await proxyRequest("/user/token-usage", "POST", {
+          userId: ctx.uid,
+          userEmail: ctx.email || "anonymous@fahem.ai",
+          promptTokens: Number(promptTokens),
+          completionTokens: Number(completionTokens),
+          totalTokens: Number(totalTokens),
+          model: modelName,
+          type: "academic_translation"
+        });
+      } catch (err) {
+        console.warn("[api-translate] Failed to log token usage:", err);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, translatedText: responseText.trim() }), {

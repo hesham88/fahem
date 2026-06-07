@@ -55,9 +55,10 @@ export default function LandingPage() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
       if (currentUser || isJudgeBypass) {
+        const savedBypassEmail = typeof window !== "undefined" ? (localStorage.getItem("judge_bypass_email") || "judge.evaluation@fahem.edu") : "judge.evaluation@fahem.edu";
         setUser(currentUser || ({
           uid: "judge_evaluation_uid_01",
-          email: "judge.evaluation@fahem.edu",
+          email: savedBypassEmail,
           displayName: "⭐ JUDGE",
           photoURL: "/avatars/golden_crown.svg",
           phoneNumber: "+15555555555",
@@ -398,10 +399,16 @@ export default function LandingPage() {
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
-                if (judgeEmail.trim() === "judge.evaluation@fahem.edu") {
+                const trimmedEmail = judgeEmail.trim().toLowerCase();
+                const domain = trimmedEmail.split("@")[1];
+                const isValidJudgeDomain = domain && ["google.com", "mongodb.com", "devpost.com"].includes(domain);
+                const isValidJudgeEmail = trimmedEmail === "judge.evaluation@fahem.edu" || isValidJudgeDomain;
+                
+                if (isValidJudgeEmail) {
                   setBypassActive(true);
                   if (typeof window !== "undefined") {
                     localStorage.setItem("judge_bypass_session", "true");
+                    localStorage.setItem("judge_bypass_email", trimmedEmail);
                   }
                   router.push(`/${language}/home`);
                 } else {
@@ -472,6 +479,44 @@ export default function LandingPage() {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Built with Partner Band */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.5rem",
+            marginTop: "1.5rem",
+            padding: "0.75rem 1.5rem",
+            background: "rgba(255, 255, 255, 0.25)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            borderRadius: "16px",
+            width: "100%",
+            maxWidth: "500px"
+          }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "1.5px" }}>
+              {language === "ar" ? "بنيت باستخدام شراكاتنا التقنية" : "Built with Leading Tech Integrations"}
+            </span>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+              {/* Google Cloud */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", opacity: 0.85 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4"/>
+                </svg>
+                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>Google Cloud</span>
+              </div>
+              {/* MongoDB */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", opacity: 0.85 }}>
+                <svg width="14" height="20" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M16 0C13.5 6.5 9 13.5 9 19.5C9 28.5 13 33.5 16 38C19 33.5 23 28.5 23 19.5C23 13.5 18.5 6.5 16 0Z" fill="#13AA52"/>
+                  <path d="M16 1.5V36.5C17.5 32.5 21 28 21 19.5C21 14.5 18 8 16 1.5Z" fill="#118843"/>
+                  <path d="M16 38V48L13 42L16 38Z" fill="#13AA52"/>
+                </svg>
+                <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#118843", letterSpacing: "-0.2px" }}>MongoDB</span>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -714,7 +759,16 @@ export default function LandingPage() {
         </div>
 
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <p style={{ fontSize: "0.9rem", color: "#64748b", margin: 0 }}>{t("footer_landing")}</p>
+          <p style={{ fontSize: "0.9rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <span>{t("footer_landing")}</span>
+            <span style={{ color: "#cbd5e1" }}>•</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#003E54" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0h24v24H0V0zm12 3a9 9 0 100 18 9 9 0 000-18zm2 12.5h-4v-7h4c1.5 0 2.5 1 2.5 2.5s-1 4.5-2.5 4.5z"/>
+              </svg>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#003E54" }}>Devpost</span>
+            </span>
+          </p>
           <p style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 600, margin: 0, letterSpacing: "0.5px" }}>
             Developed by <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa.co</a>
           </p>

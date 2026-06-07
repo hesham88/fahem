@@ -1,12 +1,15 @@
 import httpx
 import json
+import os
 
 cloud_run_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
 url = f"{cloud_run_url}/user/list"
 
+token = os.environ.get("FAHEM_AUTH_TOKEN", "YOUR_FAHEM_AUTH_TOKEN")
+
 headers = {
     "Accept": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": f"Bearer {token}"
 }
 
 print("Querying Cloud Run user list...")

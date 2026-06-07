@@ -1,10 +1,19 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { verifyAuth } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { fileName, fileFormat, downloadUrl, userId } = await req.json();
 
     if (!fileName || !fileFormat) {

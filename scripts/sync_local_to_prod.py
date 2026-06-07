@@ -18,7 +18,7 @@ ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 LOCAL_DB_PATH = os.path.join(ROOT_DIR, "web", "src", "app", "api", "local_db.json")
 
 PROD_URL = "https://fahem-agent-1061555578804.us-east4.run.app/admin/sync-db"
-BYPASS_TOKEN = "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+BYPASS_TOKEN = f"Bearer {os.environ.get('FAHEM_AUTH_TOKEN', 'YOUR_FAHEM_AUTH_TOKEN')}"
 
 def sync_local_to_production():
     print("--------------------------------------------------")

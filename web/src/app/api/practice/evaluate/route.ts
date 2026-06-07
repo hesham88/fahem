@@ -1,14 +1,70 @@
 import { NextRequest } from "next/server";
+import { requireUser } from "../../_auth";
+import { proxyRequest } from "../../proxy";
+import { isLocalEnv, getLocalDb } from "../../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const body = await req.json();
-    const { question, mode, userAnswer, correctOption, language } = body;
+    const { question, mode, userAnswer, correctOption, language, bookId, pageNumber } = body;
 
     const resolvedLanguage = language === "ar" ? "ar" : "en";
     const resolvedMode = mode || "mcq";
+
+    // Grounded evaluation: load the book page if bookId and pageNumber are provided
+    let page: any = null;
+    let referenceFacts = "";
+    if (bookId && pageNumber !== undefined) {
+      if (isLocalEnv()) {
+        try {
+          const localDb = getLocalDb();
+          const pages = (localDb as any).book_pages || [];
+          page = pages.find(
+            (p: any) =>
+              (p.book_id === bookId || p.bookId === bookId) &&
+              Number(p.page_number || p.pageNum || 0) === Number(pageNumber)
+          );
+        } catch (localErr) {
+          console.error("[api-practice-evaluate] Failed to read local page:", localErr);
+        }
+      } else {
+        try {
+          const proxyRes = await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET");
+          if (proxyRes.ok) {
+            const data = await proxyRes.json();
+            if (data && data.success && Array.isArray(data.pages)) {
+              page = data.pages.find((p: any) => Number(p.page_number || p.pageNum || 0) === Number(pageNumber));
+            }
+          }
+        } catch (err) {
+          console.error("[api-practice-evaluate] Failed to fetch book pages via proxy:", err);
+        }
+      }
+    }
+
+    if (page) {
+      if (page.blocks && Array.isArray(page.blocks)) {
+        referenceFacts = page.blocks
+          .map((b: any) => {
+            const parts = [];
+            if (b.title) parts.push(b.title);
+            if (b.text) parts.push(b.text);
+            if (b.term) parts.push(b.term);
+            if (b.caption) parts.push(b.caption);
+            if (b.options && Array.isArray(b.options)) parts.push(`Options: ${b.options.join(", ")}`);
+            return parts.join("\n");
+          })
+          .filter(Boolean)
+          .join("\n\n");
+      } else {
+        referenceFacts = page.content || page.contentEn || page.contentAr || "";
+      }
+    }
 
     // Build Evaluation AI Prompt
     const prompt = `
@@ -21,6 +77,13 @@ Challenge Details:
 - User's Answer: "${userAnswer}"
 ${resolvedMode === "mcq" ? `- Expected Correct Option: "${correctOption}"` : ""}
 - Language: ${resolvedLanguage === "ar" ? "Arabic" : "English"}
+
+${referenceFacts ? `
+Reference facts from the book page (this is your absolute source of truth; evaluate strictly based on this context):
+"""
+${referenceFacts}
+"""
+` : ""}
 
 Evaluation Rules:
 1. If mode is "mcq":
@@ -114,6 +177,36 @@ You MUST respond with a JSON object strictly matching this schema:
     const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!responseText) {
       return new Response(JSON.stringify({ error: "Empty response from Gemini" }), { status: 500 });
+    }
+
+    // Log Token Usage Telemetry
+    const usageMetadata = resJson.usageMetadata;
+    const promptTokens = usageMetadata?.promptTokenCount || 0;
+    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = usageMetadata?.totalTokenCount || 0;
+
+    if (totalTokens > 0) {
+      try {
+        const tokenUsagePayload: any = {
+          userId: ctx.uid,
+          userEmail: ctx.email || "anonymous@fahem.ai",
+          promptTokens: Number(promptTokens),
+          completionTokens: Number(completionTokens),
+          totalTokens: Number(totalTokens),
+          model: modelName,
+          type: "practice_evaluation"
+        };
+        if (bookId && pageNumber !== undefined) {
+          tokenUsagePayload.context = {
+            book_id: bookId,
+            page: Number(pageNumber),
+            feature: "question"
+          };
+        }
+        await proxyRequest("/user/token-usage", "POST", tokenUsagePayload);
+      } catch (err) {
+        console.warn("[api-practice-evaluate] Failed to log token usage:", err);
+      }
     }
 
     const evaluationData = JSON.parse(responseText.trim());

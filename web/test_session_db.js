@@ -11,9 +11,10 @@ async function main() {
     { role: "assistant", content: "Welcome! What is your name?", timestamp: new Date().toISOString() }
   ];
 
+  const token = process.env.FAHEM_AUTH_TOKEN || "YOUR_FAHEM_AUTH_TOKEN";
   const headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": `Bearer ${token}`
   };
 
   try {

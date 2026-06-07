@@ -1,6 +1,7 @@
 import httpx
 import json
 import sys
+import os
 
 # Reconfigure stdout to use utf-8 to avoid encoding errors with emojis
 if hasattr(sys.stdout, "reconfigure"):
@@ -9,9 +10,11 @@ if hasattr(sys.stdout, "reconfigure"):
 cloud_run_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app"
 url = f"{cloud_run_url}/db-diagnostic"
 
+token = os.environ.get("FAHEM_AUTH_TOKEN", "YOUR_FAHEM_AUTH_TOKEN")
+
 headers = {
     "Accept": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": f"Bearer {token}"
 }
 
 print("Querying Cloud Run db-diagnostic...")

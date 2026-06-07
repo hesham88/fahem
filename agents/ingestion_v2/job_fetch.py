@@ -122,27 +122,32 @@ def main():
                 shutil.copy(local_uploaded_path, temp_pdf_path)
                 logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] Local uploaded file found at {local_uploaded_path}. Copied to sandbox.")
             else:
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] File path missing or offline, copying mock PDF with real pages.")
-                update_job_status(job_id, "processing", "fetch", 20, logs, 0, 0, False, is_local, **metadata)
-                time.sleep(1.0)
-                
-                # Copy an existing small test PDF if available
-                mock_src = os.path.join(ROOT_DIR, "ignore", "temp_test_book_1.pdf")
-                if not os.path.exists(mock_src):
-                    mock_src = os.path.join(ROOT_DIR, "ignore", "temp_test_e2e_book_manual_1.pdf")
-                
-                if os.path.exists(mock_src):
-                    import shutil
-                    shutil.copy(mock_src, temp_pdf_path)
-                    logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] Successfully copied mock PDF from {os.path.basename(mock_src)}.")
+                ingest_mock = os.environ.get("INGEST_MOCK", "false").lower() in ("true", "1") or payload.get("INGEST_MOCK", False)
+                if ingest_mock:
+                    logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] File path missing or offline, copying mock PDF with real pages since INGEST_MOCK=true.")
+                    update_job_status(job_id, "processing", "fetch", 20, logs, 0, 0, False, is_local, **metadata)
+                    time.sleep(1.0)
+                    
+                    # Copy an existing small test PDF if available
+                    mock_src = os.path.join(ROOT_DIR, "ignore", "temp_test_book_1.pdf")
+                    if not os.path.exists(mock_src):
+                        mock_src = os.path.join(ROOT_DIR, "ignore", "temp_test_e2e_book_manual_1.pdf")
+                    
+                    if os.path.exists(mock_src):
+                        import shutil
+                        shutil.copy(mock_src, temp_pdf_path)
+                        logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] Successfully copied mock PDF from {os.path.basename(mock_src)}.")
+                    else:
+                        # Fallback to plain text dummy if none found
+                        with open(temp_pdf_path, "w", encoding="utf-8") as f:
+                            f.write("Placeholder textbook data for V2 local validation.\n")
                 else:
-                    # Fallback to plain text dummy if none found
-                    with open(temp_pdf_path, "w", encoding="utf-8") as f:
-                        f.write("Placeholder textbook data for V2 local validation.\n")
+                    err_msg = "Resource file path is missing, offline, or unavailable, and INGEST_MOCK is false."
+                    logs.append(f"[{time.strftime('%H:%M:%S')}] [INIT] ❌ Critical Fetch Error: {err_msg}")
+                    raise FileNotFoundError(err_msg)
 
         # 2. Extract Native Bookmarks (TOC) using PyMuPDF
         pdf_toc = []
-        page_count = 10  # default
         try:
             doc = fitz.open(temp_pdf_path)
             page_count = len(doc)
@@ -150,7 +155,9 @@ def main():
             doc.close()
             logs.append(f"[{time.strftime('%H:%M:%S')}] [TOC] Native PDF opened. Total Pages: {page_count}. Native Bookmark entries found: {len(pdf_toc)}")
         except Exception as pdf_err:
-            logs.append(f"[{time.strftime('%H:%M:%S')}] [TOC] ⚠️ Warning: Failed to extract native outline/TOC bookmarks: {pdf_err}")
+            err_msg = f"Failed to open or parse PDF file structure: {pdf_err}"
+            logs.append(f"[{time.strftime('%H:%M:%S')}] [TOC] ❌ Critical: {err_msg}")
+            raise RuntimeError(err_msg)
 
         metadata["total_pages"] = page_count
         payload["total_pages"] = page_count

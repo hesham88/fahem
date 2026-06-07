@@ -1,35 +1,22 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin } from "../helper";
+import { verifyAuth } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email");
-    
-    if (!email) {
-      return new Response(JSON.stringify({ isAdmin: false, error: "Email is required" }), {
-        status: 400,
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ isAdmin: false, isSuperadmin: false, error: "Unauthorized" }), {
+        status: 401,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    const isSuperadmin = ctx.role === "super-admin";
 
-    // 1. Superadmin check (Gated purely via environment secrets)
-    let raw = process.env.SUPERADMIN_USER || "";
-    // Strip outer quotes if any (common in Secret Manager values)
-    raw = raw.trim().replace(/^['"]|['"]$/g, "");
-    const envSuperadmins = raw
-      ? raw.split(",").map((addr) => addr.trim().toLowerCase().replace(/^['"]|['"]$/g, ""))
-      : [];
-    const isSuperadmin = envSuperadmins.includes(normalizedEmail);
-
-    // 2. Comprehensive Admin Check (Superadmin OR MongoDB approved standard admin)
-    const isAdmin = await checkIsAdmin(normalizedEmail);
-
-    return new Response(JSON.stringify({ isAdmin, isSuperadmin }), {
+    return new Response(JSON.stringify({ isAdmin, isSuperadmin, email: ctx.email, role: ctx.role }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

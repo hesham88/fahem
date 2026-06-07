@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,9 @@ const EDUCATION_KEYWORDS = [
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
     const { searchParams } = new URL(req.url);
     const query = (searchParams.get("query") || "").trim().toLowerCase();
     const country = (searchParams.get("country") || "Egypt").trim().toLowerCase();

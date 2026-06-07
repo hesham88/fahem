@@ -24,9 +24,10 @@ async function main() {
     streaming: false
   };
 
+  const token = process.env.FAHEM_AUTH_TOKEN || "YOUR_FAHEM_AUTH_TOKEN";
   const headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer LOCAL_BYPASS_TOKEN_fahem_2026"
+    "Authorization": `Bearer ${token}`
   };
 
   try {

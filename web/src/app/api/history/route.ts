@@ -1,17 +1,34 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../proxy";
+import { verifyAuth } from "../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    let userId = searchParams.get("userId");
 
     if (!userId) {
-      return new Response(JSON.stringify({ error: "userId is required" }), {
-        status: 400,
+      userId = ctx.uid;
+    }
+
+    // IDOR Protection: Standard users can only view their own history
+    const isSelf = userId === ctx.uid;
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+
+    if (!isSelf && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view these chat sessions" }), {
+        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -36,7 +53,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return await proxyRequest(`/user/chat-session?userId=${encodeURIComponent(userId)}`, "GET");
+    return await proxyRequest(`/user/chat-session?userId=${encodeURIComponent(userId)}`, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -47,14 +64,31 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { sessionId, userId, userEmail, title, messages } = body;
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
-    if (!sessionId || !userId || !userEmail) {
-      return new Response(JSON.stringify({ error: "sessionId, userId, and userEmail are required" }), {
+    const body = await req.json();
+    const { sessionId, title, messages } = body;
+    let userId = body.userId;
+    let userEmail = body.userEmail;
+
+    if (!sessionId) {
+      return new Response(JSON.stringify({ error: "sessionId is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    // Bind identity strictly to verified caller session
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    if (!userId || !isAdmin) {
+      userId = ctx.uid;
+      userEmail = ctx.email ?? "anonymous@fahem.app";
     }
 
     if (isLocalEnv()) {
@@ -63,6 +97,15 @@ export async function POST(req: NextRequest) {
         db.chat_sessions = [];
       }
       const existingIndex = db.chat_sessions.findIndex((s: any) => s.sessionId === sessionId);
+      
+      // IDOR Protection for update
+      if (existingIndex > -1 && db.chat_sessions[existingIndex].userId !== ctx.uid && !isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden: You do not own this chat session" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
       const now = new Date().toISOString();
       if (existingIndex > -1) {
         const existing = db.chat_sessions[existingIndex];
@@ -93,10 +136,10 @@ export async function POST(req: NextRequest) {
     return await proxyRequest("/user/chat-session", "POST", {
       sessionId,
       userId,
-      userEmail,
+      userEmail: userEmail || ctx.email || "anonymous@fahem.app",
       title,
       messages
-    });
+    }, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -107,6 +150,14 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("sessionId");
 
@@ -117,9 +168,18 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+
     if (isLocalEnv()) {
       const db = getLocalDb();
       if (db.chat_sessions) {
+        const session = db.chat_sessions.find((s: any) => s.sessionId === sessionId);
+        if (session && session.userId !== ctx.uid && !isAdmin) {
+          return new Response(JSON.stringify({ error: "Forbidden: You do not own this chat session" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
         db.chat_sessions = db.chat_sessions.filter((s: any) => s.sessionId !== sessionId);
         saveLocalDb(db);
       }
@@ -129,7 +189,7 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
-    return await proxyRequest(`/user/chat-session?sessionId=${encodeURIComponent(sessionId)}`, "DELETE");
+    return await proxyRequest(`/user/chat-session?sessionId=${encodeURIComponent(sessionId)}`, "DELETE", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -140,6 +200,14 @@ export async function DELETE(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const body = await req.json();
     const { sessionId, title } = body;
 
@@ -150,6 +218,8 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+
     if (isLocalEnv()) {
       const db = getLocalDb();
       if (!db.chat_sessions) {
@@ -157,6 +227,12 @@ export async function PATCH(req: NextRequest) {
       }
       const existing = db.chat_sessions.find((s: any) => s.sessionId === sessionId);
       if (existing) {
+        if (existing.userId !== ctx.uid && !isAdmin) {
+          return new Response(JSON.stringify({ error: "Forbidden: You do not own this chat session" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
         existing.title = title;
         existing.updatedAt = new Date().toISOString();
         saveLocalDb(db);
@@ -175,7 +251,7 @@ export async function PATCH(req: NextRequest) {
     return await proxyRequest("/user/chat-session/rename", "POST", {
       sessionId,
       title
-    });
+    }, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

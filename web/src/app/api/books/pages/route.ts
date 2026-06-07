@@ -1,11 +1,20 @@
 import { NextRequest } from "next/server";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
+import { verifyAuth } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
     const bookId = searchParams.get("bookId") || searchParams.get("book_id");
@@ -145,7 +154,7 @@ export async function GET(req: NextRequest) {
         });
       }
       
-      return await proxyRequest(`/user/books/search?query=${encodeURIComponent(query)}`, "GET");
+      return await proxyRequest(`/user/books/search?query=${encodeURIComponent(query)}`, "GET", null, ctx);
     }
 
     if (isLocalEnv()) {
@@ -416,7 +425,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Proxy to Cloud Run Agent
-    const proxyRes = await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET");
+    const proxyRes = await proxyRequest(`/user/books/pages?book_id=${bookId}`, "GET", null, ctx);
     const proxyData = await proxyRes.json();
     return new Response(JSON.stringify(proxyData), {
       status: proxyRes.status,

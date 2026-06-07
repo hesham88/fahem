@@ -611,6 +611,14 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
+
+  const isJudgeEmail = (email?: string | null) => {
+    if (!email) return false;
+    const domain = email.toLowerCase().split("@")[1];
+    return ["google.com", "mongodb.com", "devpost.com"].includes(domain);
+  };
+  const isJudgeBypass = typeof window !== "undefined" && localStorage.getItem("judge_bypass_session") === "true";
+  const isJudge = isJudgeBypass || isJudgeEmail(user?.email) || userProfile?.role === "judge" || userProfile?.isWhitelisted;
   
   // Conversational Onboarding states
   const [localCompleted, setLocalCompleted] = useState(false);
@@ -694,6 +702,7 @@ export default function Home() {
   const [selectedBookReader, setSelectedBookReader] = useState<any>(null);
   const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
+  const [translationLanguage, setTranslationLanguage] = useState<string>("Original");
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
 
@@ -875,7 +884,7 @@ export default function Home() {
     ];
   };
 
-  // Fetch book pages from database/API when a book is selected
+  // Fetch book pages from database/API when a book is selected with sessionStorage cache
   useEffect(() => {
     if (!selectedBookReader) {
       setLoadedBookPages([]);
@@ -884,6 +893,22 @@ export default function Home() {
     
     const bookId = selectedBookReader._id || selectedBookReader.id;
     if (!bookId) return;
+
+    // Try to load from sessionStorage cache first
+    try {
+      const cached = sessionStorage.getItem(`book_pages:${bookId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`[Library-Reader] Loaded ${parsed.length} pages for book ID: ${bookId} from sessionStorage cache.`);
+          setLoadedBookPages(parsed);
+          setLoadingBookPages(false);
+          return;
+        }
+      }
+    } catch (cacheErr) {
+      console.warn("[Library-Reader] Failed to parse sessionStorage cache:", cacheErr);
+    }
 
     setLoadingBookPages(true);
     console.log(`[Library-Reader] Fetching book pages for book ID: ${bookId}...`);
@@ -903,6 +928,11 @@ export default function Home() {
         if (data && data.success && data.pages) {
           console.log(`[Library-Reader] Loaded ${data.pages.length} pages for book ID: ${bookId}`);
           setLoadedBookPages(data.pages);
+          try {
+            sessionStorage.setItem(`book_pages:${bookId}`, JSON.stringify(data.pages));
+          } catch (storageErr) {
+            console.warn("[Library-Reader] Failed to write to sessionStorage:", storageErr);
+          }
         } else {
           console.warn("[Library-Reader] API returned success false or no pages.");
           setLoadedBookPages([]);
@@ -916,6 +946,18 @@ export default function Home() {
         setLoadingBookPages(false);
       });
   }, [selectedBookReader]);
+
+  // Automatically sync loadedBookPages updates (like translations) to sessionStorage cache
+  useEffect(() => {
+    if (!selectedBookReader) return;
+    const bookId = selectedBookReader._id || selectedBookReader.id;
+    if (!bookId || loadedBookPages.length === 0) return;
+    try {
+      sessionStorage.setItem(`book_pages:${bookId}`, JSON.stringify(loadedBookPages));
+    } catch (storageErr) {
+      console.warn("[Library-Reader] Failed to sync loadedBookPages to sessionStorage:", storageErr);
+    }
+  }, [loadedBookPages, selectedBookReader]);
 
   const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
 
@@ -947,14 +989,15 @@ export default function Home() {
             titleEn: activePage?.titleEn || "",
             titleAr: activePage?.titleAr || "",
             contentEn: activePage?.contentEn || "",
-            contentAr: activePage?.contentAr || ""
+            contentAr: activePage?.contentAr || "",
+            translationLanguage: translationLanguage
           }
         }));
       } else {
         window.dispatchEvent(new CustomEvent("fahemBookContext", { detail: null }));
       }
     }
-  }, [selectedBookReader, readerCurrentPage, loadedBookPages, language]);
+  }, [selectedBookReader, readerCurrentPage, loadedBookPages, language, translationLanguage]);
 
   // Deep-linking: listener for the custom navigate event
   useEffect(() => {
@@ -995,9 +1038,28 @@ export default function Home() {
 
   // Deep-linking: initial URL query load on app startup
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      
+      // 1. Restore active tab
+      const tabParam = params.get("tab");
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+      
+      // 2. Restore selected subject ID
+      const subjectParam = params.get("subject") || params.get("subjectId") || params.get("subject_id");
+      if (subjectParam) {
+        setSelectedSubjectId(subjectParam);
+      }
+    }
+  }, []);
+
+  // Deep-linking: handle initial book navigation when dynamicBooks load
+  useEffect(() => {
     if (typeof window !== "undefined" && dynamicBooks.length > 0) {
       const params = new URLSearchParams(window.location.search);
-      const bookId = params.get("bookId") || params.get("book_id");
+      const bookId = params.get("book") || params.get("bookId") || params.get("book_id");
       const pageParam = params.get("page");
       if (bookId) {
         const page = parseInt(pageParam || "1", 10) || 1;
@@ -1012,30 +1074,65 @@ export default function Home() {
     }
   }, [dynamicBooks]);
 
-  // Deep-linking: sync current viewer state back to browser URL string
+  // Deep-linking: sync current tab, subject, and viewer state back to browser URL string
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      let updated = false;
+
+      // Sync active tab
+      if (params.get("tab") !== activeTab) {
+        params.set("tab", activeTab);
+        updated = true;
+      }
+
+      // Sync selected subject
+      if (selectedSubjectId) {
+        if (params.get("subject") !== selectedSubjectId) {
+          params.set("subject", selectedSubjectId);
+          updated = true;
+        }
+      } else {
+        if (params.has("subject")) {
+          params.delete("subject");
+          updated = true;
+        }
+      }
+
+      // Sync book reader and current page
       if (selectedBookReader) {
         const bookId = selectedBookReader._id || selectedBookReader.id;
         if (bookId) {
-          params.set("bookId", bookId);
-          params.set("page", readerCurrentPage.toString());
-          const newSearch = params.toString();
-          const newUrl = `${window.location.pathname}?${newSearch}`;
-          window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+          if (params.get("book") !== bookId) {
+            params.set("book", bookId);
+            updated = true;
+          }
+          const pageStr = readerCurrentPage.toString();
+          if (params.get("page") !== pageStr) {
+            params.set("page", pageStr);
+            updated = true;
+          }
+          if (params.has("bookId")) {
+            params.delete("bookId");
+            updated = true;
+          }
         }
       } else {
-        if (params.has("bookId") || params.has("page")) {
+        if (params.has("book") || params.has("bookId") || params.has("page")) {
+          params.delete("book");
           params.delete("bookId");
           params.delete("page");
-          const newSearch = params.toString();
-          const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
-          window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+          updated = true;
         }
       }
+
+      if (updated) {
+        const newSearch = params.toString();
+        const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
+        window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+      }
     }
-  }, [selectedBookReader, readerCurrentPage]);
+  }, [activeTab, selectedSubjectId, selectedBookReader, readerCurrentPage]);
 
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
   const [mentionSearch, setMentionQuery] = useState<string>("");
@@ -3493,9 +3590,10 @@ export default function Home() {
       if (!firebaseUser && !isJudgeBypass) {
         router.push(`/${language}`);
       } else {
+        const savedBypassEmail = typeof window !== "undefined" ? (localStorage.getItem("judge_bypass_email") || "judge.evaluation@fahem.edu") : "judge.evaluation@fahem.edu";
         const currentUser = firebaseUser || ({
           uid: "judge_evaluation_uid_01",
-          email: "judge.evaluation@fahem.edu",
+          email: savedBypassEmail,
           displayName: "⭐ JUDGE",
           photoURL: "/avatars/golden_crown.svg",
           phoneNumber: "+15555555555",
@@ -3514,18 +3612,21 @@ export default function Home() {
         fetchBooksAndSubjects(); // Fetch dynamic books and subjects from database
         fetchSpaceHistory(currentUser.uid); // Fetch active recall and space audit history
         
+        const isRealJudgeEmail = currentUser.email && isJudgeEmail(currentUser.email);
+        
         // Fetch User Profile over MongoDB Agent Proxies
         setLoadingProfile(true);
         setProfileLoadError(null);
-        if (isJudgeBypass) {
+        if (isJudgeBypass || isRealJudgeEmail) {
+          const savedPersona = typeof window !== "undefined" ? (sessionStorage.getItem("judge_selected_persona") || "admin") : "admin";
           const judgeProfile = {
             userId: currentUser.uid,
-            email: currentUser.email || "",
-            name: "⭐ JUDGE",
-            username: "judge_evaluation",
+            email: currentUser.email || "judge.evaluation@fahem.edu",
+            name: currentUser.email && isRealJudgeEmail ? `⭐ JUDGE (${currentUser.email.split("@")[1]})` : "⭐ JUDGE (Sandbox)",
+            username: currentUser.email && isRealJudgeEmail ? `judge_${currentUser.email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "")}` : "judge_evaluation",
             onboardingCompleted: true,
-            userType: "student",
-            role: "student",
+            userType: savedPersona === "teacher" ? "teacher" : "student",
+            role: savedPersona === "admin" ? "admin" : savedPersona,
             isWhitelisted: true,
             friends: [],
             groupsJoined: [],
@@ -3537,7 +3638,7 @@ export default function Home() {
           };
           setUserProfile(judgeProfile);
           setLoadingProfile(false);
-          setIsAdmin(true); // Allow judge Standard/Superadmin console access for auditing
+          setIsAdmin(savedPersona === "admin"); // Allow judge Standard/Superadmin console access for auditing
         } else {
           fetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
             .then((res) => {
@@ -3702,7 +3803,7 @@ export default function Home() {
         }
 
         // Verify superadmin status
-        if (currentUser.email && !isJudgeBypass) {
+        if (currentUser.email && !isJudgeBypass && !isRealJudgeEmail) {
           fetch(`/api/admin/check?email=${encodeURIComponent(currentUser.email)}`)
             .then((res) => res.json())
             .then((data) => setIsAdmin(data.isAdmin))
@@ -3758,7 +3859,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           prompt: promptText,
-          language,
+          language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
           userEmail: user?.email || "",
           userId: user?.uid || "",
           sessionId: currentSessionId || undefined
@@ -4014,7 +4115,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           prompt: queryText,
-          language,
+          language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
           userEmail: user?.email || "",
           userId: user?.uid || "",
           sessionId: currentSessionId || undefined
@@ -4300,7 +4401,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           prompt: promptPayload,
-          language,
+          language: (translationLanguage && translationLanguage !== "Original") ? translationLanguage : language,
           userEmail: user?.email || "",
           userId: user?.uid || "",
           sessionId: currentSessionId || undefined
@@ -5918,6 +6019,96 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="main-content" style={{ position: "relative", zIndex: 2 }}>
+        {/* Judge Sandbox Persona Switcher */}
+        {isJudge && (
+          <div
+            style={{
+              background: "linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(16, 107, 163, 0.95))",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(212, 175, 55, 0.35)",
+              borderRadius: "16px",
+              padding: "1rem 1.5rem",
+              marginBottom: "2rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "1rem",
+              boxShadow: "0 10px 30px -5px rgba(16, 107, 163, 0.25), 0 0 15px rgba(212, 175, 55, 0.1)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <span style={{ fontSize: "1.5rem" }}>⚖️</span>
+              <div>
+                <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#ffd700" }}>
+                  {language === "ar" ? "لوحة محاكاة فحص المحكمين المعتمدين" : "WHITELISTED JUDGE SANDBOX CONSOLE"}
+                </h4>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>
+                  {language === "ar" 
+                    ? "أنت في بيئة آمنة وقابلة للتبديل السلس للاختبار الشامل." 
+                    : "You are in a secure, ephemeral playground. Select a role persona below to audit different views."}
+                </p>
+              </div>
+            </div>
+
+            {/* Persona buttons */}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {[
+                { id: "admin", labelAr: "المشرف (Studio & Limits)", labelEn: "Admin (Studio & Overrides)", icon: "🛠️" },
+                { id: "student", labelAr: "طالب متفوق (Gamification)", labelEn: "Student (Gamification)", icon: "🎓" },
+                { id: "teacher", labelAr: "معلم (Assignments)", labelEn: "Teacher (Assignments)", icon: "🏫" }
+              ].map((p) => {
+                const isSelected = (userProfile?.role === p.id) || (p.id === "admin" && userProfile?.role === "super-admin") || (p.id === "admin" && userProfile?.role === "admin");
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      sessionStorage.setItem("judge_selected_persona", p.id);
+                      
+                      // Dynamically switch the active profile
+                      const updatedProfile = {
+                        ...userProfile,
+                        role: p.id === "admin" ? "admin" : p.id,
+                        userType: p.id === "teacher" ? "teacher" : "student",
+                      };
+                      setUserProfile(updatedProfile);
+                      setIsAdmin(p.id === "admin");
+                      
+                      // Auto route or toggle to the most interesting tab for the role
+                      if (p.id === "admin") {
+                        setActiveTab("admin");
+                      } else if (p.id === "student") {
+                        setActiveTab("library");
+                      } else {
+                        setActiveTab("social");
+                      }
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "10px",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      border: isSelected ? "2px solid #ffd700" : "1px solid rgba(255, 255, 255, 0.15)",
+                      background: isSelected ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.04)",
+                      color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.8)",
+                      boxShadow: isSelected ? "0 0 10px rgba(255, 215, 0, 0.2)" : "none",
+                      transition: "all 0.2s ease",
+                    }}
+                    type="button"
+                  >
+                    <span>{p.icon}</span>
+                    <span>{language === "ar" ? p.labelAr : p.labelEn}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Page Title Section */}
         <header className="page-title-section">
           <h1>{getTabHeader().title}</h1>
@@ -5959,6 +6150,8 @@ export default function Home() {
             loadingBookPages={loadingBookPages}
             readerCurrentPage={readerCurrentPage}
             setReaderCurrentPage={setReaderCurrentPage}
+            translationLanguage={translationLanguage}
+            setTranslationLanguage={setTranslationLanguage}
             selectedText={selectedText}
             setSelectedText={setSelectedText}
             bubbleCoords={bubbleCoords}

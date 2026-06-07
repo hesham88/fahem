@@ -45,6 +45,19 @@ async def _run_mcp_tool(tool_name: str, args: dict) -> json:
     """Helper to programmatically invoke a specific MCP tool inside mcp_toolset, with high-performance direct MongoDB connection fallback."""
     global _mcp_connected
     
+    # Run guardrail check first (collapsing direct PyMongo and MCP writes to one gated path)
+    try:
+        from guardrails import before_tool_callback
+        class DummyTool:
+            def __init__(self, name):
+                self.name = name
+        before_tool_callback(DummyTool(tool_name), args or {})
+    except PermissionError as pe:
+        logger.error(f"[SECURITY] Direct tool run blocked: {pe}")
+        raise pe
+    except Exception as ge:
+        logger.warning(f"Guardrail pre-check error: {ge}")
+        
     # Direct high-performance PyMongo & Schema-validated execution if db_engine is connected
     if db_engine and db_engine._db is not None:
         try:

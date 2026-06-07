@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { checkIsAdmin, checkIsSuperadmin } from "../helper";
+import { requireSuperadmin } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 
@@ -8,23 +8,8 @@ export const dynamic = "force-dynamic";
 // GET: Fetch pending change requests for Superadmin Audit Trail
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const superadminEmail = searchParams.get("superadminEmail") || "";
-
-    if (!superadminEmail) {
-      return new Response(JSON.stringify({ error: "superadminEmail is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isAdmin = await checkIsAdmin(superadminEmail);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized administrator." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
     if (isLocalEnv()) {
       const db = getLocalDb();
@@ -37,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     // In production, we proxy to Cloud Run Agent or fallback to local DB tracking
     try {
-      const proxyRes = await proxyRequest(`/admin/approve-changes?superadminEmail=${encodeURIComponent(superadminEmail)}`, "GET");
+      const proxyRes = await proxyRequest("/admin/approve-changes", "GET", undefined, ctx);
       if (proxyRes.ok) {
         return proxyRes;
       }
@@ -64,19 +49,15 @@ export async function GET(req: NextRequest) {
 // POST: Approve or reject an admin's change request
 export async function POST(req: NextRequest) {
   try {
-    const { superadminEmail, requestId, action } = await req.json();
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!superadminEmail || !requestId || !action) {
-      return new Response(JSON.stringify({ error: "Missing required parameters: superadminEmail, requestId, action" }), {
+    const body = await req.json();
+    const { requestId, action } = body;
+
+    if (!requestId || !action) {
+      return new Response(JSON.stringify({ error: "Missing required parameters: requestId, action" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(superadminEmail);
-    if (!isSuper) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized superadmin." }), {
-        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -170,7 +151,7 @@ export async function POST(req: NextRequest) {
 
     // In production, we proxy or fallback
     try {
-      const proxyRes = await proxyRequest("/admin/approve-changes", "POST", { superadminEmail, requestId, action });
+      const proxyRes = await proxyRequest("/admin/approve-changes", "POST", { requestId, action }, ctx);
       if (proxyRes.ok) {
         return proxyRes;
       }

@@ -20,6 +20,9 @@ interface LocalDb {
   admin_change_requests?: any[];
   user_activities?: any[];
   chat_sessions?: any[];
+  libraries?: any[];
+  curricula?: any[];
+  reading_sessions?: any[];
 }
 
 const DEFAULT_DB: LocalDb = {
@@ -82,7 +85,8 @@ const DEFAULT_DB: LocalDb = {
     { userId: "user_super_1", name: "Hesham", username: "hesham1988", email: "hesham1988@gmail.com", role: "super-admin", userType: "admin", school: "Fahem HQ", isWhitelisted: true, banned: false, avatar: "👑", country: "EG", grade: "General" }
   ],
   admin_change_requests: [],
-  user_activities: []
+  user_activities: [],
+  reading_sessions: []
 };
 
 export function isLocalEnv(): boolean {
@@ -148,6 +152,10 @@ export function getLocalDb(): LocalDb {
     }
     if (!db.chat_sessions) {
       db.chat_sessions = [];
+      updated = true;
+    }
+    if (!db.reading_sessions) {
+      db.reading_sessions = [];
       updated = true;
     }
     

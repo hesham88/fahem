@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { GoogleAuth } from "google-auth-library";
 import { proxyRequest } from "../../proxy";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { requireUser } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,13 @@ async function checkModelArmor(prompt: string): Promise<{ blocked: boolean; reas
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, language, userEmail, userId, sessionId } = await req.json();
+    const ctx = await requireUser(req);
+    if (ctx instanceof Response) return ctx;
+
+    const body = await req.json();
+    const { prompt, language, sessionId } = body;
+    const userId = ctx.uid;
+    const userEmail = ctx.email || "anonymous@fahem.ai";
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,

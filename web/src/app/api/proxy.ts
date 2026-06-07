@@ -96,7 +96,8 @@ export async function getOidcToken(): Promise<string | null> {
 export async function proxyRequest(
   path: string,
   method: string = "GET",
-  body?: any
+  body?: any,
+  ctx?: any
 ): Promise<Response> {
   if (!cloudRunUrl) {
     return new Response(
@@ -106,10 +107,7 @@ export async function proxyRequest(
   }
 
   try {
-    let oidcToken = await getOidcToken();
-    if (!oidcToken) {
-      oidcToken = "LOCAL_BYPASS_TOKEN_fahem_2026";
-    }
+    const oidcToken = await getOidcToken();
     const headers: Record<string, string> = {
       "Accept": "application/json",
     };
@@ -120,6 +118,15 @@ export async function proxyRequest(
 
     if (oidcToken) {
       headers["Authorization"] = `Bearer ${oidcToken}`;
+    }
+
+    // Forward the authenticated end-user principal to the Python backend
+    if (ctx) {
+      headers["X-Verified-Principal"] = JSON.stringify({
+        uid: ctx.uid,
+        email: ctx.email,
+        role: ctx.role
+      });
     }
 
     const url = `${cloudRunUrl}${path}`;
@@ -157,3 +164,4 @@ export async function proxyRequest(
     );
   }
 }
+

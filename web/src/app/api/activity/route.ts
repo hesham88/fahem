@@ -1,17 +1,34 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../proxy";
+import { verifyAuth } from "../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    let userId = searchParams.get("userId");
 
     if (!userId) {
-      return new Response(JSON.stringify({ error: "userId is required" }), {
-        status: 400,
+      userId = ctx.uid;
+    }
+
+    // IDOR Protection: Standard users can only view their own activities
+    const isSelf = userId === ctx.uid;
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+
+    if (!isSelf && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view these activities" }), {
+        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -19,7 +36,6 @@ export async function GET(req: NextRequest) {
     if (isLocalEnv()) {
       const db = getLocalDb();
       const activities = (db as any).user_activities || [];
-      // Filter activities belonging to this user
       const userActivities = activities.filter((act: any) => act.userId === userId);
       return new Response(JSON.stringify({ activities: userActivities }), {
         status: 200,
@@ -27,7 +43,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return await proxyRequest(`/user/activity?userId=${encodeURIComponent(userId)}`, "GET");
+    return await proxyRequest(`/user/activity?userId=${encodeURIComponent(userId)}`, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -38,15 +54,27 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { userId, userEmail, action, status, details } = body;
+    const ctx = await verifyAuth(req);
+    if (!ctx) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid or missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
-    if (!userId || !userEmail || !action || !status) {
-      return new Response(JSON.stringify({ error: "userId, userEmail, action, and status are required" }), {
+    const body = await req.json();
+    const { action, status, details } = body;
+
+    if (!action || !status) {
+      return new Response(JSON.stringify({ error: "action and status are required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
+
+    // Bind identity strictly to verified caller session
+    const userId = ctx.uid;
+    const userEmail = ctx.email ?? "anonymous@fahem.app";
 
     if (isLocalEnv()) {
       const db = getLocalDb();
@@ -81,7 +109,7 @@ export async function POST(req: NextRequest) {
       action,
       status,
       details
-    });
+    }, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

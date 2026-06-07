@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { checkIsSuperadmin } from "../helper";
+import { requireSuperadmin } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb, resolveScriptPath } from "../../localDbHelper";
 import { proxyRequest } from "../../proxy";
 import { spawn } from "child_process";
@@ -9,23 +9,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const superadminEmail = searchParams.get("superadminEmail") || "";
-
-    if (!superadminEmail) {
-      return new Response(JSON.stringify({ error: "superadminEmail is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(superadminEmail);
-    if (!isSuper) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized superadmin." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
     if (isLocalEnv()) {
       const db = getLocalDb();
@@ -37,7 +22,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest(`/admin/approve-ingestion?superadminEmail=${encodeURIComponent(superadminEmail)}`, "GET");
+    return await proxyRequest("/admin/approve-ingestion", "GET", undefined, ctx);
 
   } catch (err: any) {
     console.error("[approve-ingestion GET] failed:", err);
@@ -50,19 +35,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { superadminEmail, bookId, action } = await req.json();
+    const ctx = await requireSuperadmin(req);
+    if (ctx instanceof Response) return ctx;
 
-    if (!superadminEmail || !bookId || !action) {
-      return new Response(JSON.stringify({ error: "Missing required parameters: superadminEmail, bookId, action" }), {
+    const body = await req.json();
+    const { bookId, action } = body;
+
+    if (!bookId || !action) {
+      return new Response(JSON.stringify({ error: "Missing required parameters: bookId, action" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    const isSuper = await checkIsSuperadmin(superadminEmail);
-    if (!isSuper) {
-      return new Response(JSON.stringify({ error: "Access Denied: Requester is not an authorized superadmin." }), {
-        status: 403,
         headers: { "Content-Type": "application/json" }
       });
     }
@@ -154,7 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest("/admin/approve-ingestion", "POST", { bookId, action, superadminEmail });
+    return await proxyRequest("/admin/approve-ingestion", "POST", { bookId, action }, ctx);
 
   } catch (err: any) {
     console.error("[approve-ingestion POST] failed:", err);
