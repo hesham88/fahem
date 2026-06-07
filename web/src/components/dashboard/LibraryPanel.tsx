@@ -3306,7 +3306,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   border: "1px solid rgba(16, 107, 163, 0.1)",
                   borderRadius: "16px",
                   userSelect: "text",
-                  boxShadow: "0 10px 30px rgba(16, 107, 163, 0.01)"
+                  boxShadow: "0 10px 30px rgba(16, 107, 163, 0.01)",
+                  touchAction: "pan-y"
                 }}
               >
                 <div>

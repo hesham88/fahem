@@ -40,7 +40,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P6-5 | builder-3 | 6 | Brand-compliant logos & copy revisions | phase-6-reporting-judges-branding-docs §6.7 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
 | P7-1 | builder-3 | 7 | Fluid CSS breakpoint layouts (Mobile, Tablet, Desktop) | phase-7-responsive-and-companion-ux §7.2 @ bd4d3b35a14a | done | yes | [web/src/app/globals.css](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/globals.css) |
 | P7-2 | builder-3 | 7 | Overlay-only portal companion & dvh heights | phase-7-responsive-and-companion-ux §7.3 @ bd4d3b35a14a | done | yes | [web/src/components/StickyChat.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/StickyChat.tsx) |
-| P7-3 | (unclaimed) | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | todo | — | — |
+| P7-3 | builder-1 | 7 | Reader horizontal swipe & gesture ownership | phase-7-responsive-and-companion-ux §7.4 @ bd4d3b35a14a | done | yes | [web/src/components/dashboard/LibraryPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/LibraryPanel.tsx) |
 | P7-4 | (unclaimed) | 7 | Mount once, sticky language & user-controlled FAB open | phase-7-responsive-and-companion-ux §7.5 @ bd4d3b35a14a | todo | — | — |
 
 ## Event log (append-only; one line per task transition)
