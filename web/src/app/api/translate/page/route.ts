@@ -52,21 +52,7 @@ export async function POST(req: NextRequest) {
           Number(p.page_number || p.pageNum || 0) === Number(pageNumber)
       );
     } else {
-      try {
-        if (!shouldSkipDirectMongo()) {
-          const { MongoClient } = require("mongodb");
-          const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-          mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-          await mongoClient.connect();
-          const db = mongoClient.db(getDbTarget());
-          page = await db.collection("book_pages").findOne({
-            book_id: bookId,
-            page_number: Number(pageNumber)
-          });
-        }
-      } catch (mongoErr) {
-        console.error("[api-translate-page] MongoDB Direct Connection failed, trying fallback:", mongoErr);
-      }
+      return await proxyRequest("/user/translate/page", "POST", { bookId, pageNumber, targetLanguage }, ctx);
     }
 
     // Fallback if production failed/skipped or page is not in localDb

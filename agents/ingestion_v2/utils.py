@@ -47,6 +47,16 @@ def get_mongodb_uri():
         pass
     return "mongodb://localhost:27017"
 
+def get_active_db(client):
+    try:
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if parent_dir not in sys.path:
+            sys.path.append(parent_dir)
+        from mongodb_engine import db_target_var
+        return client[db_target_var.get()]
+    except Exception:
+        return client['fahem']
+
 _MONGO_DISABLED = None
 
 def is_mongodb_enabled():
@@ -232,7 +242,7 @@ def get_job_status(job_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
-            db = client["fahem"]
+            db = get_active_db(client)
             job = db["ingestion_jobs"].find_one({"_id": job_id})
             client.close()
             if job:
@@ -323,7 +333,7 @@ def update_job_status_db_only(job_id, status, current_step, progress, logs, is_l
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             set_fields = {
                 "status": status,
@@ -474,7 +484,7 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=10000)
-            db = client["fahem"]
+            db = get_active_db(client)
             
             set_fields = {
                 "status": status,

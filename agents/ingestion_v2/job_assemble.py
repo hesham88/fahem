@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageColor
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH,
-    make_progress_bar, get_gemini_config, generate_gemini_image
+    make_progress_bar, get_gemini_config, generate_gemini_image, get_active_db
 )
 
 def compile_chapters_and_toc(book_id, total_pages, is_local, pdf_toc=None):
@@ -75,7 +75,7 @@ def compile_chapters_and_toc(book_id, total_pages, is_local, pdf_toc=None):
             try:
                 from pymongo import MongoClient
                 client = MongoClient(get_mongodb_uri())
-                db = client["fahem"]
+                db = get_active_db(client)
                 pages_list = list(db["book_pages"].find({"book_id": book_id}))
                 client.close()
             except Exception:
@@ -266,7 +266,7 @@ def load_subject_metadata(subject_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri())
-            db = client["fahem"]
+            db = get_active_db(client)
             subject = db["subjects"].find_one({"_id": subject_id})
             if subject:
                 if subject.get("color"):

@@ -26,7 +26,7 @@ from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, get_gemini_config, execute_with_retry,
     is_mongodb_enabled, get_mongodb_uri, atomic_write_json, LOCAL_DB_PATH,
-    make_progress_bar
+    make_progress_bar, get_active_db
 )
 from google import genai
 from google.genai import types
@@ -136,7 +136,7 @@ def load_structured_pages(book_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri())
-            db = client["fahem"]
+            db = get_active_db(client)
             pages = list(db["book_pages"].find({"book_id": book_id}))
             client.close()
         except Exception:

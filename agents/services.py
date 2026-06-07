@@ -213,6 +213,174 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "error": str(err)
             }
 
+    @app.get("/admin/inspect-r17")
+    async def inspect_r17_data():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            # 1. Fetch books
+            books = list(db["books"].find({}, {"_id": 1, "title": 1, "subject_id": 1, "curriculum_id": 1, "library_id": 1, "status": 1}))
+            for b in books:
+                b["_id"] = str(b["_id"])
+                
+            # 2. Get distinct book_id from book_pages
+            distinct_page_book_ids = db["book_pages"].distinct("book_id")
+            
+            # 3. Find orphans
+            existing_book_ids = {b["_id"] for b in books}
+            orphans = [bid for bid in distinct_page_book_ids if bid not in existing_book_ids]
+            
+            orphan_details = []
+            for ob_id in orphans:
+                # Find a sample page
+                sample_page = db["book_pages"].find_one({"book_id": ob_id})
+                sample_info = {}
+                if sample_page:
+                    sample_info = {
+                        "book_id": str(sample_page.get("book_id")),
+                        "book_title": sample_page.get("book_title") or sample_page.get("title") or "Unknown",
+                        "page_number": sample_page.get("page_number"),
+                        "text_snippet": str(sample_page.get("content") or sample_page.get("text") or "")[:200],
+                        "has_blocks": "blocks" in sample_page and bool(sample_page["blocks"])
+                    }
+                orphan_details.append({
+                    "book_id": ob_id,
+                    "sample_page": sample_info,
+                    "page_count": db["book_pages"].count_documents({"book_id": ob_id})
+                })
+                
+            client.close()
+            return {
+                "status": "success",
+                "total_books": len(books),
+                "books": books,
+                "distinct_page_book_ids": distinct_page_book_ids,
+                "orphans": orphan_details
+            }
+        except Exception as err:
+            logger.error(f"[services.py] inspect_r17_data failed: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    @app.post("/admin/recover-r17")
+    async def recover_r17_data(request: fastapi.Request):
+        try:
+            payload = await request.json()
+            # payload format: { "recoveries": [ { "book_id": "...", "title": "...", "title_ar": "...", "library_id": "...", "curriculum_id": "...", "subject_id": "...", "role": "core", "visibility": "public" } ] }
+            recoveries = payload.get("recoveries", [])
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            rebuilt_count = 0
+            subject_updates = {}
+            
+            for rec in recoveries:
+                book_id = rec.get("book_id")
+                if not book_id:
+                    continue
+                    
+                # Verify pages exist
+                pages_count = db["book_pages"].count_documents({"book_id": book_id})
+                if pages_count == 0:
+                    logger.warning(f"[RECOVER] No surviving pages found for book_id {book_id}")
+                    continue
+                    
+                # Find max page number
+                max_page_doc = list(db["book_pages"].find({"book_id": book_id}).sort("page_number", -1).limit(1))
+                total_pages = max_page_doc[0].get("page_number", 1) if max_page_doc else 1
+                
+                # Fetch distinct chapters/topics structure from pages if possible
+                chapters = []
+                pages = list(db["book_pages"].find({"book_id": book_id}, {"page_number": 1, "chapter_id": 1, "chapter_title": 1, "topic_id": 1, "topic_title": 1}))
+                
+                # Simple extraction of chapters
+                chap_map = {}
+                for p in pages:
+                    ch_id = p.get("chapter_id") or "ch_1"
+                    ch_title = p.get("chapter_title") or "Chapter 1"
+                    if ch_id not in chap_map:
+                        chap_map[ch_id] = {
+                            "id": ch_id,
+                            "title": ch_title,
+                            "title_ar": ch_title, # Fallback
+                            "page_start": p.get("page_number", 1),
+                            "page_end": p.get("page_number", 1),
+                            "concepts": [],
+                            "topics": []
+                        }
+                    else:
+                        chap_map[ch_id]["page_start"] = min(chap_map[ch_id]["page_start"], p.get("page_number", 1))
+                        chap_map[ch_id]["page_end"] = max(chap_map[ch_id]["page_end"], p.get("page_number", 1))
+                        
+                    topic_id = p.get("topic_id")
+                    topic_title = p.get("topic_title")
+                    if topic_id and topic_title:
+                        # Ensure uniqueness of topics
+                        if not any(t["id"] == topic_id for t in chap_map[ch_id]["topics"]):
+                            chap_map[ch_id]["topics"].append({
+                                "id": topic_id,
+                                "title": topic_title,
+                                "title_ar": topic_title,
+                                "page": p.get("page_number", 1)
+                            })
+                            
+                chapters = list(chap_map.values())
+                chapters.sort(key=lambda x: x["page_start"])
+                
+                # Reconstruct parent book
+                book_doc = {
+                    "_id": book_id,
+                    "title": rec.get("title", "Recovered Book"),
+                    "title_ar": rec.get("title_ar", rec.get("title", "Recovered Book")),
+                    "library_id": rec.get("library_id", "lib_moe"),
+                    "curriculum_id": rec.get("curriculum_id", "cur_moe_g10_t1_2026"),
+                    "subject_id": rec.get("subject_id", "subj_cur_moe_g10_t1_2026_python"),
+                    "role": rec.get("role", "core"),
+                    "visibility": rec.get("visibility", "public"),
+                    "status": "embedded",
+                    "totalPages": total_pages,
+                    "chapters": chapters,
+                    "grade": rec.get("grade", "Grade 10"),
+                    "term": rec.get("term", "Term 1"),
+                    "year": rec.get("year", "2026"),
+                    "language": rec.get("language", "ar"),
+                    "coverUrl": rec.get("coverUrl", f"/libs/covers/{book_id}.jpg"),
+                    "coverThumbUrl": rec.get("coverThumbUrl", f"/libs/covers/{book_id}_thumb.jpg"),
+                    "book_type": rec.get("role", "core")
+                }
+                
+                db["books"].replace_one({"_id": book_id}, book_doc, upsert=True)
+                rebuilt_count += 1
+                
+                # Track subject count rebuild
+                sub_id = book_doc["subject_id"]
+                subject_updates[sub_id] = subject_updates.get(sub_id, 0) + 1
+                
+            # Rebuild books_count on linked subject documents
+            for sub_id, count_add in subject_updates.items():
+                actual_count = db["books"].count_documents({"subject_id": sub_id})
+                db["subjects"].update_one({"_id": sub_id}, {"$set": {"books_count": actual_count}})
+                
+            client.close()
+            return {
+                "status": "success",
+                "message": f"Successfully rebuilt {rebuilt_count} parent book(s) and synchronized subject counts.",
+                "rebuilt_count": rebuilt_count,
+                "subject_updates": subject_updates
+            }
+        except Exception as err:
+            logger.error(f"[services.py] recover_r17_data failed: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
     @app.post("/admin/seed-db")
     async def custom_db_seed(request: fastapi.Request):
         try:
@@ -1286,19 +1454,26 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
             
+            # Guard Block: refuse sync if payload book count is less than current DB book count unless forced
+            if "books" in payload:
+                incoming_books = payload.get("books")
+                if isinstance(incoming_books, list):
+                    incoming_count = len(incoming_books)
+                    current_count = db["books"].count_documents({})
+                    
+                    force_query = request.query_params.get("force", "").lower() == "true"
+                    force_body = payload.get("force") in (True, "true", "True")
+                    if incoming_count < current_count and not (force_query or force_body):
+                        client.close()
+                        raise fastapi.HTTPException(
+                            status_code=400,
+                            detail=f"Refusing sync: payload book count ({incoming_count}) is less than current database book count ({current_count}). Pass ?force=true to override."
+                        )
+            
             summary = {}
             for col_name, documents in payload.items():
                 if not isinstance(documents, list):
                     continue
-                
-                if col_name in ["libraries", "curricula", "subjects", "books"]:
-                    payload_ids = []
-                    for doc in documents:
-                        if isinstance(doc, dict):
-                            d_id = doc.get("_id") or doc.get("id") or doc.get("userId")
-                            if d_id:
-                                payload_ids.append(d_id)
-                    db[col_name].delete_many({"_id": {"$nin": payload_ids}})
 
                 inserted_count = 0
                 for doc in documents:
@@ -1869,6 +2044,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to execute custom database tool: {err}", exc_info=True)
             return {"status": "error", "error": str(err)}
 
+    # (Deleted duplicate get_knowledge_endpoint here. The canonical implementation is defined further down.)
+
+
     @app.get("/user/books")
     async def get_books_endpoint(subject_id: str = None):
         try:
@@ -1888,6 +2066,173 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to get books: {err}", exc_info=True)
             return {"books": [], "error": str(err)}
+
+    @app.get("/user/knowledge")
+    async def get_knowledge_endpoint(request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            from bson import ObjectId
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            # Extract query params
+            params = dict(request.query_params)
+            library_id = params.get("library_id")
+            curriculum_id = params.get("curriculum_id")
+            subject_id = params.get("subject_id")
+            role = params.get("role")
+            language = params.get("language")
+            text_query = params.get("query") or params.get("search")
+            
+            # Extract scope filters
+            standard_keys = {"library_id", "curriculum_id", "subject_id", "role", "language", "query", "search", "locale"}
+            scope_filters = {k: v for k, v in params.items() if k not in standard_keys}
+            
+            def make_id_filter(val):
+                if not val:
+                    return None
+                filters = [val]
+                if isinstance(val, str) and len(val) == 24:
+                    try:
+                        filters.append(ObjectId(val))
+                    except Exception:
+                        pass
+                return {"$in": filters}
+
+            # 1. Fetch curricula
+            curricula_query = {}
+            if library_id:
+                curricula_query["library_id"] = make_id_filter(library_id)
+            
+            curricula = list(db["curricula"].find(curricula_query))
+            
+            # Filter curricula by scope
+            if scope_filters:
+                filtered_curricula = []
+                for c in curricula:
+                    scope = c.get("scope")
+                    if isinstance(scope, dict) and all(scope.get(k) == v for k, v in scope_filters.items()):
+                        filtered_curricula.append(c)
+                curricula = filtered_curricula
+            
+            valid_curriculum_ids = set()
+            for c in curricula:
+                if "_id" in c:
+                    valid_curriculum_ids.add(c["_id"])
+                    valid_curriculum_ids.add(str(c["_id"]))
+            
+            # 2. Fetch books
+            books_query = {}
+            if library_id:
+                books_query["library_id"] = make_id_filter(library_id)
+            if curriculum_id:
+                books_query["curriculum_id"] = make_id_filter(curriculum_id)
+            if subject_id:
+                books_query["subject_id"] = make_id_filter(subject_id)
+            if role:
+                books_query["role"] = role
+            if language:
+                books_query["language"] = language
+                
+            books = list(db["books"].find(books_query))
+            
+            from guardrails import verified_principal_ctx
+            principal = None
+            try:
+                principal = verified_principal_ctx.get()
+            except Exception:
+                pass
+            uid = principal.get("uid") if principal else None
+            
+            filtered_books = []
+            for book in books:
+                # Visibility check
+                is_owner = uid and book.get("owner_uid") == uid
+                is_public = book.get("visibility") == "public" or not book.get("visibility")
+                if not is_public and not is_owner:
+                    continue
+                    
+                # Curriculum check if filtered by library_id or scope_filters (when direct curriculum_id not provided)
+                if (library_id or scope_filters) and not curriculum_id:
+                    b_curriculum_id = book.get("curriculum_id")
+                    if not b_curriculum_id or (b_curriculum_id not in valid_curriculum_ids and str(b_curriculum_id) not in valid_curriculum_ids):
+                        continue
+                        
+                # Text query check
+                if text_query:
+                    q = text_query.lower()
+                    title_en = str(book.get("title") or "").lower()
+                    title_ar = str(book.get("title_ar") or "").lower()
+                    desc_en = str(book.get("description") or "").lower()
+                    desc_ar = str(book.get("description_ar") or "").lower()
+                    if (q not in title_en) and (q not in title_ar) and (q not in desc_en) and (q not in desc_ar):
+                        continue
+                        
+                filtered_books.append(book)
+            books = filtered_books
+            
+            # 3. Get active subjects based on filtered books
+            active_subject_ids = set()
+            for b in books:
+                s_id = b.get("subject_id")
+                if s_id:
+                    active_subject_ids.add(s_id)
+                    active_subject_ids.add(str(s_id))
+            
+            # Fetch subjects
+            subjects_query = {}
+            if subject_id:
+                subjects_query["_id"] = make_id_filter(subject_id)
+            elif curriculum_id:
+                subjects_query["curriculum_id"] = make_id_filter(curriculum_id)
+                
+            subjects = list(db["subjects"].find(subjects_query))
+            
+            # Post-filter subjects to only active ones unless curriculum_id is specified
+            if not subject_id and not curriculum_id:
+                subjects = [s for s in subjects if s.get("_id") in active_subject_ids or str(s.get("_id")) in active_subject_ids]
+                
+            # 4. Group books by subject
+            def sanitize(obj):
+                if isinstance(obj, dict):
+                    return {k: sanitize(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [sanitize(x) for x in obj]
+                elif type(obj).__name__ == "ObjectId":
+                    return str(obj)
+                else:
+                    return obj
+
+            subjects_with_books = []
+            for subject in subjects:
+                sub_id = subject.get("_id")
+                subject_books = [b for b in books if b.get("subject_id") == sub_id or str(b.get("subject_id")) == str(sub_id)]
+                
+                # Split into core and supporting
+                core_books = [b for b in subject_books if b.get("role") == "core" or not b.get("role")]
+                supporting_books = [b for b in subject_books if b.get("role") == "supporting"]
+                
+                subject_copy = sanitize(subject)
+                subject_copy["books"] = sanitize(subject_books)
+                subject_copy["core_books"] = sanitize(core_books)
+                subject_copy["supporting_books"] = sanitize(supporting_books)
+                subject_copy["books_count"] = len(subject_books)
+                
+                # Keep empty subjects only if specifically viewing a single curriculum
+                if len(subject_books) > 0 or curriculum_id:
+                    subjects_with_books.append(subject_copy)
+                    
+            return {
+                "success": True,
+                "subjects": subjects_with_books,
+                "total_books": len(books)
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed in user/knowledge: {err}", exc_info=True)
+            return {"success": False, "subjects": [], "total_books": 0, "error": str(err)}
 
     @app.get("/user/books/pages")
     async def get_book_pages_endpoint(book_id: str):
@@ -4213,6 +4558,574 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to verify recaptcha: {err}", exc_info=True)
             return {"success": False, "status": "error", "error": str(err), "score": 0.0}
+
+    @app.post("/admin/recover-orphans")
+    async def admin_recover_orphans(request: fastapi.Request):
+        try:
+            # Verify auth - require super-admin or admin
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ("super-admin", "admin"):
+                return fastapi.responses.JSONResponse(
+                    status_code=403,
+                    content={"success": False, "error": "Forbidden: Admin access required"}
+                )
+
+            data = await request.json()
+            dry_run = data.get("dry_run", True)
+            
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            # Find distinct book_ids in book_pages
+            page_book_ids = db.book_pages.distinct("book_id")
+            
+            # Find all existing book docs
+            books = list(db.books.find({}, {"_id": 1, "title": 1, "subject_id": 1, "curriculum_id": 1, "library_id": 1}))
+            existing_book_ids = {str(b["_id"]) for b in books}
+            
+            orphaned_ids = [bid for bid in page_book_ids if str(bid) not in existing_book_ids]
+            
+            orphans_info = []
+            for bid in orphaned_ids:
+                # Find page count
+                page_count = db.book_pages.count_documents({"book_id": bid})
+                # Find a sample page to inspect structure
+                sample_page = db.book_pages.find_one({"book_id": bid})
+                sample_info = {}
+                if sample_page:
+                    sample_info = {
+                        "_id": str(sample_page["_id"]),
+                        "page_number": sample_page.get("page_number"),
+                        "title": sample_page.get("title") or sample_page.get("metadata", {}).get("title"),
+                        "book_title": sample_page.get("book_title") or sample_page.get("metadata", {}).get("book_title"),
+                        "subject_id": sample_page.get("subject_id") or sample_page.get("metadata", {}).get("subject_id"),
+                        "curriculum_id": sample_page.get("curriculum_id") or sample_page.get("metadata", {}).get("curriculum_id"),
+                        "library_id": sample_page.get("library_id") or sample_page.get("metadata", {}).get("library_id"),
+                        "language": sample_page.get("language") or sample_page.get("metadata", {}).get("language"),
+                    }
+                
+                orphans_info.append({
+                    "book_id": str(bid),
+                    "page_count": page_count,
+                    "sample": sample_info
+                })
+                
+            if dry_run:
+                client.close()
+                return {
+                    "success": True,
+                    "mode": "dry_run",
+                    "existing_books": [dict(b, _id=str(b["_id"])) for b in books],
+                    "orphans": orphans_info
+                }
+                
+            # Perform recovery
+            recovered_books = []
+            for orphan in orphans_info:
+                bid = orphan["book_id"]
+                sample = orphan["sample"]
+                
+                # Determine title, fallback to something descriptive
+                title = sample.get("book_title") or sample.get("title") or f"Recovered Book {bid}"
+                language = sample.get("language") or "ar"
+                
+                # Try to map library, curriculum, subject from sample, or use canonical defaults
+                library_id = sample.get("library_id") or "lib_moe"
+                curriculum_id = sample.get("curriculum_id") or "curr_egypt_secondary2_term2"
+                subject_id = sample.get("subject_id") or "subj_egypt_secondary2_term2_history" # fallback
+                
+                # Let's count total pages
+                max_page_doc = db.book_pages.find_one({"book_id": bid}, sort=[("page_number", -1)])
+                total_pages = max_page_doc.get("page_number", orphan["page_count"]) if max_page_doc else orphan["page_count"]
+                
+                # Reconstruct chapters & topics from pages
+                # Find all pages sorted by page_number
+                pages_cursor = db.book_pages.find({"book_id": bid}, {"page_number": 1, "chapter_title": 1, "topic_title": 1}).sort("page_number", 1)
+                chapters_dict = {}
+                for p in pages_cursor:
+                    ch_title = p.get("chapter_title") or "General"
+                    tp_title = p.get("topic_title") or "Overview"
+                    if ch_title not in chapters_dict:
+                        chapters_dict[ch_title] = set()
+                    chapters_dict[ch_title].add(tp_title)
+                    
+                chapters_list = []
+                for ch_title, topics_set in chapters_dict.items():
+                    chapters_list.append({
+                        "title": ch_title,
+                        "topics": [{"title": t, "startPage": 1} for t in sorted(list(topics_set))]
+                    })
+                    
+                book_doc = {
+                    "_id": bid,
+                    "title": title,
+                    "title_ar": title if language == "ar" else "",
+                    "description": f"Recovered from book pages",
+                    "description_ar": "تم استرداد هذا الكتاب من الصفحات المخزنة" if language == "ar" else "",
+                    "language": language,
+                    "library_id": library_id,
+                    "curriculum_id": curriculum_id,
+                    "subject_id": subject_id,
+                    "role": "core",
+                    "visibility": "public",
+                    "status": "embedded",
+                    "totalPages": total_pages,
+                    "chapters": chapters_list,
+                    "coverUrl": f"/libs/moe.svg", # fallback
+                    "coverThumbUrl": f"/libs/moe.svg"
+                }
+                
+                db.books.replace_one({"_id": bid}, book_doc, upsert=True)
+                
+                # Let's make sure the subject exists and has correct count
+                if subject_id:
+                    subject_doc = db.subjects.find_one({"_id": subject_id})
+                    if not subject_doc:
+                        # Recreate subject Deterministically
+                        subject_doc = {
+                            "_id": subject_id,
+                            "curriculum_id": curriculum_id,
+                            "name": subject_id.split("_")[-1].capitalize(),
+                            "name_ar": "مادة مستردة",
+                            "slug": subject_id.split("_")[-1],
+                            "color": "#4F46E5",
+                            "emoji": "📚"
+                        }
+                        db.subjects.replace_one({"_id": subject_id}, subject_doc, upsert=True)
+                    
+                    # Update books count under this subject
+                    books_count = db.books.count_documents({"subject_id": subject_id})
+                    db.subjects.update_one({"_id": subject_id}, {"$set": {"books_count": books_count}})
+                    
+                recovered_books.append(book_doc)
+                
+            client.close()
+            return {
+                "success": True,
+                "mode": "recover",
+                "recovered_books_count": len(recovered_books),
+                "recovered_books": [dict(b, _id=str(b["_id"])) for b in recovered_books]
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Orphan recovery failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/user/translate/page")
+    async def user_translate_page(request: fastapi.Request):
+        try:
+            # Authenticate: require verified user
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(
+                    status_code=401,
+                    content={"success": False, "error": "Unauthorized: Authentication required"}
+                )
+                
+            body = await request.json()
+            book_id = body.get("bookId")
+            page_number = body.get("pageNumber")
+            target_language = body.get("targetLanguage")
+            
+            if not book_id or page_number is None or not target_language:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Missing required parameters"}
+                )
+                
+            supported_languages = ["en", "ar", "es", "fr", "de", "zh", "it"]
+            if target_language not in supported_languages:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": f"Unsupported language: {target_language}"}
+                )
+                
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            # Find page
+            page = db.book_pages.find_one({
+                "book_id": book_id,
+                "page_number": int(page_number)
+            })
+            
+            if not page:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    status_code=404,
+                    content={"success": False, "error": "Page not found"}
+                )
+                
+            # Initialize page i18n
+            i18n = page.get("i18n") or {}
+            
+            # Check if translation exists
+            has_existing = False
+            blocks = page.get("blocks") or []
+            if blocks and isinstance(blocks, list) and len(blocks) > 0:
+                block_ids = [b.get("id") for b in blocks if b.get("id")]
+                has_existing = all(str(bid) in i18n and target_language in i18n[str(bid)] for bid in block_ids)
+            else:
+                has_existing = target_language in i18n
+                
+            if has_existing:
+                client.close()
+                return {
+                    "success": True,
+                    "i18n": i18n
+                }
+                
+            # Gemini translation is needed
+            gemini_api_key = os.environ.get("GEMINI_API_KEY")
+            if not gemini_api_key:
+                try:
+                    from tools import get_gemini_api_key
+                    gemini_api_key = get_gemini_api_key()
+                except Exception:
+                    pass
+            
+            # Call Google GenAI
+            from google import genai
+            from google.genai import types
+            import re
+            
+            if gemini_api_key:
+                genai_client = genai.Client(api_key=gemini_api_key)
+            else:
+                genai_client = genai.Client()
+                
+            model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+            
+            target_language_names = {
+                "en": "English",
+                "ar": "Arabic",
+                "es": "Spanish",
+                "fr": "French",
+                "de": "German",
+                "zh": "Chinese (Simplified)",
+                "it": "Italian"
+            }
+            target_language_name = target_language_names.get(target_language, target_language)
+            
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            
+            if blocks and isinstance(blocks, list) and len(blocks) > 0:
+                # Structured block translation
+                blocks_to_translate = []
+                for b in blocks:
+                    fields = {}
+                    for field in ["text", "term", "caption", "label", "title", "prompt", "answer"]:
+                        if b.get(field):
+                            fields[field] = b.get(field)
+                    if b.get("options") and isinstance(b["options"], list):
+                        fields["options"] = b["options"]
+                    if b.get("items") and isinstance(b["items"], list):
+                        fields["items"] = b["items"]
+                    if fields:
+                        blocks_to_translate.append({"id": b.get("id"), "fields": fields})
+                        
+                if not blocks_to_translate:
+                    client.close()
+                    return {"success": True, "i18n": i18n}
+                    
+                prompt = (
+                    f"You are the elite 'Fahem Translation Agent' specialized in preserving layout and pedagogical flow.\n"
+                    f"Your task is to translate academic textbook blocks into {target_language_name}.\n\n"
+                    f"MANDATORY RULES:\n"
+                    f"1. Translate all academic text, titles, descriptions, and educational materials beautifully and naturally into {target_language_name}.\n"
+                    f"2. Keep technical variables, identifier names, programming variables (e.g., x, y, score, value), and actual code snippets in English as-is. Do NOT translate or transcribe them to the target language.\n"
+                    f"3. Keep all formatting tags, HTML entities, and Markdown syntax (such as bolding **, headers #, etc.) in their EXACT relative layout placement.\n"
+                    f"4. If there are equations, formulas, or numbers being evaluated, leave them exactly in their original notation.\n"
+                    f"5. You must return your translations in a strict JSON format mapping each block's ID to its translated fields object.\n"
+                    f"6. Preserve the exact keys of the fields (e.g., 'text', 'term', 'caption', 'label', 'title', 'prompt', 'options', 'items').\n"
+                    f"7. For array fields like 'options' and 'items', return a translated array of the exact same length.\n"
+                    f"8. Output ONLY the raw JSON object, without any markdown code fences, headers, or explanations. Start with '{{' and end with '}}'."
+                )
+                
+                Translation = None
+                try:
+                    from ingestion_v2.schema import Translation
+                except ImportError:
+                    try:
+                        from agents.ingestion_v2.schema import Translation
+                    except ImportError:
+                        pass
+                
+                if Translation:
+                    resp = genai_client.models.generate_content(
+                        model=model_name,
+                        contents=[prompt, f"Here are the textbook blocks to translate:\n\n{json.dumps(blocks_to_translate, ensure_ascii=False)}"],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=Translation,
+                            temperature=0.1,
+                            top_p=0.95
+                        )
+                    )
+                    parsed_translations = json.loads(resp.text)
+                    for tb in parsed_translations.get("blocks", []):
+                        block_id = tb.get("id")
+                        if block_id:
+                            if block_id not in i18n:
+                                i18n[block_id] = {}
+                            fields = {k: v for k, v in tb.items() if k != "id" and v is not None}
+                            i18n[block_id][target_language] = fields
+                else:
+                    resp = genai_client.models.generate_content(
+                        model=model_name,
+                        contents=[prompt, f"Here are the textbook blocks to translate:\n\n{json.dumps(blocks_to_translate, ensure_ascii=False)}"],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.1,
+                            top_p=0.95
+                        )
+                    )
+                    responseText = resp.text or ""
+                    cleanJsonText = responseText.strip()
+                    if cleanJsonText.startswith("```"):
+                        cleanJsonText = re.sub(r'^```(?:json)?\s*', '', cleanJsonText)
+                        cleanJsonText = re.sub(r'\s*```$', '', cleanJsonText)
+                    parsed_translations = json.loads(cleanJsonText)
+                    for block_id, fields in parsed_translations.items():
+                        if block_id not in i18n:
+                            i18n[block_id] = {}
+                        i18n[block_id][target_language] = fields
+                        
+                if resp.usage_metadata:
+                    prompt_tokens = resp.usage_metadata.prompt_token_count
+                    completion_tokens = resp.usage_metadata.candidates_token_count
+                    total_tokens = resp.usage_metadata.total_token_count
+                    
+            else:
+                original_text = page.get("content") or page.get("contentEn") or page.get("contentAr") or ""
+                if not original_text.strip():
+                    client.close()
+                    return {"success": True, "i18n": i18n}
+                    
+                prompt = (
+                    f"You are the elite 'Fahem Translation Agent' specialized in preserving layout and pedagogical flow.\n"
+                    f"Your task is to translate academic textbook page content into the target language while maintaining maximum accuracy, pedagogical clarity, and absolute layout structure.\n\n"
+                    f"Target Language: {target_language_name}\n\n"
+                    f"MANDATORY RULES:\n"
+                    f"1. Translate all academic text, titles, descriptions, and educational materials beautifully and naturally.\n"
+                    f"2. Keep technical variables, identifier names, programming variables (e.g., x, y, score, value), and actual code snippets in English as-is. Do NOT translate them or transcribe them to the target language.\n"
+                    f"3. Keep all formatting tags, HTML entities, and Markdown syntax (such as bolding **, headers #, ##, ###, bullet points -, *, •, numbered lists, code blocks ```, blockquotes, and tables) in their EXACT relative layout placement. The document structure must be completely preserved.\n"
+                    f"4. If there are equations, formulas, or numbers being evaluated, leave them exactly in their original notation.\n"
+                    f"5. Do NOT output any intro, outro, conversational notes, or wrapping JSON markdown codeblocks. Output ONLY the raw translated text."
+                )
+                
+                resp = genai_client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt, f"Here is the academic textbook page content to translate:\n\n{original_text}"],
+                    config=types.GenerateContentConfig(
+                        temperature=0.1,
+                        top_p=0.95
+                    )
+                )
+                responseText = resp.text or ""
+                i18n[target_language] = responseText.strip()
+                
+                if resp.usage_metadata:
+                    prompt_tokens = resp.usage_metadata.prompt_token_count
+                    completion_tokens = resp.usage_metadata.candidates_token_count
+                    total_tokens = resp.usage_metadata.total_token_count
+            
+            # Save updated page i18n
+            db.book_pages.update_one({"_id": page["_id"]}, {"$set": {"i18n": i18n}})
+            client.close()
+            
+            # Log Token Usage Telemetry inside python backend directly!
+            if total_tokens > 0:
+                try:
+                    import datetime
+                    db_local = MongoClient(uri).get_database(getDbTarget())
+                    usage_doc = {
+                        "userId": principal.get("uid"),
+                        "userEmail": principal.get("email") or "anonymous@fahem.ai",
+                        "promptTokens": int(prompt_tokens),
+                        "completionTokens": int(completion_tokens),
+                        "totalTokens": int(total_tokens),
+                        "model": model_name,
+                        "type": "academic_translation",
+                        "context": {
+                            "book_id": book_id,
+                            "page": int(page_number),
+                            "feature": "translate"
+                        },
+                        "createdAt": datetime.datetime.utcnow()
+                    }
+                    db_local.user_token_usage.insert_one(usage_doc)
+                except Exception as usage_err:
+                    logger.warning(f"Failed to log backend translation token usage: {usage_err}")
+            
+            return {
+                "success": True,
+                "i18n": i18n
+            }
+            
+        except Exception as err:
+            logger.error(f"[services.py] Page translation endpoint failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/user/audio/tts")
+    async def user_audio_tts(request: fastapi.Request):
+        try:
+            # Authenticate: require verified user
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(
+                    status_code=401,
+                    content={"success": False, "error": "Unauthorized: Authentication required"}
+                )
+                
+            body = await request.json()
+            text = body.get("text")
+            language = body.get("language")
+            voice = body.get("voice")
+            book_id = body.get("bookId")
+            page_number = body.get("pageNumber")
+            
+            if not text:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Text is required"}
+                )
+                
+            import re
+            # Clean text to remove graphic emojis and textual emoticons
+            clean_text = re.sub(r'[\u2600-\u27BF]|[\u1F300-\u1F6FF]|[\u1F900-\u1F9FF]', '', text)
+            clean_text = re.sub(r'[:;=B8x][-~\']?[)D\]pP(|\\\/O*D@$]', '', clean_text)
+            clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+            
+            if not clean_text:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Text contains no readable speech after stripping emoticons"}
+                )
+                
+            gemini_api_key = os.environ.get("GEMINI_API_KEY")
+            if not gemini_api_key:
+                try:
+                    from tools import get_gemini_api_key
+                    gemini_api_key = get_gemini_api_key()
+                except Exception:
+                    pass
+                    
+            if not gemini_api_key:
+                return fastapi.responses.JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "Gemini API key is not configured"}
+                )
+                
+            model_name = "gemini-2.5-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
+            
+            selected_voice = voice or "Aoede"
+            prompt_text = f"Please read the following text exactly as written, word-for-word, in its original language, with absolutely no greetings, prefaces, answers, or commentary:\n\n{clean_text}"
+            
+            is_arabic = language == "ar" or any(ord(c) >= 0x0600 and ord(c) <= 0x06FF for c in clean_text)
+            if is_arabic:
+                prompt_text = f"Please read the following Arabic text exactly as written, word-for-word, with absolutely no greetings, prefaces, answers, or commentary. You must read it strictly using the authentic Egyptian Arabic dialect (اللهجة المصرية) pronunciation, rhythm, accent, and tone. Do not use Modern Standard Arabic (Fusha) pronunciation — speak completely in a natural Egyptian dialect (اللهجة العامية المصرية):\n\n{clean_text}"
+                
+            import requests
+            payload = {
+                "contents": [{"parts": [{"text": prompt_text}]}],
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {
+                        "voiceConfig": {
+                            "prebuiltVoiceConfig": {
+                                "voiceName": selected_voice
+                            }
+                        }
+                    }
+                }
+            }
+            
+            resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+            if resp.status_code != 200:
+                return fastapi.responses.JSONResponse(
+                    status_code=resp.status_code,
+                    content={"success": False, "error": f"Gemini TTS API error: {resp.status_code} - {resp.text}"}
+                )
+                
+            res_json = resp.json()
+            inline_data = None
+            try:
+                inline_data = res_json["candidates"][0]["content"]["parts"][0]["inlineData"]
+            except (KeyError, IndexError):
+                pass
+                
+            if not inline_data or "data" not in inline_data:
+                return fastapi.responses.JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "No audio content returned from Gemini TTS model"}
+                )
+                
+            # Log Token Usage Telemetry
+            try:
+                usage = res_json.get("usageMetadata", {})
+                prompt_tokens = usage.get("promptTokenCount", 0)
+                completion_tokens = usage.get("candidatesTokenCount", 0)
+                total_tokens = usage.get("totalTokenCount", 0)
+                
+                if total_tokens > 0:
+                    import datetime
+                    from pymongo import MongoClient
+                    from tools import get_mongodb_uri
+                    db_local = MongoClient(get_mongodb_uri()).get_database(getDbTarget())
+                    usage_doc = {
+                        "userId": principal.get("uid"),
+                        "userEmail": principal.get("email") or "anonymous@fahem.ai",
+                        "promptTokens": int(prompt_tokens),
+                        "completionTokens": int(completion_tokens),
+                        "totalTokens": int(total_tokens),
+                        "model": model_name,
+                        "type": "audio_text_to_speech",
+                        "createdAt": datetime.datetime.utcnow()
+                    }
+                    if book_id and page_number is not None:
+                        usage_doc["context"] = {
+                            "book_id": book_id,
+                            "page": int(page_number),
+                            "feature": "audio"
+                        }
+                    db_local.user_token_usage.insert_one(usage_doc)
+            except Exception as usage_err:
+                logger.warning(f"Failed to log backend TTS token usage: {usage_err}")
+                
+            # Try to determine sample rate
+            sample_rate = 24000
+            mime = inline_data.get("mimeType", "")
+            rate_match = re.search(r'rate=(\d+)', mime)
+            if rate_match:
+                sample_rate = int(rate_match.group(1))
+                
+            return {
+                "success": True,
+                "audio_base64": inline_data["data"],
+                "sample_rate": sample_rate,
+                "voice": selected_voice
+            }
+        except Exception as err:
+            logger.error(f"[services.py] TTS endpoint failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
 
     logger.info("Mounted custom database, logging, activity, session, token, and recaptcha routes onto FastAPI application.")
 

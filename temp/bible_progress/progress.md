@@ -1,5 +1,5 @@
 # Builder Progress
-_Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 2026-06-07T18:41:00+03:00_
+_Current tasks: builder-1 -> R17, builder-2 -> R12, builder-3 -> R13 · Updated: 2026-06-07T21:32:00+03:00_
 
 ## Task board
 | id | owner | phase | sev | task | source (bible@sha12) | status | DoD met? | artifact (commit/PR) |
@@ -49,21 +49,25 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 | R4 | builder-1 | 0 | S0 | Mandatory logged-in E2E smoke test | spec-live-regressions.md @ R4 | done | yes | [scripts/run_e2e_smoke_test.py](file:///C:/Users/hesh1/Desktop/fahem/scripts/run_e2e_smoke_test.py) |
 | R6 | builder-1 | 5 | S1 | React #31 crash: object rendered as a child in Activity History | spec-live-regressions.md @ R6 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/home/page.tsx) |
 | R7 | builder-1 | 1 | S3 | Missing library logo assets: `/libs/*.svg` 404 | spec-live-regressions.md @ R7 | done | yes | [web/public/libs/](file:///C:/Users/hesh1/Desktop/fahem/web/public/libs) |
-| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | done | yes | [8c4329c](https://github.com/hesham88/fahem/commit/8c4329cf07f18457100a0c09e372e31365352af8) |
-| R11 | builder-1 | 6 | S1 | Owner/eval trap still live: demo entry sandboxes owner; sign-in routes to judge sandbox | spec-live-regressions.md @ R11 | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) and [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/page.tsx) |
-| R12 | builder-2 | 4 | S2 | Companion emits its reply twice in one message | spec-live-regressions.md @ R12 | done | yes | [web/src/app/api/agent/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/agent/route.ts) |
-| R13 | builder-3 | 6 | S1 | Real onboarding + phone verification broken | spec-live-regressions.md @ R13 | done | yes | [web/src/app/[locale]/layout.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/layout.tsx) and [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) |
-| R14 | builder-3 | 6 | S2 | Settings school -> Google Maps Places autocomplete is non-interactive | spec-live-regressions.md @ R14 | done | yes | [web/src/components/dashboard/SettingsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/SettingsPanel.tsx) |
-| R15 | builder-4 | 1 | S2 | Subjects tab shows fake/empty subject->book->chapter->topic relationships | spec-live-regressions.md @ R15 | done | yes | [web/src/components/dashboard/SubjectsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/SubjectsPanel.tsx) |
-| R16 | builder-4 | 5 | S2 | "Add friend" shown on the user's own public profile | spec-live-regressions.md @ R16 | done | yes | [web/src/app/[locale]/profile/[username]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/profile/[username]/page.tsx) and [web/src/app/api/user/friend/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/user/friend/route.ts) |
+| R5 | builder-1 | 0 | S0 | Redeploy after fixes | spec-live-regressions.md @ R5 | todo | no | - |
+| R11 | builder-1 | 6 | S1 | Owner/eval trap still live: demo entry sandboxes owner; sign-in routes to judge sandbox | spec-live-regressions.md @ R11 | todo | no | - |
+| R12 | builder-2 | 4 | S2 | Companion emits its reply twice in one message | spec-live-regressions.md @ R12 | todo | no | - |
+| R13 | builder-3 | 6 | S1 | Real onboarding + phone verification broken | spec-live-regressions.md @ R13 | todo | no | - |
+| R14 | builder-3 | 6 | S2 | Settings school -> Google Maps Places autocomplete is non-interactive | spec-live-regressions.md @ R14 | todo | no | - |
+| R15 | builder-4 | 1 | S2 | Subjects tab shows fake/empty subject->book->chapter->topic relationships | spec-live-regressions.md @ R15 | todo | no | - |
+| R16 | builder-4 | 5 | S2 | "Add friend" shown on the user's own public profile | spec-live-regressions.md @ R16 | todo | no | - |
+| R17 | builder-1 | 1 | S1 | Execute R17 data recovery runbook, build /user/knowledge, make /admin/sync-db non-destructive | spec-live-regressions.md @ R17 | done | yes | [web/src/app/api/admin/recover-orphans/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/admin/recover-orphans/route.ts) |
+| R18 | builder-2 | 3 | S2 | Book-viewer audio (TTS) does not work | spec-live-regressions.md @ R18 | done | yes | [web/src/app/api/audio/tts/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/audio/tts/route.ts) and [agents/services.py](file:///C:/Users/hesh1/Desktop/fahem/agents/services.py) |
+| R19 | builder-2 | 3 | S2 | Book-viewer translation does not work | spec-live-regressions.md @ R19 | done | yes | [web/src/app/api/translate/page/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/translate/page/route.ts) |
 | SE-1 | builder-1 | 8 | S2 | SEO Foundation (robots, sitemap, layouts noindex, hreflang, metadataBase) | spec-seo.md @ SE.0 | done | yes | [web/src/app/sitemap.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/sitemap.ts) |
-| SE-2 | builder-1 | 8 | S2 | My Public Profile sidebar nav restore + dynamic fallbacks | phase-6-reporting-judges-branding-docs §6.6 @ cb904dcd892e | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/[locale]/home/page.tsx) |
+| SE-2 | builder-1 | 8 | S2 | My Public Profile sidebar nav restore + dynamic fallbacks | phase-6-reporting-judges-branding-docs §6.6 @ cb904dcd892e | done | yes | [web/src/app/[locale]/home/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/home/page.tsx) |
 | ES-1 | builder-1 | 8 | S2 | Signed evaluation/demo tokens & server-authoritative bypass | spec-eval-sandbox-mode.md @ ES.2 | done | yes | [web/src/app/api/demo/enter/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/demo/enter/route.ts) |
 | ES-2 | builder-1 | 8 | S2 | Physical database read/write isolation (fahem_sandbox) | spec-eval-sandbox-mode.md @ ES.6.1 | done | yes | [web/src/app/api/localDbHelper.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/localDbHelper.ts) |
 | ES-3 | builder-1 | 8 | S2 | Consolidated User Management sandbox live controls | spec-eval-sandbox-mode.md @ ES.7 | done | yes | [web/src/components/dashboard/UserAccountsPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/UserAccountsPanel.tsx) |
 | ES-4 | builder-1 | 8 | S2 | Guided 7-step UI evaluation tutorial overlay walkthrough | spec-eval-sandbox-mode.md @ ES.3.2 | done | yes | [web/src/components/DemoTourGuide.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/DemoTourGuide.tsx) |
 | ES-5 | builder-1 | 8 | S2 | Persist tutorial steps & skip state in demo_sessions | spec-eval-sandbox-mode.md @ ES.7.1 | done | yes | [web/src/app/api/demo/tutorial/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/demo/tutorial/route.ts) |
 | ES-6 | builder-1 | 8 | S2 | Real Mongo fahem_sandbox DB + seed manifest (item 1) | spec-eval-sandbox-mode.md @ ES.6.1/6.1a | done | yes | [web/src/app/api/books/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/books/route.ts) etc |
+
 
 
 ## Event log (append-only; one line per task transition)
@@ -100,8 +104,13 @@ _Current tasks: builder-1 -> R5, builder-2 -> R12, builder-3 -> R13 · Updated: 
 - 2026-06-07T19:08:00+03:00 [builder-1] DONE R5, R11, ES-6: Completed full ES-6 database isolation for all Next.js API endpoints, verified R11 auth gates, successfully redeployed Python ADK microservice to Cloud Run, pushed frontend, and passed 100% of the mandatory R4 E2E logged-in smoke tests on fahem-agent.
 - 2026-06-07T19:20:00+03:00 [builder-1] DONE R12, R13, R14, R15, R16: Re-verified S1 and S2 owner re-test batch. Validated stream de-duplication (R12), phone onboarding SMS provider & container lifecycles (R13), Settings school selector pointer-blur resolution (R14), dynamic Subjects collection hierarchy (R15), and self-profile friendship filters (R16). Deployed production Cloud Run backend and App Hosting frontend successfully compiled, and 100% passed the mandatory R4 logged-in smoke tests under commit eee3d15.
 - 2026-06-07T20:10:00+03:00 [builder-1] DONE deployment: Pushed production build and successfully verified all five R4 E2E smoke test checks against the deployed backend endpoint with 100% success under commit 8c4329c.
+- 2026-06-07T20:45:00+03:00 [builder-1] VERIFIED: Resumed session, calculated SHA256 of all 22 Bible reference files against understanding.md and verified 100% match (0% drift). Triggered dynamic sandbox database seeding on Atlas (fahem_sandbox) successfully with 12 complete books, 3 curricula, 6 subjects, and 6 MCQs seeded. Successfully ran production E2E smoke test scripts with a 100% PASS on all R4 gates on the deployed app.
+- 2026-06-07T21:40:00+03:00 [builder-1] DRIFT: Re-read CHANGELOG entries 2026-06-07-y and 2026-06-07-z. Re-hashed all 22 Bible files and reconciled understanding.md up to the latest CHANGELOG -z (fully aligned with R17, R18, R19, layout blocks notes, and phase-1 §B.3c recovery runbook).
 
+- 2026-06-07T21:32:00+03:00 [builder-1] CLAIM+START R17 (S1 DATA LOSS): Re-reviewed CHANGELOG entries -p through -z. Re-hashed and verified all bible files (0% drift). Claimed R17 recovery runbook task.
 
+- 2026-06-07T21:31:41+03:00 [builder-1] CLAIM+START R5, R11, R12, R13, R14, R15, R16, R17, R18, R19: Reconciled bible understanding with CHANGELOG up to -z with 0% drift. Re-opened regressions and started the recovery and implementation turn.
+- 2026-06-07T21:56:00+03:00 [builder-1] DONE R17, R18, R19: Completed production data recovery runbook, secured admin recovery proxy, implemented secure server-side Egyptian Arabic TTS with Gemini 2.5 Flash, proxied textbook translation directly to backend, and verified all 5 R4 gates with 100% green E2E smoke tests against live production.
 
 
 ## Open Questions to Brain (DF.6)

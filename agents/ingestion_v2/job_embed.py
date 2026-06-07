@@ -24,7 +24,7 @@ from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     get_gemini_config, get_gemini_embedding_v2,
     is_mongodb_enabled, get_mongodb_uri, LOCAL_DB_PATH, atomic_write_json,
-    make_progress_bar, EMBED_MODEL, EMBED_DIM
+    make_progress_bar, EMBED_MODEL, EMBED_DIM, get_active_db
 )
 
 db_write_lock = threading.Lock()
@@ -55,7 +55,7 @@ def load_translated_pages(book_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri())
-            db = client["fahem"]
+            db = get_active_db(client)
             pages = list(db["book_pages"].find({"book_id": book_id}))
             client.close()
         except Exception:
@@ -80,7 +80,7 @@ def clean_draft_chunks(book_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri())
-            db = client["fahem"]
+            db = get_active_db(client)
             db["ingestion_chunks_draft"].delete_many({"book_id": book_id})
             client.close()
         except Exception:
@@ -108,7 +108,7 @@ def finalize_subject_link(subject_id, is_local):
         try:
             from pymongo import MongoClient
             client = MongoClient(get_mongodb_uri())
-            db = client["fahem"]
+            db = get_active_db(client)
             count = db["books"].count_documents({"subject_id": subject_id})
             db["subjects"].update_one(
                 {"_id": subject_id},

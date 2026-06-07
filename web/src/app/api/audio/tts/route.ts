@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
-
 import { requireUser } from "../../_auth";
+import { isLocalEnv } from "../../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -66,13 +66,40 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Text contains no readable speech after stripping emoticons" }), { status: 400 });
     }
 
+    if (!isLocalEnv()) {
+      const backendRes = await proxyRequest("/user/audio/tts", "POST", { text, language, voice, bookId, pageNumber }, ctx);
+      if (backendRes.status !== 200) {
+        return backendRes;
+      }
+      const backendJson = await backendRes.json();
+      if (!backendJson.success) {
+        return new Response(JSON.stringify({ error: backendJson.error || "Failed to generate TTS from backend" }), { status: 500 });
+      }
+      
+      const rawPcmB64 = backendJson.audio_base64;
+      const pcmBuffer = Buffer.from(rawPcmB64, "base64");
+      const sampleRate = backendJson.sample_rate || 24000;
+      
+      const wavBuffer = pcmToWav(pcmBuffer, sampleRate, 1, 16);
+      const wavB64 = wavBuffer.toString("base64");
+      
+      return new Response(JSON.stringify({
+        success: true,
+        audioContent: wavB64,
+        mimeType: "audio/wav"
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), { status: 500 });
     }
 
-    // Use latest gemini-3.1-flash-tts-preview for natural voice and high performance
-    const modelName = "gemini-3.1-flash-tts-preview";
+    // Use latest gemini-2.5-flash for natural voice and high performance
+    const modelName = "gemini-2.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
     // Select standard voice name if not provided
