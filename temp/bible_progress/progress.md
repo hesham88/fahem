@@ -32,7 +32,7 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 | P5-2 | (unclaimed) | 5 | New Insights & Gamification tab | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
 | P5-3 | (unclaimed) | 5 | Social groups, threads & discussions panel fix | phase-5-academic-integration §5.2 @ 9c120cc4cc28 | blocked(Phase-4) | — | — |
 | P5-4 | builder-1 | 5 | Notification system model, fan-out & bell badge | spec-notification-system @ f076e33d39a6 | done | yes | [web/src/components/NotificationBell.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/NotificationBell.tsx) etc |
-| P5-5 | (unclaimed) | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | todo | — | — |
+| P5-5 | builder-1 | 5 | Group assignments timed flow & messaging activity-lock | spec-group-assignments @ d5fef0464f84 | done | yes | [web/src/components/dashboard/SocialPanel.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/dashboard/SocialPanel.tsx) etc |
 | P6-1 | builder-3 | 6 | Unified feedback/chat reports with daily limits | phase-6-reporting-judges-branding-docs §6.1 @ 1c43b2dd9fdc | done | yes | [web/src/app/api/feedback/route.ts](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/api/feedback/route.ts) |
 | P6-2 | builder-3 | 6 | Admin report triager & per-user token override UI | phase-6-reporting-judges-branding-docs §6.2 @ 1c43b2dd9fdc | done | yes | [web/src/components/AdminSecurityDashboard.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/components/AdminSecurityDashboard.tsx) |
 | P6-3 | builder-3 | 6 | Judge domain whitelist & switchable sandbox personas | phase-6-reporting-judges-branding-docs §6.3 @ 1c43b2dd9fdc | done | yes | [web/src/app/[locale]/page.tsx](file:///C:/Users/hesh1/Desktop/fahem/web/src/app/%5Blocale%5D/page.tsx) |
@@ -60,6 +60,8 @@ _Current tasks: builder-2 -> P4-1..P4-4 · Updated: 2026-06-07T06:45:00+03:00_
 - 2026-06-07T06:46:00+03:00 [builder-1] DONE P3-1, P3-2, P3-3, P3-4: Resolved redeclared variables, missing properties, possibly null selectedBookReader, and untyped parameters in LibraryPanel.tsx. Verified zero compilation errors and verified that Next.js production build compiles with 100% success.
 - 2026-06-07T06:49:00+03:00 [builder-1] CLAIM+START P5-4: Notification system model, fan-out & bell badge. Unblocked P7-3 since Phase 3 is completed.
 - 2026-06-07T06:56:00+03:00 [builder-1] DONE P5-4: Completed full Notification System implementation (backend model, helpers, endpoints, i18n, responsive notification bell dropdown/center component with interactive deep-linking and state polling). Unblocked task P5-5.
+- 2026-06-07T07:15:00+03:00 [builder-1] DONE P5-5: Fully integrated Group Assignments, including teacher-authored timed assignments, multi-type question answer sheet, camera OCR question generator, single-attempt answers, program/critique grading, and fail-closed activity locks (companion & messaging locked during active assignments and solo practice sessions).
+
 
 ## Open Questions to Brain (DF.6)
 - 2026-06-07T04:12:00+03:00 Q: Please review and confirm the proposed resolutions for Open Decisions D1 through D10 in part-5-open-decisions.md (recommended: Option A for D1, D2, D3, D4, D5, D7, D8, D9, D10; Teacher persona for D6).
