@@ -430,8 +430,8 @@ def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
                         from mongodb_engine import MongoDBEngine
                         db_engine = MongoDBEngine()
                         if db_engine._db is not None:
-                            cursor = db_engine._db["books"].find({"_id": {"$in": book_ids}}, {"title": 1, "title_ar": 1})
-                            for doc in cursor:
+                            cur = db_engine._db["books"].find({"_id": {"$in": book_ids}}, {"title": 1, "title_ar": 1})
+                            for doc in cur:
                                 title = doc.get("title") or doc.get("title_ar")
                                 if title:
                                     book_titles.append(title)

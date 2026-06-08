@@ -210,9 +210,9 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     }
                 ]
                 
-                cursor = mdb["book_pages"].aggregate(pipeline)
+                cur = mdb["book_pages"].aggregate(pipeline)
                 results = []
-                for doc in cursor:
+                for doc in cur:
                     results.append({
                         "text": doc.get("text") or "",
                         "book_id": doc.get("book_id"),
