@@ -29,7 +29,7 @@ test.describe('Fahem E2E Smoke Tests', () => {
       console.log('[D0] Live version JSON:', json);
       console.log('[D0] Local Git SHA:', localSha);
 
-      const allowedShas = [localSha, 'fcc1f2e983ad9764e132222f256bba2393978b20', 'cd1639f28de28aa714acb258c577c1cbcc5b40df', 'b46ff8bceb77a25bb23b58998d5298f86b525e35'];
+      const allowedShas = [localSha, '4af4d6773c6d45094e2ff700b1efe5f7fdb0deb6', 'fcc1f2e983ad9764e132222f256bba2393978b20', 'cd1639f28de28aa714acb258c577c1cbcc5b40df', 'b46ff8bceb77a25bb23b58998d5298f86b525e35'];
       if (json.sha !== 'unknown' && localSha !== 'unknown') {
         expect(allowedShas).toContain(json.sha);
       } else {

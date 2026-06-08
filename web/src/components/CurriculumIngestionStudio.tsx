@@ -240,6 +240,234 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
+export interface TreeNode {
+  key: string;
+  name: string;
+  type: "directory" | "file";
+  children?: TreeNode[];
+  bookId?: string;
+  url?: string;
+}
+
+export function getAllBookIds(node: TreeNode): string[] {
+  if (node.type === "file") {
+    return node.bookId ? [node.bookId] : [];
+  }
+  const ids: string[] = [];
+  if (node.children) {
+    node.children.forEach(child => {
+      ids.push(...getAllBookIds(child));
+    });
+  }
+  return ids;
+}
+
+export function buildDirectoryTree(books: any[]): TreeNode[] {
+  const rootNodes: TreeNode[] = [];
+
+  books.forEach(book => {
+    let urlStr = book.url || "";
+    let hostname = "";
+    let paths: string[] = [];
+
+    try {
+      if (urlStr) {
+        if (!/^https?:\/\//i.test(urlStr)) {
+          urlStr = "https://" + urlStr;
+        }
+        const parsedUrl = new URL(urlStr);
+        hostname = parsedUrl.hostname;
+        paths = parsedUrl.pathname.split("/").filter(Boolean);
+      }
+    } catch (e) {
+      hostname = "unknown-source";
+      paths = [urlStr.replace(/[^a-zA-Z0-9]/g, "_")].filter(Boolean);
+    }
+
+    if (!hostname) {
+      hostname = "unknown-source";
+    }
+
+    let currentChildren = rootNodes;
+    let currentPathKey = "dir:" + hostname;
+
+    let hostnameNode = currentChildren.find(n => n.name === hostname && n.type === "directory");
+    if (!hostnameNode) {
+      hostnameNode = {
+        key: currentPathKey,
+        name: hostname,
+        type: "directory",
+        children: []
+      };
+      currentChildren.push(hostnameNode);
+    }
+    currentChildren = hostnameNode.children!;
+
+    for (let i = 0; i < paths.length; i++) {
+      const part = paths[i];
+      currentPathKey += "/" + part;
+      let node = currentChildren.find(n => n.name === part && n.type === "directory");
+      if (!node) {
+        node = {
+          key: currentPathKey,
+          name: part,
+          type: "directory",
+          children: []
+        };
+        currentChildren.push(node);
+      }
+      currentChildren = node.children!;
+    }
+
+    currentChildren.push({
+      key: book.id,
+      name: book.title,
+      type: "file",
+      bookId: book.id,
+      url: book.url
+    });
+  });
+
+  return rootNodes;
+}
+
+export interface DirectoryNodeProps {
+  node: TreeNode;
+  selectedDiscovered: Record<string, boolean>;
+  crawlExpandedNodes: Record<string, boolean>;
+  onToggleNode: (node: TreeNode, checked: boolean) => void;
+  onToggleExpand: (key: string) => void;
+  isAr: boolean;
+}
+
+export function DirectoryNode({
+  node,
+  selectedDiscovered,
+  crawlExpandedNodes,
+  onToggleNode,
+  onToggleExpand,
+  isAr
+}: DirectoryNodeProps) {
+  const isExpanded = !!crawlExpandedNodes[node.key];
+  const isDir = node.type === "directory";
+
+  const childIds = getAllBookIds(node);
+  const checkedCount = childIds.filter(id => !!selectedDiscovered[id]).length;
+  const isChecked = checkedCount === childIds.length && childIds.length > 0;
+  const isIndeterminate = checkedCount > 0 && checkedCount < childIds.length;
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onToggleNode(node, e.target.checked);
+  };
+
+  return (
+    <div className="directory-branch" style={{ paddingLeft: isAr ? 0 : "4px", paddingRight: isAr ? "4px" : 0 }}>
+      <div 
+        className="tree-row-folder" 
+        style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "space-between",
+          padding: "0.25rem 0.5rem",
+          minHeight: "32px"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0, flex: 1 }}>
+          {isDir ? (
+            <button
+              type="button"
+              onClick={() => onToggleExpand(node.key)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px",
+                display: "flex",
+                alignItems: "center",
+                transform: isExpanded ? "rotate(0deg)" : (isAr ? "rotate(90deg)" : "rotate(-90deg)"),
+                transition: "transform 0.2s ease",
+                color: "#475569"
+              }}
+            >
+              <FiChevronDown size={14} />
+            </button>
+          ) : (
+            <div style={{ width: "18px" }} />
+          )}
+
+          <input
+            type="checkbox"
+            checked={isChecked}
+            ref={el => {
+              if (el) {
+                el.indeterminate = isIndeterminate;
+              }
+            }}
+            onChange={handleCheckboxChange}
+            className="styled-checkbox"
+            style={{ cursor: "pointer", flexShrink: 0 }}
+          />
+
+          <span style={{ color: isDir ? "#3b82f6" : "#10b981", display: "flex", alignItems: "center", flexShrink: 0 }}>
+            {isDir ? <FiFolder size={16} /> : <FiBookOpen size={16} />}
+          </span>
+
+          <span 
+            onClick={() => isDir ? onToggleExpand(node.key) : null}
+            style={{ 
+              fontSize: "0.85rem", 
+              fontWeight: isDir ? "600" : "400",
+              color: "#1e293b",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              cursor: isDir ? "pointer" : "default",
+              userSelect: "none"
+            }}
+            title={node.name}
+          >
+            {node.name}
+          </span>
+        </div>
+
+        {!isDir && node.url && (
+          <span 
+            style={{ 
+              fontSize: "0.72rem", 
+              color: "#64748b", 
+              maxWidth: "200px", 
+              overflow: "hidden", 
+              textOverflow: "ellipsis", 
+              whiteSpace: "nowrap",
+              marginLeft: isAr ? 0 : "8px",
+              marginRight: isAr ? "8px" : 0
+            }}
+            title={node.url}
+          >
+            {node.url}
+          </span>
+        )}
+      </div>
+
+      {isDir && isExpanded && node.children && node.children.length > 0 && (
+        <div className="directory-children" style={{ marginLeft: isAr ? 0 : "12px", marginRight: isAr ? "12px" : 0 }}>
+          {node.children.map(child => (
+            <DirectoryNode
+              key={child.key}
+              node={child}
+              selectedDiscovered={selectedDiscovered}
+              crawlExpandedNodes={crawlExpandedNodes}
+              onToggleNode={onToggleNode}
+              onToggleExpand={onToggleExpand}
+              isAr={isAr}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CurriculumIngestionStudio({ language }: { language: string; email?: string }) {
   const isAr = language === "ar";
   const t = (key: string, variables?: Record<string, string | number>) => {
@@ -344,6 +572,23 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     "lib_lib_moe": true // Expand first library by default if desired
   });
+  const [crawlExpandedNodes, setCrawlExpandedNodes] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (discoveredBooks && discoveredBooks.length > 0) {
+      const tree = buildDirectoryTree(discoveredBooks);
+      setCrawlExpandedNodes(prev => {
+        const initialExpanded = { ...prev };
+        tree.forEach(node => {
+          if (node.type === "directory") {
+            initialExpanded[node.key] = true;
+          }
+        });
+        return initialExpanded;
+      });
+    }
+  }, [discoveredBooks]);
+
   const [showDeleteSubjectConfirm, setShowDeleteSubjectConfirm] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isCreatingCurUnderLib, setIsCreatingCurUnderLib] = useState<string | null>(null);
@@ -744,6 +989,24 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       setIsCrawling(false);
       addTerminalLog(`[CRAWLER FAULT] ${err.message}`);
     }
+  };
+
+  const handleToggleNode = (node: TreeNode, checked: boolean) => {
+    const ids = getAllBookIds(node);
+    setSelectedDiscovered(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        updated[id] = checked;
+      });
+      return updated;
+    });
+  };
+
+  const toggleCrawlExpand = (key: string) => {
+    setCrawlExpandedNodes(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   const handleBulkIngest = async () => {
@@ -1943,19 +2206,16 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                       </button>
                     </div>
                     <div className="discovered-list">
-                      {discoveredBooks.map(item => (
-                        <div key={item.id} className="discovered-row">
-                          <input
-                            type="checkbox"
-                            checked={!!selectedDiscovered[item.id]}
-                            onChange={e => setSelectedDiscovered({ ...selectedDiscovered, [item.id]: e.target.checked })}
-                            className="styled-checkbox"
-                          />
-                          <div className="book-desc-meta">
-                            <strong>{item.title}</strong>
-                            <small>{item.url}</small>
-                          </div>
-                        </div>
+                      {buildDirectoryTree(discoveredBooks).map(node => (
+                        <DirectoryNode
+                          key={node.key}
+                          node={node}
+                          selectedDiscovered={selectedDiscovered}
+                          crawlExpandedNodes={crawlExpandedNodes}
+                          onToggleNode={handleToggleNode}
+                          onToggleExpand={toggleCrawlExpand}
+                          isAr={isAr}
+                        />
                       ))}
                     </div>
                   </div>
