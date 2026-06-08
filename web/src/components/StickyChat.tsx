@@ -587,7 +587,7 @@ export default function StickyChat() {
     const rec = new SpeechRecognition();
     rec.continuous = false;
     rec.interimResults = false;
-    rec.lang = language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US";
+    rec.lang = language === "ar" ? "ar-EG" : (language as string) === "es" ? "es-ES" : (language as string) === "fr" ? "fr-FR" : (language as string) === "de" ? "de-DE" : (language as string) === "zh" ? "zh-CN" : (language as string) === "it" ? "it-IT" : "en-US";
 
     rec.onstart = () => {
       setIsListeningChat(true);
@@ -687,7 +687,7 @@ export default function StickyChat() {
             const hasArabic = /[\u0600-\u06FF]/.test(currentText);
             const lang = hasArabic 
               ? "ar-EG" 
-              : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+              : (language === "ar" ? "ar-EG" : (language as string) === "es" ? "es-ES" : (language as string) === "fr" ? "fr-FR" : (language as string) === "de" ? "de-DE" : (language as string) === "zh" ? "zh-CN" : (language as string) === "it" ? "it-IT" : "en-US");
             tempSegments.push({ text: currentText, lang });
           }
           currentText = part;
@@ -698,7 +698,7 @@ export default function StickyChat() {
         const hasArabic = /[\u0600-\u06FF]/.test(currentText);
         const lang = hasArabic 
           ? "ar-EG" 
-          : (language === "ar" ? "ar-EG" : language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : language === "zh" ? "zh-CN" : language === "it" ? "it-IT" : "en-US");
+          : (language === "ar" ? "ar-EG" : (language as string) === "es" ? "es-ES" : (language as string) === "fr" ? "fr-FR" : (language as string) === "de" ? "de-DE" : (language as string) === "zh" ? "zh-CN" : (language as string) === "it" ? "it-IT" : "en-US");
         tempSegments.push({ text: currentText, lang });
       }
 

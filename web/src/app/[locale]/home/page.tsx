@@ -4670,11 +4670,11 @@ export default function Home() {
         return [
           { 
             label: language === "ar" ? "ابدأ التعلم الآن! 🚀" :
-                   language === "es" ? "¡Comienza a aprender ahora! 🚀" :
-                   language === "fr" ? "Commencer à apprendre maintenant ! 🚀" :
-                   language === "de" ? "Jetzt lernen starten! 🚀" :
-                   language === "zh" ? "现在开始学习！ 🚀" :
-                   language === "it" ? "Inizia a imparare ora! 🚀" :
+                   (language as string) === "es" ? "¡Comienza a aprender ahora! 🚀" :
+                   (language as string) === "fr" ? "Commencer à apprendre maintenant ! 🚀" :
+                   (language as string) === "de" ? "Jetzt lernen starten! 🚀" :
+                   (language as string) === "zh" ? "现在开始学习！ 🚀" :
+                   (language as string) === "it" ? "Inizia a imparare ora! 🚀" :
                    "Start Learning Now! 🚀", 
             value: "COMPLETE_ONBOARDING_MANUAL_CLICKED" 
           }
@@ -4953,11 +4953,11 @@ export default function Home() {
               >
                 <span>
                   {language === "ar" ? "ابدأ التعلم 🚀" :
-                   language === "es" ? "Comenzar 🚀" :
-                   language === "fr" ? "Commencer 🚀" :
-                   language === "de" ? "Starten 🚀" :
-                   language === "zh" ? "开始学习 🚀" :
-                   language === "it" ? "Inizia 🚀" :
+                   (language as string) === "es" ? "Comenzar 🚀" :
+                   (language as string) === "fr" ? "Commencer 🚀" :
+                   (language as string) === "de" ? "Starten 🚀" :
+                   (language as string) === "zh" ? "开始学习 🚀" :
+                   (language as string) === "it" ? "Inizia 🚀" :
                    "Start Learning 🚀"}
                 </span>
               </button>
