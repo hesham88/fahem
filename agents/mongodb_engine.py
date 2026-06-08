@@ -339,6 +339,28 @@ class MongoDBEngine:
             self._db["assignment_submissions"].create_index([("assignment_id", 1), ("uid", 1)], unique=True, background=True)
             self._db["assignment_reports"].create_index("assignment_id", background=True)
             
+            
+            # 9. Assert Atlas Vector Search Index 'vector_index_book_pages' exists on book_pages collection
+            try:
+                if "book_pages" in self._db.list_collection_names():
+                    try:
+                        indexes = list(self._db["book_pages"].list_search_indexes())
+                        found_v_index = False
+                        for idx in indexes:
+                            if idx.get("name") == "vector_index_book_pages":
+                                found_v_index = True
+                                logger.info(f"[INDEX CHECK] Atlas Vector Search index 'vector_index_book_pages' verified successfully: {idx}")
+                                break
+                        if not found_v_index:
+                            msg = "CRITICAL: Atlas Vector Search index 'vector_index_book_pages' is missing on book_pages! Dense search is offline."
+                            logger.error(msg)
+                            if os.environ.get("K_SERVICE") or (os.environ.get("MONGODB_URI") and "mongodb.net" in os.environ.get("MONGODB_URI")):
+                                raise RuntimeError(msg)
+                    except Exception as ex:
+                        logger.warning(f"Could not check search indexes on book_pages (expected if not on Atlas/permission restricted): {ex}")
+            except Exception as outer_ex:
+                logger.warning(f"Error listing collection names for index check: {outer_ex}")
+
             logger.info("[MongoDBEngine] Auto-healing schema & unique index tuning completed successfully! 🚀")
         except Exception as e:
             logger.warning(f"[MongoDBEngine] Non-critical schema index-tuning warning: {e}")

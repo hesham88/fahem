@@ -31,7 +31,8 @@ from schema import PageStructure, FlatBlock
 from utils import (
     update_job_status, check_cooperative_control, ROOT_DIR,
     JSON_Encoder, get_gemini_config, execute_with_retry,
-    is_mongodb_enabled, get_mongodb_uri, make_progress_bar
+    is_mongodb_enabled, get_mongodb_uri, make_progress_bar,
+    LOCAL_DB_PATH, get_active_db
 )
 
 db_write_lock = threading.Lock()
@@ -321,9 +322,78 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
         
         raise RuntimeError(f"Vision call failed: {e}")
 
+def find_cached_page_by_hash(page_hash, is_local):
+    """
+    Looks up an existing page doc by pageHash in MongoDB or local_db.json.
+    """
+    if is_local or not is_mongodb_enabled():
+        if os.path.exists(LOCAL_DB_PATH):
+            try:
+                with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
+                    db = json.load(f)
+                for p in db.get("book_pages", []):
+                    if p.get("pageHash") == page_hash and p.get("blocks"):
+                        return p
+            except Exception:
+                pass
+    if is_mongodb_enabled():
+        try:
+            from pymongo import MongoClient
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            # Find a page that is successfully structured and has blocks
+            p = db["book_pages"].find_one({"pageHash": page_hash, "blocks": {"$exists": True, "$not": {"$size": 0}}})
+            client.close()
+            if p:
+                return p
+        except Exception as e:
+            print(f"[Cache Lookup Error] MongoDB lookup failed: {e}", file=sys.stderr)
+            pass
+    return None
+
+def format_blocks_tree(blocks):
+    """
+    Builds a beautiful ASCII tree of FlatBlocks for logging.
+    """
+    from schema import rebuild_tree, FlatBlock
+    typed_blocks = []
+    for b in blocks:
+        try:
+            typed_blocks.append(FlatBlock(**b) if isinstance(b, dict) else b)
+        except Exception:
+            pass
+    if not typed_blocks:
+        return "  (No blocks found)"
+    
+    roots = rebuild_tree(typed_blocks)
+    lines = []
+    
+    def _render_node(node, prefix=""):
+        b = node.block
+        b_type = b.type.value if hasattr(b.type, "value") else str(b.type)
+        label = b.text or b.prompt or b.term or b.label or ""
+        if len(label) > 40:
+            label = label[:37] + "..."
+        label = label.replace("\n", " ")
+        lines.append(f"  {prefix}└── [{b_type}] {label}")
+        
+        # Render children
+        children = node.children
+        for i, child in enumerate(children):
+            # If it is the last child of this container, we can render nice prefix
+            is_last = (i == len(children) - 1)
+            next_prefix = prefix + ("    " if is_last else "│   ")
+            _render_node(child, next_prefix)
+            
+    for r in roots:
+        _render_node(r)
+        
+    return "\n".join(lines)
+
 def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload):
     """
     Thread-pool worker processing a single PDF page: rasterization, sha1, Gemini structuring.
+    With content-addressed deduplication (skip + serve-from-cache).
     """
     try:
         # Open document locally inside thread context to ensure safety
@@ -341,7 +411,37 @@ def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload)
         # 3. Calculate pageHash
         page_hash = hashlib.sha1(png_bytes).hexdigest()
         
-        # 4. Attempt structuring via API
+        # 4. Check Cache/Deduplication
+        is_local = payload.get("is_local", True)
+        cached_page = find_cached_page_by_hash(page_hash, is_local)
+        if cached_page:
+            print(f"[Worker] ⚡ Page {page_num} Cache HIT! Restoring from cache hash {page_hash[:10]}...", flush=True)
+            page_doc = {
+                "_id": f"page_{payload['book_id']}_{page_num}",
+                "book_id": payload["book_id"],
+                "page_number": page_num,
+                "dir": cached_page.get("dir", "rtl"),
+                "blocks": cached_page.get("blocks", []),
+                "status": cached_page.get("status", "structured"),
+                "pageHash": page_hash,
+                "model": cached_page.get("model") or model or "gemini-3.1-flash-lite",
+                "is_cached": True
+            }
+            if "i18n" in cached_page:
+                page_doc["i18n"] = cached_page["i18n"]
+            if "embedding" in cached_page:
+                page_doc["embedding"] = cached_page["embedding"]
+                page_doc["embed_model"] = cached_page.get("embed_model")
+                page_doc["embed_dim"] = cached_page.get("embed_dim")
+                page_doc["embed_provenance"] = cached_page.get("embed_provenance")
+            if "concepts" in cached_page:
+                page_doc["concepts"] = cached_page["concepts"]
+            if "formulas" in cached_page:
+                page_doc["formulas"] = cached_page["formulas"]
+                
+            return page_num, page_doc, None
+
+        # 5. Attempt structuring via API
         structured_data = None
         err_msg = ""
         try:
@@ -415,6 +515,8 @@ def main():
     final_pages = {}
     has_errors = False
 
+    struct_start_time = time.time()
+
     # Thread Pool execution with 3 workers
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
@@ -434,9 +536,20 @@ def main():
                 pct = 30 + int((processed_pages / total_pages) * 25)  # Range 30% - 55%
                 sub_pct = (processed_pages / total_pages) * 100.0
                 bar = make_progress_bar(sub_pct, width=20)
-                log_msg = f"{bar} Parsed Page {p_no}/{total_pages} (Blocks Count: {len(p_doc['blocks'])})."
+                
+                # Compute ETA
+                elapsed = time.time() - struct_start_time
+                avg_time = elapsed / processed_pages
+                rem_pages = total_pages - processed_pages
+                eta_s = int(avg_time * rem_pages)
+                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                
+                log_msg = f"{bar} Parsed Page {p_no}/{total_pages} (Blocks Count: {len(p_doc['blocks'])}) [ETA {eta_str}]."
                 print(f"[JOB 2: STRUCT] {log_msg}", flush=True)
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] {log_msg}")
+                
+                # Format logical object tree
+                tree_str = format_blocks_tree(p_doc['blocks'])
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] {log_msg}\nObject-Tree:\n{tree_str}")
                 
                 # Write page to database
                 with db_write_lock:

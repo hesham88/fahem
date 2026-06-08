@@ -79,51 +79,6 @@ export async function POST(req: NextRequest) {
       saveLocalDb(db);
     }
 
-    // 3. Persist cancellation in MongoDB
-    try {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-
-      const book = await db.collection("books").findOne({ _id: bookId });
-      if (book) {
-        const existingLogs = book.ingestion_logs || [];
-        const timestamp = new Date().toLocaleTimeString();
-        const updatedLogs = [
-          ...existingLogs,
-          `[${timestamp}] [CANCEL] ⛔ Ingestion task was manually aborted by administrator: ${requesterEmail}`,
-          `[${timestamp}] [INIT] Releasing virtual machine sandboxed processor context.`
-        ];
-
-        await db.collection("books").updateOne(
-          { _id: bookId },
-          {
-            $set: {
-              ingestion_status: "failed",
-              ingestion_logs: updatedLogs,
-              updated_at: Date.now() / 1000
-            }
-          }
-        );
-
-        await db.collection("ingestion_jobs").updateOne(
-          { _id: `job_${bookId}` },
-          {
-            $set: {
-              status: "failed",
-              logs: updatedLogs,
-              updated_at: Date.now() / 1000
-            }
-          }
-        );
-      }
-      await client.close();
-    } catch (mongoErr) {
-      // Ignore Mongo connection fallback
-    }
-
     return new Response(JSON.stringify({
       success: true,
       message: terminated 

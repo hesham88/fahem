@@ -69,30 +69,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-        await client.connect();
-        const db = client.db(getDbTarget());
 
-        const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
-        if (job) {
-          const updatedLogs = [
-            ...(job.logs || []),
-            `[${timestamp}] [CONTROL] ⏸️ Administrative cooperative pause request sent.`
-          ];
-          await db.collection("ingestion_jobs").updateOne(
-            { _id: resolvedJobId },
-            { $set: { status: "paused", logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-          await db.collection("books").updateOne(
-            { _id: bookId },
-            { $set: { ingestion_status: "paused", ingestion_logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-        }
-        await client.close();
-      } catch (mongoErr) {}
 
       message = "Ingestion job set to pause state. Processing threads are cooperatively resting.";
       success = true;
@@ -124,30 +101,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-        await client.connect();
-        const db = client.db(getDbTarget());
 
-        const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
-        if (job) {
-          const updatedLogs = [
-            ...(job.logs || []),
-            `[${timestamp}] [CONTROL] ▶️ Administrative cooperative resume request sent. Activating processing thread.`
-          ];
-          await db.collection("ingestion_jobs").updateOne(
-            { _id: resolvedJobId },
-            { $set: { status: "processing", logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-          await db.collection("books").updateOne(
-            { _id: bookId },
-            { $set: { ingestion_status: "processing", ingestion_logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-        }
-        await client.close();
-      } catch (mongoErr) {}
 
       message = "Ingestion job set to processing state. Processing thread context resumed.";
       success = true;
@@ -194,32 +148,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 3. Persist cancellation to MongoDB
-      try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-        await client.connect();
-        const db = client.db(getDbTarget());
 
-        const job = await db.collection("ingestion_jobs").findOne({ _id: resolvedJobId });
-        if (job) {
-          const updatedLogs = [
-            ...(job.logs || []),
-            `[${timestamp}] [CONTROL] 🛑 Ingestion job manually killed/terminated by administrator: ${requesterEmail}`,
-            `[${timestamp}] [SYSTEM] Process context released.`
-          ];
-          await db.collection("ingestion_jobs").updateOne(
-            { _id: resolvedJobId },
-            { $set: { status: "killed", logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-          await db.collection("books").updateOne(
-            { _id: bookId },
-            { $set: { ingestion_status: "failed", ingestion_logs: updatedLogs, updated_at: Date.now() / 1000 } }
-          );
-        }
-        await client.close();
-      } catch (mongoErr) {}
 
       message = processKilled 
         ? "Active backend worker threads terminated immediately." 

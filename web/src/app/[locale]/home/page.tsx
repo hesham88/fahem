@@ -717,7 +717,10 @@ export default function Home() {
   const [dynamicSubjects, setDynamicSubjects] = useState<any[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj_algebra_stats");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
+  const [initialBookId, setInitialBookId] = useState<string | null>(null);
+  const [initialPage, setInitialPage] = useState<number | null>(null);
 
   // MOE Ingestion Harvester States
   const [moeFile, setMoeFile] = useState<File | null>(null);
@@ -1085,31 +1088,58 @@ export default function Home() {
       const subjectParam = params.get("subject") || params.get("subjectId") || params.get("subject_id");
       if (subjectParam) {
         setSelectedSubjectId(subjectParam);
+      } else {
+        setSelectedSubjectId("");
+      }
+
+      // 3. Keep track of initial book/page to hydrate once books load
+      const bookId = params.get("book") || params.get("bookId") || params.get("book_id");
+      const pageParam = params.get("page");
+      if (bookId) {
+        setInitialBookId(bookId);
+        if (pageParam) {
+          setInitialPage(parseInt(pageParam, 10) || 1);
+        }
+      } else {
+        setIsHydrated(true); // No book to wait for, we are ready!
       }
     }
   }, []);
 
-  // Deep-linking: handle initial book navigation when dynamicBooks load
+  // Deep-linking: handle initial book navigation once dynamicBooks are ready
   useEffect(() => {
-    if (typeof window !== "undefined" && dynamicBooks.length > 0) {
-      const params = new URLSearchParams(window.location.search);
-      const bookId = params.get("book") || params.get("bookId") || params.get("book_id");
-      const pageParam = params.get("page");
-      if (bookId) {
-        const page = parseInt(pageParam || "1", 10) || 1;
-        console.log(`[Deep-Linking] Initial load parsed parameter bookId: ${bookId}, page: ${page}`);
-        setTimeout(() => {
-          const event = new CustomEvent("fahemNavigateBook", {
-            detail: { bookId, page }
-          });
-          window.dispatchEvent(event);
-        }, 1500); // Small buffer to ensure library panels are mounted and ready
+    if (dynamicBooks.length > 0 && initialBookId && !isHydrated) {
+      console.log(`[Deep-Linking] Hydrating book from URL parameters: bookId=${initialBookId}, page=${initialPage || 1}`);
+      const matchedBook = dynamicBooks.find(b => b._id === initialBookId || b.id === initialBookId || b.subject === initialBookId);
+      if (matchedBook) {
+        setSelectedBookReader(matchedBook);
+        setReaderCurrentPage(initialPage || 1);
+        setActiveTab("library");
+      } else {
+        // Fallback check for static books
+        const staticBooks: Record<string, any> = {
+          "Math": { _id: "Math", id: "Math", title: "Advanced Mathematics Grade 9", titleEn: "Advanced Mathematics Grade 9", titleAr: "الرياضيات المتقدمة - الصف التاسع", subject: "Math" },
+          "Science": { _id: "Science", id: "Science", title: "Comprehensive Chemistry Handbook", titleEn: "Comprehensive Chemistry Handbook", titleAr: "كتاب الكيمياء الشامل والمبسط", subject: "Science" },
+          "Arabic": { _id: "Arabic", id: "Arabic", title: "Grammar & Arabic Linguistics Keys", titleEn: "Grammar & Arabic Linguistics Keys", titleAr: "مفاتيح النحو وقواعد الصرف المبسطة", subject: "Arabic" }
+        };
+        const staticBook = staticBooks[initialBookId];
+        if (staticBook) {
+          setSelectedBookReader(staticBook);
+          setReaderCurrentPage(initialPage || 1);
+          setActiveTab("library");
+        }
       }
+      setIsHydrated(true); // Hydration completes!
+    } else if (dynamicBooks.length > 0 && !initialBookId && !isHydrated) {
+      // dynamicBooks loaded but there is no book parameter in the URL
+      setIsHydrated(true);
     }
-  }, [dynamicBooks]);
+  }, [dynamicBooks, initialBookId, initialPage, isHydrated]);
 
   // Deep-linking: sync current tab, subject, and viewer state back to browser URL string
   useEffect(() => {
+    if (!isHydrated) return; // EARLY RETURN: block writing back to URL until hydration is complete!
+
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       let updated = false;
@@ -1166,7 +1196,7 @@ export default function Home() {
         window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
       }
     }
-  }, [activeTab, selectedSubjectId, selectedBookReader, readerCurrentPage]);
+  }, [activeTab, selectedSubjectId, selectedBookReader, readerCurrentPage, isHydrated]);
 
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
   const [mentionSearch, setMentionQuery] = useState<string>("");
@@ -4892,11 +4922,6 @@ export default function Home() {
                 >
                   <option value="en" style={{ color: "#111827", background: "#ffffff" }}>English</option>
                   <option value="ar" style={{ color: "#111827", background: "#ffffff" }}>العربية</option>
-                  <option value="es" style={{ color: "#111827", background: "#ffffff" }}>Español</option>
-                  <option value="fr" style={{ color: "#111827", background: "#ffffff" }}>Français</option>
-                  <option value="de" style={{ color: "#111827", background: "#ffffff" }}>Deutsch</option>
-                  <option value="zh" style={{ color: "#111827", background: "#ffffff" }}>中文</option>
-                  <option value="it" style={{ color: "#111827", background: "#ffffff" }}>Italiano</option>
                 </select>
               </div>
 
@@ -5827,14 +5852,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Connection Status */}
-          <div className="sidebar-status">
-            <div className="status-badge" id="mcp-status-badge" style={{ background: "rgba(255,255,255,0.75)", border: "1px solid var(--card-border)", display: "flex", width: "100%", justifyContent: "center" }}>
-              <span className="status-dot"></span>
-              <FiServer style={{ color: "var(--accent-green)", fontSize: "0.95rem" }} />
-              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{t("cluster_status")}</span>
-            </div>
-          </div>
+
 
           {/* Navigation Items (Toolkit & Admin) */}
           <nav className="sidebar-nav custom-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: "4px" }}>
@@ -6038,11 +6056,6 @@ export default function Home() {
               >
                 <option value="en">English</option>
                 <option value="ar">العربية</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="zh">中文</option>
-                <option value="it">Italiano</option>
               </select>
             </div>
 

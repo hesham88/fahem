@@ -24,6 +24,67 @@ def register_telemetry_route(app: fastapi.FastAPI):
         if hasattr(route, "path") and route.path == "/db-metadata":
             return
 
+    @app.on_event("startup")
+    async def assert_atlas_vector_index():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import os
+            
+            uri = get_mongodb_uri()
+            if "localhost" in uri or "127.0.0.1" in uri:
+                logger.info("[STARTUP CHECK] Skipping Atlas Search Index assertion for local MongoDB.")
+                return
+                
+            logger.info("[STARTUP CHECK] Verifying Atlas Search Index on boot...")
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = client["fahem"]
+            coll = db["book_pages"]
+            
+            index_name = os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages")
+            
+            try:
+                search_indexes = list(coll.list_search_indexes())
+            except Exception as se_err:
+                logger.error(f"[STARTUP CHECK] ERROR listing search indexes from Atlas: {se_err}")
+                logger.error("[STARTUP CHECK] ALERT: Setup or Permission error when connecting to Atlas Search Indexes.")
+                return
+                
+            found = False
+            for idx in search_indexes:
+                if idx.get("name") == index_name:
+                    found = True
+                    latest_def = idx.get("latestDefinition", {}) or idx.get("definition", {}) or {}
+                    mappings = latest_def.get("mappings", {}) or {}
+                    fields = mappings.get("fields", {}) or {}
+                    embedding_field = fields.get("embedding", {}) or {}
+                    if isinstance(embedding_field, list) and len(embedding_field) > 0:
+                        embedding_field = embedding_field[0]
+                    elif isinstance(embedding_field, dict):
+                        pass
+                    else:
+                        embedding_field = {}
+                    
+                    dimensions = embedding_field.get("dimensions")
+                    if dimensions is not None:
+                        dimensions = int(dimensions)
+                        if dimensions != 3072:
+                            logger.error(f"[STARTUP CHECK] ALERT: Search index '{index_name}' dimension mismatch: found {dimensions}, expected 3072.")
+                            raise RuntimeError(f"Database configuration error: Search index '{index_name}' has invalid dimensions {dimensions} (expected 3072)")
+                    break
+            
+            if not found:
+                logger.error(f"[STARTUP CHECK] ALERT: Atlas search index '{index_name}' does not exist on 'book_pages' collection!")
+                raise RuntimeError(f"Database configuration error: Required Atlas search index '{index_name}' is missing.")
+            
+            logger.info(f"[STARTUP CHECK] Success: Atlas search index '{index_name}' verified (3072 dims).")
+            
+        except Exception as e:
+            logger.error(f"[STARTUP CHECK] CRITICAL: Atlas search index assertion failed: {e}", exc_info=True)
+            is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+            if is_gcp or "fahemcluster" in get_mongodb_uri():
+                raise e
+
     # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment with Fail-Closed defaults
     @app.middleware("http")
     async def oidc_security_middleware(request: fastapi.Request, call_next):
@@ -433,7 +494,21 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = get_active_db(client)
+            db = client["fahem_sandbox"]
+            assert db.name == "fahem_sandbox", "CRITICAL ERROR: seed-db is strictly hardcoded to fahem_sandbox! Refusing to run on any other database!"
+            if db.name == "fahem":
+                raise fastapi.HTTPException(status_code=400, detail="Refusing to run seed-db against production 'fahem' database")
+            
+            # --- PURGE MOCK USERS FROM PRODUCTION 'fahem' DATABASE ---
+            try:
+                prod_db = client["fahem"]
+                mock_emails = ["ziad.student@fahem.pro", "tarek.teacher@fahem.pro"]
+                for coll_name in ["users", "user_profiles"]:
+                    res1 = prod_db[coll_name].delete_many({"email": {"$in": mock_emails}})
+                    res2 = prod_db[coll_name].delete_many({"userId": {"$in": ["test_user_id_gemini_2026", "test_teacher_id_gemini_2026"]}})
+                    logger.info(f"[SEED] Purged mock users from production '{coll_name}': {res1.deleted_count} by email, {res2.deleted_count} by ID")
+            except Exception as pe:
+                logger.error(f"[SEED] Error purging mock users from production: {pe}")
             
             # --- 0. DROP HISTORICAL COLLECTIONS TO PREVENT INDEX COLLISIONS ---
             collections_to_drop = [
@@ -2561,6 +2636,219 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"success": True, "curriculum": updated_curr}
         except Exception as err:
             logger.error(f"[services.py] Failed to patch curriculum: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+
+    @app.get("/auth/session-status")
+    async def get_session_status_endpoint(sandbox_session_id: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            session = db["demo_sessions"].find_one({"sandbox_session_id": sandbox_session_id})
+            client.close()
+            
+            status = "active"
+            if session:
+                status = session.get("status", "active")
+                
+            return {"success": True, "status": status}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to check session status: {err}", exc_info=True)
+            return {"success": False, "status": "active", "error": str(err)}
+
+
+    @app.get("/auth/resolve-role")
+    async def resolve_role_endpoint(uid: str, email: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            normalized_email = email.lower().strip() if email else ""
+            
+            # Check users collection
+            query = {"$or": [{"userId": uid}]}
+            if normalized_email:
+                query["$or"].append({"email": normalized_email})
+                
+            user = db["users"].find_one(query)
+            client.close()
+            
+            role = "user"
+            if user and user.get("role"):
+                role = user.get("role")
+                
+            return {"success": True, "role": role}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to resolve role: {err}", exc_info=True)
+            return {"success": False, "role": "user", "error": str(err)}
+
+
+    @app.post("/user/reports")
+    async def post_user_report_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Unauthorized: authenticated user required"},
+                    status_code=401
+                )
+            
+            uid = principal.get("uid")
+            email = principal.get("email")
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            import random
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            import datetime
+            now_dt = datetime.datetime.now(datetime.timezone.utc)
+            start_of_day = datetime.datetime(now_dt.year, now_dt.month, now_dt.day, tzinfo=datetime.timezone.utc)
+            start_of_day_ms = int(start_of_day.timestamp() * 1000)
+            
+            count = db["reports"].count_documents({
+                "userId": uid,
+                "createdAt": {"$gte": start_of_day_ms}
+            })
+            
+            if count >= 3:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "daily limit reached."},
+                    status_code=429
+                )
+                
+            report_id = "rep_" + str(int(time.time() * 1000)) + "_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=5))
+            
+            new_report = {
+                "_id": report_id,
+                "userId": uid,
+                "source": payload.get("source", "footer"),
+                "category": payload.get("category", "General"),
+                "title": payload.get("title") or payload.get("category") or "Feedback Report",
+                "body": payload.get("body") or payload.get("feedback"),
+                "context": payload.get("context") or {
+                    "name": payload.get("name", "Anonymous"),
+                    "email": payload.get("email") or email or "anonymous@fahem.edu"
+                },
+                "status": "new",
+                "createdAt": int(time.time() * 1000)
+            }
+            
+            db["reports"].insert_one(new_report)
+            client.close()
+            
+            return {"success": True, "message": "Report submitted successfully.", "report": new_report}
+        except Exception as err:
+            logger.error(f"[services.py] Post user report failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+
+    @app.get("/admin/reports")
+    async def get_admin_reports_endpoint(request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Admin access required"},
+                    status_code=403
+                )
+                
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            reports = list(db["reports"].find({}).sort("createdAt", -1))
+            client.close()
+            
+            for rep in reports:
+                if "_id" in rep:
+                    rep["_id"] = str(rep["_id"])
+                    
+            return {"success": True, "reports": reports}
+        except Exception as err:
+            logger.error(f"[services.py] Get admin reports failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+
+    @app.post("/admin/reports")
+    async def post_admin_reports_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Admin access required"},
+                    status_code=403
+                )
+                
+            report_id = payload.get("reportId")
+            status = payload.get("status")
+            
+            if not report_id or not status:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "reportId and status are required"},
+                    status_code=400
+                )
+                
+            if status not in ["new", "triaged", "resolved"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "invalid status value"},
+                    status_code=400
+                )
+                
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            result = db["reports"].update_one(
+                {"_id": report_id},
+                {"$set": {"status": status}}
+            )
+            
+            if result.matched_count == 0:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Report not found"},
+                    status_code=404
+                )
+                
+            updated_report = db["reports"].find_one({"_id": report_id})
+            client.close()
+            
+            if updated_report and "_id" in updated_report:
+                updated_report["_id"] = str(updated_report["_id"])
+                
+            return {"success": True, "report": updated_report}
+        except Exception as err:
+            logger.error(f"[services.py] Post admin reports failed: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"success": False, "error": str(err)},
                 status_code=500
@@ -5451,6 +5739,236 @@ def register_telemetry_route(app: fastapi.FastAPI):
             }
         except Exception as err:
             logger.error(f"[services.py] TTS endpoint failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/user/demo/tutorial")
+    async def post_user_demo_tutorial_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Unauthorized"},
+                    status_code=401
+                )
+            
+            sandbox_session_id = payload.get("sandbox_session_id")
+            if not sandbox_session_id:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "sandbox_session_id is required"},
+                    status_code=400
+                )
+            
+            update_fields = {}
+            for field in ["tutorial_shown", "tutorial_skipped", "tutorial_step_reached"]:
+                if field in payload:
+                    update_fields[field] = payload[field]
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            update_fields["last_active_at"] = int(time.time())
+            
+            db["demo_sessions"].update_one(
+                {"sandbox_session_id": sandbox_session_id},
+                {"$set": update_fields}
+            )
+            client.close()
+            return {"success": True, "updated": update_fields}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to update demo tutorial: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+    @app.post("/notifications")
+    async def create_notification_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            recipient_uid = payload.get("recipient_uid")
+            if not recipient_uid:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "recipient_uid is required"})
+                
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            notif = create_notification_internal(
+                db,
+                recipient_uid=recipient_uid,
+                ntf_type=payload.get("type", "general"),
+                title=payload.get("title", ""),
+                title_ar=payload.get("title_ar", ""),
+                body=payload.get("body", ""),
+                body_ar=payload.get("body_ar", ""),
+                payload=payload.get("payload")
+            )
+            client.close()
+            return {"success": True, "notification": notif}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to create notification: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.get("/user/reading-sessions")
+    async def get_user_reading_sessions_endpoint(request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            sessions = list(db["reading_sessions"].find({"uid": uid}))
+            client.close()
+            return {"success": True, "sessions": sessions}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get reading sessions: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/user/reading-sessions")
+    async def post_user_reading_sessions_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            book_id = payload.get("bookId")
+            page_number = payload.get("pageNumber")
+            curriculum_id = payload.get("curriculumId") or ""
+            subject_id = payload.get("subjectId") or ""
+            duration_increment = payload.get("durationIncrement") or 0
+            action = payload.get("action")
+            tokens = payload.get("tokens") or 0
+            
+            if not book_id or page_number is None:
+                return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing required parameters: bookId or pageNumber"})
+            
+            session_key = f"rs_{uid}_{book_id}"
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            session = db["reading_sessions"].find_one({"_id": session_key})
+            now = int(time.time() * 1000)
+            
+            if not session:
+                session = {
+                    "_id": session_key,
+                    "uid": uid,
+                    "book_id": book_id,
+                    "curriculum_id": curriculum_id,
+                    "subject_id": subject_id,
+                    "first_opened_at": now,
+                    "last_active_at": now,
+                    "last_page": int(page_number),
+                    "pages_visited": [int(page_number)],
+                    "max_page": int(page_number),
+                    "duration_seconds": int(duration_increment),
+                    "action_counts": {
+                        "audio": 1 if action == "audio" else 0,
+                        "translate": 1 if action == "translate" else 0,
+                        "explain": 1 if action == "explain" else 0,
+                        "question": 1 if action == "question" else 0
+                    },
+                    "tokens_spent": int(tokens)
+                }
+            else:
+                visited = session.get("pages_visited") or []
+                num_page = int(page_number)
+                if num_page not in visited:
+                    visited.append(num_page)
+                
+                actions = session.get("action_counts") or {"audio": 0, "translate": 0, "explain": 0, "question": 0}
+                if action and isinstance(action, str):
+                    actions[action] = actions.get(action, 0) + 1
+                
+                session["last_active_at"] = now
+                session["last_page"] = num_page
+                session["pages_visited"] = visited
+                session["max_page"] = max(session.get("max_page") or 0, num_page)
+                session["duration_seconds"] = (session.get("duration_seconds") or 0) + int(duration_increment)
+                session["action_counts"] = actions
+                session["tokens_spent"] = (session.get("tokens_spent") or 0) + int(tokens)
+                
+            db["reading_sessions"].update_one(
+                {"_id": session_key},
+                {"$set": session},
+                upsert=True
+            )
+            client.close()
+            return {"success": True, "session": session}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post reading session: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.get("/user/token-policy")
+    async def get_my_token_policy_endpoint(request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            if not principal:
+                return fastapi.responses.JSONResponse(status_code=401, content={"error": "Unauthorized"})
+            uid = principal.get("uid")
+            
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            config_doc = db["config"].find_one({}) or {}
+            config = {
+                "isTokenControlActive": config_doc.get("isTokenControlActive", True),
+                "weeklyAllocationLimit": config_doc.get("weeklyAllocationLimit", 250000),
+                "monthlyAllocationLimit": config_doc.get("monthlyAllocationLimit", 1000000)
+            }
+            
+            user_doc = db["users"].find_one({"userId": uid}) or {}
+            token_policy = user_doc.get("tokenPolicy")
+            
+            client.close()
+            
+            if "_id" in config:
+                config["_id"] = str(config["_id"])
+                
+            return {
+                "success": True,
+                "config": config,
+                "tokenPolicy": token_policy
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get user token policy: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 status_code=500,
                 content={"success": False, "error": str(err)}

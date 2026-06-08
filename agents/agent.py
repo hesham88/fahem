@@ -186,7 +186,7 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                         pass
                 
                 vs_stage = {
-                    "index": "vector_index_book_pages",
+                    "index": os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages"),
                     "path": "embedding",
                     "queryVector": query_vector,
                     "numCandidates": 100,

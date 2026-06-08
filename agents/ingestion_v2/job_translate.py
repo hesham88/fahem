@@ -148,6 +148,12 @@ def process_translate_page_worker(p_doc, api_key, model, default_target_lang=Non
     Thread-pool worker translating a single page's blocks.
     """
     try:
+        # Check if already translated/embedded (carried over from cache)
+        if p_doc.get("i18n") and p_doc.get("status") in ["translated", "embedded"]:
+            print(f"[Translate Worker] ⚡ Page {p_doc.get('page_number')} already translated in cache! Skipping API call.", flush=True)
+            p_doc["status"] = "translated"
+            return p_doc.get("page_number", 1), p_doc, None
+            
         blocks = p_doc.get("blocks", [])
         
         # Determine target language
@@ -245,6 +251,8 @@ def main():
         elif "en" in book_lang.lower():
             default_target_lang = "ar"
 
+    translate_start_time = time.time()
+
     # Thread Pool execution with 3 workers
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
@@ -262,7 +270,15 @@ def main():
                 pct = 56 + int((translated_count / actual_total_pages) * 20)  # Range 56% - 76%
                 sub_pct = (translated_count / actual_total_pages) * 100.0
                 bar = make_progress_bar(sub_pct, width=20)
-                log_msg = f"{bar} Translated Page {p_no}/{actual_total_pages}."
+                
+                # Compute ETA
+                elapsed = time.time() - translate_start_time
+                avg_time = elapsed / translated_count
+                rem_pages = actual_total_pages - translated_count
+                eta_s = int(avg_time * rem_pages)
+                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                
+                log_msg = f"{bar} Translated Page {p_no}/{actual_total_pages} [ETA {eta_str}]."
                 print(f"[JOB 3: TRANSLATE] {log_msg}", flush=True)
                 logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] {log_msg}")
                 

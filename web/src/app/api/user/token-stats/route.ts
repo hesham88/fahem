@@ -30,29 +30,19 @@ export async function GET(req: NextRequest) {
         tokenPolicy = user.tokenPolicy;
       }
     } else {
-      // Production: fetch from DB
+      // Production: fetch config and user-policy from backend proxy
       try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-        await client.connect();
-        const db = client.db(getDbTarget());
-
-        // Config doc
-        const dbConfig = await db.collection("config").findOne({});
-        if (dbConfig) {
-          config = { ...config, ...dbConfig };
+        const { proxyRequest } = require("../../proxy");
+        const proxyRes = await proxyRequest("/user/token-policy", "GET", undefined, ctx);
+        if (proxyRes.ok) {
+          const resData = await proxyRes.json();
+          if (resData && resData.success) {
+            config = { ...config, ...resData.config };
+            tokenPolicy = resData.tokenPolicy;
+          }
         }
-
-        // User policy
-        const userDoc = await db.collection("users").findOne({ userId });
-        if (userDoc && userDoc.tokenPolicy) {
-          tokenPolicy = userDoc.tokenPolicy;
-        }
-
-        await client.close();
       } catch (err) {
-        console.warn("[token-stats-api] DB fetch failed, using local/defaults:", err);
+        console.warn("[token-stats-api] Proxy user policy fetch failed:", err);
       }
     }
 

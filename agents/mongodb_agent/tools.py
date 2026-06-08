@@ -251,7 +251,7 @@ def execute_atlas_hybrid_vector_search(spec: HybridVectorQuery) -> List[Dict[str
         pipeline = [
             {
                 "$vectorSearch": {
-                    "index": "academic_vector_search_index",
+                    "index": os.environ.get('VECTOR_INDEX_NAME', 'vector_index_book_pages'),
                     "path": "embedding",
                     "queryVector": spec.dense_vector,
                     "numCandidates": 40,

@@ -168,34 +168,6 @@ export async function POST(req: NextRequest) {
       saveLocalDb(db);
     }
 
-    // Persist initial state in MongoDB if accessible
-    try {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-      await db.collection("crawl_jobs").updateOne(
-        { _id: jobId },
-        {
-          $set: {
-            _id: jobId,
-            url: targetUrl,
-            status: "harvesting",
-            progress: 5,
-            logs: initialLogs,
-            discovered: [],
-            created_at: Date.now() / 1000,
-            updated_at: Date.now() / 1000
-          }
-        },
-        { upsert: true }
-      );
-      await client.close();
-    } catch (mongoErr) {
-      // Ignore Mongo save error in local development
-    }
-
     // Spawn Python crawling job completely asynchronously
     try {
       const pythonPath = "python";
@@ -229,24 +201,6 @@ export async function POST(req: NextRequest) {
             }
           }
         }
-
-        // Update MongoDB with active_pid asynchronously
-        (async () => {
-          try {
-            const { MongoClient } = require("mongodb");
-            const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-            const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1500 });
-            await client.connect();
-            const db = client.db(getDbTarget());
-            await db.collection("crawl_jobs").updateOne(
-              { _id: jobId },
-              { $set: { active_pid: pid, updated_at: Date.now() / 1000 } }
-            );
-            await client.close();
-          } catch (mongoErr) {
-            // Ignore
-          }
-        })();
       }
 
       child.stdin.write(JSON.stringify(payload));

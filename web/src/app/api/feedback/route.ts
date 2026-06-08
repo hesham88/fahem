@@ -21,42 +21,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (!isLocalEnv()) {
+      const { proxyRequest } = require("../proxy");
+      return await proxyRequest("/user/reports", "POST", body, ctx);
+    }
+
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const startOfDayMs = startOfDay.getTime();
 
     // Enforce 3/day report limit per user
-    if (isLocalEnv()) {
-      const db = getLocalDb() as any;
-      db.reports = db.reports || [];
-      const recentReports = db.reports.filter(
-        (rep: any) => rep.userId === ctx.uid && rep.createdAt >= startOfDayMs
-      );
-      if (recentReports.length >= 3) {
-        return new Response(JSON.stringify({ error: "daily limit reached." }), {
-          status: 429,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-    } else {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-      
-      const count = await db.collection("reports").countDocuments({
-        userId: ctx.uid,
-        createdAt: { $gte: startOfDayMs }
+    const db = getLocalDb() as any;
+    db.reports = db.reports || [];
+    const recentReports = db.reports.filter(
+      (rep: any) => rep.userId === ctx.uid && rep.createdAt >= startOfDayMs
+    );
+    if (recentReports.length >= 3) {
+      return new Response(JSON.stringify({ error: "daily limit reached." }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" }
       });
-      await client.close();
-
-      if (count >= 3) {
-        return new Response(JSON.stringify({ error: "daily limit reached." }), {
-          status: 429,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
     }
 
     const reportId = "rep_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
@@ -72,29 +56,10 @@ export async function POST(req: NextRequest) {
       createdAt: Date.now()
     };
 
-    if (isLocalEnv()) {
-      const db = getLocalDb() as any;
-      db.reports = db.reports || [];
-      db.reports.push(newReport);
-      saveLocalDb(db);
+    db.reports.push(newReport);
+    saveLocalDb(db);
 
-      return new Response(JSON.stringify({ success: true, message: "Report saved locally.", report: newReport }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Production: Save directly to MongoDB 'reports' collection
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    const db = client.db(getDbTarget());
-    
-    await db.collection("reports").insertOne(newReport);
-    await client.close();
-
-    return new Response(JSON.stringify({ success: true, message: "Report submitted successfully.", report: newReport }), {
+    return new Response(JSON.stringify({ success: true, message: "Report saved locally.", report: newReport }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

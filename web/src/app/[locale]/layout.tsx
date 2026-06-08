@@ -4,6 +4,7 @@ import "../globals.css";
 import { LanguageProvider, Language } from "../../context/LanguageContext";
 import StickyChat from "../../components/StickyChat";
 import AnalyticsProvider from "../../components/AnalyticsProvider";
+import ScreenLock from "../../components/ScreenLock";
 import React from "react";
 import Script from "next/script";
 
@@ -154,11 +155,6 @@ export function generateStaticParams() {
   return [
     { locale: "en" },
     { locale: "ar" },
-    { locale: "es" },
-    { locale: "fr" },
-    { locale: "de" },
-    { locale: "zh" },
-    { locale: "it" },
   ];
 }
 
@@ -220,7 +216,9 @@ export default async function LocaleLayout({
       <body>
         <LanguageProvider locale={locale as Language}>
           <AnalyticsProvider>
-            {children}
+            <ScreenLock>
+              {children}
+            </ScreenLock>
             <StickyChat />
           </AnalyticsProvider>
         </LanguageProvider>

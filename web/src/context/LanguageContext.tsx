@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
-export type Language = "en" | "ar" | "es" | "fr" | "de" | "zh" | "it";
+export type Language = "en" | "ar";
 
 export interface LanguageContextType {
   language: Language;
@@ -14,21 +14,11 @@ export interface LanguageContextType {
 
 import en from "../dictionaries/en.json";
 import ar from "../dictionaries/ar.json";
-import es from "../dictionaries/es.json";
-import fr from "../dictionaries/fr.json";
-import de from "../dictionaries/de.json";
-import zh from "../dictionaries/zh.json";
-import it from "../dictionaries/it.json";
 
 const translations: Record<Language, any> = {
   en,
-  ar,
-  es,
-  fr,
-  de,
-  zh,
-  it
-};;
+  ar
+};
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 

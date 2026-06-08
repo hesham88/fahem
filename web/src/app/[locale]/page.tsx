@@ -400,11 +400,6 @@ export default function LandingPage() {
               >
                 <option value="en">English</option>
                 <option value="ar">العربية</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="zh">中文</option>
-                <option value="it">Italiano</option>
               </select>
             </div>
           </li>

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getLocalDb, saveLocalDb, isLocalEnv, getDbTarget } from "../../localDbHelper";
+import { proxyRequest } from "../../proxy";
 import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
@@ -18,19 +19,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Production: read from MongoDB
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    const db = client.db(getDbTarget());
-    const reports = await db.collection("reports").find({}).sort({ createdAt: -1 }).toArray();
-    await client.close();
-
-    return new Response(JSON.stringify({ success: true, reports }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    // Production: read from MongoDB via proxy
+    return await proxyRequest("/admin/reports", "GET", undefined, ctx);
 
   } catch (err: any) {
     console.error("[admin-reports-api] GET failed:", err);
@@ -83,30 +73,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Production: update in MongoDB
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    const db = client.db(getDbTarget());
-    
-    const result = await db.collection("reports").updateOne(
-      { _id: reportId },
-      { $set: { status } }
-    );
-    await client.close();
-
-    if (result.matchedCount === 0) {
-      return new Response(JSON.stringify({ error: "Report not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true, message: "Report status updated." }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    // Production: update in MongoDB via proxy
+    return await proxyRequest("/admin/reports", "POST", { reportId, status }, ctx);
 
   } catch (err: any) {
     console.error("[admin-reports-api] POST failed:", err);

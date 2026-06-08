@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { isLocalEnv, getLocalDb, dbContextStorage } from "./localDbHelper";
+import { proxyRequest } from "./proxy";
 import crypto from "crypto";
 
 export type Role = "anonymous" | "user" | "student" | "teacher" | "admin" | "super-admin" | "judge";
@@ -70,24 +71,16 @@ export async function resolveRole(uid: string, email: string | null): Promise<Ro
     }
   } else {
     try {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db("fahem");
-      
-      const user = await db.collection("users").findOne({
-        $or: [
-          { userId: uid },
-          ...(normalizedEmail ? [{ email: normalizedEmail }] : [])
-        ]
-      });
-      await client.close();
-      if (user && user.role) {
-        return user.role as Role;
+      const url = `/auth/resolve-role?uid=${encodeURIComponent(uid)}` + (normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : "");
+      const res = await proxyRequest(url, "GET");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.role) {
+          return data.role as Role;
+        }
       }
     } catch (dbErr) {
-      console.error("[auth] Failed to retrieve user role from production database:", dbErr);
+      console.error("[auth] Failed to retrieve user role from production database via proxy:", dbErr);
     }
   }
 
@@ -117,16 +110,16 @@ async function getDBConfig() {
     return getLocalDb().config || { evalSandboxEnabled: false };
   }
   try {
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    const db = client.db("fahem");
-    const config = await db.collection("config").findOne({});
-    await client.close();
-    return config || { evalSandboxEnabled: false };
+    const res = await proxyRequest("/admin/config", "GET");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        return data.config;
+      }
+    }
+    return { evalSandboxEnabled: false };
   } catch (err) {
-    console.error("[auth] Failed to retrieve config from production DB:", err);
+    console.error("[auth] Failed to retrieve config from production DB via proxy:", err);
     return getLocalDb().config || { evalSandboxEnabled: false };
   }
 }
@@ -185,18 +178,15 @@ export async function verifyAuth(req: Request): Promise<AuthCtx | null> {
           }
         } else {
           try {
-            const { MongoClient } = require("mongodb");
-            const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-            const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-            await client.connect();
-            const db = client.db("fahem");
-            const session = await db.collection("demo_sessions").findOne({ sandbox_session_id: ctx.sandbox_session_id });
-            await client.close();
-            if (session && (session.status === "killed" || session.status === "ended")) {
-              isKilled = true;
+            const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(ctx.sandbox_session_id)}`, "GET");
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && (data.status === "killed" || data.status === "ended")) {
+                isKilled = true;
+              }
             }
           } catch (err) {
-            console.error("[auth] Failed to check demo session status in production DB:", err);
+            console.error("[auth] Failed to check demo session status in production DB via proxy:", err);
           }
         }
       }

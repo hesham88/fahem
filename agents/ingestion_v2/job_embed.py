@@ -190,6 +190,36 @@ def main():
         nonlocal embedded_count
         check_cooperative_control(job_id, is_local, logs)
         
+        # Check if already embedded (carried over from cache)
+        if p_doc.get("embedding") and p_doc.get("status") == "embedded":
+            print(f"[Embed Worker] ⚡ Page {p_doc.get('page_number')} already embedded in cache! Skipping API call.", flush=True)
+            with state_lock:
+                embedded_count += 1
+                current_embedded = embedded_count
+                pct = 86 + int((current_embedded / actual_pages_count) * 12)  # Range 86% - 98%
+                sub_pct = (current_embedded / actual_pages_count) * 100.0
+                bar = make_progress_bar(sub_pct, width=20)
+                
+                # Compute ETA
+                elapsed = time.time() - embed_start_time
+                avg_time = elapsed / current_embedded
+                rem_pages = actual_pages_count - current_embedded
+                eta_s = int(avg_time * rem_pages)
+                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                
+                log_msg = f"{bar} Page {p_doc.get('page_number')}/{actual_pages_count} loaded from Cache (Status: embedded) [ETA {eta_str}]."
+                print(f"[JOB 5: EMBED] {log_msg}", flush=True)
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
+            
+            # Update database with cached page doc (protected by thread lock)
+            with db_write_lock:
+                update_job_status(
+                    job_id, "processing", "embed", pct, logs,
+                    processed_pages=current_embedded, total_pages=actual_pages_count,
+                    is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
+                )
+            return
+
         blocks = p_doc.get("blocks", [])
         
         # 1. Chunk on boundary blocks
@@ -264,7 +294,15 @@ def main():
             pct = 86 + int((current_embedded / actual_pages_count) * 12)  # Range 86% - 98%
             sub_pct = (current_embedded / actual_pages_count) * 100.0
             bar = make_progress_bar(sub_pct, width=20)
-            log_msg = f"{bar} Processed page {p_doc.get('page_number')}/{actual_pages_count} (Status: {p_doc['status']})."
+            
+            # Compute ETA
+            elapsed = time.time() - embed_start_time
+            avg_time = elapsed / current_embedded
+            rem_pages = actual_pages_count - current_embedded
+            eta_s = int(avg_time * rem_pages)
+            eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+            
+            log_msg = f"{bar} Processed page {p_doc.get('page_number')}/{actual_pages_count} (Status: {p_doc['status']}) [ETA {eta_str}]."
             print(f"[JOB 5: EMBED] {log_msg}", flush=True)
             logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] {log_msg}")
         
@@ -279,6 +317,9 @@ def main():
     # Launch ThreadPoolExecutor
     max_workers = min(3, actual_pages_count)
     logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Spawning ThreadPoolExecutor with {max_workers} parallel workers.")
+    
+    embed_start_time = time.time()
+    
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(process_and_embed_page, idx, p_doc): p_doc for idx, p_doc in enumerate(translated_pages)}
         for fut in as_completed(futures):

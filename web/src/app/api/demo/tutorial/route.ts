@@ -37,18 +37,18 @@ export async function POST(req: NextRequest) {
 
     if (!isLocalEnv()) {
       try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-        await client.connect();
-        const mongoDb = client.db("fahem");
-        await mongoDb.collection("demo_sessions").updateOne(
-          { sandbox_session_id: authCtx.sandbox_session_id },
-          { $set: { ...updateFields, last_active_at: Math.floor(Date.now() / 1000) } }
-        );
-        await client.close();
+        const { proxyRequest } = require("../../proxy");
+        const proxyRes = await proxyRequest("/user/demo/tutorial", "POST", {
+          sandbox_session_id: authCtx.sandbox_session_id,
+          tutorial_shown,
+          tutorial_skipped,
+          tutorial_step_reached
+        }, authCtx);
+        if (!proxyRes.ok) {
+          console.error("[demo-tutorial] Failed to update demo session via proxy:", await proxyRes.text());
+        }
       } catch (err) {
-        console.error("[demo-tutorial] Failed to update demo session in Mongo DB:", err);
+        console.error("[demo-tutorial] Failed to proxy update demo session:", err);
       }
     }
 

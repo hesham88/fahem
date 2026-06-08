@@ -29,6 +29,9 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
     if not uri:
         return uri
     uri = uri.strip()
+    is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+    if not is_gcp:
+        uri = uri.replace("fahemcluster-pri.trf718.mongodb.net", "fahemcluster.trf718.mongodb.net")
     if not uri.startswith("mongodb+srv://"):
         return uri
     try:
@@ -143,6 +146,11 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
         # Reconstruct query string
         merged_query = "&".join([f"{k}={v}" for k, v in query_params.items()])
         final_db_part = f"{path}?{merged_query}" if merged_query else path
+
+        # Safeguard for local environment: -pri hosts are internal VPC peering only.
+        is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+        if not is_gcp and "-pri" in resolved_hosts:
+            return uri
 
         resolved_uri = f"mongodb://{creds_part}{resolved_hosts}{final_db_part}"
         return resolved_uri

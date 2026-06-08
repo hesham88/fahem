@@ -49,18 +49,15 @@ export async function createNotification(params: CreateNotificationParams): Prom
       return true;
     }
 
-    // Production MongoDB integration
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 });
-    await client.connect();
-    
-    const db = client.db(getDbTarget());
-    await db.collection("notifications").insertOne(newNotif);
-    await client.close();
-
-    console.log(`[Notification Helper] MongoDB created notification ${newNotif._id} for ${recipient_uid}`);
-    return true;
+    const { proxyRequest } = require("../proxy");
+    const proxyRes = await proxyRequest("/notifications", "POST", params);
+    if (proxyRes.ok) {
+      console.log(`[Notification Helper] Backend created notification via proxy for ${recipient_uid}`);
+      return true;
+    } else {
+      console.error(`[Notification Helper] Backend failed to create notification:`, await proxyRes.text());
+      return false;
+    }
   } catch (err) {
     console.error("[Notification Helper] Error creating notification:", err);
     return false;

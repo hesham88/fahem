@@ -28,18 +28,16 @@ async function getJobMetadata(jobId: string): Promise<any> {
     }
   } else {
     try {
-      if (shouldSkipDirectMongo()) {
-        throw new Error("Direct database connections skipped on App Hosting Serverless");
+      const res = await proxyRequest(`/user/books/jobs?jobId=${encodeURIComponent(jobId)}`, "GET");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.job) {
+          return data.job;
+        }
       }
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-      const job = await db.collection("ingestion_jobs").findOne({ _id: jobId });
-      await client.close();
-      return job || null;
+      return null;
     } catch (e) {
+      console.error("[agent-api] getJobMetadata failed via proxy:", e);
       return null;
     }
   }

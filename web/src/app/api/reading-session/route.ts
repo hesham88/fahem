@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "../_auth";
-import { isLocalEnv, getLocalDb, saveLocalDb, shouldSkipDirectMongo, getDbTarget } from "../localDbHelper";
+import { isLocalEnv, getLocalDb, saveLocalDb } from "../localDbHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -9,29 +9,15 @@ export async function GET(req: NextRequest) {
     const ctx = await requireUser(req);
     if (ctx instanceof Response) return ctx;
 
-    const uid = ctx.uid;
-    let sessions: any[] = [];
-    let mongoClient: any = null;
-
-    if (isLocalEnv()) {
-      const db = getLocalDb();
-      sessions = db.reading_sessions || [];
-      sessions = sessions.filter((s: any) => s.uid === uid);
-    } else {
-      try {
-        if (!shouldSkipDirectMongo()) {
-          const { MongoClient } = require("mongodb");
-          const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-          mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-          await mongoClient.connect();
-          const db = mongoClient.db(getDbTarget());
-          sessions = await db.collection("reading_sessions").find({ uid: uid }).toArray();
-          await mongoClient.close();
-        }
-      } catch (mongoErr) {
-        console.error("[api-reading-session GET] MongoDB connection failed:", mongoErr);
-      }
+    if (!isLocalEnv()) {
+      const { proxyRequest } = require("../proxy");
+      return await proxyRequest("/user/reading-sessions", "GET", undefined, ctx);
     }
+
+    const uid = ctx.uid;
+    const db = getLocalDb() as any;
+    let sessions = db.reading_sessions || [];
+    sessions = sessions.filter((s: any) => s.uid === uid);
 
     return new Response(JSON.stringify({ success: true, sessions }), {
       status: 200,
@@ -69,33 +55,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!isLocalEnv()) {
+      const { proxyRequest } = require("../proxy");
+      return await proxyRequest("/user/reading-sessions", "POST", body, ctx);
+    }
+
     const uid = ctx.uid;
     const sessionKey = `rs_${uid}_${bookId}`;
 
-    let session: any = null;
-    let localDb: any = null;
-    let mongoClient: any = null;
-
-    if (isLocalEnv()) {
-      localDb = getLocalDb();
-      if (!localDb.reading_sessions) {
-        localDb.reading_sessions = [];
-      }
-      session = localDb.reading_sessions.find((s: any) => s._id === sessionKey);
-    } else {
-      try {
-        if (!shouldSkipDirectMongo()) {
-          const { MongoClient } = require("mongodb");
-          const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-          mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-          await mongoClient.connect();
-          const db = mongoClient.db(getDbTarget());
-          session = await db.collection("reading_sessions").findOne({ _id: sessionKey });
-        }
-      } catch (mongoErr) {
-        console.error("[api-reading-session] MongoDB connection failed, trying fallback:", mongoErr);
-      }
+    const localDb = getLocalDb() as any;
+    if (!localDb.reading_sessions) {
+      localDb.reading_sessions = [];
     }
+    let session = localDb.reading_sessions.find((s: any) => s._id === sessionKey);
 
     const now = Date.now();
 
@@ -143,31 +115,20 @@ export async function POST(req: NextRequest) {
       session.tokens_spent = (session.tokens_spent || 0) + Number(tokens);
     }
 
-    // Save back to db
-    if (isLocalEnv()) {
-      const idx = localDb.reading_sessions.findIndex((s: any) => s._id === sessionKey);
-      if (idx !== -1) {
-        localDb.reading_sessions[idx] = session;
-      } else {
-        localDb.reading_sessions.push(session);
-      }
-      saveLocalDb(localDb);
-    } else if (mongoClient) {
-      const db = mongoClient.db(getDbTarget());
-      await db.collection("reading_sessions").updateOne(
-        { _id: sessionKey },
-        { $set: session },
-        { upsert: true }
-      );
-      await mongoClient.close();
+    const idx = localDb.reading_sessions.findIndex((s: any) => s._id === sessionKey);
+    if (idx !== -1) {
+      localDb.reading_sessions[idx] = session;
+    } else {
+      localDb.reading_sessions.push(session);
     }
+    saveLocalDb(localDb);
 
     return new Response(JSON.stringify({ success: true, session }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
   } catch (err: any) {
-    console.error("[api-reading-session] Error:", err);
+    console.error("[api-reading-session POST] Error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" }

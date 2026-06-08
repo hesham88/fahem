@@ -146,49 +146,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2. Production: Check MongoDB or proxy to Cloud Run Agent
-    try {
-      if (shouldSkipDirectMongo()) {
-        throw new Error("Direct database connections skipped on App Hosting Serverless");
-      }
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
+    if (!isLocalEnv()) {
+      const params = new URLSearchParams();
+      if (subjectId) params.append("subject_id", subjectId);
+      if (bookId) params.append("book_id", bookId);
 
-      if (bookId) {
-        const book = await db.collection("books").findOne({ _id: bookId });
-        await client.close();
-        if (!book) {
-          return new Response(JSON.stringify({ error: "Book not found in database" }), {
-            status: 404,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        // IDOR Protection
-        if (book.userId && book.userId !== ctx.uid && !isAdmin) {
-          return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view this book" }), {
-            status: 403,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        return new Response(JSON.stringify({ success: true, book }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      await client.close();
-    } catch (mongoErr) {
-      // Fallback if mongo is unreachable
+      return await proxyRequest(`/user/books?${params.toString()}`, "GET", undefined, ctx);
     }
-
-    const params = new URLSearchParams();
-    if (subjectId) params.append("subject_id", subjectId);
-    if (bookId) params.append("book_id", bookId);
-
-    return await proxyRequest(`/user/books?${params.toString()}`, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
@@ -492,79 +456,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Production: Update MongoDB
-    try {
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-
-      await db.collection("books").updateOne(
-        { _id: bookId },
-        { $set: draftBook },
-        { upsert: true }
-      );
-      await client.close();
-    } catch (mongoErr) {
-      // Ignore Mongo error
     }
-
-    // Also trigger python process in production container
-    try {
-      const pythonPath = "python";
-      const scriptPath = resolveScriptPath(path.join("ingestion_v2", "job_fetch.py"));
-
-      const payload = {
-        book_id: bookId,
-        subject_id: resolvedSubjectId,
-        title: resolvedTitle,
-        title_ar: resolvedTitleAr,
-        source_url: resolvedSourceUrl,
-        storage_path: resolvedStoragePath,
-        grade: grade || "General",
-        term: term || "Term 1",
-        year: year || "2026",
-        language: language || "ar",
-        book_type: book_type || "core",
-        is_private: isPrivate,
-        userId: userId || null,
-        is_local: false
-      };
-
-      logToServerFile(`[PROD INGEST] Triggering production container ingestion for book: "${resolvedTitle}" (ID: ${bookId})`);
-      logToServerFile(`[PROD INGEST] Script path: "${scriptPath}"`);
-      logToServerFile(`[PROD INGEST] Payload sent to python stdin: ${JSON.stringify(payload, null, 2)}`);
-
-      const child = spawn(pythonPath, [scriptPath], { env: process.env });
-      global.activeBookJobs?.set(bookId, child);
-
-      logToServerFile(`[PROD INGEST] Child process spawned successfully with PID: ${child.pid}`);
-
-      child.stdin.write(JSON.stringify(payload));
-      child.stdin.end();
-
-      child.stdout.on("data", (data) => {
-        const outStr = data.toString().trim();
-        logToServerFile(`[PROD PROCESS stdout] [PID ${child.pid}] ${outStr}`);
-      });
-      child.stderr.on("data", (data) => {
-        const errStr = data.toString().trim();
-        logToServerFile(`[PROD PROCESS stderr] [PID ${child.pid}] ⚠️ ${errStr}`);
-      });
-      child.on("close", (code) => {
-        global.activeBookJobs?.delete(bookId);
-        logToServerFile(`[PROD INGEST] Child process (PID ${child.pid}) exited cleanly with code: ${code}`);
-      });
-    } catch (e: any) {
-      logToServerFile(`[PROD INGEST CRITICAL ERROR] Failed to spawn process: ${e.message}\n${e.stack}`);
-    }
-
-    // Return proxy result or fallback success
-    return new Response(JSON.stringify({ success: true, message: "Book ingestion job dispatched to production container.", book: draftBook }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
 
   } catch (err: any) {
     console.error("[api-books-post] failed:", err);
@@ -620,27 +512,9 @@ export async function PUT(req: NextRequest) {
 
     const titleTranslations = await translateMetadata(title || title_ar);
 
-    if (isLocalEnv()) {
-      const db = getLocalDb() as any;
-      const idx = db.books.findIndex((b: any) => b._id === id);
-      if (idx < 0) {
-        return new Response(JSON.stringify({ error: "Book not found locally" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      // Determine total pages
-      let total_pages = db.books[idx].total_pages || 120;
-      if (chapters && Array.isArray(chapters)) {
-        try {
-          const maxPage = Math.max(...chapters.map((ch: any) => parseInt(ch.end_page || 0)));
-          if (maxPage > 0) total_pages = maxPage;
-        } catch (e) {}
-      }
-
-      db.books[idx] = {
-        ...db.books[idx],
+    if (!isLocalEnv()) {
+      return await proxyRequest("/user/books", "PUT", {
+        id,
         subject_id,
         title,
         title_ar,
@@ -650,68 +524,37 @@ export async function PUT(req: NextRequest) {
         title_de: titleTranslations.de || title,
         title_zh: titleTranslations.zh || title,
         title_it: titleTranslations.it || title,
-        grade: grade || "General",
-        term: term || "Term 1",
-        year: year || "2026",
-        language: language || "ar",
-        book_type: book_type || "core",
-        source_url: source_url || "",
-        storage_path: storage_path || "",
-        chapters: chapters || [],
-        total_pages,
-        updated_at: Date.now() / 1000
-      };
+        grade,
+        term,
+        year,
+        language,
+        book_type,
+        source_url,
+        storage_path,
+        chapters
+      }, ctx);
+    }
 
-      saveLocalDb(db);
-      return new Response(JSON.stringify({ success: true, book: db.books[idx] }), {
-        status: 200,
+    const db = getLocalDb() as any;
+    const idx = db.books.findIndex((b: any) => b._id === id);
+    if (idx < 0) {
+      return new Response(JSON.stringify({ error: "Book not found locally" }), {
+        status: 404,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // Production: Update MongoDB directly
-    try {
-      if (shouldSkipDirectMongo()) {
-        throw new Error("Direct database connections skipped on App Hosting Serverless");
-      }
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-      await db.collection("books").updateOne(
-        { _id: id },
-        {
-          $set: {
-            subject_id,
-            title,
-            title_ar,
-            title_en: titleTranslations.en || title,
-            title_es: titleTranslations.es || title,
-            title_fr: titleTranslations.fr || title,
-            title_de: titleTranslations.de || title,
-            title_zh: titleTranslations.zh || title,
-            title_it: titleTranslations.it || title,
-            grade: grade || "General",
-            term: term || "Term 1",
-            year: year || "2026",
-            language: language || "ar",
-            book_type: book_type || "core",
-            source_url: source_url || "",
-            storage_path: storage_path || "",
-            chapters: chapters || [],
-            updated_at: Date.now() / 1000
-          }
-        }
-      );
-      await client.close();
-    } catch (mongoErr) {
-      console.error("[PUT Book Mongo Error]:", mongoErr);
+    // Determine total pages
+    let total_pages = db.books[idx].total_pages || 120;
+    if (chapters && Array.isArray(chapters)) {
+      try {
+        const maxPage = Math.max(...chapters.map((ch: any) => parseInt(ch.end_page || 0)));
+        if (maxPage > 0) total_pages = maxPage;
+      } catch (e) {}
     }
 
-    // Proxy to Cloud Run Agent
-    return await proxyRequest("/user/books", "PUT", {
-      id,
+    db.books[idx] = {
+      ...db.books[idx],
       subject_id,
       title,
       title_ar,
@@ -721,15 +564,23 @@ export async function PUT(req: NextRequest) {
       title_de: titleTranslations.de || title,
       title_zh: titleTranslations.zh || title,
       title_it: titleTranslations.it || title,
-      grade,
-      term,
-      year,
-      language,
-      book_type,
-      source_url,
-      storage_path,
-      chapters
-    }, ctx);
+      grade: grade || "General",
+      term: term || "Term 1",
+      year: year || "2026",
+      language: language || "ar",
+      book_type: book_type || "core",
+      source_url: source_url || "",
+      storage_path: storage_path || "",
+      chapters: chapters || [],
+      total_pages,
+      updated_at: Date.now() / 1000
+    };
+
+    saveLocalDb(db);
+    return new Response(JSON.stringify({ success: true, book: db.books[idx] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
 
   } catch (err: any) {
     console.error("[api-books-put] failed:", err);

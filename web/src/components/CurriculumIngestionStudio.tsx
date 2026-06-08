@@ -840,6 +840,35 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     }
   };
 
+  const handleControlJob = async (bookId: string, jobId: string, action: "pause" | "resume" | "kill") => {
+    try {
+      const res = await authedFetch('/api/books/control', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ bookId, jobId, action })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        let msg = "";
+        if (action === "pause") {
+          msg = isAr ? "⏸️ تم إيقاف المهمة مؤقتاً!" : "⏸️ Ingestion job paused cooperatively!";
+        } else if (action === "resume") {
+          msg = isAr ? "▶️ تم استئناف المهمة بنجاح!" : "▶️ Ingestion job resumed successfully!";
+        } else {
+          msg = isAr ? "🛑 تم إنهاء المهمة بنجاح!" : "🛑 Ingestion job force terminated!";
+        }
+        triggerToast(msg);
+        fetchQueueJobs();
+      } else {
+        triggerToast(data.error || "Failed to control job", true);
+      }
+    } catch (err: any) {
+      triggerToast(err.message, true);
+    }
+  };
+
   const activeLibrary = libraries.find(l => l._id === selectedLibId);
 
   return (
@@ -1647,11 +1676,74 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                               <span className="progress-percent">{job.progress}% ({job.processedPages}/{job.totalPages} pgs)</span>
                             </div>
                           )}
-                          {["processing", "queued", "downloading"].includes(job.status) && (
-                            <button onClick={() => handleTerminateJob(job.id)} className="cancel-job-link-btn">
-                              {t("term_job_btn")}
-                            </button>
-                          )}
+                          <div className="job-control-actions" style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                            {["processing", "queued", "downloading"].includes(job.status) && (
+                              <button
+                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "pause")}
+                                className="control-btn"
+                                style={{
+                                  background: "rgba(245, 158, 11, 0.15)",
+                                  color: "#f59e0b",
+                                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                                  borderRadius: "4px",
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                ⏸️ {isAr ? "إيقاف مؤقت" : "Pause"}
+                              </button>
+                            )}
+                            {job.status === "paused" && (
+                              <button
+                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "resume")}
+                                className="control-btn"
+                                style={{
+                                  background: "rgba(16, 185, 129, 0.15)",
+                                  color: "#10b981",
+                                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                                  borderRadius: "4px",
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                ▶️ {isAr ? "استئناف" : "Resume"}
+                              </button>
+                            )}
+                            {["processing", "paused", "queued", "downloading"].includes(job.status) && (
+                              <button
+                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "kill")}
+                                className="control-btn"
+                                style={{
+                                  background: "rgba(239, 68, 68, 0.15)",
+                                  color: "#ef4444",
+                                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                                  borderRadius: "4px",
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                🛑 {isAr ? "إنهاء فوراً" : "Force Kill"}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}
