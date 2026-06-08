@@ -2,7 +2,7 @@
   "task": "OR-15",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "4af4d6773c6d45094e2ff700b1efe5f7fdb0deb6",
+  "sha": "febb7cb3e455897894aa6160f6291ed8e27f47d8",
   "frontend_revision": "2026-06-08T21:11:50.129Z",
   "backend_revision": "fahem-agent-00150-z9b",
   "smoke": {
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. The screenshot depicts a fully functional and populated dashboard interface. The layout is intact, featuring a structured navigation sidebar (Admin Controls, Academic Space, Language/Theme settings, user profile, and token count) and a main content area that displays a dynamic \"Whitelisted Judge Sandbox\" portal. The content includes functional components like interactive tab selectors, a \"Welcome\" modal overlay, breadcrumb-like navigation, and clear iconography. The presence of specific user data (e.g., email address, token usage \"42/100\") and a well-defined information architecture confirms this is a rendering of a live application interface rather than a blank or broken state.",
-  "timestamp": 1780953486
+  "vision_verdict": "pass. The screenshot displays a fully rendered, functional interface for the Fahem learning platform. The layout is intact with a complete navigation sidebar (including Admin Controls and Academic Space), a functional header area with persona selection for the \"Whitelisted Judge Sandbox Console,\" and a content area titled \"Interactive Knowledge Library.\" \n\nSpecific elements confirming it is a working page include:\n* **Interactive elements:** Buttons for \"Curriculum Libraries\" and \"Private Study Vault,\" a theme toggle icon, a dropdown menu for language, and a \"Sign Out\" button.\n* **Dynamic data:** The \"Daily Tokens\" progress bar reflects specific status (42/100), and there is an active user profile (\"DEM...\") with a \"JUDGE\" badge and email address.\n* **Component structure:** The page features a consistent grid and card-based design with distinct headers, typography, and iconography, indicating a fully developed front-end rather than a static or broken page. While the \"All Libraries\" section shows \"0 Books,\" this is a functional state of an empty library rather than a UI error or failure to load.",
+  "timestamp": 1780954314
 }
