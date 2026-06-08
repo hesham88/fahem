@@ -37,8 +37,9 @@ agy.exe*
 firebase-debug.log
 build_log*.txt
 
-# Ignore temporary folders
+# Ignore all temporary folders and subfolders recursively (e.g., temp/ and temp/bible_progress/)
 temp/
+**/temp/
 temp_test_book_1.pdf
 
 # Ignore scratchpad / experimental scripts

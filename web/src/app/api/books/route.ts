@@ -456,8 +456,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    }
-
   } catch (err: any) {
     console.error("[api-books-post] failed:", err);
     return new Response(JSON.stringify({ error: err.message }), {
