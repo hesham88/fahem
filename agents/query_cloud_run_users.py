@@ -1,7 +1,7 @@
 import httpx
 import json
 
-url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/user/list"
+url = "https://fahem-agent-1061555578804.us-east4.run.app/user/list"
 print("Querying Cloud Run user list...")
 try:
     res = httpx.get(url, timeout=10.0)

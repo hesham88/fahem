@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
+import { getLocalDb, saveLocalDb, isLocalEnv, dbContextStorage } from "../../localDbHelper";
 import { requireAdmin } from "../../_auth";
 import { proxyRequest } from "../../proxy";
 
@@ -43,6 +43,45 @@ export async function POST(req: NextRequest) {
         db.demo_sessions[index].status = "killed";
         db.demo_sessions[index].ended_at = Math.floor(Date.now() / 1000);
         db.demo_sessions[index].kill_reason = "Admin intervention";
+
+        // Wipe local session-tagged data in sandbox database
+        const uid = db.demo_sessions[index].uid;
+        if (uid) {
+          dbContextStorage.run({ db_target: "fahem_sandbox" }, () => {
+            const sandboxDb = getLocalDb() as any;
+            
+            // Collections to purge
+            const collectionsToPurge = [
+              "users",
+              "user_profiles",
+              "messages",
+              "threads",
+              "social_threads",
+              "social_replies",
+              "companion_facts",
+              "companion_memories",
+              "active_practice_sessions",
+              "demo_activities",
+              "reading_sessions",
+              "user_activities",
+              "notifications"
+            ];
+            
+            collectionsToPurge.forEach((colName) => {
+              if (sandboxDb[colName] && Array.isArray(sandboxDb[colName])) {
+                const initialCount = sandboxDb[colName].length;
+                sandboxDb[colName] = sandboxDb[colName].filter((item: any) => {
+                  const matchesUid = item.userId === uid || item.uid === uid || item.recipient_uid === uid || item.author_id === uid || item.authorId === uid;
+                  const matchesSession = item.sandbox_session_id === sandbox_session_id;
+                  return !matchesUid && !matchesSession;
+                });
+                console.log(`[local-demo-action] Cleaned up '${colName}' in local fahem_sandbox: removed ${initialCount - sandboxDb[colName].length} docs`);
+              }
+            });
+            
+            saveLocalDb(sandboxDb);
+          });
+        }
       } else if (action === "quota") {
         db.demo_sessions[index].token_budget = Number(quota_value) || 250000;
       }

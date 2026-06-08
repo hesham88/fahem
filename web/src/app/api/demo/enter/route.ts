@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     const sessionDoc = {
       _id: "demo_session_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
       sandbox_session_id: sandboxSessionId,
+      uid: uid,
       email: email,
       verified: isVerified,
       tier: tier,

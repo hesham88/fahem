@@ -218,6 +218,18 @@
         "sandboxSessionId": "sb_sess_1780949882478_za3ps",
         "ip": "::1"
       }
+    },
+    {
+      "userId": "demo_anon_xqx3ls0z",
+      "action": "enter_demo",
+      "timestamp": "2026-06-08T20:31:13.511Z",
+      "details": {
+        "email": "playwright-test@fahem.pro",
+        "tier": 0,
+        "role": "student",
+        "sandboxSessionId": "sb_sess_1780950673511_otjry",
+        "ip": "::1"
+      }
     }
   ],
   "crawl_jobs": [
@@ -442,6 +454,28 @@
       "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36",
       "started_at": 1780949882,
       "last_active_at": 1780949886,
+      "ended_at": null,
+      "duration_seconds": 0,
+      "tutorial_shown": true,
+      "tutorial_skipped": false,
+      "tutorial_step_reached": 1,
+      "token_budget": 250000,
+      "tokens_used": 0,
+      "action_count": 0,
+      "status": "active"
+    },
+    {
+      "_id": "demo_session_1780950673511_40ftk",
+      "sandbox_session_id": "sb_sess_1780950673511_otjry",
+      "uid": "demo_anon_xqx3ls0z",
+      "email": "playwright-test@fahem.pro",
+      "verified": false,
+      "tier": 0,
+      "persona": "student",
+      "ip": "::1",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36",
+      "started_at": 1780950673,
+      "last_active_at": 1780950677,
       "ended_at": null,
       "duration_seconds": 0,
       "tutorial_shown": true,

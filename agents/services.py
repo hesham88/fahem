@@ -3078,6 +3078,50 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         }
                     }
                 )
+                
+                # Perform sandbox database clean-up to fully restore the baseline
+                uid = session.get("uid")
+                email = session.get("email")
+                
+                if uid:
+                    logger.info(f"[demo-action] Killing session. Starting clean-up in fahem_sandbox for uid={uid}, email={email}")
+                    try:
+                        sandbox_db = client["fahem_sandbox"]
+                        
+                        # Collections and query fields to search and delete
+                        purge_configs = [
+                            ("users", [{"userId": uid}, {"email": email}]),
+                            ("user_profiles", [{"userId": uid}, {"email": email}]),
+                            ("messages", [{"userId": uid}, {"senderId": uid}]),
+                            ("threads", [{"userId": uid}, {"creatorId": uid}]),
+                            ("social_threads", [{"userId": uid}, {"creatorId": uid}, {"authorId": uid}]),
+                            ("social_replies", [{"userId": uid}, {"authorId": uid}]),
+                            ("companion_facts", [{"userId": uid}]),
+                            ("companion_memories", [{"userId": uid}]),
+                            ("active_practice_sessions", [{"userId": uid}]),
+                            ("demo_activities", [{"userId": uid}]),
+                            ("reading_sessions", [{"userId": uid}]),
+                            ("user_activities", [{"userId": uid}]),
+                            ("notifications", [{"recipient_uid": uid}, {"userId": uid}])
+                        ]
+                        
+                        for col_name, queries in purge_configs:
+                            valid_or = []
+                            for q in queries:
+                                clean_q = {k: v for k, v in q.items() if v}
+                                if clean_q:
+                                    valid_or.append(clean_q)
+                                    
+                            if valid_or:
+                                or_query = {"$or": valid_or}
+                                try:
+                                    res = sandbox_db[col_name].delete_many(or_query)
+                                    logger.info(f"[demo-action] Cleaned up '{col_name}' in fahem_sandbox: deleted {res.deleted_count} docs matching {or_query}")
+                                except Exception as col_err:
+                                    logger.error(f"[demo-action] Error purging collection '{col_name}': {col_err}")
+                                    
+                    except Exception as purge_err:
+                        logger.error(f"[demo-action] Failed sandbox clean-up sequence: {purge_err}", exc_info=True)
             elif action == "quota":
                 session_col.update_one(
                     {"sandbox_session_id": sandbox_session_id},
