@@ -1,0 +1,24 @@
+{
+  "task": "OR-6",
+  "builder": "builder-1",
+  "d_box": "D1",
+  "sha": "cd1639f28de28aa714acb258c577c1cbcc5b40df",
+  "frontend_revision": "2026-06-08T20:35:49.062Z",
+  "backend_revision": "local",
+  "smoke": {
+    "url": "http://localhost:3000",
+    "status": "pass",
+    "assertions": [
+      "D0 - Version Parity validated",
+      "D1 - Sandbox entry (no auth) succeeded",
+      "D1 - Redirected to /home on submit",
+      "D1 - Asserted no 'not eligible' block displayed"
+    ],
+    "screenshots": [
+      "evidence/shots/D1-landing.png",
+      "evidence/shots/D1-home.png"
+    ]
+  },
+  "vision_verdict": "pass. This screenshot depicts a fully functional and populated dashboard interface. The layout is intact, featuring a clear navigation sidebar on the left with functional categories (Admin Controls, Academic Space, Language/Theme settings, and user profile information). The main content area displays a \"Whitelisted Judge Sandbox\" role-selection bar, a well-rendered header for the \"Interactive Knowledge Library,\" and active UI components such as tabbed buttons (Curriculum Libraries, Private Study Vault), a library card with an icon, and an interactive \"Welcome\" onboarding modal overlay with a progress indicator and navigation buttons. The presence of dynamic data—such as the user email \"playwright-test@fahem...\", a token count of \"42/100\", and specific pedagogical labels—confirms that this is a working application view rather than a static or broken mockup.",
+  "timestamp": 1780951250
+}
