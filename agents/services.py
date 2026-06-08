@@ -27,7 +27,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
     # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment with Fail-Closed defaults
     @app.middleware("http")
     async def oidc_security_middleware(request: fastapi.Request, call_next):
-        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha"}
+        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha", "/sms/rate-limit"}
         path = request.url.path
         is_secured = path not in PUBLIC_PATHS and not any(path.startswith(p + "/") for p in PUBLIC_PATHS if p != "/")
         
@@ -4771,6 +4771,98 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to verify recaptcha: {err}", exc_info=True)
             return {"success": False, "status": "error", "error": str(err), "score": 0.0}
+
+    @app.post("/sms/rate-limit")
+    async def post_sms_rate_limit(request: fastapi.Request):
+        try:
+            import datetime
+            from datetime import timedelta
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            
+            data = await request.json()
+            phone = data.get("phone", "").strip()
+            ip = data.get("ip", "").strip()
+            
+            if not phone:
+                return fastapi.responses.JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Phone number is required", "errorAr": "رقم الهاتف مطلوب"}
+                )
+            
+            # Connect to MongoDB
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            now = datetime.datetime.utcnow()
+            one_hour_ago = now - timedelta(hours=1)
+            one_day_ago = now - timedelta(days=1)
+            
+            # 1. Enforce Global Daily SMS Budget: Limit of 100 successful requests per day system-wide.
+            global_daily_count = db.sms_logs.count_documents({
+                "timestamp": {"$gte": one_day_ago}
+            })
+            if global_daily_count >= 100:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    status_code=429,
+                    content={
+                        "success": False,
+                        "error": "Global daily SMS limit reached. Please try again tomorrow.",
+                        "errorAr": "تم الوصول إلى الحد اليومي الأقصى لرسائل التحقق. يرجى المحاولة غداً."
+                    }
+                )
+                
+            # 2. Hourly Phone Limit: Max 3 requests per hour per specific phone number.
+            phone_hourly_count = db.sms_logs.count_documents({
+                "phone": phone,
+                "timestamp": {"$gte": one_hour_ago}
+            })
+            if phone_hourly_count >= 3:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    status_code=429,
+                    content={
+                        "success": False,
+                        "error": "Too many verification requests for this phone number. Please wait an hour.",
+                        "errorAr": "لقد طلبت الكثير من رموز التحقق لهذا الرقم. يرجى الانتظار ساعة والمحاولة مجدداً."
+                    }
+                )
+                
+            # 3. Hourly Location Limit: Max 5 requests per hour per IP address.
+            if ip:
+                ip_hourly_count = db.sms_logs.count_documents({
+                    "ip": ip,
+                    "timestamp": {"$gte": one_hour_ago}
+                })
+                if ip_hourly_count >= 5:
+                    client.close()
+                    return fastapi.responses.JSONResponse(
+                        status_code=429,
+                        content={
+                            "success": False,
+                            "error": "Too many verification requests from this IP. Please wait an hour.",
+                            "errorAr": "لقد طلبت الكثير من رموز التحقق من هذا العنوان. يرجى الانتظار ساعة والمحاولة مجدداً."
+                        }
+                    )
+            
+            # If all checks pass, log the SMS request and return allowed.
+            db.sms_logs.insert_one({
+                "phone": phone,
+                "ip": ip,
+                "timestamp": now
+            })
+            
+            client.close()
+            return {"success": True, "allowed": True}
+            
+        except Exception as err:
+            logger.error(f"[services.py] SMS rate limit check failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err), "errorAr": "فشل التحقق من حد الرسائل القصيرة."}
+            )
 
     @app.post("/admin/recover-orphans")
     async def admin_recover_orphans(request: fastapi.Request):

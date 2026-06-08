@@ -59,7 +59,9 @@ import {
   FiUser,
   FiX,
   FiMenu,
-  FiAward
+  FiAward,
+  FiSun,
+  FiMoon
 } from "react-icons/fi";
 
 interface PresetQuery {
@@ -624,6 +626,34 @@ export default function Home() {
   };
   const isJudge = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
   
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("fahem_theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add("dark");
+      } else {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fahem_theme", nextDark ? "dark" : "light");
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  };
   // Conversational Onboarding states
   const [localCompleted, setLocalCompleted] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -5992,78 +6022,141 @@ export default function Home() {
         </div>
 
         {/* Sidebar Footer (Language + Profile + Sign Out) */}
-        <div className="sidebar-footer">
-          {/* Language Swapper */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <label style={{ fontSize: "0.8rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-              <FiGlobe /> <span>{language === "ar" ? "اللغة" : "Language"}</span>
-            </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as any)}
-              className="sidebar-language-select"
-            >
-              <option value="en">English</option>
-              <option value="ar">العربية</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="zh">中文</option>
-              <option value="it">Italiano</option>
-            </select>
+        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "1.25rem", borderTop: "1px dashed var(--card-border)", background: "rgba(16, 107, 163, 0.01)" }}>
+          {/* Controls: Language + Premium Theme Toggle (W-5) */}
+          <div style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "flex-end" }}>
+            {/* Language Swapper */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
+              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <FiGlobe /> <span>{language === "ar" ? "اللغة" : "Language"}</span>
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="sidebar-language-select"
+                style={{ width: "100%", padding: "6px 10px", fontSize: "0.8rem", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--foreground)" }}
+              >
+                <option value="en">English</option>
+                <option value="ar">العربية</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="zh">中文</option>
+                <option value="it">Italiano</option>
+              </select>
+            </div>
+
+            {/* Premium Theme Switcher */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <span>{language === "ar" ? "المظهر" : "Theme"}</span>
+              </label>
+              <button
+                onClick={toggleTheme}
+                type="button"
+                className="theme-toggle-btn"
+                title={language === "ar" ? "تبديل المظهر" : "Toggle Theme"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  color: "var(--primary)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  outline: "none"
+                }}
+              >
+                {isDarkMode ? (
+                  <FiSun style={{ fontSize: "1.05rem", color: "var(--accent-yellow)" }} />
+                ) : (
+                  <FiMoon style={{ fontSize: "1.05rem", color: "var(--primary)" }} />
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Profile Card */}
+          {/* Profile Card & Token Telemetry */}
           {user && (
-            <div 
-              className="sidebar-user-card" 
-              onClick={() => {
-                const targetUsername = userProfile?.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
-                router.push(`/${language}/profile/${targetUsername}`);
-              }}
-              style={{ cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <div className="sidebar-user-avatar-wrapper" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {userProfile?.avatar ? (
-                  renderAvatar(userProfile.avatar, "1.5rem")
-                ) : user.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName || "User"} className="sidebar-user-avatar" />
-                ) : (
-                  <div className="sidebar-user-avatar" style={{ background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem" }}>
-                    {user.email ? user.email[0].toUpperCase() : "U"}
-                  </div>
-                )}
-              </div>
-              <div className="sidebar-user-info">
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
-                    {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
-                  </span>
-                  {userProfile?.isWhitelisted && (
-                    <span style={{
-                      fontSize: "0.62rem",
-                      fontWeight: 800,
-                      color: "#b8860b",
-                      background: "linear-gradient(135deg, #ffd700, #ffa500)",
-                      padding: "1px 6px",
-                      borderRadius: "6px",
-                      boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)",
-                      whiteSpace: "nowrap",
-                      textShadow: "0 1px 0 rgba(255,255,255,0.4)"
-                    }}>
-                      ⭐ JUDGE
-                    </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", width: "100%" }}>
+              <div 
+                className="sidebar-user-card" 
+                onClick={() => {
+                  const targetUsername = userProfile?.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
+                  router.push(`/${language}/profile/${targetUsername}`);
+                }}
+                style={{ cursor: "pointer", transition: "all 0.2s", margin: 0, width: "100%" }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <div className="sidebar-user-avatar-wrapper" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {userProfile?.avatar ? (
+                    renderAvatar(userProfile.avatar, "1.5rem")
+                  ) : user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || "User"} className="sidebar-user-avatar" />
+                  ) : (
+                    <div className="sidebar-user-avatar" style={{ background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem" }}>
+                      {user.email ? user.email[0].toUpperCase() : "U"}
+                    </div>
                   )}
                 </div>
-                <span className="sidebar-user-email" title={user.email || ""}>
-                  {user.email}
-                </span>
+                <div className="sidebar-user-info">
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
+                      {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
+                    </span>
+                    {userProfile?.isWhitelisted && (
+                      <span style={{
+                        fontSize: "0.62rem",
+                        fontWeight: 800,
+                        color: "#b8860b",
+                        background: "linear-gradient(135deg, #ffd700, #ffa500)",
+                        padding: "1px 6px",
+                        borderRadius: "6px",
+                        boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)",
+                        whiteSpace: "nowrap",
+                        textShadow: "0 1px 0 rgba(255,255,255,0.4)"
+                      }}>
+                        ⭐ JUDGE
+                      </span>
+                    )}
+                  </div>
+                  <span className="sidebar-user-email" title={user.email || ""}>
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+
+              {/* Token-Usage Indicator (W-9) */}
+              <div style={{ 
+                padding: "8px 12px", 
+                background: "rgba(16, 107, 163, 0.04)", 
+                borderRadius: "12px", 
+                border: "1px solid rgba(16, 107, 163, 0.08)",
+                fontSize: "0.75rem",
+                width: "100%"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontWeight: 700 }}>
+                  <span style={{ color: "#6a7c88" }}>⚡ {language === "ar" ? "الرموز اليومية:" : "Daily Tokens:"}</span>
+                  <span style={{ color: "var(--foreground)" }}>{consumedClt} / {totalAllocatedClt}</span>
+                </div>
+                <div style={{ width: "100%", height: "6px", background: "rgba(16, 107, 163, 0.1)", borderRadius: "10px", overflow: "hidden" }}>
+                  <div style={{ 
+                    width: `${Math.min(100, Math.max(0, tokenProgressPercent))}%`, 
+                    height: "100%", 
+                    background: `linear-gradient(90deg, ${tokenProgressPercent > 80 ? "var(--secondary)" : "var(--primary)"}, ${tokenProgressPercent > 80 ? "var(--secondary-hover)" : "var(--accent-green)"})`, 
+                    borderRadius: "10px",
+                    transition: "width 0.4s ease"
+                  }}></div>
+                </div>
               </div>
             </div>
           )}

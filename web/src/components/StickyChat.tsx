@@ -97,6 +97,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "Explain the Calvin Cycle in Biology and what wavelengths chlorophyll absorbs least.",
     preset3_label: "Inchoative Verbs (Grammar)",
     preset3_query: "Explain Kaada and her Sisters and when its predicate must not be associated with 'An'.",
+    preset4_label: "Mitosis vs Meiosis",
+    preset4_query: "What is the key difference between Mitosis and Meiosis in Biology?",
+    preset5_label: "Socrates' Philosophy",
+    preset5_query: "Explain Socrates' method of elenchus (Socratic inquiry) in simple terms.",
     math_label: "📊 Math",
     science_label: "🧬 Science",
     arabic_label: "✍️ Arabic",
@@ -159,6 +163,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "اشرح لي دورة كالفن في الأحياء وما هي الأطوال الموجية الأقل امتصاصاً.",
     preset3_label: "أفعال الشروع (النحو)",
     preset3_query: "اشرح لي قاعدة كاد وأخواتها ومتى يمتنع اقتران خبرها بـ 'أن'.",
+    preset4_label: "الروابط التساهمية",
+    preset4_query: "اشرح الروابط التساهمية في الكيمياء وكيف تتشكل بين الذرات.",
+    preset5_label: "ميكانيكا نيوتن",
+    preset5_query: "اشرح قانون نيوتن الثالث للحركة وأعطني أمثلة عملية من حياتنا اليومية.",
     math_label: "➕ الرياضيات",
     science_label: "🧪 العلوم",
     arabic_label: "📖 اللغة العربية",
@@ -221,6 +229,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "Explique el ciclo de Calvin en biología y qué longitudes de onda absorbe menos la clorofila.",
     preset3_label: "Verbos incoativos (Gramática)",
     preset3_query: "Explique Kaada y sus hermanas y cuándo su predicado no debe asociarse con 'An'.",
+    preset4_label: "Mitosis vs Meiosis",
+    preset4_query: "¿Cuál es la diferencia clave entre la mitosis y la meiosis en biología?",
+    preset5_label: "Filosofía de Sócrates",
+    preset5_query: "Explique el método socrático de elenchus (indagación socrática) en términos sencillos.",
     math_label: "📊 Matemáticas",
     science_label: "🧬 Ciencias",
     arabic_label: "✍️ Árabe",
@@ -282,6 +294,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "Expliquez le cycle de Calvin en biologie et quelles longueurs d'onde la chlorophylle absorbe le moins.",
     preset3_label: "Verbes inchoatifs (Grammaire)",
     preset3_query: "Expliquez Kaada et ses sœurs et quand son prédicat ne doit pas être associé à 'An'.",
+    preset4_label: "Mitose vs Méiose",
+    preset4_query: "Quelle est la différence clé entre la mitose et la méiose en biologie ?",
+    preset5_label: "Philosophie de Socrate",
+    preset5_query: "Expliquez la méthode socratique de l'elenchus (enquête socratique) en termes simples.",
     math_label: "📊 Mathématiques",
     science_label: "🧬 Sciences",
     arabic_label: "✍️ Arabe",
@@ -343,6 +359,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "Erklären Sie den Calvin-Zyklus in der Biologie und welche Wellenlängen Chlorophyll am wenigsten absorbiert.",
     preset3_label: "Inchoative Verben (Grammatik)",
     preset3_query: "Erklären Sie Kaada und ihre Schwestern und wann ihr Prädikat nicht mit 'An' verbunden sein darf.",
+    preset4_label: "Mitose vs. Meiose",
+    preset4_query: "Was ist der Hauptunterschied zwischen Mitose und Meiose in der Biologie?",
+    preset5_label: "Sokrates' Philosophie",
+    preset5_query: "Erklären Sie die sokratische Methode des Elenchus (sokratische Befragung) in einfachen Worten.",
     math_label: "📊 Mathematik",
     science_label: "🧬 Wissenschaft",
     arabic_label: "✍️ Arabisch",
@@ -404,6 +424,10 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset2_query: "解释生物学中的卡尔文循环，以及叶绿素吸收最少的波长。",
     preset3_label: "起始动词（语法）",
     preset3_query: "解释 Kaada 及其姐妹词，以及什么时候它的谓语不能与 'An' 连用。",
+    preset4_label: "有丝分裂与减数分裂",
+    preset4_query: "生物学中有丝分裂和减数分裂的关键区别是什么？",
+    preset5_label: "苏格拉底哲学",
+    preset5_query: "用简单的语言解释苏格拉底的质问法（苏格拉底式探究）。",
     math_label: "📊 数学",
     science_label: "🧬 科学",
     arabic_label: "✍️ 阿拉伯语",
@@ -463,8 +487,12 @@ const chatTranslations: Record<string, Record<string, string>> = {
     preset1_query: "Dammi una domanda pratica sull'inversione di matrici dall'algebra a pagina 14.",
     preset2_label: "Ciclo di Calvin (Biologia)",
     preset2_query: "Spiega il ciclo di Calvin in biologia e quali lunghezze d'onda la clorofilla assorbe meno.",
-    preset3_label: "Verbi incoativi (Grammatica)",
+    preset3_label: "Verbi incoativas (Grammatica)",
     preset3_query: "Spiega Kaada e le sue sorelle e quando il suo predicato non deve essere associato a 'An'.",
+    preset4_label: "Mitosi vs Meiosi",
+    preset4_query: "Qual è la differenza fondamentale tra mitosi e meiosi in biologia?",
+    preset5_label: "Filosofia di Socrate",
+    preset5_query: "Spiega il metodo socratico dell'elenchus (indagine socratica) in termini semplici.",
     math_label: "📊 Matematica",
     science_label: "🧬 Scienze",
     arabic_label: "✍️ Arabo",
@@ -1086,20 +1114,30 @@ export default function StickyChat() {
         label: ct("preset3_label"),
         query: ct("preset3_query"),
         icon: "✍️"
+      },
+      {
+        label: ct("preset4_label"),
+        query: ct("preset4_query"),
+        icon: "🧬"
+      },
+      {
+        label: ct("preset5_label"),
+        query: ct("preset5_query"),
+        icon: "💡"
       }
     ];
 
-    // Combine predictions and fill up to 3 slots
+    // Combine predictions and fill up to 5 slots
     const finalSuggestions = [...suggestions];
     for (const preset of defaultPresets) {
-      if (finalSuggestions.length >= 4) break;
+      if (finalSuggestions.length >= 6) break;
       // Avoid exact duplicates
       if (!finalSuggestions.some((s) => s.label === preset.label)) {
         finalSuggestions.push(preset);
       }
     }
 
-    setSmartSuggestions(finalSuggestions.slice(0, 3));
+    setSmartSuggestions(finalSuggestions.slice(0, 5));
   }, [messages, bookContext, userActivities, language, isSending]);
 
   // Manage layout class on body for side-panel push effect

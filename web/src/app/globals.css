@@ -28,6 +28,21 @@
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* High-Premium Light/Dark Theme Override (W-5) */
+html.dark, :root.dark {
+  --background: #090d16;      /* Extra-premium deep obsidian/navy */
+  --foreground: #f8fafc;      /* Crisp slate-50 light text */
+  --primary: #3b82f6;         /* Bright electric blue */
+  --primary-hover: #60a5fa;   /* Bright electric hover */
+  --secondary: #fb923c;       /* Bright sunset orange */
+  --secondary-hover: #f97316;
+  --card-bg: #111827;         /* Deep slate-900 background */
+  --card-border: rgba(51, 65, 85, 0.45); /* Soft slate border */
+  --card-border-active: #3b82f6;
+  --code-bg: #030712;         /* Deep logs terminal pitch black */
+  --code-fg: #f3f4f6;
+}
+
 /* RTL and Arabic Language Font Mapping */
 html[lang="ar"], [dir="rtl"] {
   --font-sans: var(--font-arabic, 'Cairo', sans-serif) !important;

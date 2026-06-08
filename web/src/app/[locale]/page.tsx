@@ -31,7 +31,9 @@ import {
   FiZap,
   FiGitCommit,
   FiTerminal,
-  FiDatabase
+  FiDatabase,
+  FiSun,
+  FiMoon
 } from "react-icons/fi";
 
 export default function LandingPage() {
@@ -49,8 +51,36 @@ export default function LandingPage() {
   const [judgeEmail, setJudgeEmail] = useState("");
   const [selectedPersona, setSelectedPersona] = useState<"student" | "teacher" | "admin">("student");
   const [bypassActive, setBypassActive] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("fahem_theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add("dark");
+      } else {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fahem_theme", nextDark ? "dark" : "light");
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  };
 
   useEffect(() => {
     // 1. One-time boot purge of legacy bypass flags
@@ -143,6 +173,22 @@ export default function LandingPage() {
     setErrorMsg("");
 
     try {
+      console.log("[Phone Auth] Checking server-side SMS rate limits for:", phoneNumber);
+      const rateLimitRes = await fetch("/api/user/sms-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneNumber.trim() })
+      });
+      
+      const rateLimitData = await rateLimitRes.json();
+      if (!rateLimitRes.ok || !rateLimitData.success || !rateLimitData.allowed) {
+        const isAr = language === "ar";
+        const customError = isAr 
+          ? (rateLimitData.errorAr || rateLimitData.error || "تم الوصول إلى الحد الأقصى لرسائل التحقق.") 
+          : (rateLimitData.error || "Verification rate limit exceeded.");
+        throw new Error(customError);
+      }
+
       cleanupRecaptcha();
       
       const verifier = setupRecaptcha("recaptcha-container");
@@ -289,7 +335,7 @@ export default function LandingPage() {
       </div>
 
       {/* Glassmorphic Navbar */}
-      <nav className="glass-nav" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, backdropFilter: "blur(20px)", borderBottom: "1px solid var(--card-border)", background: "rgba(248, 250, 252, 0.75)" }}>
+      <nav className="glass-nav" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, backdropFilter: "blur(20px)", borderBottom: "1px solid var(--card-border)", background: isDarkMode ? "rgba(17, 24, 39, 0.75)" : "rgba(248, 250, 252, 0.75)" }}>
         <div className="glass-nav-logo" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <FiCpu className="pulse-icon" style={{ fontSize: "1.6rem", color: "var(--secondary)" }} />
           <span style={{ fontWeight: 800, letterSpacing: "0.5px", background: "linear-gradient(135deg, var(--primary), var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t("dashboard_title")}</span>
@@ -319,6 +365,29 @@ export default function LandingPage() {
             <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
               <FiGithub /> {t("nav_github")}
             </a>
+          </li>
+          <li>
+            <button
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--foreground)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0.35rem",
+                borderRadius: "50%",
+                fontSize: "1.2rem",
+                transition: "all 0.2s ease",
+                opacity: 0.85
+              }}
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDarkMode ? <FiSun style={{ color: "var(--accent-yellow)" }} /> : <FiMoon style={{ color: "var(--primary)" }} />}
+            </button>
           </li>
           <li>
             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)" }}>
@@ -354,12 +423,12 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%", scrollMarginTop: "100px" }}>
-        <div className="glass-card" style={{ background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(20px)", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-lg)", padding: "1.25rem 2rem", boxShadow: "var(--shadow-lg)", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
+        <div className="glass-card" style={{ background: isDarkMode ? "rgba(17, 24, 39, 0.45)" : "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(20px)", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-lg)", padding: "1.25rem 2rem", boxShadow: "var(--shadow-lg)", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
           <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(37, 99, 235, 0.15)" }}>
             <FiKey style={{ fontSize: "1.25rem", color: "#ffffff" }} />
           </div>
           <h2 style={{ fontSize: "1.85rem", fontWeight: 800, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.2 }}>{t("welcome_to_fahem")}</h2>
-          <p style={{ fontSize: "0.92rem", color: "#475569", maxWidth: "800px", margin: "0 auto", lineHeight: 1.5 }}>{t("hero_subtitle")}</p>
+          <p style={{ fontSize: "0.92rem", color: "var(--foreground)", opacity: 0.8, maxWidth: "800px", margin: "0 auto", lineHeight: 1.5 }}>{t("hero_subtitle")}</p>
 
           <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "0.4rem", width: "100%", maxWidth: "420px", padding: "0.6rem 0", margin: "0.4rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)", borderBottom: "1px solid rgba(235, 220, 185, 0.2)" }}>
             <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
@@ -390,7 +459,7 @@ export default function LandingPage() {
               className="google-btn"
               id="google-signin-button"
               type="button"
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "#ffffff", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s", opacity: (signingIn || bypassActive) ? 0.6 : 1 }}
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s", opacity: (signingIn || bypassActive) ? 0.6 : 1 }}
             >
               {/* Embedded Google Color Logo SVG */}
               <svg className="google-icon-svg" viewBox="0 0 24 24" width="16" height="18" xmlns="http://www.w3.org/2000/svg">
@@ -707,7 +776,7 @@ export default function LandingPage() {
       </section>
 
       {/* System Features Section */}
-      <section id="features" style={{ zIndex: 1, padding: "4rem 1.5rem", background: "rgba(255, 255, 255, 0.3)", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)", width: "100%", scrollMarginTop: "100px" }}>
+      <section id="features" style={{ zIndex: 1, padding: "4rem 1.5rem", background: isDarkMode ? "rgba(17, 24, 39, 0.3)" : "rgba(255, 255, 255, 0.3)", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)", width: "100%", scrollMarginTop: "100px" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: "3rem" }}>
             <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
@@ -861,7 +930,7 @@ export default function LandingPage() {
       </section>
 
       {/* Styled Interactive Footer with Asdaa.co Attribution */}
-      <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
+      <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: isDarkMode ? "rgba(9, 13, 22, 0.9)" : "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
         <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
           <a href={`/${language}/terms`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
             <FiBookOpen /> {t("nav_terms")}

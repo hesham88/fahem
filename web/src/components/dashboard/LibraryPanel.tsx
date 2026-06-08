@@ -2112,7 +2112,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                   selectedBookReader.chapters.length > 0 && 
                                   selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0);
 
-    if (hasChaptersWithTopics) {
+    if (hasChaptersWithTopics && selectedBookReader?.chapters) {
       return selectedBookReader.chapters.map((ch: any, idx: number) => {
         return {
           id: `ch-${idx}`,
