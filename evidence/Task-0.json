@@ -2,11 +2,11 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "febb7cb3e455897894aa6160f6291ed8e27f47d8",
-  "frontend_revision": "2026-06-08T21:11:50.129Z",
-  "backend_revision": "Cloud Run",
+  "sha": "2a54ee2a939d5753031e43c90279c1985fa67470",
+  "frontend_revision": "2026-06-08T21:10:24.245Z",
+  "backend_revision": "local",
   "smoke": {
-    "url": "https://fahem.pro",
+    "url": "http://localhost:3000",
     "status": "pass",
     "assertions": [
       "D0 - Version Parity validated",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. This is a fully functional, rendered web interface for the Fahem platform. \n\nThe layout is intact and contains dynamic, feature-rich content rather than static placeholders or error states. Specific evidence of a working environment includes:\n*   **Navigation Sidebar:** A comprehensive menu with active categories (Admin Controls, Academic Space) and interactive sub-items like \"Knowledge Library,\" \"Practice Workstation,\" and \"Study Planner.\"\n*   **Role-Based Sandbox Controls:** A functional top header (\"Whitelisted Judge Sandbox Console\") allows users to switch between persona views (Admin, Student, Teacher).\n*   **Dynamic UI Elements:** The presence of an interactive onboarding overlay (\"Welcome to Fahem Sandbox!\") with progress dots and a \"Next\" button indicates an active JavaScript-driven session. \n*   **Personalized/Stateful Data:** The sidebar shows account-specific information, including a \"DEM...\" user profile, a \"JUDGE\" badge, and a real-time \"Daily Tokens\" progress bar (42/100).\n*   **Utility Features:** Interactive components such as a theme toggle (moon icon), a language selection dropdown, and a \"Sign Out\" button are present, confirming this is a live, operational user dashboard.",
-  "timestamp": 1780954334
+  "vision_verdict": "pass. This is a fully functional-looking dashboard interface. The layout is intact and contains comprehensive UI elements: a navigation sidebar with categorized menus (Admin Controls, Academic Space), language and theme toggles, a user profile section with dynamic data (token count), a top-level persona switcher (Whitelisted Judge Sandbox), a main content area titled \"Interactive Knowledge Library\" with descriptive subtext, and an active, multi-step onboarding modal. The presence of specific data like \"42/100\" tokens and \"playwright-test@fahem...\" email suggests an active, stateful environment rather than a static mockup or error page.",
+  "timestamp": 1780954884
 }

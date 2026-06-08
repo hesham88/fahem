@@ -2,9 +2,9 @@
   "task": "OR-15",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "febb7cb3e455897894aa6160f6291ed8e27f47d8",
-  "frontend_revision": "2026-06-08T21:11:50.129Z",
-  "backend_revision": "fahem-agent-00150-z9b",
+  "sha": "2a54ee2a939d5753031e43c90279c1985fa67470",
+  "frontend_revision": "2026-06-08T21:38:33.239Z",
+  "backend_revision": "fahem-agent-00151-d6t",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. The screenshot displays a fully rendered, functional interface for the Fahem learning platform. The layout is intact with a complete navigation sidebar (including Admin Controls and Academic Space), a functional header area with persona selection for the \"Whitelisted Judge Sandbox Console,\" and a content area titled \"Interactive Knowledge Library.\" \n\nSpecific elements confirming it is a working page include:\n* **Interactive elements:** Buttons for \"Curriculum Libraries\" and \"Private Study Vault,\" a theme toggle icon, a dropdown menu for language, and a \"Sign Out\" button.\n* **Dynamic data:** The \"Daily Tokens\" progress bar reflects specific status (42/100), and there is an active user profile (\"DEM...\") with a \"JUDGE\" badge and email address.\n* **Component structure:** The page features a consistent grid and card-based design with distinct headers, typography, and iconography, indicating a fully developed front-end rather than a static or broken page. While the \"All Libraries\" section shows \"0 Books,\" this is a functional state of an empty library rather than a UI error or failure to load.",
-  "timestamp": 1780954314
+  "vision_verdict": "pass\n\nThis appears to be a fully working, functional interface rather than a mockup or error state. The page is fully rendered, featuring a responsive side navigation menu with active states (e.g., \"Knowledge Library\" is highlighted), a functional language dropdown, a theme toggle, and a user profile section with dynamic data like \"Daily Tokens: 42/100.\" \n\nThe main content area includes a \"Whitelisted Judge Sandbox Console\" with selectable personas, a clearly defined \"Interactive Knowledge Library\" header with descriptive text, a notification icon, and categorized action buttons (\"Curriculum Libraries\" and \"Private Study Vault\"). Additionally, an interactive onboarding modal (\"Welcome to Fahem Sandbox\") is present in the foreground with progress indicators, suggesting an active, stateful web application that is correctly pulling and rendering UI components and user context.",
+  "timestamp": 1780954899
 }
