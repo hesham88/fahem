@@ -88,7 +88,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
     # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment with Fail-Closed defaults
     @app.middleware("http")
     async def oidc_security_middleware(request: fastapi.Request, call_next):
-        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha", "/sms/rate-limit"}
+        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha", "/sms/rate-limit", "/public/usernames"}
         path = request.url.path
         is_secured = path not in PUBLIC_PATHS and not any(path.startswith(p + "/") for p in PUBLIC_PATHS if p != "/")
         
@@ -236,6 +236,28 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     selected_book_ids_var.reset(selected_book_ids_ctx)
                 except Exception:
                     pass
+
+
+    @app.get("/public/usernames")
+    async def get_public_usernames():
+        try:
+            agents_dir = os.path.dirname(os.path.abspath(__file__))
+            if agents_dir not in sys.path:
+                sys.path.insert(0, agents_dir)
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            users = list(db["users"].find({"username": {"$exists": True, "$ne": ""}}, {"username": 1}))
+            usernames = [u.get("username") for u in users if u.get("username")]
+            client.close()
+            return {"usernames": usernames}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to fetch dynamic usernames for public sitemap: {err}", exc_info=True)
+            return {"usernames": []}
 
 
     @app.get("/db-metadata")
