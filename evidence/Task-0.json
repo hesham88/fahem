@@ -2,11 +2,11 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "229ef98b00ea5543da6a22b5d55aa19b5db3a0a1",
-  "frontend_revision": "2026-06-08T19:59:21.769Z",
-  "backend_revision": "fahem-agent-00143-xfh",
+  "sha": "fcc1f2e983ad9764e132222f256bba2393978b20",
+  "frontend_revision": "2026-06-08T20:17:20.316Z",
+  "backend_revision": "Local Dev",
   "smoke": {
-    "url": "https://fahem.pro",
+    "url": "http://localhost:3000",
     "status": "pass",
     "assertions": [
       "D0 - Version Parity validated",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. This is a fully functional-looking dashboard interface. The layout is intact and contains extensive UI elements: a sidebar with navigation links (Admin Panel, Users, Curriculum Studio, Knowledge Library, etc.), a user profile section with token tracking, a theme toggle, a sign-out button, and a central \"Interactive Knowledge Library\" content area. The presence of a context-aware onboarding tooltip (\"Welcome to Fahem Sandbox!\"), a role-based navigation bar, and clear, distinct sections for curriculum and private files indicates a populated, interactive application rather than a static or broken page.",
-  "timestamp": 1780949453
+  "vision_verdict": "pass. The screenshot depicts a fully functional and populated web interface for the \"Fahem\" learning platform. The layout is completely intact, featuring a structured sidebar navigation (including Admin Controls and Academic Space), a primary content area with a \"Whitelisted Judge Sandbox Console,\" and an \"Interactive Knowledge Library\" section. Various UI elements—such as the user profile, token count, theme toggle, and a multi-step interactive onboarding modal—are clearly visible and properly rendered. The content, including icons, text headers, and sub-headings, is cohesive and formatted as a dynamic dashboard, indicating a functional web application rather than a static mockup or error state.",
+  "timestamp": 1780949912
 }

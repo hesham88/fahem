@@ -206,7 +206,20 @@
     }
   ],
   "admin_change_requests": [],
-  "user_activities": [],
+  "user_activities": [
+    {
+      "userId": "demo_anon_8p1grstp",
+      "action": "enter_demo",
+      "timestamp": "2026-06-08T20:18:02.479Z",
+      "details": {
+        "email": "playwright-test@fahem.pro",
+        "tier": 0,
+        "role": "student",
+        "sandboxSessionId": "sb_sess_1780949882478_za3ps",
+        "ip": "::1"
+      }
+    }
+  ],
   "crawl_jobs": [
     {
       "_id": "crawl_job_mock_1",
@@ -409,6 +422,35 @@
       "created_by": "system",
       "created_at": "2026-06-07T07:58:20.934Z",
       "updated_at": "2026-06-07T07:58:20.934Z"
+    }
+  ],
+  "reading_sessions": [],
+  "notifications": [],
+  "group_assignments": [],
+  "assignment_submissions": [],
+  "assignment_reports": [],
+  "active_practice_sessions": [],
+  "demo_sessions": [
+    {
+      "_id": "demo_session_1780949882479_d34fb",
+      "sandbox_session_id": "sb_sess_1780949882478_za3ps",
+      "email": "playwright-test@fahem.pro",
+      "verified": false,
+      "tier": 0,
+      "persona": "student",
+      "ip": "::1",
+      "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36",
+      "started_at": 1780949882,
+      "last_active_at": 1780949886,
+      "ended_at": null,
+      "duration_seconds": 0,
+      "tutorial_shown": true,
+      "tutorial_skipped": false,
+      "tutorial_step_reached": 1,
+      "token_budget": 250000,
+      "tokens_used": 0,
+      "action_count": 0,
+      "status": "active"
     }
   ]
 }

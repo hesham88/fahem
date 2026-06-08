@@ -174,7 +174,7 @@ def main():
         be_url = "http://localhost:8000/health"
     else:
         fe_url = "https://fahem.pro/api/version"
-        be_url = "https://fahem-agent-1061555578804.us-east4.run.app/health"
+        be_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/health"
 
     fe_data = fetch_json(fe_url, "Frontend") or {}
     be_data = fetch_json(be_url, "Backend") or {}
