@@ -280,90 +280,115 @@ class MongoDBEngine:
             self._client = None
 
     def ensure_schema_and_indexes(self):
-        """Preemptively boots up collections and strictly applies unique constraints & index-tuning."""
-        if self._db is None:
+        """Preemptively boots up collections and strictly applies unique constraints & index-tuning on both prod and sandbox."""
+        if self._client is None:
             logger.warning("[MongoDBEngine] MongoClient connection missing; skipping index initialization.")
             return
 
-        try:
-            logger.info("[MongoDBEngine] Booting up auto-healing database schema & index-tuning...")
-            
-            # 1. Users Unique Indexes
-            self._db["users"].create_index("userId", unique=True, background=True)
-            self._db["users"].create_index("username_clean", unique=True, background=True)
-            self._db["users"].create_index("email", unique=True, background=True)
-            
-            # 2. Messages Composite Indexes for ultra-fast chat query performance
-            self._db["messages"].create_index([("senderId", 1), ("recipientId", 1), ("timestamp", 1)], background=True)
-            self._db["messages"].create_index([("recipientId", 1), ("senderId", 1), ("timestamp", 1)], background=True)
-            
-            # 3. Chat Sessions
-            self._db["chat_sessions"].create_index("userId", background=True)
-            self._db["chat_sessions"].create_index("sessionId", unique=True, background=True)
-            
-            # 4. User Activities
-            self._db["user_activities"].create_index("userId", background=True)
-            
-            # 5. Token Telemetry
-            self._db["token_telemetry"].create_index("userId", background=True)
-            self._db["token_telemetry"].create_index([("userId", 1), ("timestamp", 1)], background=True)
-            self._db["token_telemetry"].create_index([("userId", 1), ("createdAt", 1)], background=True)
-            
-            # 6. Audit Logs
-            self._db["audit_logs"].create_index("timestamp", background=True)
-
-            # 7. Phase 1 — Curricula, Libraries, Subjects, Books Index Tuning
-            self._db["libraries"].create_index("_id", unique=True, background=True)
-            
-            self._db["curricula"].create_index("library_id", background=True)
-            self._db["curricula"].create_index([("scope.grade", 1), ("scope.term", 1)], background=True)
-            self._db["curricula"].create_index([("visibility", 1), ("owner_uid", 1)], background=True)
-            
-            self._db["subjects"].create_index("curriculum_id", background=True)
-            self._db["subjects"].create_index("category", background=True)
-            self._db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True, background=True)
+        old_target = db_target_var.get()
+        
+        for target_db_name in ["fahem", "fahem_sandbox"]:
             try:
-                self._db["subjects"].drop_index("name_1")
-            except Exception:
-                pass
-            
-            self._db["books"].create_index([("curriculum_id", 1), ("subject_id", 1), ("role", 1)], background=True)
-            self._db["books"].create_index([("visibility", 1), ("owner_uid", 1)], background=True)
-            self._db["books"].create_index("subject_id", background=True)
-            
-            self._db["book_pages"].create_index([("book_id", 1), ("page_number", 1)], background=True)
-            
-            # 8. Notification & Assignment Systems
-            self._db["notifications"].create_index([("recipient_uid", 1), ("read", 1), ("createdAt", -1)], background=True)
-            self._db["group_assignments"].create_index([("group_id", 1), ("status", 1), ("ends_at", 1)], background=True)
-            self._db["assignment_submissions"].create_index([("assignment_id", 1), ("uid", 1)], unique=True, background=True)
-            self._db["assignment_reports"].create_index("assignment_id", background=True)
-            
-            
-            # 9. Assert Atlas Vector Search Index 'vector_index_book_pages' exists on book_pages collection
-            try:
-                if "book_pages" in self._db.list_collection_names():
-                    try:
-                        indexes = list(self._db["book_pages"].list_search_indexes())
-                        found_v_index = False
-                        for idx in indexes:
-                            if idx.get("name") == "vector_index_book_pages":
-                                found_v_index = True
-                                logger.info(f"[INDEX CHECK] Atlas Vector Search index 'vector_index_book_pages' verified successfully: {idx}")
-                                break
-                        if not found_v_index:
-                            msg = "CRITICAL: Atlas Vector Search index 'vector_index_book_pages' is missing on book_pages! Dense search is offline."
-                            logger.error(msg)
-                            if os.environ.get("K_SERVICE") or (os.environ.get("MONGODB_URI") and "mongodb.net" in os.environ.get("MONGODB_URI")):
-                                raise RuntimeError(msg)
-                    except Exception as ex:
-                        logger.warning(f"Could not check search indexes on book_pages (expected if not on Atlas/permission restricted): {ex}")
-            except Exception as outer_ex:
-                logger.warning(f"Error listing collection names for index check: {outer_ex}")
+                db_target_var.set(target_db_name)
+                logger.info(f"[MongoDBEngine] Booting up auto-healing database schema & index-tuning for {target_db_name}...")
+                
+                # 1. Users Unique Indexes
+                self._db["users"].create_index("userId", unique=True, background=True)
+                self._db["users"].create_index("username_clean", unique=True, background=True)
+                self._db["users"].create_index("email", unique=True, background=True)
+                
+                # 2. Messages Composite Indexes for ultra-fast chat query performance
+                self._db["messages"].create_index([("senderId", 1), ("recipientId", 1), ("timestamp", 1)], background=True)
+                self._db["messages"].create_index([("recipientId", 1), ("senderId", 1), ("timestamp", 1)], background=True)
+                
+                # 3. Chat Sessions
+                self._db["chat_sessions"].create_index("userId", background=True)
+                self._db["chat_sessions"].create_index("sessionId", unique=True, background=True)
+                
+                # 4. User Activities
+                self._db["user_activities"].create_index("userId", background=True)
+                
+                # 5. Token Telemetry
+                self._db["token_telemetry"].create_index("userId", background=True)
+                self._db["token_telemetry"].create_index([("userId", 1), ("timestamp", 1)], background=True)
+                self._db["token_telemetry"].create_index([("userId", 1), ("createdAt", 1)], background=True)
+                
+                # 6. Audit Logs
+                self._db["audit_logs"].create_index("timestamp", background=True)
 
-            logger.info("[MongoDBEngine] Auto-healing schema & unique index tuning completed successfully! 🚀")
-        except Exception as e:
-            logger.warning(f"[MongoDBEngine] Non-critical schema index-tuning warning: {e}")
+                # 7. Phase 1 — Curricula, Libraries, Subjects, Books Index Tuning
+                self._db["libraries"].create_index("_id", unique=True, background=True)
+                
+                self._db["curricula"].create_index("library_id", background=True)
+                self._db["curricula"].create_index([("scope.grade", 1), ("scope.term", 1)], background=True)
+                self._db["curricula"].create_index([("visibility", 1), ("owner_uid", 1)], background=True)
+                
+                self._db["subjects"].create_index("curriculum_id", background=True)
+                self._db["subjects"].create_index("category", background=True)
+                self._db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True, background=True)
+                try:
+                    self._db["subjects"].drop_index("name_1")
+                except Exception:
+                    pass
+                
+                self._db["books"].create_index([("curriculum_id", 1), ("subject_id", 1), ("role", 1)], background=True)
+                self._db["books"].create_index([("visibility", 1), ("owner_uid", 1)], background=True)
+                self._db["books"].create_index("subject_id", background=True)
+                
+                self._db["book_pages"].create_index([("book_id", 1), ("page_number", 1)], background=True)
+                
+                # 8. Notification & Assignment Systems
+                self._db["notifications"].create_index([("recipient_uid", 1), ("read", 1), ("createdAt", -1)], background=True)
+                self._db["group_assignments"].create_index([("group_id", 1), ("status", 1), ("ends_at", 1)], background=True)
+                self._db["assignment_submissions"].create_index([("assignment_id", 1), ("uid", 1)], unique=True, background=True)
+                self._db["assignment_reports"].create_index("assignment_id", background=True)
+                
+                # 9. Assert/Create Atlas Vector Search Index 'vector_index_book_pages'
+                try:
+                    if "book_pages" in self._db.list_collection_names():
+                        try:
+                            indexes = list(self._db["book_pages"].list_search_indexes())
+                            found_v_index = False
+                            for idx in indexes:
+                                if idx.get("name") == "vector_index_book_pages":
+                                    found_v_index = True
+                                    logger.info(f"[INDEX CHECK] Atlas Vector Search index 'vector_index_book_pages' verified on {target_db_name}: {idx}")
+                                    break
+                            if not found_v_index:
+                                logger.info(f"Atlas Vector Search index 'vector_index_book_pages' is missing on {target_db_name}. Initiating auto-creation...")
+                                try:
+                                    from pymongo.operations import SearchIndexModel
+                                    definition = {
+                                        "fields": [
+                                            { "type": "vector", "path": "embedding", "numDimensions": 3072, "similarity": "cosine" },
+                                            { "type": "filter", "path": "book_id" },
+                                            { "type": "filter", "path": "subject_id" },
+                                            { "type": "filter", "path": "curriculum_id" },
+                                            { "type": "filter", "path": "status" }
+                                        ]
+                                    }
+                                    model = SearchIndexModel(
+                                        definition=definition,
+                                        name="vector_index_book_pages",
+                                        type="vectorSearch"
+                                    )
+                                    self._db["book_pages"].create_search_index(model=model)
+                                    logger.info(f"Successfully submitted search index creation for 'vector_index_book_pages' in {target_db_name}.")
+                                except Exception as inner_ex:
+                                    logger.warning(f"Could not auto-create search index on {target_db_name}: {inner_ex}")
+                                    if os.environ.get("K_SERVICE") or (os.environ.get("MONGODB_URI") and "mongodb.net" in os.environ.get("MONGODB_URI")):
+                                        if target_db_name == "fahem":
+                                            raise RuntimeError(f"CRITICAL: Search index missing and auto-creation failed: {inner_ex}")
+                        except Exception as ex:
+                            logger.warning(f"Could not check search indexes on book_pages in {target_db_name}: {ex}")
+                except Exception as outer_ex:
+                    logger.warning(f"Error listing collection names for index check in {target_db_name}: {outer_ex}")
+
+            except Exception as e:
+                logger.warning(f"[MongoDBEngine] Index-tuning warning for {target_db_name}: {e}")
+                
+        db_target_var.set(old_target)
+        logger.info("[MongoDBEngine] Auto-healing schema & unique index tuning completed for all targets! 🚀")
 
     def run_startup_migration(self):
         """Checks if libraries are empty in DB. If so, seeds standard libraries, curricula, subjects, and groups books."""
@@ -845,6 +870,9 @@ class MongoDBEngine:
         # Validate input against the strict schema
         validated = UserProfileSchema(**flat_profile)
         dumped_data = validated.model_dump(by_alias=True, exclude_none=True)
+
+        # Pop 'createdAt' from dumped_data so it doesn't conflict with $setOnInsert
+        dumped_data.pop("createdAt", None)
 
         self._db["users"].update_one(
             {"userId": user_id},
