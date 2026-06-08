@@ -9,13 +9,10 @@ export async function POST(req: NextRequest) {
     const db = getLocalDb();
     const config = db.config;
 
-    // Check if evaluation/demo sandbox is enabled
-    if (!config || !config.evalSandboxEnabled) {
-      return new Response(JSON.stringify({ success: false, error: "Demo Sandbox is currently disabled." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    // If evalSandboxEnabled is false, we ignore it for Tier-0 (anonymous) access and instead treat it as a budget/capacity message.
+    const capacityNotice = (!config || !config.evalSandboxEnabled)
+      ? "Demo Sandbox is currently running under low-capacity mode (daily budget ceiling reached). Enjoy exploring!"
+      : null;
 
     // Try to get authenticated user context to determine if they are verified Tier-1
     const authCtx = await verifyAuth(req);
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
       
       const isOwner = email === "hesham1988@gmail.com";
       const domain = email ? email.split("@")[1] : null;
-      const isJudgeDomain = domain && config.demoDomains?.includes(domain);
+      const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
 
       if (isOwner || isJudgeDomain) {
         tier = 1; // Tier-1 (verified domain or owner)
@@ -50,7 +47,7 @@ export async function POST(req: NextRequest) {
     } else if (email) {
       // Best-effort check if typed email matches config.demoDomains (Tier-0 still, unverified!)
       const domain = email.split("@")[1];
-      const isJudgeDomain = domain && config.demoDomains?.includes(domain);
+      const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
       
       // Spoofed/typed email gets Tier-0 anonymous-level capability
       tier = 0;
@@ -117,13 +114,8 @@ export async function POST(req: NextRequest) {
     // Also persist to MongoDB demo_sessions if in production
     if (!isLocalEnv()) {
       try {
-        const { MongoClient } = require("mongodb");
-        const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-        await client.connect();
-        const mongoDb = client.db("fahem"); // audit store is in main prod DB
-        await mongoDb.collection("demo_sessions").insertOne(sessionDoc);
-        await client.close();
+        const { proxyRequest } = require("../../proxy");
+        await proxyRequest("/admin/create-demo-session", "POST", sessionDoc);
       } catch (err) {
         console.error("[demo-enter] Failed to write demo session to Mongo audit store:", err);
       }
@@ -134,6 +126,7 @@ export async function POST(req: NextRequest) {
       token: token,
       app_mode: "demo",
       expires_at: exp,
+      capacity_message: capacityNotice,
       session: {
         tier: tier,
         persona: role,

@@ -390,6 +390,67 @@ def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
     agent_name = getattr(context, "agent_name", "UnknownAgent")
     logger.info(f"[AUDIT] Calling LLM on behalf of agent '{agent_name}'")
     
+    # R21: Inject active book context dynamically into the Companion's system prompt
+    if request and hasattr(request, "config") and request.config:
+        try:
+            system_instruction = getattr(request.config, "system_instruction", None)
+            if system_instruction:
+                from guardrails import verified_principal_ctx
+                principal = verified_principal_ctx.get()
+                book_ids = None
+                if principal and isinstance(principal, dict):
+                    book_ids = principal.get("selected_book_ids")
+                if not book_ids:
+                    try:
+                        from agents.mongodb_engine import selected_book_ids_var
+                        book_ids = selected_book_ids_var.get()
+                    except Exception:
+                        pass
+                if book_ids:
+                    if isinstance(book_ids, str):
+                        book_ids = [book_ids]
+                    
+                    book_titles = []
+                    try:
+                        local_db_path = "C:\\Users\\hesh1\\Desktop\\fahem\\web\\src\\app\\api\\local_db.json"
+                        if os.path.exists(local_db_path):
+                            with open(local_db_path, "r", encoding="utf-8") as f:
+                                local_db = json.load(f)
+                            books = local_db.get("books", [])
+                            for bid in book_ids:
+                                found = next((b for b in books if b.get("_id") == bid), None)
+                                if found:
+                                    title = found.get("title") or found.get("title_ar")
+                                    if title:
+                                        book_titles.append(title)
+                    except Exception:
+                        pass
+                        
+                    try:
+                        from mongodb_engine import MongoDBEngine
+                        db_engine = MongoDBEngine()
+                        if db_engine._db is not None:
+                            cursor = db_engine._db["books"].find({"_id": {"$in": book_ids}}, {"title": 1, "title_ar": 1})
+                            for doc in cursor:
+                                title = doc.get("title") or doc.get("title_ar")
+                                if title:
+                                    book_titles.append(title)
+                    except Exception:
+                        pass
+                        
+                    if book_titles:
+                        titles_str = ", ".join(list(set(book_titles)))
+                        additional_instruction = f"\n\nACTIVE BOOK CONTEXT:\nThe user has selected the following active book(s): {titles_str}. The current conversational scope is strictly restricted to these books. Ground your answers in them. If the user's prompt is general but can be answered using content from these books, do so. Never ask the user 'which book' they are referring to, as they have already selected {titles_str}.\n"
+                        if isinstance(system_instruction, str):
+                            request.config.system_instruction = system_instruction + additional_instruction
+                        elif hasattr(system_instruction, "parts") and system_instruction.parts:
+                            for p in system_instruction.parts:
+                                if hasattr(p, "text") and p.text:
+                                    p.text = p.text + additional_instruction
+                        logger.info(f"[R21 SYSTEM PROMPT INJECTION] Injected active book context: {titles_str}")
+        except Exception as e:
+            logger.warning(f"Failed to inject active book context into system prompt: {e}")
+
     if request and hasattr(request, "contents") and request.contents:
         for content in request.contents:
             if hasattr(content, "parts") and content.parts:

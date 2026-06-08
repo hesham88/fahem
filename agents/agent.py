@@ -134,8 +134,101 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
         k: Maximum number of relevant page results to return.
     """
     logger.info(f"[TOOL] rag_tool query='{query}' scope={scope}")
+    
+    # 1. Try high-fidelity MongoDB Atlas vector search first
     try:
-        # High-fidelity Local search fallback (Atlas vector search simulation / substring overlapping match)
+        from tools import get_mongodb_uri
+        from pymongo import MongoClient
+        from guardrails import verified_principal_ctx
+        
+        uri = get_mongodb_uri()
+        if uri:
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+            # Verify connectivity
+            client.admin.command('ping')
+            mdb = get_active_db(client)
+            
+            # Retrieve embedding using Gemini v2 API
+            from ingestion_v2.utils import get_gemini_embedding_v2
+            api_key = os.environ.get("GEMINI_API_KEY")
+            query_vector = get_gemini_embedding_v2(query, api_key)
+            
+            if query_vector:
+                # Determine book scoping
+                book_ids = None
+                if scope:
+                    if "book_ids" in scope:
+                        book_ids = scope["book_ids"]
+                        if isinstance(book_ids, str):
+                            book_ids = [book_ids]
+                    elif "book_id" in scope:
+                        book_ids = [scope["book_id"]]
+                
+                # Fallback to verified_principal_ctx if not specified in scope
+                if not book_ids:
+                    principal = verified_principal_ctx.get()
+                    if principal and isinstance(principal, dict):
+                        book_ids = principal.get("selected_book_ids")
+                        if isinstance(book_ids, str):
+                            book_ids = [book_ids]
+                
+                # Fallback to selected_book_ids_var context variable if still not specified
+                if not book_ids:
+                    try:
+                        from agents.mongodb_engine import selected_book_ids_var
+                    except ImportError:
+                        from mongodb_engine import selected_book_ids_var
+                    try:
+                        book_ids = selected_book_ids_var.get()
+                        if isinstance(book_ids, str):
+                            book_ids = [book_ids]
+                    except Exception:
+                        pass
+                
+                vs_stage = {
+                    "index": "vector_index_book_pages",
+                    "path": "embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": 100,
+                    "limit": k
+                }
+                
+                if book_ids:
+                    vs_stage["filter"] = {
+                        "book_id": {"$in": book_ids}
+                    }
+                
+                pipeline = [
+                    {"$vectorSearch": vs_stage},
+                    {
+                        "$project": {
+                            "text": {"$ifNull": ["$content", {"$ifNull": ["$contentEn", {"$ifNull": ["$contentAr", ""]}]}]},
+                            "book_id": 1,
+                            "page_number": 1,
+                            "score": {"$meta": "vectorSearchScore"}
+                        }
+                    }
+                ]
+                
+                cursor = mdb["book_pages"].aggregate(pipeline)
+                results = []
+                for doc in cursor:
+                    results.append({
+                        "text": doc.get("text") or "",
+                        "book_id": doc.get("book_id"),
+                        "page_number": doc.get("page_number", 1),
+                        "score": round(doc.get("score", 1.0), 4)
+                    })
+                
+                client.close()
+                if results:
+                    logger.info(f"[TOOL] rag_tool Atlas Vector search returned {len(results)} results successfully.")
+                    return results
+    except Exception as mongo_err:
+        logger.warning(f"[TOOL] rag_tool Atlas Vector search failed or unconfigured ({mongo_err}). Falling back to local search.")
+
+    # 2. Local fallback
+    try:
         db = load_local_db()
         pages = db.get("book_pages", [])
         books = db.get("books", [])
@@ -156,6 +249,28 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     book_ids = [b for b in book_ids if b in scoped_books]
                 else:
                     book_ids = scoped_books
+
+        # Fallback to verified_principal_ctx for local search if not specified
+        if book_ids is None:
+            from guardrails import verified_principal_ctx
+            principal = verified_principal_ctx.get()
+            if principal and isinstance(principal, dict):
+                book_ids = principal.get("selected_book_ids")
+                if isinstance(book_ids, str):
+                    book_ids = [book_ids]
+
+        # Fallback to selected_book_ids_var for local search if still not specified
+        if book_ids is None:
+            try:
+                from agents.mongodb_engine import selected_book_ids_var
+            except ImportError:
+                from mongodb_engine import selected_book_ids_var
+            try:
+                book_ids = selected_book_ids_var.get()
+                if isinstance(book_ids, str):
+                    book_ids = [book_ids]
+            except Exception:
+                pass
 
         if book_ids is not None:
             pages = [p for p in pages if p.get("book_id") in book_ids]

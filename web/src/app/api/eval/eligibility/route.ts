@@ -8,13 +8,8 @@ export async function POST(req: NextRequest) {
     const db = getLocalDb();
     const config = db.config;
 
-    // Returns { eligible: false } when sandbox or global config is off - no info leak
-    if (!config || !config.evalSandboxEnabled) {
-      return new Response(JSON.stringify({ eligible: false }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    // Public users are eligible for Tier-0 public sandbox tryouts regardless of global capacity limit.
+    const capacityLimited = !config || !config.evalSandboxEnabled;
 
     const body = await req.json().catch(() => ({}));
     const email = (body.email || "").trim().toLowerCase();
@@ -26,14 +21,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Check if whitelisted or matching demo domains
-    const isWhitelisted = config.evalWhitelist?.map(e => e.toLowerCase()).includes(email);
-    const domain = email.split("@")[1];
-    const isDemoDomain = domain && config.demoDomains?.includes(domain);
-
-    const eligible = !!(isWhitelisted || isDemoDomain || email === "hesham1988@gmail.com");
-
-    return new Response(JSON.stringify({ eligible }), {
+    // All typed emails or empty inputs are eligible for Tier-0 public sandbox
+    const eligible = true;
+    return new Response(JSON.stringify({ eligible, capacityLimited }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

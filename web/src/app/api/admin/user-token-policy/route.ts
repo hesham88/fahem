@@ -33,19 +33,17 @@ export async function GET(req: NextRequest) {
         userName = user.name || "";
       }
     } else {
-      // Production: query Mongo
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db(getDbTarget());
-      const userDoc = await db.collection("users").findOne({ userId });
-      await client.close();
-
-      if (userDoc) {
-        userPolicy = userDoc.tokenPolicy || null;
-        userEmail = userDoc.email || "";
-        userName = userDoc.name || "";
+      // Production: query Mongo via Cloud Run backend proxy
+      const proxyRes = await proxyRequest(`/admin/user-token-policy?userId=${encodeURIComponent(userId)}`, "GET", undefined, ctx);
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data.success) {
+          userPolicy = data.tokenPolicy || null;
+          userEmail = data.email || "";
+          userName = data.name || "";
+        }
+      } else {
+        throw new Error(`Backend user token policy query failed: ${proxyRes.statusText}`);
       }
     }
 
@@ -140,38 +138,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Production: update in MongoDB
-    const { MongoClient } = require("mongodb");
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    const db = client.db(getDbTarget());
-
-    let result;
-    if (clearPolicy) {
-      result = await db.collection("users").updateOne(
-        { userId },
-        { $unset: { tokenPolicy: "" } }
-      );
+    // Production: proxy update to Cloud Run backend
+    const proxyRes = await proxyRequest("/admin/user-token-policy", "POST", body, ctx);
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data.success) {
+        return new Response(JSON.stringify({ success: true, message: "User token policy updated successfully.", tokenPolicy: data.tokenPolicy }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      } else {
+        return new Response(JSON.stringify({ error: data.error || "Failed to update user token policy on backend." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     } else {
-      result = await db.collection("users").updateOne(
-        { userId },
-        { $set: { tokenPolicy } }
-      );
+      throw new Error(`Backend token policy update failed: ${proxyRes.statusText}`);
     }
-    await client.close();
-
-    if (result.matchedCount === 0) {
-      return new Response(JSON.stringify({ error: "User not found in database." }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true, message: "User token policy updated successfully.", tokenPolicy }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
 
   } catch (err: any) {
     console.error("[admin-user-token-policy-api] POST failed:", err);

@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), { status: 500 });
     }
 
-    // Use latest gemini-2.5-flash for natural voice and high performance
-    const modelName = "gemini-2.5-flash";
+    // Use latest gemini-2.5-flash-preview-tts for natural voice and high performance
+    const modelName = "gemini-2.5-flash-preview-tts";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
     // Select standard voice name if not provided

@@ -230,6 +230,7 @@ class BookSchema(BaseModel):
 
 import contextvars
 db_target_var = contextvars.ContextVar("db_target", default="fahem")
+selected_book_ids_var = contextvars.ContextVar("selected_book_ids", default=[])
 
 # =====================================================================
 # PYMONGO ENGINE (DIRECT HIGH-PERFORMANCE DATA LAYER WITH SCHEMAS)
@@ -730,6 +731,109 @@ class MongoDBEngine:
         except Exception as e:
             logger.error(f"[MongoDBEngine] Profile upsert failed for {user_id}: {e}", exc_info=True)
             raise e
+
+    async def ensure_user_profile(self, user_id: str, email: str, display_name: Optional[str] = None, role: Optional[str] = None) -> UserProfileSchema:
+        """Idempotently inserts or retrieves a user profile for the given user_id and email."""
+        if self._db is None:
+            raise RuntimeError("Database engine not connected.")
+        
+        # 1. Try to find by userId
+        doc = self._db["users"].find_one({"userId": user_id})
+        if not doc and email:
+            doc = self._db["users"].find_one({"email": email.strip().lower()})
+            if doc:
+                # Update userId if it was somehow different or missing
+                self._db["users"].update_one({"_id": doc["_id"]}, {"$set": {"userId": user_id}})
+                doc["userId"] = user_id
+
+        if doc:
+            doc.pop("_id", None)
+            if "userId" in doc and doc["userId"] is not None:
+                doc["userId"] = str(doc["userId"])
+            if "friends" in doc and isinstance(doc["friends"], list):
+                doc["friends"] = [str(f) for f in doc["friends"]]
+            if "groupsJoined" in doc and isinstance(doc["groupsJoined"], list):
+                doc["groupsJoined"] = [str(g) for g in doc["groupsJoined"]]
+            return UserProfileSchema(**doc)
+
+        # 2. Not found, create standard profile
+        import datetime
+        now_str = datetime.datetime.utcnow().isoformat() + "Z"
+        
+        # Derive name
+        name = display_name or ""
+        
+        # Clean username derivation
+        base_username = ""
+        if name:
+            # strip special characters, keep alphanumeric
+            base_username = re.sub(r'[^a-zA-Z0-9]', '', name)
+        
+        if not base_username and email:
+            base_username = email.split("@")[0]
+            base_username = re.sub(r'[^a-zA-Z0-9]', '', base_username)
+            
+        if len(base_username) < 3:
+            base_username = "user_" + user_id[:6]
+            
+        if len(base_username) > 25:
+            base_username = base_username[:25]
+            
+        # Find a unique username
+        username = base_username
+        suffix = 1
+        while True:
+            # check availability
+            username_clean = username.lower()
+            existing = self._db["users"].find_one({
+                "$or": [
+                    {"username_clean": username_clean},
+                    {"username": {"$regex": f"^{re.escape(username)}$", "$options": "i"}}
+                ]
+            })
+            if not existing:
+                break
+            username = f"{base_username[:20]}{suffix}"
+            suffix += 1
+
+        # Determine role
+        final_role = role
+        if not final_role:
+            email_lower = email.strip().lower()
+            if email_lower == "hesham1988@gmail.com":
+                final_role = "super-admin"
+            elif email_lower == "contact@fahem.pro":
+                final_role = "super-admin"
+            else:
+                final_role = "user"
+
+        flat_profile = {
+            "userId": user_id,
+            "username": username,
+            "username_clean": username.lower(),
+            "email": email.strip().lower(),
+            "role": final_role,
+            "name": name or username,
+            "onboardingCompleted": False,
+            "phoneVerified": False,
+            "createdAt": now_str,
+            "updatedAt": now_str
+        }
+
+        # Validate input against the strict schema
+        validated = UserProfileSchema(**flat_profile)
+        dumped_data = validated.model_dump(by_alias=True, exclude_none=True)
+
+        self._db["users"].update_one(
+            {"userId": user_id},
+            {
+                "$set": dumped_data,
+                "$setOnInsert": {"createdAt": now_str}
+            },
+            upsert=True
+        )
+        logger.info(f"[MongoDBEngine] Idempotently created default user profile for {user_id} ({email})")
+        return validated
 
     async def delete_user_account(self, user_id: str, email: str) -> bool:
         """Performs atomic cascading compliance deletion of a user's entire footprint."""

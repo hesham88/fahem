@@ -935,6 +935,41 @@ export default function StickyChat() {
     return () => window.removeEventListener("fahemBookContext", handleContextChange);
   }, [language]);
 
+  // Listen to selection popup actions from active reader
+  useEffect(() => {
+    const handleAskCompanion = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.text) {
+        setIsOpen(true);
+        setLayoutMode("side");
+        
+        // Ensure active page/book context is set for grounding
+        if (detail.book) {
+          setBookContext(detail);
+        }
+        
+        if (detail.bookId) {
+          const bId = String(detail.bookId);
+          setSelectedBookIds([bId]);
+          try {
+            sessionStorage.setItem("fahem_selected_book_ids", JSON.stringify([bId]));
+          } catch (err) {
+            console.error("Failed to save selected book ids:", err);
+          }
+        }
+        
+        setTimeout(() => {
+          if (sendMessageRef.current) {
+            sendMessageRef.current(detail.text);
+          }
+        }, 400);
+      }
+    };
+    window.addEventListener("fahemAskCompanion", handleAskCompanion);
+    return () => window.removeEventListener("fahemAskCompanion", handleAskCompanion);
+  }, []);
+
+
   // Dynamic predictive companion suggestion engine
   useEffect(() => {
     if (isSending) return; // Prevent updates while streaming
@@ -1436,13 +1471,47 @@ export default function StickyChat() {
   };
 
   const parseInlineMarkdown = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\))/g);
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[pP]\d+\])/g);
     return parts.map((part, pIdx) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      if (/^\[[pP]\d+\]$/.test(part)) {
+        const pageNum = parseInt(part.slice(2, -1), 10) || 1;
+        const bookId = selectedBookIds.length > 0 ? selectedBookIds[0] : "";
+        return (
+          <a
+            key={pIdx}
+            href={`?bookId=${bookId}&page=${pageNum}`}
+            onClick={(e) => {
+              e.preventDefault();
+              const event = new CustomEvent("fahemNavigateBook", {
+                detail: { bookId, page: pageNum }
+              });
+              window.dispatchEvent(event);
+            }}
+            style={{
+              color: "var(--secondary, #d4af37)",
+              textDecoration: "underline",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "2px",
+              background: "rgba(212, 175, 55, 0.08)",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              border: "1px solid rgba(212, 175, 55, 0.15)",
+              transition: "all 0.2s"
+            }}
+            title={`Go to Page ${pageNum}`}
+          >
+            📖 {part}
+          </a>
+        );
       }
       if (part.startsWith("[") && part.includes("](")) {
         const closeBracketIdx = part.indexOf("](");

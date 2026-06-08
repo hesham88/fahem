@@ -169,6 +169,126 @@ const getSubjectTheme = (subjectOrColor: string, customEmoji?: string) => {
   };
 };
 
+const BookCoverWithFallback: React.FC<{
+  src?: string;
+  alt: string;
+  width: string | number;
+  height: string | number;
+  subject?: string;
+  subjectColor?: string;
+  subjectEmoji?: string;
+  style?: React.CSSProperties;
+  title?: string;
+  language?: string;
+}> = ({
+  src,
+  alt,
+  width,
+  height,
+  subject,
+  subjectColor,
+  subjectEmoji,
+  style,
+  title,
+  language
+}) => {
+  const [hasError, setHasError] = useState(!src);
+
+  useEffect(() => {
+    setHasError(!src);
+  }, [src]);
+
+  if (hasError) {
+    const theme = getSubjectTheme(subjectColor || subject || "", subjectEmoji);
+    const emoji = theme.emoji || "📖";
+    const bgGradient = theme.gradient || "linear-gradient(135deg, #106ba3, #3190cb)";
+    
+    return (
+      <div
+        style={{
+          width,
+          height,
+          borderRadius: "8px",
+          background: bgGradient,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px",
+          color: "#ffffff",
+          fontFamily: "var(--font-sans)",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          flexShrink: 0,
+          position: "relative",
+          overflow: "hidden",
+          boxSizing: "border-box",
+          ...style
+        }}
+      >
+        <div style={{
+          position: "absolute",
+          top: "-50%",
+          left: "-50%",
+          width: "200%",
+          height: "200%",
+          background: "radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%)",
+          pointerEvents: "none"
+        }} />
+        
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: "4px",
+          background: "rgba(0,0,0,0.15)",
+          borderRight: "1px solid rgba(255,255,255,0.2)"
+        }} />
+
+        <div style={{ fontSize: typeof width === 'number' && width < 50 ? "1.2rem" : "1.8rem", zIndex: 1, marginTop: "4px" }}>
+          {emoji}
+        </div>
+        
+        {title && (typeof width === 'number' && width > 50 || parseInt(String(width)) > 50) && (
+          <div style={{
+            fontSize: "0.65rem",
+            fontWeight: 800,
+            textAlign: "center",
+            lineHeight: "1.2",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            wordBreak: "break-word",
+            padding: "0 2px",
+            zIndex: 1,
+            marginBottom: "4px"
+          }}>
+            {title}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        width,
+        height,
+        objectFit: "cover",
+        flexShrink: 0,
+        ...style
+      }}
+      onError={() => setHasError(true)}
+    />
+  );
+};
+
 const getSubjectNameLabel = (subject: string, language: string, customNameAr?: string, customNameEn?: string) => {
   const s = (subject || "").toLowerCase().trim();
   const isAr = language === "ar";
@@ -1034,6 +1154,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   loadingBookPages,
   readerCurrentPage,
   setReaderCurrentPage,
+  selectedText,
   setSelectedText,
   bubbleCoords,
   setBubbleCoords,
@@ -2046,6 +2167,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [isReadingPage, setIsReadingPage] = useState(false);
   const [isNextPageGlow, setIsNextPageGlow] = useState(false);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioIsPaused, setAudioIsPaused] = useState(false);
 
   const [selectedVoice, setSelectedVoice] = useState<string>("Aoede");
 
@@ -2230,11 +2354,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       activeAudioRef.current = null;
     }
     setIsReadingPage(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioIsPaused(false);
   };
 
   const handleReadPage = async (textToRead: string, totalPages: number) => {
-    if (isReadingPage) {
-      handleStopReading();
+    if (isReadingPage && activeAudioRef.current) {
+      if (audioIsPaused) {
+        activeAudioRef.current.play();
+        setAudioIsPaused(false);
+      } else {
+        activeAudioRef.current.pause();
+        setAudioIsPaused(true);
+      }
       return;
     }
 
@@ -2243,6 +2376,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
     try {
       setIsReadingPage(true);
+      setAudioIsPaused(false);
+      setAudioCurrentTime(0);
+      setAudioDuration(0);
       const hasArabicChars = /[\u0600-\u06FF]/.test(cleanedText);
       const reqLang = hasArabicChars ? "ar" : (translationLanguage || "en");
 
@@ -2265,6 +2401,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           const audio = new Audio(audioUrl);
           activeAudioRef.current = audio;
 
+          // Wire up event listeners
+          audio.onloadedmetadata = () => {
+            setAudioDuration(audio.duration || 0);
+          };
+          audio.ontimeupdate = () => {
+            setAudioCurrentTime(audio.currentTime || 0);
+          };
+          audio.onplay = () => {
+            setAudioIsPaused(false);
+          };
+          audio.onpause = () => {
+            setAudioIsPaused(true);
+          };
+
           // Log audio activity telemetry
           logActivityEvent("audio_played", {
             book_id: selectedBookReader?._id || selectedBookReader?.id,
@@ -2275,13 +2425,16 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           audio.onended = () => {
             activeAudioRef.current = null;
             setIsReadingPage(false);
+            setAudioCurrentTime(0);
+            setAudioDuration(0);
+            setAudioIsPaused(false);
             setIsNextPageGlow(true);
             setTimeout(() => setIsNextPageGlow(false), 3000);
           };
 
           audio.onerror = (err) => {
             console.error("Audio playback error:", err);
-            setIsReadingPage(false);
+            handleStopReading();
           };
 
           await audio.play();
@@ -2790,21 +2943,19 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   ⬅️ {language === "ar" ? "المكتبة" : "Library"}
                 </button>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  {(selectedBookReader.coverThumbUrl || selectedBookReader.coverUrl) && (
-                    <img
-                      src={selectedBookReader.coverThumbUrl || selectedBookReader.coverUrl}
-                      alt="Textbook Cover"
-                      style={{
-                        width: "36px",
-                        height: "54px",
-                        borderRadius: "6px",
-                        objectFit: "cover",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
-                        border: "1px solid rgba(16, 107, 163, 0.12)",
-                        flexShrink: 0
-                      }}
-                    />
-                  )}
+                  <BookCoverWithFallback
+                    src={selectedBookReader.coverThumbUrl || selectedBookReader.coverUrl}
+                    alt="Textbook Cover"
+                    width="36px"
+                    height="54px"
+                    subject={selectedBookReader.subject}
+                    title={language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
+                    style={{
+                      borderRadius: "6px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+                      border: "1px solid rgba(16, 107, 163, 0.12)",
+                    }}
+                  />
                   <div>
                     <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
                       {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
@@ -3440,9 +3591,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         alignItems: "center",
                         position: "relative"
                       }}>
-                        <img 
+                        <BookCoverWithFallback 
                           src={selectedBookReader.coverUrl}
                           alt={selectedBookReader.title}
+                          width="280px"
+                          height="420px"
+                          subject={selectedBookReader.subject}
+                          title={language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
                           style={{
                             maxWidth: "100%",
                             maxHeight: "420px",
@@ -3452,8 +3607,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             objectFit: "contain",
                             transition: "transform 0.3s ease"
                           }}
-                          onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.02)"; }}
-                          onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
                         />
                       </div>
 
@@ -3636,49 +3789,126 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             marginBottom: "1.5rem",
                             boxShadow: "0 8px 32px rgba(16, 107, 163, 0.02)"
                           }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                              <button
-                                onClick={() => handleReadPage(getPageContentToRead(activePage, translationLanguage), totalPagesCount)}
-                                style={{
-                                  background: isReadingPage 
-                                    ? "linear-gradient(135deg, #ef4444, #dc2626)" 
-                                    : "linear-gradient(135deg, var(--primary), var(--secondary))",
-                                  color: "#ffffff",
-                                  border: "none",
-                                  padding: "8px 18px",
-                                  borderRadius: "20px",
-                                  fontWeight: 800,
-                                  fontSize: "0.85rem",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.5rem",
-                                  boxShadow: isReadingPage 
-                                    ? "0 4px 15px rgba(239, 68, 68, 0.3)" 
-                                    : "0 4px 15px rgba(16, 107, 163, 0.2)",
-                                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                                }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.transform = "translateY(-1px)";
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.transform = "translateY(0)";
-                                }}
-                              >
-                                {isReadingPage ? (
-                                  <>
-                                    <span style={{ display: "inline-block", animation: "waveMotion 1s infinite" }}>🛑</span>
-                                    <span>{language === "ar" ? "إيقاف القراءة" : "Stop Reading"}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>🔊</span>
-                                    <span>{language === "ar" ? "قراءة الصفحة" : "Read Page"}</span>
-                                  </>
-                                )}
-                              </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: "250px" }}>
+                              {!isReadingPage ? (
+                                <button
+                                  onClick={() => handleReadPage(getPageContentToRead(activePage, translationLanguage), totalPagesCount)}
+                                  style={{
+                                    background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                                    color: "#ffffff",
+                                    border: "none",
+                                    padding: "8px 18px",
+                                    borderRadius: "20px",
+                                    fontWeight: 800,
+                                    fontSize: "0.85rem",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                    boxShadow: "0 4px 15px rgba(16, 107, 163, 0.2)",
+                                    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
+                                >
+                                  <span>🔊</span>
+                                  <span>{language === "ar" ? "قراءة الصفحة" : "Read Page"}</span>
+                                </button>
+                              ) : (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", flexWrap: "wrap" }}>
+                                  {/* Play/Pause Button */}
+                                  <button
+                                    onClick={() => handleReadPage(getPageContentToRead(activePage, translationLanguage), totalPagesCount)}
+                                    style={{
+                                      background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                                      color: "#ffffff",
+                                      border: "none",
+                                      width: "36px",
+                                      height: "36px",
+                                      borderRadius: "50%",
+                                      fontWeight: 800,
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      boxShadow: "0 4px 12px rgba(16, 107, 163, 0.25)",
+                                      transition: "all 0.2s",
+                                      flexShrink: 0
+                                    }}
+                                    title={audioIsPaused ? (language === "ar" ? "استئناف" : "Resume") : (language === "ar" ? "إيقاف مؤقت" : "Pause")}
+                                  >
+                                    {audioIsPaused ? "▶️" : "⏸️"}
+                                  </button>
 
-                              {isReadingPage && (
+                                  {/* Stop Button */}
+                                  <button
+                                    onClick={handleStopReading}
+                                    style={{
+                                      background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                                      color: "#ffffff",
+                                      border: "none",
+                                      width: "36px",
+                                      height: "36px",
+                                      borderRadius: "50%",
+                                      fontWeight: 800,
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)",
+                                      transition: "all 0.2s",
+                                      flexShrink: 0
+                                    }}
+                                    title={language === "ar" ? "إنهاء" : "Stop"}
+                                  >
+                                    ⏹️
+                                  </button>
+
+                                  {/* Custom Seek Bar progress bar slider */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: "160px" }}>
+                                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700, fontFamily: "monospace" }}>
+                                      {(() => {
+                                        const m = Math.floor(audioCurrentTime / 60);
+                                        const s = Math.floor(audioCurrentTime % 60);
+                                        return `${m}:${s < 10 ? '0' : ''}${s}`;
+                                      })()}
+                                    </span>
+                                    
+                                    <input 
+                                      type="range"
+                                      min={0}
+                                      max={audioDuration || 100}
+                                      value={audioCurrentTime}
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        if (activeAudioRef.current) {
+                                          activeAudioRef.current.currentTime = val;
+                                          setAudioCurrentTime(val);
+                                        }
+                                      }}
+                                      style={{
+                                        flex: 1,
+                                        height: "6px",
+                                        borderRadius: "3px",
+                                        accentColor: "var(--primary)",
+                                        cursor: "pointer",
+                                        outline: "none"
+                                      }}
+                                    />
+
+                                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700, fontFamily: "monospace" }}>
+                                      {(() => {
+                                        const d = audioDuration || 0;
+                                        const m = Math.floor(d / 60);
+                                        const s = Math.floor(d % 60);
+                                        return `${m}:${s < 10 ? '0' : ''}${s}`;
+                                      })()}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {isReadingPage && !audioIsPaused && (
                                 <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
                                   <div style={{ width: "3px", height: "12px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.1s" }}></div>
                                   <div style={{ width: "3px", height: "18px", background: "var(--primary)", borderRadius: "10px", animation: "waveMotion 0.8s infinite 0.2s" }}></div>
@@ -3845,23 +4075,63 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   }}>
                     <button
                       onClick={() => {
-                        const customEvent = new CustomEvent("fahemAskCompanion", { detail: { text: `Explain this section: "${window.getSelection()?.toString()}"` } });
+                        const targetText = window.getSelection()?.toString() || selectedText || "";
+                        const promptText = language === "ar" 
+                          ? `اشرح هذا الجزء بالتفصيل: "${targetText}"` 
+                          : `Explain this section: "${targetText}"`;
+                        
+                        const customEvent = new CustomEvent("fahemAskCompanion", {
+                          detail: {
+                            text: promptText,
+                            bookId: selectedBookReader?._id || selectedBookReader?.id,
+                            pageNumber: readerCurrentPage,
+                            book: selectedBookReader,
+                            currentPage: readerCurrentPage,
+                            totalPages: totalPagesCount,
+                            chapterTitleEn: activePage?.chapterTitleEn || "",
+                            chapterTitleAr: activePage?.chapterTitleAr || "",
+                            titleEn: activePage?.titleEn || "",
+                            titleAr: activePage?.titleAr || "",
+                            contentEn: activePage?.contentEn || activePage?.content || "",
+                            contentAr: activePage?.contentAr || activePage?.content || ""
+                          }
+                        });
                         window.dispatchEvent(customEvent);
                         setBubbleCoords(null);
                       }}
                       style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
                     >
-                      🧠 Explain
+                      🧠 {language === "ar" ? "اشرح" : "Explain"}
                     </button>
                     <button
                       onClick={() => {
-                        const customEvent = new CustomEvent("fahemAskCompanion", { detail: { text: `Translate or summarize this: "${window.getSelection()?.toString()}"` } });
+                        const targetText = window.getSelection()?.toString() || selectedText || "";
+                        const promptText = language === "ar" 
+                          ? `لخص هذا الجزء واعرضه في نقاط واضحة: "${targetText}"` 
+                          : `Summarize this section: "${targetText}"`;
+                        
+                        const customEvent = new CustomEvent("fahemAskCompanion", {
+                          detail: {
+                            text: promptText,
+                            bookId: selectedBookReader?._id || selectedBookReader?.id,
+                            pageNumber: readerCurrentPage,
+                            book: selectedBookReader,
+                            currentPage: readerCurrentPage,
+                            totalPages: totalPagesCount,
+                            chapterTitleEn: activePage?.chapterTitleEn || "",
+                            chapterTitleAr: activePage?.chapterTitleAr || "",
+                            titleEn: activePage?.titleEn || "",
+                            titleAr: activePage?.titleAr || "",
+                            contentEn: activePage?.contentEn || activePage?.content || "",
+                            contentAr: activePage?.contentAr || activePage?.content || ""
+                          }
+                        });
                         window.dispatchEvent(customEvent);
                         setBubbleCoords(null);
                       }}
                       style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
                     >
-                      📝 Summarize
+                      📝 {language === "ar" ? "لخص" : "Summarize"}
                     </button>
                   </div>
                 )}
@@ -4601,21 +4871,21 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         </div>
 
                         <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-                          {(item.coverThumbUrl || item.coverUrl) && (
-                            <img 
-                              src={item.coverThumbUrl || item.coverUrl} 
-                              alt="book thumbnail" 
-                              style={{ 
-                                width: "64px", 
-                                height: "96px", 
-                                borderRadius: "10px", 
-                                objectFit: "cover", 
-                                boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
-                                border: "1px solid rgba(16, 107, 163, 0.08)",
-                                flexShrink: 0
-                              }} 
-                            />
-                          )}
+                          <BookCoverWithFallback
+                            src={item.coverThumbUrl || item.coverUrl}
+                            alt="book thumbnail"
+                            width="64px"
+                            height="96px"
+                            subject={item.subject}
+                            subjectColor={item.subjectColor}
+                            subjectEmoji={item.subjectEmoji}
+                            title={language === "ar" ? (item.titleAr || item.title) : (item.titleEn || item.title)}
+                            style={{
+                              borderRadius: "10px",
+                              boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
+                              border: "1px solid rgba(16, 107, 163, 0.08)",
+                            }}
+                          />
                           <div style={{ flex: 1 }}>
                             <h3 style={{
                               fontSize: "0.95rem",

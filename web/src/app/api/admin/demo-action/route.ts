@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getLocalDb, saveLocalDb, isLocalEnv } from "../../localDbHelper";
 import { requireAdmin } from "../../_auth";
+import { proxyRequest } from "../../proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -48,43 +49,19 @@ export async function POST(req: NextRequest) {
 
       saveLocalDb(db);
     } else {
-      // Production: update MongoDB
-      const { MongoClient } = require("mongodb");
-      const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 2000 });
-      await client.connect();
-      const db = client.db("fahem");
-
-      const sessionCol = db.collection("demo_sessions");
-      const session = await sessionCol.findOne({ sandbox_session_id });
-
-      if (!session) {
-        await client.close();
-        return new Response(JSON.stringify({ error: "Demo session not found" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" }
-        });
+      // Production: proxy to Python backend
+      const proxyRes = await proxyRequest("/admin/demo-action", "POST", body, ctx);
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (!data.success) {
+          return new Response(JSON.stringify({ error: data.error || "Failed to execute demo action on backend." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      } else {
+        throw new Error(`Backend demo-action POST failed: ${proxyRes.statusText}`);
       }
-
-      if (action === "kill") {
-        await sessionCol.updateOne(
-          { sandbox_session_id },
-          {
-            $set: {
-              status: "killed",
-              ended_at: Math.floor(Date.now() / 1000),
-              kill_reason: "Admin intervention"
-            }
-          }
-        );
-      } else if (action === "quota") {
-        await sessionCol.updateOne(
-          { sandbox_session_id },
-          { $set: { token_budget: Number(quota_value) || 250000 } }
-        );
-      }
-
-      await client.close();
     }
 
     // Also log admin action in audit log/activities

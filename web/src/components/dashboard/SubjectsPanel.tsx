@@ -19,8 +19,69 @@ interface Book {
   titleEn?: string;
   titleAr?: string;
   subject_id?: string;
-  chapters?: any[];
+  coverUrl?: string;
+  coverThumbUrl?: string;
 }
+
+const SubjectsBookCover: React.FC<{
+  src?: string;
+  alt: string;
+  subjectColor: string;
+  subjectIcon: string;
+}> = ({ src, alt, subjectColor, subjectIcon }) => {
+  const [hasError, setHasError] = useState(!src);
+
+  useEffect(() => {
+    setHasError(!src);
+  }, [src]);
+
+  if (hasError) {
+    return (
+      <div style={{
+        width: "24px",
+        height: "36px",
+        borderRadius: "4px",
+        background: `linear-gradient(135deg, ${subjectColor}, color-mix(in srgb, ${subjectColor} 60%, #000))`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        flexShrink: 0,
+        position: "relative",
+        overflow: "hidden"
+      }}>
+        {/* Spine line */}
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: "2px",
+          background: "rgba(0,0,0,0.2)"
+        }} />
+        <span style={{ fontSize: "0.85rem", zIndex: 1 }}>{subjectIcon || "📖"}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        width: "24px",
+        height: "36px",
+        borderRadius: "4px",
+        objectFit: "cover",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+        border: "1px solid rgba(0,0,0,0.08)",
+        flexShrink: 0
+      }}
+      onError={() => setHasError(true)}
+    />
+  );
+};
 
 interface SubjectsPanelProps {
   language: string;
@@ -232,7 +293,12 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                         marginBottom: "0.25rem",
                       }}
                     >
-                      <span style={{ fontSize: "1.2rem" }}>📖</span>
+                      <SubjectsBookCover 
+                        src={book.coverThumbUrl || book.coverUrl} 
+                        alt={bookTitle} 
+                        subjectColor={activeSubjectColor} 
+                        subjectIcon={selectedSubjectObj?.icon || "📖"} 
+                      />
                       <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--foreground)" }}>
                         {bookTitle}
                       </span>

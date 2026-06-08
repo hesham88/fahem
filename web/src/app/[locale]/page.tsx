@@ -420,25 +420,7 @@ export default function LandingPage() {
                   
                   const trimmedEmail = judgeEmail.trim();
 
-                  // 1. Check eligibility server-side
-                  const eligResponse = await fetch("/api/eval/eligibility", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: trimmedEmail })
-                  });
-                  const eligData = await eligResponse.json();
-
-                  if (!eligResponse.ok || !eligData.eligible) {
-                    setErrorMsg(
-                      language === "ar" 
-                        ? "عذرًا، هذا البريد الإلكتروني غير مؤهل أو غير مسجل للتقييم." 
-                        : "Sorry, this email is not eligible or registered for evaluation."
-                    );
-                    setBypassActive(false);
-                    return;
-                  }
-
-                  // 2. Call /api/demo/enter
+                  // Call /api/demo/enter directly
                   const response = await fetch("/api/demo/enter", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -906,6 +888,66 @@ export default function LandingPage() {
           <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
             <FiFacebook />
           </a>
+        </div>
+
+        {/* Premium Partner & Infrastructure Logos Showcase */}
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "center", 
+          alignItems: "center", 
+          gap: "2.5rem", 
+          flexWrap: "wrap", 
+          margin: "2rem auto", 
+          maxWidth: "600px",
+          padding: "1rem",
+          borderTop: "1px dashed rgba(16, 107, 163, 0.08)",
+          borderBottom: "1px dashed rgba(16, 107, 163, 0.08)"
+        }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>
+            {language === "ar" ? "الشركاء والتقنيات" : "Partners & Technologies"}
+          </span>
+          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
+            {/* Google Cloud Partner */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s" }}
+                 onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
+                 onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4"/>
+              </svg>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Cloud Run</span>
+            </div>
+
+            {/* Firebase Partner */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s" }}
+                 onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
+                 onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
+              <svg width="16" height="18" viewBox="0 0 116 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24.3 95.7L0 11.1c-.6-2 1.5-3.5 3.1-2.2L107.5 73 24.3 95.7z" fill="#FFC24C"/>
+                <path d="M43.7 130l63.8-57L24.3 95.7 43.7 130z" fill="#FF9800"/>
+                <path d="M14.6 30.7L0 11.1c-.6-2 1.5-3.5 3.1-2.2L116 112c.9 1-1.3 2.1-2.1 1L14.6 30.7z" fill="#E65100"/>
+              </svg>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Firebase</span>
+            </div>
+
+            {/* Gemini Partner */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s" }}
+                 onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
+                 onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C12 2 12.3 8.3 17.5 12C12.3 15.7 12 22 12 22C12 22 11.7 15.7 6.5 12C11.7 8.3 12 2 12 2Z" fill="#1A73E8"/>
+                <path d="M12 6C12 6 12.15 9.15 14.75 11C12.15 12.85 12 16 12 16C12 16 11.85 12.85 9.25 11C11.85 9.15 12 6 12 6Z" fill="#E8F0FE"/>
+              </svg>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Gemini AI</span>
+            </div>
+
+            {/* Asdaa Partner */}
+            <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
+                 onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
+                 onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
+              <span style={{ fontSize: "1rem" }}>🎙️</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Asdaa.co</span>
+            </a>
+          </div>
         </div>
 
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.5rem" }}>

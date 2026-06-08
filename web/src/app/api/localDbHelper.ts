@@ -66,7 +66,7 @@ const DEFAULT_DB: LocalDb = {
     weeklyAllocationLimit: 250000,
     monthlyAllocationLimit: 1000000,
     maxUploadSize: 2, // 2MB
-    evalSandboxEnabled: false,
+    evalSandboxEnabled: true,
     evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
     demoDomains: ["google.com", "mongodb.com", "devpost.com"]
   },

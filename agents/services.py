@@ -111,20 +111,42 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.warning(f"Failed to import/set verified_principal_ctx: {ctx_err}")
 
         db_target_ctx = None
+        selected_book_ids_ctx = None
         try:
             db_target = "fahem"
+            selected_book_ids = []
             if principal and isinstance(principal, dict):
                 db_target = principal.get("db_target") or "fahem"
+                selected_book_ids = principal.get("selected_book_ids") or []
             
             try:
-                from agents.mongodb_engine import db_target_var
+                from agents.mongodb_engine import db_target_var, selected_book_ids_var
             except ImportError:
-                from mongodb_engine import db_target_var
+                from mongodb_engine import db_target_var, selected_book_ids_var
                 
             db_target_ctx = db_target_var.set(db_target)
+            selected_book_ids_ctx = selected_book_ids_var.set(selected_book_ids)
             logger.info(f"[DB TARGET] ContextVar db_target set globally to: {db_target}")
-        except Exception as e:
-            logger.warning(f"Failed to set db_target_var ContextVar: {e}")
+            logger.info(f"[SELECTED BOOKS] ContextVar selected_book_ids set to: {selected_book_ids}")
+        except Exception as sb_err:
+            logger.warning(f"Failed to set context variables: {sb_err}")
+
+        # Idempotent user profile provisioning on first authenticated request (R22)
+        if principal and principal.get("uid") and principal.get("email"):
+            try:
+                try:
+                    from agents.mongodb_engine import MongoDBEngine
+                except ImportError:
+                    from mongodb_engine import MongoDBEngine
+                db_engine = MongoDBEngine()
+                if db_engine._client is not None:
+                    await db_engine.ensure_user_profile(
+                        user_id=principal.get("uid"),
+                        email=principal.get("email"),
+                        display_name=principal.get("displayName") or principal.get("name")
+                    )
+            except Exception as pe_err:
+                logger.warning(f"Failed to auto-provision user profile: {pe_err}")
 
         try:
             return await call_next(request)
@@ -142,6 +164,15 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     except ImportError:
                         from mongodb_engine import db_target_var
                     db_target_var.reset(db_target_ctx)
+                except Exception:
+                    pass
+            if selected_book_ids_ctx is not None:
+                try:
+                    try:
+                        from agents.mongodb_engine import selected_book_ids_var
+                    except ImportError:
+                        from mongodb_engine import selected_book_ids_var
+                    selected_book_ids_var.reset(selected_book_ids_ctx)
                 except Exception:
                     pass
 
@@ -2562,6 +2593,176 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to check admin: {err}", exc_info=True)
             return {"isAdmin": False, "error": str(err)}
 
+    @app.get("/admin/user-token-policy")
+    async def get_user_token_policy_endpoint(userId: str):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            user_doc = db["users"].find_one({"userId": userId})
+            client.close()
+            
+            if user_doc:
+                token_policy = user_doc.get("tokenPolicy")
+                return {
+                    "success": True,
+                    "userId": userId,
+                    "email": user_doc.get("email", ""),
+                    "name": user_doc.get("name", ""),
+                    "tokenPolicy": token_policy
+                }
+            else:
+                return {"success": False, "error": "User not found"}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get user token policy: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/admin/user-token-policy")
+    async def post_user_token_policy_endpoint(payload: dict):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            userId = payload.get("userId")
+            if not userId:
+                client.close()
+                return {"success": False, "error": "userId is required"}
+                
+            clearPolicy = payload.get("clearPolicy", False)
+            
+            if clearPolicy:
+                result = db["users"].update_one(
+                    {"userId": userId},
+                    {"$unset": {"tokenPolicy": ""}}
+                )
+                token_policy = None
+            else:
+                token_policy = {
+                    "enabled": bool(payload.get("enabled", True)),
+                    "weeklyLimit": int(payload.get("weeklyLimit", 250000)),
+                    "monthlyLimit": int(payload.get("monthlyLimit", 1000000)),
+                    "reason": payload.get("reason", "admin override")
+                }
+                result = db["users"].update_one(
+                    {"userId": userId},
+                    {"$set": {"tokenPolicy": token_policy}}
+                )
+                
+            client.close()
+            
+            if result.matched_count == 0:
+                return {"success": False, "error": "User not found in database"}
+                
+            return {
+                "success": True,
+                "message": "User token policy updated successfully.",
+                "tokenPolicy": token_policy
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post user token policy: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.get("/admin/demo-sessions")
+    async def get_demo_sessions_endpoint():
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            sessions = list(db["demo_sessions"].find({}).sort("started_at", -1).limit(100))
+            client.close()
+            
+            for sess in sessions:
+                if "_id" in sess:
+                    sess["_id"] = str(sess["_id"])
+                    
+            return {"success": True, "sessions": sessions}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to get demo sessions: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/admin/demo-action")
+    async def post_demo_action_endpoint(payload: dict):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            action = payload.get("action")
+            sandbox_session_id = payload.get("sandbox_session_id")
+            quota_value = payload.get("quota_value")
+            
+            if not sandbox_session_id:
+                client.close()
+                return {"success": False, "error": "sandbox_session_id is required"}
+                
+            if action not in ["kill", "quota"]:
+                client.close()
+                return {"success": False, "error": "Invalid action. Must be 'kill' or 'quota'."}
+                
+            session_col = db["demo_sessions"]
+            session = session_col.find_one({"sandbox_session_id": sandbox_session_id})
+            
+            if not session:
+                client.close()
+                return {"success": False, "error": "Demo session not found"}
+                
+            if action == "kill":
+                session_col.update_one(
+                    {"sandbox_session_id": sandbox_session_id},
+                    {
+                        "$set": {
+                            "status": "killed",
+                            "ended_at": int(time.time()),
+                            "kill_reason": "Admin intervention"
+                        }
+                    }
+                )
+            elif action == "quota":
+                session_col.update_one(
+                    {"sandbox_session_id": sandbox_session_id},
+                    {"$set": {"token_budget": int(quota_value or 250000)}}
+                )
+                
+            client.close()
+            return {"success": True, "message": f"Action '{action}' executed successfully."}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to post demo action: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/admin/create-demo-session")
+    async def create_demo_session_endpoint(payload: dict):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            
+            session_col = db["demo_sessions"]
+            session_col.insert_one(payload)
+            client.close()
+            return {"success": True}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to create demo session: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
     @app.get("/admin/approve")
     async def admin_approve_get_endpoint():
         try:
@@ -2688,7 +2889,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "weeklyAllocationLimit": 250000,
                     "monthlyAllocationLimit": 1000000,
                     "maxUploadSize": 2,
-                    "evalSandboxEnabled": False,
+                    "evalSandboxEnabled": True,
                     "evalWhitelist": ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
                     "demoDomains": ["google.com", "mongodb.com", "devpost.com"]
                 }
@@ -4714,12 +4915,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     
                 recovered_books.append(book_doc)
                 
+            auth_users = data.get("auth_users", [])
+            backfilled_count = 0
+            if not dry_run and auth_users:
+                try:
+                    try:
+                        from agents.mongodb_engine import MongoDBEngine
+                    except ImportError:
+                        from mongodb_engine import MongoDBEngine
+                    db_engine = MongoDBEngine()
+                    for au in auth_users:
+                        uid = au.get("uid")
+                        email = au.get("email")
+                        disp_name = au.get("displayName")
+                        if uid and email:
+                            await db_engine.ensure_user_profile(
+                                user_id=uid,
+                                email=email,
+                                display_name=disp_name
+                            )
+                            backfilled_count += 1
+                except Exception as b_err:
+                    logger.warning(f"Failed to backfill auth users during orphan recovery: {b_err}")
+                
             client.close()
             return {
                 "success": True,
                 "mode": "recover",
                 "recovered_books_count": len(recovered_books),
-                "recovered_books": [dict(b, _id=str(b["_id"])) for b in recovered_books]
+                "recovered_books": [dict(b, _id=str(b["_id"])) for b in recovered_books],
+                "backfilled_users_count": backfilled_count
             }
         except Exception as err:
             logger.error(f"[services.py] Orphan recovery failed: {err}", exc_info=True)
