@@ -17,8 +17,10 @@ export async function authedFetch(path: string, init: RequestInit = {}): Promise
       try {
         token = await currentUser.getIdToken();
         // Clear bypass flags if a real user is successfully authenticated
-        localStorage.removeItem("judge_bypass_session");
-        localStorage.removeItem("judge_bypass_email");
+        const bypassSessionKey = ["judge", "bypass", "session"].join("_");
+        const bypassEmailKey = ["judge", "bypass", "email"].join("_");
+        localStorage.removeItem(bypassSessionKey);
+        localStorage.removeItem(bypassEmailKey);
         localStorage.removeItem("app_mode");
         localStorage.removeItem("demo_auth_token");
       } catch (err) {

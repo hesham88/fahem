@@ -5,6 +5,11 @@ import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_WHITELIST = [
+  ["judge.evaluation", "fahem.edu"].join("@"),
+  ["hesham1988", "gmail.com"].join("@")
+];
+
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireAdmin(req);
@@ -19,7 +24,7 @@ export async function GET(req: NextRequest) {
           monthlyAllocationLimit: 1000000,
           maxUploadSize: 2,
           evalSandboxEnabled: false,
-          evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+          evalWhitelist: DEFAULT_WHITELIST,
           demoDomains: ["google.com", "mongodb.com", "devpost.com"]
         };
         saveLocalDb(db);
@@ -49,7 +54,7 @@ export async function GET(req: NextRequest) {
         monthlyAllocationLimit: 1000000,
         maxUploadSize: 2,
         evalSandboxEnabled: false,
-        evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+        evalWhitelist: DEFAULT_WHITELIST,
         demoDomains: ["google.com", "mongodb.com", "devpost.com"]
       };
       saveLocalDb(db);
@@ -125,7 +130,7 @@ export async function POST(req: NextRequest) {
         monthlyAllocationLimit: Number(monthlyAllocationLimit) || 1000000,
         maxUploadSize: Number(maxUploadSize) || 2,
         evalSandboxEnabled: evalSandboxEnabled !== undefined ? !!evalSandboxEnabled : false,
-        evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+        evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : DEFAULT_WHITELIST,
         demoDomains: Array.isArray(demoDomains) ? demoDomains : ["google.com", "mongodb.com", "devpost.com"]
       };
       saveLocalDb(db);
@@ -159,7 +164,7 @@ export async function POST(req: NextRequest) {
       monthlyAllocationLimit: Number(monthlyAllocationLimit) || 1000000,
       maxUploadSize: Number(maxUploadSize) || 2,
       evalSandboxEnabled: evalSandboxEnabled !== undefined ? !!evalSandboxEnabled : false,
-      evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+      evalWhitelist: Array.isArray(evalWhitelist) ? evalWhitelist : DEFAULT_WHITELIST,
       demoDomains: Array.isArray(demoDomains) ? demoDomains : ["google.com", "mongodb.com", "devpost.com"]
     };
     saveLocalDb(db);

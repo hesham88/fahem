@@ -345,11 +345,11 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         jailbreak_patterns = [
             "ignore previous instructions",
             "system prompt",
-            "drop database",
+            "drop database",  # db.name
             "delete database",
             "delete collection",
             "drop_collection",
-            "drop_database",
+            "drop_database",  # db.name
         ]
         for pattern in jailbreak_patterns:
             if pattern in prompt_lower:

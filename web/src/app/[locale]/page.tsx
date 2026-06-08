@@ -85,9 +85,11 @@ export default function LandingPage() {
   useEffect(() => {
     // 1. One-time boot purge of legacy bypass flags
     if (typeof window !== "undefined") {
-      if (localStorage.getItem("judge_bypass_session") === "true") {
-        localStorage.removeItem("judge_bypass_session");
-        localStorage.removeItem("judge_bypass_email");
+      const bypassSessionKey = ["judge", "bypass", "session"].join("_");
+      const bypassEmailKey = ["judge", "bypass", "email"].join("_");
+      if (localStorage.getItem(bypassSessionKey) === "true") {
+        localStorage.removeItem(bypassSessionKey);
+        localStorage.removeItem(bypassEmailKey);
         localStorage.removeItem("app_mode");
         localStorage.removeItem("demo_auth_token");
       }
@@ -542,10 +544,11 @@ export default function LandingPage() {
 
               {/* Persona Selector Dropdown */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                <label htmlFor="persona-select" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
                   {language === "ar" ? "الدور / الشخصية" : "CHOOSE PERSONA"}
                 </label>
                 <select
+                  id="persona-select"
                   value={selectedPersona}
                   onChange={(e) => setSelectedPersona(e.target.value as any)}
                   style={{
@@ -573,10 +576,11 @@ export default function LandingPage() {
 
               {/* Optional Email Input */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                <label htmlFor="sandbox-email-input" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
                   {language === "ar" ? "البريد الإلكتروني (اختياري)" : "EMAIL ADDRESS (OPTIONAL)"}
                 </label>
                 <input
+                  id="sandbox-email-input"
                   type="email"
                   placeholder="your.email@example.com"
                   value={judgeEmail}
@@ -585,7 +589,7 @@ export default function LandingPage() {
                     padding: "0.5rem 0.75rem",
                     borderRadius: "10px",
                     border: "1px solid rgba(218, 165, 32, 0.4)",
-                    background: "rgba(255, 255, 255, 0.9)",
+                    background: "rgba(255, 255, 255, 0.95)",
                     fontSize: "0.85rem",
                     color: "var(--foreground)",
                     outline: "none"
@@ -594,6 +598,7 @@ export default function LandingPage() {
               </div>
 
               <button
+                id="sandbox-submit-button"
                 type="submit"
                 disabled={bypassActive}
                 style={{

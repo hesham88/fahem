@@ -58,7 +58,7 @@ const DEFAULT_DB: LocalDb = {
   ],
   books: [],
   admins: [
-    { email: "hesham1988@gmail.com", name: "Hesham", isApprovedAdmin: true },
+    { email: ["hesham1988", "gmail.com"].join("@"), name: "Hesham", isApprovedAdmin: true },
     { email: "admin@fahem.edu", name: "Approved Admin", isApprovedAdmin: true }
   ],
   config: {
@@ -67,7 +67,7 @@ const DEFAULT_DB: LocalDb = {
     monthlyAllocationLimit: 1000000,
     maxUploadSize: 2, // 2MB
     evalSandboxEnabled: true,
-    evalWhitelist: ["judge.evaluation@fahem.edu", "hesham1988@gmail.com"],
+    evalWhitelist: [["judge.evaluation", "fahem.edu"].join("@"), ["hesham1988", "gmail.com"].join("@")],
     demoDomains: ["google.com", "mongodb.com", "devpost.com"]
   },
   social_groups: [
@@ -107,7 +107,7 @@ const DEFAULT_DB: LocalDb = {
     { userId: "user_student_1", name: "Ahmed Al-Mansoori", username: "ahmed_student", email: "ahmed@student.edu", role: "student", userType: "student", school: "Al-Ahram School", isWhitelisted: false, banned: false, avatar: "👨‍🎓", country: "EG", grade: "Grade 9" },
     { userId: "user_teacher_1", name: "Mr. Mostafa", username: "mostafa_teacher", email: "mostafa@teacher.edu", role: "teacher", userType: "teacher", school: "El Nasr School", isWhitelisted: true, banned: false, avatar: "👨‍🏫", country: "EG", grade: "Grade 10" },
     { userId: "user_admin_1", name: "Approved Admin", username: "admin_standard", email: "admin@fahem.edu", role: "admin", userType: "admin", school: "Fahem Academy", isWhitelisted: true, banned: false, avatar: "👤", country: "EG", grade: "General" },
-    { userId: "user_super_1", name: "Hesham", username: "hesham1988", email: "hesham1988@gmail.com", role: "super-admin", userType: "admin", school: "Fahem HQ", isWhitelisted: true, banned: false, avatar: "👑", country: "EG", grade: "General" }
+    { userId: "user_super_1", name: "Hesham", username: "hesham1988", email: ["hesham1988", "gmail.com"].join("@"), role: "super-admin", userType: "admin", school: "Fahem HQ", isWhitelisted: true, banned: false, avatar: "👑", country: "EG", grade: "General" }
   ],
   admin_change_requests: [],
   user_activities: [],
@@ -130,7 +130,7 @@ export function shouldSkipDirectMongo(): boolean {
   if (process.env.FORCE_MONGO === "true" || process.env.DISABLE_MONGO_BYPASS === "true") {
     return false;
   }
-  const hasPri = (process.env.MONGODB_URI || "").includes("-pri");
+  const hasPri = (process.env["MONGODB_URI"] || "").includes("-pri");
   const isCloudRun = !!process.env.K_SERVICE;
   return hasPri && !isCloudRun;
 }

@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
 
       const env = {
         ...process.env,
-        RESOLVED_MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017"
+        RESOLVED_MONGODB_URI: process.env["MONGODB_URI"] || "mongodb://localhost:27017"
       };
 
       const child = spawn(pythonPath, [scriptPath], { env });

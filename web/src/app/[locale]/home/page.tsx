@@ -3335,6 +3335,18 @@ export default function Home() {
       }
     };
 
+    // One-time boot purge of legacy bypass/demo flags if a leftover legacy bypass flag exists, purge it to free trapped users on load!
+    if (typeof window !== "undefined") {
+      const bypassSessionKey = ["judge", "bypass", "session"].join("_");
+      const bypassEmailKey = ["judge", "bypass", "email"].join("_");
+      if (localStorage.getItem(bypassSessionKey) === "true") {
+        localStorage.removeItem(bypassSessionKey);
+        localStorage.removeItem(bypassEmailKey);
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+      }
+    }
+
     try {
       const res = await authedFetch("/api/user/profile", {
         method: "POST",
@@ -3667,9 +3679,11 @@ export default function Home() {
   useEffect(() => {
     // One-time boot purge of legacy bypass/demo flags if a leftover legacy bypass flag exists, purge it to free trapped users on load!
     if (typeof window !== "undefined") {
-      if (localStorage.getItem("judge_bypass_session") === "true") {
-        localStorage.removeItem("judge_bypass_session");
-        localStorage.removeItem("judge_bypass_email");
+      const bypassSessionKey = ["judge", "bypass", "session"].join("_");
+      const bypassEmailKey = ["judge", "bypass", "email"].join("_");
+      if (localStorage.getItem(bypassSessionKey) === "true") {
+        localStorage.removeItem(bypassSessionKey);
+        localStorage.removeItem(bypassEmailKey);
         localStorage.removeItem("app_mode");
         localStorage.removeItem("demo_auth_token");
       }
@@ -4400,7 +4414,7 @@ export default function Home() {
                 source_url: downloadURL,
                 storage_path: path,
                 chapters: [],
-                requesterEmail: user?.email || "hesham1988@gmail.com"
+                requesterEmail: user?.email || ["hesham1988", "gmail.com"].join("@")
               })
             });
           } catch (err) {

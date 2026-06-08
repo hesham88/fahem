@@ -81,7 +81,7 @@
   ],
   "admins": [
     {
-      "email": "hesham1988@gmail.com",
+      "email": "hesham.admin@fahem.edu",
       "name": "Hesham",
       "isApprovedAdmin": true
     },
@@ -194,7 +194,7 @@
       "userId": "user_super_1",
       "name": "Hesham",
       "username": "hesham1988",
-      "email": "hesham1988@gmail.com",
+      "email": "hesham.admin@fahem.edu",
       "role": "super-admin",
       "userType": "admin",
       "school": "Fahem HQ",
@@ -212,7 +212,7 @@
       "_id": "crawl_job_mock_1",
       "url": "https://openstax.org/books/introduction-python",
       "status": "completed",
-      "triggered_by": "hesham1988@gmail.com",
+      "triggered_by": "hesham.admin@fahem.edu",
       "created_at": "2026-06-05T05:00:00Z",
       "completed_at": "2026-06-05T05:10:00Z",
       "logs": [

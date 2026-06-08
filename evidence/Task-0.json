@@ -1,0 +1,24 @@
+{
+  "task": "Task-0",
+  "builder": "builder-1",
+  "d_box": "D1",
+  "sha": "efc145afc5d0c522a99381b860bef38fbcebfd47",
+  "frontend_revision": "App Hosting",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D0 - Version Parity validated",
+      "D1 - Sandbox entry (no auth) succeeded",
+      "D1 - Redirected to /home on submit",
+      "D1 - Asserted no 'not eligible' block displayed"
+    ],
+    "screenshots": [
+      "evidence/shots/D1-landing.png",
+      "evidence/shots/D1-home.png"
+    ]
+  },
+  "vision_verdict": "pass\n\nThis screenshot shows a fully functional, populated interface for the \"Fahem\" learning platform. The layout is intact, featuring a complete sidebar with navigation links (e.g., Curriculum Studio, Course Subjects, Study Planner), an active user profile showing specific credentials (\"playwright-test@fahem...\"), and a real-time token usage counter (42/100). The main dashboard is interactive, displaying a \"Whitelisted Judge Sandbox Console\" with selectable role personas, a specific \"Interactive Knowledge Library\" header, and a functional overlay modal (\"Welcome to Fahem Sandbox\") that provides contextual guidance. All UI components, including icons, text hierarchy, and interactive buttons, are rendered properly, indicating a live application state rather than a mockup or error state.",
+  "timestamp": 1780948633
+}

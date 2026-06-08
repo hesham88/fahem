@@ -1,7 +1,19 @@
 import type { NextConfig } from "next";
+import { execSync } from "child_process";
+
+let gitSha = "unknown";
+try {
+  gitSha = execSync("git rev-parse HEAD").toString().trim();
+} catch (e) {
+  // Fallback if git is not available or outside repo
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || gitSha,
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+  },
   serverExternalPackages: [
     "@mongodb-js/mongodb-mcp-server",
     "@modelcontextprotocol/sdk",
@@ -19,4 +31,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-

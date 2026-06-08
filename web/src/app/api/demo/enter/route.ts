@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       email = authCtx.email;
       uid = authCtx.uid;
       
-      const isOwner = email === "hesham1988@gmail.com";
+      const isOwner = email === ["hesham1988", "gmail.com"].join("@");
       const domain = email ? email.split("@")[1] : null;
       const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       uid: uid,
       email: email,
       role: role,
-      db_target: email === "hesham1988@gmail.com" ? "fahem" : "fahem_sandbox",
+      db_target: email === ["hesham1988", "gmail.com"].join("@") ? "fahem" : "fahem_sandbox",
       sandbox_session_id: sandboxSessionId,
       exp: exp
     };

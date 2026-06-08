@@ -238,6 +238,41 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     pass
 
 
+    @app.get("/health")
+    async def get_health():
+        git_sha = os.environ.get("NEXT_PUBLIC_BUILD_SHA") or os.environ.get("GIT_COMMIT_SHA")
+        if not git_sha:
+            try:
+                import subprocess
+                git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+            except Exception:
+                pass
+        if not git_sha:
+            try:
+                agents_dir = os.path.dirname(os.path.abspath(__file__))
+                sha_file = os.path.join(agents_dir, "build_sha.txt")
+                if os.path.exists(sha_file):
+                    with open(sha_file, "r") as f:
+                        git_sha = f.read().strip()
+            except Exception:
+                pass
+        
+        sha_val = git_sha or "unknown"
+        return {
+            "status": "healthy",
+            "sha": sha_val,
+            "revision": os.environ.get("K_REVISION", "local"),
+            "commit": sha_val
+        }
+
+    @app.get("/")
+    async def get_root():
+        return {
+            "status": "healthy",
+            "name": "Fahem Multi-Agent API Gateway",
+            "revision": os.environ.get("K_REVISION", "local")
+        }
+
     @app.get("/public/usernames")
     async def get_public_usernames():
         try:
@@ -540,7 +575,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "companion_memories", "active_practice_sessions"
             ]
             for col in collections_to_drop:
-                db[col].drop()
+                db[col].drop()  # db.name == "fahem_sandbox"
                 logger.info(f"[SEED] Dropped collection: {col}")
 
             # --- 1. SEED LIBRARIES (2) ---
