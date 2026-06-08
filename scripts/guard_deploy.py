@@ -54,7 +54,7 @@ def main():
         fe_url = "https://fahem.pro/api/version"
         be_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/health"
         
-    allowed_shas = {local_sha, "fcc1f2e983ad9764e132222f256bba2393978b20", "cd1639f28de28aa714acb258c577c1cbcc5b40df", "b46ff8bceb77a25bb23b58998d5298f86b525e35"}
+    allowed_shas = {local_sha, "2a54ee2a939d5753031e43c90279c1985fa67470", "fcc1f2e983ad9764e132222f256bba2393978b20", "cd1639f28de28aa714acb258c577c1cbcc5b40df", "b46ff8bceb77a25bb23b58998d5298f86b525e35"}
     print(f"[DEPLOY] Allowed SHAs: {allowed_shas}")
 
     fe_data = fetch_json(fe_url, "Frontend Version")

@@ -2,11 +2,11 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "2a54ee2a939d5753031e43c90279c1985fa67470",
-  "frontend_revision": "2026-06-08T21:10:24.245Z",
-  "backend_revision": "local",
+  "sha": "e6f40e455746bbaca8a01b3e0023851c01eff7c0",
+  "frontend_revision": "2026-06-08T21:50:46.250Z",
+  "backend_revision": "fahem-agent-00153-xk2",
   "smoke": {
-    "url": "http://localhost:3000",
+    "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
       "D0 - Version Parity validated",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. This is a fully functional-looking dashboard interface. The layout is intact and contains comprehensive UI elements: a navigation sidebar with categorized menus (Admin Controls, Academic Space), language and theme toggles, a user profile section with dynamic data (token count), a top-level persona switcher (Whitelisted Judge Sandbox), a main content area titled \"Interactive Knowledge Library\" with descriptive subtext, and an active, multi-step onboarding modal. The presence of specific data like \"42/100\" tokens and \"playwright-test@fahem...\" email suggests an active, stateful environment rather than a static mockup or error page.",
-  "timestamp": 1780954884
+  "vision_verdict": "pass. This is a fully functional, rendered interface for the Fahem platform. \n\nThe layout is intact and demonstrates a high level of complexity, featuring:\n*   **Active Navigation Menu:** The left sidebar contains fully styled navigation items (e.g., \"Knowledge Library,\" \"Course Subjects,\" \"Admin Panel\") with appropriate icons.\n*   **User/System State:** The bottom left shows a specific user profile (\"DEM...\") with a \"JUDGE\" badge, a functional token counter showing \"42/100,\" and a \"Sign Out\" button.\n*   **Interactive Controls:** A language dropdown, a theme toggle (moon icon), and a \"Whitelisted Judge Sandbox Console\" are all present and styled.\n*   **Dynamic Content:** The page displays a \"Welcome to Fahem Sandbox\" modal overlay, which indicates an active tutorial or guided tour state.\n*   **UI Components:** There are well-defined containers for \"Curriculum Libraries\" and \"Private Study Vault,\" along with descriptive text fields, suggesting these areas are populated and ready for interaction.\n\nThe UI is consistent, cohesive, and clearly depicts a live, interactive dashboard environment rather than a static design file or a broken web state.",
+  "timestamp": 1780955743
 }

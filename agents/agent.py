@@ -154,7 +154,28 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
             query_vector = get_gemini_embedding_v2(query, api_key)
             
             if query_vector:
-                # Determine book scoping
+                # Determine principal scoping
+                principal = verified_principal_ctx.get() or {}
+                uid = principal.get("uid")
+                selected_book_ids = principal.get("selected_book_ids")
+                if isinstance(selected_book_ids, str):
+                    selected_book_ids = [selected_book_ids]
+                
+                # Retrieve all books matching ownership/visibility to enforce security scoping
+                book_query = {
+                    "$or": [
+                        {"visibility": "public"},
+                        {"visibility": {"$exists": False}},
+                        {"visibility": None}
+                    ]
+                }
+                if uid:
+                    book_query["$or"].append({"owner_uid": uid})
+                    
+                books_cursor = mdb["books"].find(book_query, {"_id": 1})
+                allowed_book_ids = [str(b["_id"]) for b in books_cursor]
+                
+                # Determine book scoping based on scope, principal, or context var
                 book_ids = None
                 if scope:
                     if "book_ids" in scope:
@@ -164,15 +185,10 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     elif "book_id" in scope:
                         book_ids = [scope["book_id"]]
                 
-                # Fallback to verified_principal_ctx if not specified in scope
                 if not book_ids:
-                    principal = verified_principal_ctx.get()
-                    if principal and isinstance(principal, dict):
-                        book_ids = principal.get("selected_book_ids")
-                        if isinstance(book_ids, str):
-                            book_ids = [book_ids]
+                    if selected_book_ids is not None:
+                        book_ids = selected_book_ids
                 
-                # Fallback to selected_book_ids_var context variable if still not specified
                 if not book_ids:
                     try:
                         from agents.mongodb_engine import selected_book_ids_var
@@ -185,6 +201,12 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     except Exception:
                         pass
                 
+                # Apply intersection for security verification, or fallback to all allowed
+                if book_ids is not None:
+                    book_ids = [b for b in book_ids if b in allowed_book_ids]
+                else:
+                    book_ids = allowed_book_ids
+                
                 vs_stage = {
                     "index": os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages"),
                     "path": "embedding",
@@ -193,10 +215,10 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     "limit": k
                 }
                 
-                if book_ids:
-                    vs_stage["filter"] = {
-                        "book_id": {"$in": book_ids}
-                    }
+                # Always restrict search to authorized book IDs
+                vs_stage["filter"] = {
+                    "book_id": {"$in": book_ids}
+                }
                 
                 pipeline = [
                     {"$vectorSearch": vs_stage},
@@ -315,6 +337,117 @@ async def library_tool(action: str, query: Optional[str] = None) -> Dict[str, An
         query: Optional search keyword or ID query.
     """
     logger.info(f"[TOOL] library_tool action='{action}' query='{query}'")
+    try:
+        from tools import get_mongodb_uri
+        from pymongo import MongoClient
+        from guardrails import verified_principal_ctx
+        from bson import ObjectId
+        
+        # Helper to serialize MongoDB docs to standard JSON-compatible dicts
+        def sanitize(obj):
+            if isinstance(obj, dict):
+                return {k: sanitize(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [sanitize(x) for x in obj]
+            elif type(obj).__name__ == "ObjectId":
+                return str(obj)
+            elif type(obj).__name__ in ["datetime", "Datetime"]:
+                return obj.isoformat()
+            else:
+                return obj
+                
+        uri = get_mongodb_uri()
+        if uri:
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+            client.admin.command('ping')
+            mdb = get_active_db(client)
+            
+            principal = verified_principal_ctx.get() or {}
+            uid = principal.get("uid")
+            selected_book_ids = principal.get("selected_book_ids")
+            if isinstance(selected_book_ids, str):
+                selected_book_ids = [selected_book_ids]
+                
+            def filter_book(book):
+                # 1. Ownership and visibility check
+                is_owner = uid and book.get("owner_uid") == uid
+                is_public = book.get("visibility") == "public" or not book.get("visibility")
+                if not is_public and not is_owner:
+                    return False
+                # 2. Selected book IDs check
+                if selected_book_ids is not None:
+                    b_id = str(book.get("_id"))
+                    if b_id not in selected_book_ids:
+                        return False
+                return True
+
+            if action == "list_subjects":
+                # Fetch all subjects
+                subjects = list(mdb["subjects"].find({}))
+                client.close()
+                return {"status": "success", "subjects": sanitize(subjects)}
+                
+            elif action == "list_books":
+                query_filter = {}
+                if query:
+                    # Query is the subject_id
+                    subject_id_filters = [query]
+                    if len(query) == 24:
+                        try:
+                            subject_id_filters.append(ObjectId(query))
+                        except Exception:
+                            pass
+                    query_filter["subject_id"] = {"$in": subject_id_filters}
+                
+                books = list(mdb["books"].find(query_filter))
+                client.close()
+                
+                filtered_books = [b for b in books if filter_book(b)]
+                return {"status": "success", "books": sanitize(filtered_books)}
+                
+            elif action == "get_curricula":
+                curricula = list(mdb["curricula"].find({}))
+                client.close()
+                return {"status": "success", "curricula": sanitize(curricula)}
+                
+            elif action == "search":
+                if not query:
+                    client.close()
+                    return {"status": "error", "message": "query is required for search."}
+                
+                q_lower = query.lower()
+                
+                # Fetch books and subjects
+                books = list(mdb["books"].find({}))
+                subjects = list(mdb["subjects"].find({}))
+                client.close()
+                
+                # Filter books by visibility/scoping and text match
+                matched_books = []
+                for b in books:
+                    if filter_book(b):
+                        title_en = str(b.get("title") or "").lower()
+                        title_ar = str(b.get("title_ar") or "").lower()
+                        if q_lower in title_en or q_lower in title_ar:
+                            matched_books.append(b)
+                            
+                # Filter subjects by text match
+                matched_subjects = []
+                for s in subjects:
+                    name_en = str(s.get("name") or "").lower()
+                    name_ar = str(s.get("name_ar") or "").lower()
+                    if q_lower in name_en or q_lower in name_ar:
+                        matched_subjects.append(s)
+                        
+                return {"status": "success", "books": sanitize(matched_books), "subjects": sanitize(matched_subjects)}
+                
+            client.close()
+            return {"status": "error", "message": f"Unknown action: {action}"}
+            
+    except Exception as mongo_err:
+        logger.warning(f"[TOOL] library_tool Atlas search failed or unconfigured ({mongo_err}). Falling back to local search.")
+
+    # Local fallback
     try:
         db = load_local_db()
         if action == "list_subjects":
