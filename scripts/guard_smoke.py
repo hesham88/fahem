@@ -63,6 +63,7 @@ def fetch_json(url, name):
 def analyze_screenshot_with_gemini(screenshot_path, api_key, model_name):
     """
     Call Gemini LLM via official google-genai SDK to verify screenshot visual appeal and functionality.
+    Includes robust retry logic with exponential backoff for transient network errors.
     """
     try:
         from google import genai
@@ -79,33 +80,41 @@ def analyze_screenshot_with_gemini(screenshot_path, api_key, model_name):
     with open(screenshot_path, "rb") as f:
         img_bytes = f.read()
 
-    print(f"[SMOKE] Calling Gemini Vision Model ({model_name}) for verification verdict...")
-    try:
-        client = genai.Client(api_key=api_key) if api_key else genai.Client()
-        
-        prompt = (
-            "Analyze this screenshot of the Fahem learning platform home page.\n"
-            "Does it look like a fully working page with actual content (such as subjects, books, interactive chat, theme toggle, etc.) "
-            "rather than a blank page, error page, loading spinner, or static mockup?\n"
-            "Respond with 'pass' followed by a brief, detailed description of what is visible and why the layout is intact, "
-            "or 'fail' with the reason. Your response MUST start with 'pass' or 'fail'."
-        )
+    max_retries = 3
+    backoff = 2
+    for attempt in range(1, max_retries + 1):
+        print(f"[SMOKE] Calling Gemini Vision Model ({model_name}) for verification verdict (Attempt {attempt}/{max_retries})...")
+        try:
+            client = genai.Client(api_key=api_key) if api_key else genai.Client()
+            
+            prompt = (
+                "Analyze this screenshot of the Fahem learning platform home page.\n"
+                "Does it look like a fully working page with actual content (such as subjects, books, interactive chat, theme toggle, etc.) "
+                "rather than a blank page, error page, loading spinner, or static mockup?\n"
+                "Respond with 'pass' followed by a brief, detailed description of what is visible and why the layout is intact, "
+                "or 'fail' with the reason. Your response MUST start with 'pass' or 'fail'."
+            )
 
-        resp = client.models.generate_content(
-            model=model_name,
-            contents=[
-                types.Part.from_bytes(data=img_bytes, mime_type="image/png"),
-                prompt,
-            ]
-        )
-        
-        verdict = resp.text
-        if not verdict:
-            return "fail - empty response from Gemini"
-        return verdict.strip()
-    except Exception as e:
-        print(f"[SMOKE][ERROR] Gemini visual check failed: {e}")
-        return f"fail - vision check error: {e}"
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Part.from_bytes(data=img_bytes, mime_type="image/png"),
+                    prompt,
+                ]
+            )
+            
+            verdict = resp.text
+            if not verdict:
+                raise ValueError("empty response from Gemini")
+            return verdict.strip()
+        except Exception as e:
+            print(f"[SMOKE][WARN] Gemini visual check attempt {attempt} failed: {e}")
+            if attempt == max_retries:
+                print(f"[SMOKE][ERROR] Gemini visual check failed after {max_retries} attempts.")
+                return f"fail - vision check error after retries: {e}"
+            sleep_time = backoff ** attempt
+            print(f"[SMOKE] Sleeping for {sleep_time} seconds before retrying...")
+            time.sleep(sleep_time)
 
 def main():
     use_local = "--local" in sys.argv

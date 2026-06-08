@@ -7,6 +7,14 @@ import json
 import urllib.request
 import subprocess
 
+# Ensure UTF-8 printing
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+
 def get_local_sha():
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
@@ -29,7 +37,7 @@ def main():
     print("[DEPLOY] Running Deploy Parity Check (G8)")
     print("==================================================")
     
-    local_sha = get_local_sha()
+    local_sha = get_local_sha().strip().replace("\ufeff", "")
     if local_sha == "unknown":
         print("[DEPLOY][ERROR] Cannot verify deploy parity without local git SHA.")
         sys.exit(1)
@@ -55,7 +63,7 @@ def main():
         print(f"[DEPLOY][WARN] Frontend version endpoint is unreachable. If this is the initial deployment of /api/version, this is normal and expected.")
         print("[DEPLOY][WARN] Continuing deployment to allow /api/version to become live.")
     else:
-        fe_sha = fe_data.get("sha", "unknown")
+        fe_sha = fe_data.get("sha", "unknown").strip().replace("\ufeff", "")
         print(f"[DEPLOY] Deployed Frontend SHA: {fe_sha}")
         if fe_sha != local_sha:
             print(f"[DEPLOY][FAIL] Frontend SHA mismatch! Live: {fe_sha} != Local: {local_sha}")
@@ -67,8 +75,9 @@ def main():
         print(f"[DEPLOY][FAIL] Backend health endpoint is unreachable.")
         failed = True
     else:
-        be_sha = be_data.get("sha") or be_data.get("commit", "unknown")
+        be_sha = (be_data.get("sha") or be_data.get("commit", "unknown")).strip().replace("\ufeff", "")
         print(f"[DEPLOY] Deployed Backend SHA: {be_sha}")
+
         if be_sha != local_sha:
             # We can allow 'local' or 'unknown' for local development bypass if not in production mode
             if use_local and be_sha in ["local", "unknown"]:

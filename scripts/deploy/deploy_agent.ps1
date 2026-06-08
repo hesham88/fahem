@@ -44,6 +44,12 @@ if (Test-Path $TempScriptsDir) {
 }
 Copy-Item -Recurse -Force (Join-Path $RootDir 'scripts') $TempScriptsDir
 
+# Write build_sha.txt so the health endpoint can report the correct SHA
+Write-Host 'Generating build_sha.txt inside agents folder...' -ForegroundColor Yellow
+$ShaFile = Join-Path $AgentsDir 'build_sha.txt'
+$GitSha = (git rev-parse HEAD).Trim()
+$GitSha | Out-File -FilePath $ShaFile -Encoding utf8 -NoNewline
+
 # 4. Deploy to Cloud Run
 Write-Host 'Deploying agent microservice to Cloud Run...' -ForegroundColor Yellow
 Write-Host "Source directory: $AgentsDir" -ForegroundColor Gray
@@ -76,12 +82,20 @@ try {
     if (Test-Path $TempScriptsDir) {
         Remove-Item -Recurse -Force $TempScriptsDir
     }
+    if (Test-Path $ShaFile) {
+        Remove-Item -Force $ShaFile
+    }
     Exit 1
 }
 
-# 5. Clean up temporary scripts folder in agents
+# 5. Clean up temporary scripts and sha file in agents
 if (Test-Path $TempScriptsDir) {
     Write-Host 'Cleaning up temporary scripts folder...' -ForegroundColor Gray
     Remove-Item -Recurse -Force $TempScriptsDir
 }
+if (Test-Path $ShaFile) {
+    Write-Host 'Cleaning up build_sha.txt...' -ForegroundColor Gray
+    Remove-Item -Force $ShaFile
+}
+
 
