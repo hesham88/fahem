@@ -33,26 +33,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  // Fetch dynamic public profile usernames from MongoDB if URI is available
+  // Fetch dynamic public profile usernames by proxying to the Python backend (Invariant #1)
   let usernames: string[] = [];
-  const uri = process.env.MONGODB_URI;
-  if (uri) {
+  const agentUrl = (process.env.MONGODB_AGENT_URL || "http://localhost:8000").trim();
+  if (agentUrl) {
     try {
-      const { MongoClient } = require("mongodb");
-      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 });
-      await client.connect();
-      const db = client.db("fahem");
-      
-      const users = await db
-        .collection("users")
-        .find({ username: { $exists: true, $ne: "" } })
-        .project({ username: 1 })
-        .toArray();
-      
-      usernames = users.map((u: any) => u.username).filter(Boolean);
-      await client.close();
+      const res = await fetch(`${agentUrl}/public/usernames`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.usernames)) {
+          usernames = data.usernames;
+        }
+      } else {
+        console.error(`[sitemap] Failed to fetch dynamic usernames from backend: ${res.status}`);
+      }
     } catch (err) {
-      console.error("[sitemap] Failed to fetch dynamic usernames from MongoDB:", err);
+      console.error("[sitemap] Failed to fetch dynamic usernames from backend:", err);
     }
   }
 
