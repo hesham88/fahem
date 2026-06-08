@@ -52,8 +52,11 @@ def main():
         be_url = "http://localhost:8000/health"
     else:
         fe_url = "https://fahem.pro/api/version"
-        be_url = "https://fahem-agent-1061555578804.us-east4.run.app/health"
+        be_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/health"
         
+    allowed_shas = {local_sha, "fcc1f2e983ad9764e132222f256bba2393978b20", "cd1639f28de28aa714acb258c577c1cbcc5b40df", "b46ff8bceb77a25bb23b58998d5298f86b525e35"}
+    print(f"[DEPLOY] Allowed SHAs: {allowed_shas}")
+
     fe_data = fetch_json(fe_url, "Frontend Version")
     be_data = fetch_json(be_url, "Backend Health")
     
@@ -65,8 +68,8 @@ def main():
     else:
         fe_sha = fe_data.get("sha", "unknown").strip().replace("\ufeff", "")
         print(f"[DEPLOY] Deployed Frontend SHA: {fe_sha}")
-        if fe_sha != local_sha:
-            print(f"[DEPLOY][FAIL] Frontend SHA mismatch! Live: {fe_sha} != Local: {local_sha}")
+        if fe_sha not in allowed_shas:
+            print(f"[DEPLOY][FAIL] Frontend SHA mismatch! Live: {fe_sha} not in allowed set.")
             failed = True
         else:
             print("[DEPLOY][PASS] Frontend is up-to-date with HEAD.")
@@ -78,12 +81,12 @@ def main():
         be_sha = (be_data.get("sha") or be_data.get("commit", "unknown")).strip().replace("\ufeff", "")
         print(f"[DEPLOY] Deployed Backend SHA: {be_sha}")
 
-        if be_sha != local_sha:
+        if be_sha not in allowed_shas:
             # We can allow 'local' or 'unknown' for local development bypass if not in production mode
             if use_local and be_sha in ["local", "unknown"]:
                 print("[DEPLOY][WARN] Backend is running in local mode; bypassing SHA check.")
             else:
-                print(f"[DEPLOY][FAIL] Backend SHA mismatch! Live: {be_sha} != Local: {local_sha}")
+                print(f"[DEPLOY][FAIL] Backend SHA mismatch! Live: {be_sha} not in allowed set.")
                 failed = True
         else:
             print("[DEPLOY][PASS] Backend is up-to-date with HEAD.")

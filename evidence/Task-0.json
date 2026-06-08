@@ -2,11 +2,11 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "fcc1f2e983ad9764e132222f256bba2393978b20",
-  "frontend_revision": "2026-06-08T20:17:20.316Z",
-  "backend_revision": "Local Dev",
+  "sha": "b46ff8bceb77a25bb23b58998d5298f86b525e35",
+  "frontend_revision": "2026-06-08T20:33:09.835Z",
+  "backend_revision": "fahem-agent-00149-cb5",
   "smoke": {
-    "url": "http://localhost:3000",
+    "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
       "D0 - Version Parity validated",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass. The screenshot depicts a fully functional and populated web interface for the \"Fahem\" learning platform. The layout is completely intact, featuring a structured sidebar navigation (including Admin Controls and Academic Space), a primary content area with a \"Whitelisted Judge Sandbox Console,\" and an \"Interactive Knowledge Library\" section. Various UI elements—such as the user profile, token count, theme toggle, and a multi-step interactive onboarding modal—are clearly visible and properly rendered. The content, including icons, text headers, and sub-headings, is cohesive and formatted as a dynamic dashboard, indicating a functional web application rather than a static mockup or error state.",
-  "timestamp": 1780949912
+  "vision_verdict": "pass\n\nThe screenshot shows a functional, fully rendered web application interface. The layout is complete, featuring a structured left-hand navigation sidebar (with categorized sections for Admin Controls, Academic Space, and User Settings) and a main content area. The content is interactive and detailed, including a \"Whitelisted Judge Sandbox Console\" at the top, a clearly defined \"Interactive Knowledge Library\" header, and a modal overlay (the \"Welcome to Fahem Sandbox\" tour guide) with pagination and a functional \"Next\" button. The presence of specific data—such as the user's email, the \"Daily Tokens\" progress bar (42/100), and specific UI elements like the theme toggle, library tabs, and dropdown menus—confirms this is an active application state rather than a mockup or error page.",
+  "timestamp": 1780952992
 }

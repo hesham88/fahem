@@ -187,7 +187,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
             db_target_ctx = db_target_var.set(db_target)
             selected_book_ids_ctx = selected_book_ids_var.set(selected_book_ids)
-            logger.info(f"[DB TARGET] ContextVar db_target set globally to: {db_target}")
+            logger.info(f"[DB TARGET] ContextVar db_target set for request: {db_target}")
             logger.info(f"[SELECTED BOOKS] ContextVar selected_book_ids set to: {selected_book_ids}")
         except Exception as sb_err:
             logger.warning(f"Failed to set context variables: {sb_err}")
