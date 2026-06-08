@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     const requesterEmail = ctx.email || "anonymous@fahem.ai";
     const isSuper = ctx.role === "super-admin";
-    const needsApproval = !isSuper;
+    const needsApproval = !isSuper && ctx.db_target !== "fahem_sandbox" && !isLocalEnv();
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       color,
       core_book_ids,
       supporting_book_ids
-    });
+    }, ctx);
 
   } catch (err: any) {
     console.error("[api-subjects-post] failed:", err);
@@ -249,7 +249,7 @@ export async function PUT(req: NextRequest) {
 
     const requesterEmail = ctx.email || "anonymous@fahem.ai";
     const isSuper = ctx.role === "super-admin";
-    const needsApproval = !isSuper;
+    const needsApproval = !isSuper && ctx.db_target !== "fahem_sandbox" && !isLocalEnv();
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -360,7 +360,7 @@ export async function PUT(req: NextRequest) {
       color,
       core_book_ids,
       supporting_book_ids
-    });
+    }, ctx);
 
   } catch (err: any) {
     console.error("[api-subjects-put] failed:", err);
@@ -388,7 +388,7 @@ export async function DELETE(req: NextRequest) {
 
     const requesterEmail = ctx.email || "anonymous@fahem.ai";
     const isSuper = ctx.role === "super-admin";
-    const needsApproval = !isSuper;
+    const needsApproval = !isSuper && ctx.db_target !== "fahem_sandbox" && !isLocalEnv();
 
     if (needsApproval) {
       const db = getLocalDb();
@@ -420,19 +420,24 @@ export async function DELETE(req: NextRequest) {
           headers: { "Content-Type": "application/json" }
         });
       }
-      // Remove associated books
-      db.books = db.books.filter(b => b.subject_id !== id);
+      // Decouple associated books instead of deleting them (OR-12)
+      db.books = (db.books || []).map((b: any) => {
+        if (b.subject_id === id) {
+          return { ...b, subject_id: null, curriculum_id: null, role: null };
+        }
+        return b;
+      });
       // Remove subject
       db.subjects.splice(idx, 1);
       saveLocalDb(db);
-      return new Response(JSON.stringify({ success: true, message: "Subject and associated books deleted locally." }), {
+      return new Response(JSON.stringify({ success: true, message: "Subject deleted and associated books decoupled locally." }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
 
     // Proxy to Cloud Run Agent
-    return await proxyRequest(`/user/subjects?id=${id}`, "DELETE");
+    return await proxyRequest(`/user/subjects?id=${id}`, "DELETE", undefined, ctx);
 
   } catch (err: any) {
     console.error("[api-subjects-delete] failed:", err);

@@ -2,9 +2,9 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "b46ff8bceb77a25bb23b58998d5298f86b525e35",
-  "frontend_revision": "2026-06-08T20:33:09.835Z",
-  "backend_revision": "fahem-agent-00149-cb5",
+  "sha": "4af4d6773c6d45094e2ff700b1efe5f7fdb0deb6",
+  "frontend_revision": "2026-06-08T21:11:50.129Z",
+  "backend_revision": "fahem-agent-00150-z9b",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -19,6 +19,6 @@
       "evidence/shots/D1-home.png"
     ]
   },
-  "vision_verdict": "pass\n\nThe screenshot shows a functional, fully rendered web application interface. The layout is complete, featuring a structured left-hand navigation sidebar (with categorized sections for Admin Controls, Academic Space, and User Settings) and a main content area. The content is interactive and detailed, including a \"Whitelisted Judge Sandbox Console\" at the top, a clearly defined \"Interactive Knowledge Library\" header, and a modal overlay (the \"Welcome to Fahem Sandbox\" tour guide) with pagination and a functional \"Next\" button. The presence of specific data—such as the user's email, the \"Daily Tokens\" progress bar (42/100), and specific UI elements like the theme toggle, library tabs, and dropdown menus—confirms this is an active application state rather than a mockup or error page.",
-  "timestamp": 1780952992
+  "vision_verdict": "pass. The screenshot displays a fully functional and populated dashboard interface. The layout is intact, featuring a structured navigation sidebar with active links (e.g., Knowledge Library, Course Subjects, Practice Workstation, Study Planner) and distinct UI components. Specifically, it shows an active \"Whitelisted Judge Sandbox\" role selector, a main content area for the \"Interactive Knowledge Library\" with sub-navigation tabs, a data-driven \"Daily Tokens\" progress bar, a user profile section, and an interactive onboarding modal (\"Welcome to Fahem Sandbox\"). All iconography, typography, and spacing suggest a dynamic, live application rather than a static or broken mockup.",
+  "timestamp": 1780953760
 }

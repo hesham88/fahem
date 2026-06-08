@@ -3503,8 +3503,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
             
-            # Delete associated books
-            db["books"].delete_many({"subject_id": id})
+            # Decouple associated books instead of deleting them (OR-12)
+            db["books"].update_many(
+                {"subject_id": id},
+                {"$set": {"subject_id": None, "curriculum_id": None, "role": None}}
+            )
             
             # Delete subject itself
             res = db["subjects"].delete_one({"_id": id})
@@ -3517,7 +3520,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 )
                 
             client.close()
-            return {"success": True, "message": "Subject and associated books deleted successfully."}
+            return {"success": True, "message": "Subject deleted and associated books decoupled successfully."}
         except Exception as err:
             logger.error(f"[services.py] Failed to delete subject: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
@@ -4046,6 +4049,172 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to update book: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"error": str(err)},
+                status_code=500
+            )
+
+    @app.patch("/user/books/{book_id}/assign")
+    async def assign_book_endpoint(book_id: str, request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import datetime
+            
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            body = await request.json()
+            action = body.get("action")
+            
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+
+            # Find the book
+            book_doc = db["books"].find_one({"_id": book_id})
+            if not book_doc:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Book with ID '{book_id}' not found"},
+                    status_code=404
+                )
+
+            if action == "decouple":
+                old_subject_id = book_doc.get("subject_id")
+                
+                # Update book fields to None (unassigned)
+                db["books"].update_one(
+                    {"_id": book_id},
+                    {"$set": {
+                        "curriculum_id": None,
+                        "library_id": None,
+                        "subject_id": None,
+                        "role": None,
+                        "updated_at": datetime.datetime.utcnow().isoformat()
+                    }}
+                )
+
+                # Clean up old subject relations if any
+                if old_subject_id:
+                    old_subj = db["subjects"].find_one({"_id": old_subject_id})
+                    if old_subj:
+                        core_book_ids = [bid for bid in old_subj.get("core_book_ids", []) if bid != book_id]
+                        supporting_book_ids = [bid for bid in old_subj.get("supporting_book_ids", []) if bid != book_id]
+                        books_count = len(core_book_ids) + len(supporting_book_ids)
+                        db["subjects"].update_one(
+                            {"_id": old_subject_id},
+                            {"$set": {
+                                "core_book_ids": core_book_ids,
+                                "supporting_book_ids": supporting_book_ids,
+                                "books_count": books_count
+                            }}
+                        )
+                
+                updated_book = db["books"].find_one({"_id": book_id})
+                client.close()
+                return {"success": True, "book": updated_book}
+
+            curriculum_id = body.get("curriculum_id")
+            subject_id = body.get("subject_id")
+            role = body.get("role")
+
+            if not curriculum_id or not subject_id or not role:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Missing required fields: curriculum_id, subject_id, role"},
+                    status_code=400
+                )
+
+            if role not in ["core", "supporting"]:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Invalid role value. Must be 'core' or 'supporting'"},
+                    status_code=400
+                )
+
+            # Find the curriculum
+            curriculum = db["curricula"].find_one({"_id": curriculum_id})
+            if not curriculum:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Curriculum with ID '{curriculum_id}' not found"},
+                    status_code=404
+                )
+
+            # Find the subject
+            subject = db["subjects"].find_one({"_id": subject_id})
+            if not subject:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Subject with ID '{subject_id}' not found"},
+                    status_code=404
+                )
+
+            old_subject_id = book_doc.get("subject_id")
+
+            # Update book fields
+            db["books"].update_one(
+                {"_id": book_id},
+                {"$set": {
+                    "curriculum_id": curriculum_id,
+                    "library_id": curriculum.get("library_id"),
+                    "subject_id": subject_id,
+                    "role": role,
+                    "updated_at": datetime.datetime.utcnow().isoformat()
+                }}
+            )
+
+            # Clean up old subject relations if any
+            if old_subject_id:
+                old_subj = db["subjects"].find_one({"_id": old_subject_id})
+                if old_subj:
+                    core_book_ids = [bid for bid in old_subj.get("core_book_ids", []) if bid != book_id]
+                    supporting_book_ids = [bid for bid in old_subj.get("supporting_book_ids", []) if bid != book_id]
+                    books_count = len(core_book_ids) + len(supporting_book_ids)
+                    db["subjects"].update_one(
+                        {"_id": old_subject_id},
+                        {"$set": {
+                            "core_book_ids": core_book_ids,
+                            "supporting_book_ids": supporting_book_ids,
+                            "books_count": books_count
+                        }}
+                    )
+
+            # Add to new subject relations
+            target_subj = db["subjects"].find_one({"_id": subject_id})
+            if target_subj:
+                core_book_ids = list(target_subj.get("core_book_ids", []) or [])
+                supporting_book_ids = list(target_subj.get("supporting_book_ids", []) or [])
+
+                if role == "core":
+                    supporting_book_ids = [bid for bid in supporting_book_ids if bid != book_id]
+                    if book_id not in core_book_ids:
+                        core_book_ids.append(book_id)
+                else:
+                    core_book_ids = [bid for bid in core_book_ids if bid != book_id]
+                    if book_id not in supporting_book_ids:
+                        supporting_book_ids.append(book_id)
+
+                books_count = len(core_book_ids) + len(supporting_book_ids)
+                db["subjects"].update_one(
+                    {"_id": subject_id},
+                    {"$set": {
+                        "core_book_ids": core_book_ids,
+                        "supporting_book_ids": supporting_book_ids,
+                        "books_count": books_count
+                    }}
+                )
+
+            updated_book = db["books"].find_one({"_id": book_id})
+            client.close()
+            return {"success": True, "book": updated_book}
+        except Exception as err:
+            logger.error(f"[services.py] Failed to assign book: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
                 status_code=500
             )
 

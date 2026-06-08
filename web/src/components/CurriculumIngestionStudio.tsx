@@ -340,6 +340,15 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   ]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
+  // Tree Explorer, Emoji Picker, Delete Confirm & Pending states
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
+    "lib_lib_moe": true // Expand first library by default if desired
+  });
+  const [showDeleteSubjectConfirm, setShowDeleteSubjectConfirm] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isCreatingCurUnderLib, setIsCreatingCurUnderLib] = useState<string | null>(null);
+  const [isCreatingSubjUnderCur, setIsCreatingSubjUnderCur] = useState<string | null>(null);
+
   // Onboarding loads
   useEffect(() => {
     fetchLibraries();
@@ -638,22 +647,24 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     }
     setLoading(true);
     try {
-      const payload = {
-        ...subjForm,
-        _id: editingSubjId || `subj_${Date.now()}`,
-        curriculum_id: selectedCurriculumId
-      };
+      const isEdit = !!editingSubjId;
+      const payload = isEdit 
+        ? { ...subjForm, id: editingSubjId, curriculum_id: selectedCurriculumId }
+        : { ...subjForm, curriculum_id: selectedCurriculumId };
+        
       const res = await authedFetch("/api/subjects", {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        triggerToast(isAr ? "🎨 تم حفظ المادة وتحديث الألوان بالنظام!" : "🎨 Subject details and theme color saved!");
+        triggerToast(isAr ? "🎨 تم حفظ المادة بنجاح!" : "🎨 Subject details and theme color saved!");
         fetchSubjects(selectedCurriculumId);
         setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
         setEditingSubjectId(null);
+        setIsCreatingSubjUnderCur(null);
+        setSelectedSubjectId("");
       } else {
         triggerToast(data.error || "Failed to save subject", true);
       }
@@ -1088,324 +1099,698 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
         {/* TAB 2: Curriculum Builder */}
         {activeTab === "curricula_builder" && (
           <div className="curriculum-builder-layout">
-            <div className="library-picker-panel">
-              <label>{t("select_library")}:</label>
-              <select
-                value={selectedLibId}
-                onChange={e => setSelectedLibId(e.target.value)}
-                className="styled-select-large"
-              >
-                {libraries.map(lib => (
-                  <option key={lib._id} value={lib._id}>{isAr ? lib.name_ar : lib.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="tab-grid grid-3">
-              {/* Curriculum Form & List */}
-              <section className="column-container">
-                <div className="form-card compact-margin">
-                  <h2>{isEditingCur ? t("edit_curriculum") : t("create_curriculum")}</h2>
-                  <form onSubmit={handleSaveCurriculum} className="standard-form">
-                    <div className="form-group">
-                      <label>{t("cur_id_opt")}</label>
-                      <input
-                        type="text"
-                        disabled={isEditingCur}
-                        value={curForm._id}
-                        onChange={e => setCurForm({ ...curForm, _id: e.target.value })}
-                        placeholder="e.g. cur_moe_g12"
-                        className="styled-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t("cur_title_en")}</label>
-                      <input
-                        type="text"
-                        value={curForm.title}
-                        onChange={e => setCurForm({ ...curForm, title: e.target.value })}
-                        className="styled-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t("cur_title_ar")}</label>
-                      <input
-                        type="text"
-                        value={curForm.title_ar}
-                        onChange={e => setCurForm({ ...curForm, title_ar: e.target.value })}
-                        className="styled-input"
-                      />
-                    </div>
-
-                    {/* Scope Dimension Values */}
-                    {activeLibrary && activeLibrary.scopeSchema?.length > 0 && (
-                      <div className="dynamic-scope-fields">
-                        <h3>{t("scope_details")}</h3>
-                        {activeLibrary.scopeSchema.map(dim => (
-                          <div key={dim.key} className="form-group">
-                            <label>{isAr ? dim.label_ar : dim.label} ({dim.key})</label>
-                            {dim.type === "enum" ? (
-                              <select
-                                value={curForm.scope[dim.key] || ""}
-                                onChange={e => setCurForm({
-                                  ...curForm,
-                                  scope: { ...curForm.scope, [dim.key]: e.target.value }
-                                })}
-                                className="styled-select"
-                              >
-                                <option value="">-- Select Option --</option>
-                                {dim.options?.map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                value={curForm.scope[dim.key] || ""}
-                                onChange={e => setCurForm({
-                                  ...curForm,
-                                  scope: { ...curForm.scope, [dim.key]: e.target.value }
-                                })}
-                                className="styled-input"
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <button type="submit" className="primary-submit-btn">
-                      <FiSave /> {t("save_curriculum")}
-                    </button>
-                  </form>
+            <div className="tree-dual-pane-layout">
+              
+              {/* TREE EXPLORER SIDEBAR */}
+              <aside className="tree-explorer-sidebar">
+                <div className="sidebar-header">
+                  <h3>🌳 {isAr ? "مستكشف المناهج" : "Curriculum Explorer"}</h3>
+                  <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b" }}>
+                    {isAr ? "الهيكل الهرمي للمكتبات والمناهج والكتب" : "Hierarchical structure of libraries & textbooks"}
+                  </p>
                 </div>
 
-                <div className="list-card compact-margin max-300">
-                  <h2>{t("curricula_list")}</h2>
-                  <div className="list-scroller-compact">
-                    {curricula.length === 0 ? (
-                      <p className="empty-state-text">{t("no_curricula")}</p>
-                    ) : (
-                      curricula.map(cur => (
-                        <div
-                          key={cur._id}
-                          onClick={() => setSelectedCurriculumId(cur._id)}
-                          className={`item-row-card selectable ${selectedCurriculumId === cur._id ? "selected-active" : ""}`}
-                        >
-                          <div className="item-meta">
-                            <FiLayers />
-                            <div>
-                              <h5>{isAr ? cur.title_ar : cur.title}</h5>
-                              <div className="scope-labels-row">
-                                {Object.entries(cur.scope || {}).map(([k, v]) => (
-                                  <span key={k} className="scope-tag">{k}:{v}</span>
-                                ))}
-                              </div>
+                <div className="library-picker-panel" style={{ padding: "0.5rem", border: "none", background: "none" }}>
+                  <select
+                    value={selectedLibId}
+                    onChange={e => {
+                      setSelectedLibId(e.target.value);
+                      setSelectedCurriculumId("");
+                      setSelectedSubjectId("");
+                      setIsCreatingCurUnderLib(null);
+                      setIsCreatingSubjUnderCur(null);
+                    }}
+                    className="styled-select-large"
+                    style={{ width: "100%" }}
+                  >
+                    <option value="">-- {isAr ? "اختر المكتبة" : "Select Library Domain"} --</option>
+                    {libraries.map(lib => (
+                      <option key={lib._id} value={lib._id}>{isAr ? lib.name_ar : lib.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button 
+                  type="button" 
+                  className="create-library-btn"
+                  onClick={() => {
+                    setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+                    setIsEditingLib(false);
+                    setActiveTab("libraries");
+                  }}
+                >
+                  <FiPlus /> {isAr ? "إضافة مكتبة جديدة" : "Add New Library"}
+                </button>
+
+                <div className="tree-scroller">
+                  {libraries
+                    .filter(lib => !selectedLibId || lib._id === selectedLibId)
+                    .map(lib => {
+                      const libExpanded = !!expandedNodes[`lib_${lib._id}`];
+                      const libCurricula = curricula.filter(c => c.library_id === lib._id);
+                      return (
+                        <div key={lib._id} className="tree-branch">
+                          <div 
+                            className={`tree-row ${selectedLibId === lib._id && !selectedCurriculumId && !selectedSubjectId ? "active-row" : ""}`}
+                            onClick={() => {
+                              setSelectedLibId(lib._id);
+                              setSelectedCurriculumId("");
+                              setSelectedSubjectId("");
+                              setIsEditingLib(true);
+                              setLibForm(lib);
+                              setIsCreatingCurUnderLib(null);
+                              setIsCreatingSubjUnderCur(null);
+                            }}
+                          >
+                            <span 
+                              className="expand-toggle" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedNodes(prev => ({ ...prev, [`lib_${lib._id}`]: !prev[`lib_${lib._id}`] }));
+                              }}
+                            >
+                              {libCurricula.length > 0 ? (libExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                            </span>
+                            <img src={lib.logo || "/libs/logo.svg"} className="tree-lib-logo" alt="" onError={e => { (e.target as any).src = "/libs/logo.svg" }} />
+                            <span className="tree-node-text" style={{ fontWeight: 700 }}>{isAr ? lib.name_ar : lib.name}</span>
+                            <button 
+                              type="button" 
+                              className="tree-row-action" 
+                              title={isAr ? "إضافة منهج" : "Add Curriculum"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedLibId(lib._id);
+                                setSelectedCurriculumId("");
+                                setSelectedSubjectId("");
+                                setIsCreatingCurUnderLib(lib._id);
+                                setIsCreatingSubjUnderCur(null);
+                                setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
+                              }}
+                            >
+                              <FiPlus />
+                            </button>
+                          </div>
+
+                          {libExpanded && (
+                            <div className="tree-children">
+                              {isCreatingCurUnderLib === lib._id && (
+                                <div className="tree-row pending-creation">
+                                  <FiPlus className="pending-icon spin-animation" />
+                                  <span className="tree-node-text italic" style={{ opacity: 0.6 }}>{isAr ? "منهج جديد..." : "New Curriculum..."}</span>
+                                </div>
+                              )}
+                              {libCurricula.map(cur => {
+                                const curExpanded = !!expandedNodes[`cur_${cur._id}`];
+                                const curSubjects = subjects.filter(s => s.curriculum_id === cur._id);
+                                return (
+                                  <div key={cur._id} className="tree-branch">
+                                    <div 
+                                      className={`tree-row ${selectedCurriculumId === cur._id && !selectedSubjectId ? "active-row" : ""}`}
+                                      onClick={() => {
+                                        setSelectedLibId(lib._id);
+                                        setSelectedCurriculumId(cur._id);
+                                        setSelectedSubjectId("");
+                                        setIsEditingCur(true);
+                                        setCurForm({ _id: cur._id, title: cur.title, title_ar: cur.title_ar, scope: cur.scope || {} });
+                                        setIsCreatingCurUnderLib(null);
+                                        setIsCreatingSubjUnderCur(null);
+                                      }}
+                                    >
+                                      <span 
+                                        className="expand-toggle" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedNodes(prev => ({ ...prev, [`cur_${cur._id}`]: !prev[`cur_${cur._id}`] }));
+                                        }}
+                                      >
+                                        {curSubjects.length > 0 ? (curExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                                      </span>
+                                      <FiLayers className="tree-node-icon" style={{ color: "#6366f1" }} />
+                                      <span className="tree-node-text">{isAr ? cur.title_ar : cur.title}</span>
+                                      <button 
+                                        type="button" 
+                                        className="tree-row-action" 
+                                        title={isAr ? "إضافة مادة" : "Add Subject"}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedLibId(lib._id);
+                                          setSelectedCurriculumId(cur._id);
+                                          setSelectedSubjectId("");
+                                          setIsCreatingSubjUnderCur(cur._id);
+                                          setIsCreatingCurUnderLib(null);
+                                          setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
+                                          setEditingSubjectId(null);
+                                        }}
+                                      >
+                                        <FiPlus />
+                                      </button>
+                                    </div>
+
+                                    {curExpanded && (
+                                      <div className="tree-children">
+                                        {isCreatingSubjUnderCur === cur._id && (
+                                          <div className="tree-row pending-creation">
+                                            <FiPlus className="pending-icon spin-animation" />
+                                            <span className="tree-node-text italic" style={{ opacity: 0.6 }}>{isAr ? "مادة جديدة..." : "New Subject..."}</span>
+                                          </div>
+                                        )}
+                                        {curSubjects.map(subj => {
+                                          const subjExpanded = !!expandedNodes[`subj_${subj._id}`];
+                                          const subjBooks = books.filter(b => b.subject_id === subj._id);
+                                          return (
+                                            <div key={subj._id} className="tree-branch">
+                                              <div 
+                                                className={`tree-row ${selectedSubjectId === subj._id ? "active-row" : ""}`}
+                                                style={{ borderLeft: `3px solid ${subj.color}`, borderRight: isAr ? `3px solid ${subj.color}` : "none" }}
+                                                onClick={() => {
+                                                  setSelectedLibId(lib._id);
+                                                  setSelectedCurriculumId(cur._id);
+                                                  setSelectedSubjectId(subj._id);
+                                                  setSubjForm(subj);
+                                                  setEditingSubjectId(subj._id);
+                                                  setIsCreatingCurUnderLib(null);
+                                                  setIsCreatingSubjUnderCur(null);
+                                                }}
+                                              >
+                                                <span 
+                                                  className="expand-toggle" 
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setExpandedNodes(prev => ({ ...prev, [`subj_${subj._id}`]: !prev[`subj_${subj._id}`] }));
+                                                  }}
+                                                >
+                                                  {subjBooks.length > 0 ? (subjExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                                                </span>
+                                                <span className="tree-node-emoji">{subj.emoji}</span>
+                                                <span className="tree-node-text">{isAr ? subj.name_ar : subj.name}</span>
+                                              </div>
+
+                                              {subjExpanded && (
+                                                <div className="tree-children">
+                                                  {subjBooks.map(book => (
+                                                    <div key={book._id} className="tree-row tree-row-book">
+                                                      <FiBookOpen className="tree-node-icon" style={{ color: "#10b981", flexShrink: 0 }} />
+                                                      <div className="tree-node-book-meta" style={{ flexGrow: 1, minWidth: 0 }}>
+                                                        <span className="tree-node-text-bold" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                          {isAr ? book.title_ar : book.title}
+                                                        </span>
+                                                        <span className="tree-node-subtext">
+                                                          ({book.language}) - {book.role === "core" ? (isAr ? "أساسي" : "Core") : (isAr ? "داعم" : "Supporting")}
+                                                        </span>
+                                                      </div>
+                                                      <button
+                                                        type="button"
+                                                        className="tree-row-action decouple-action"
+                                                        title={isAr ? "فصل الكتاب" : "Decouple Book"}
+                                                        onClick={async (e) => {
+                                                          e.stopPropagation();
+                                                          if (confirm(isAr ? `هل أنت متأكد من فصل "${book.title}"؟` : `Are you sure you want to decouple "${book.title}"?`)) {
+                                                            setLoading(true);
+                                                            try {
+                                                              const res = await authedFetch(`/api/books/${book._id}/assign`, {
+                                                                method: "PATCH",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ action: "decouple" })
+                                                              });
+                                                              if (res.ok) {
+                                                                triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
+                                                                fetchBooks();
+                                                                fetchSubjects(cur._id);
+                                                              } else {
+                                                                triggerToast("Failed to decouple book", true);
+                                                              }
+                                                            } catch (err: any) {
+                                                              triggerToast(err.message, true);
+                                                            } finally {
+                                                                setLoading(false);
+                                                            }
+                                                          }
+                                                        }}
+                                                      >
+                                                        <FiTrash2 style={{ color: "#ef4444" }} />
+                                                      </button>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </div>
+                          )}
                         </div>
-                      ))
-                    )}
-                  </div>
+                      );
+                    })}
                 </div>
-              </section>
+              </aside>
 
-              {/* Subject Manager Column */}
-              <section className="column-container">
-                <div className="form-card compact-margin">
-                  <h2>{t("subjects_manager")}</h2>
-                  {selectedCurriculumId ? (
-                    <form onSubmit={handleSaveSubject} className="standard-form">
-                      <div className="form-group-row">
-                        <div className="form-group">
-                          <label>{t("subject_name_en")}</label>
-                          <input
-                            type="text"
-                            value={subjForm.name || ""}
-                            onChange={e => setSubjForm({ ...subjForm, name: e.target.value })}
-                            className="styled-input"
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>{t("subject_name_ar")}</label>
-                          <input
-                            type="text"
-                            value={subjForm.name_ar || ""}
-                            onChange={e => setSubjForm({ ...subjForm, name_ar: e.target.value })}
-                            className="styled-input"
-                          />
-                        </div>
+              {/* FOCUSED WORKSPACE EDITOR PANEL */}
+              <main className="workspace-editor-panel">
+                
+                {/* 1. Subject Form / Create / Edit View */}
+                {(selectedSubjectId || isCreatingSubjUnderCur) ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                    <section className="form-card" style={{ margin: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                        <h2>
+                          {editingSubjId ? `🎨 ${isAr ? "تعديل المادة" : "Edit Subject"}` : `🎨 ${isAr ? "مادة جديدة" : "Create Subject"}`}
+                        </h2>
+                        {editingSubjId && (
+                          <button
+                            type="button"
+                            onClick={() => setShowDeleteSubjectConfirm(true)}
+                            className="discard-btn"
+                            style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)" }}
+                          >
+                            <FiTrash2 /> {isAr ? "حذف المادة" : "Delete Subject"}
+                          </button>
+                        )}
                       </div>
-
-                      <div className="form-group-row">
-                        <div className="form-group color-picker-group">
-                          <label>{t("subject_color")}</label>
-                          <div className="color-picker-input-wrapper">
-                            <input
-                              type="color"
-                              value={subjForm.color || "#4F46E5"}
-                              onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
-                              className="styled-color-picker"
-                            />
+                      
+                      <form onSubmit={handleSaveSubject} className="standard-form">
+                        <div className="form-group-row">
+                          <div className="form-group">
+                            <label>{t("subject_name_en")}</label>
                             <input
                               type="text"
-                              value={subjForm.color || ""}
-                              onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
-                              className="styled-input hex-code-input"
+                              value={subjForm.name || ""}
+                              onChange={e => setSubjForm({ ...subjForm, name: e.target.value })}
+                              className="styled-input"
+                              required
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>{t("subject_name_ar")}</label>
+                            <input
+                              type="text"
+                              value={subjForm.name_ar || ""}
+                              onChange={e => setSubjForm({ ...subjForm, name_ar: e.target.value })}
+                              className="styled-input"
+                              required
                             />
                           </div>
                         </div>
+
+                        <div className="form-group-row">
+                          <div className="form-group color-picker-group">
+                            <label>{t("subject_color")}</label>
+                            <div className="color-picker-input-wrapper">
+                              <input
+                                type="color"
+                                value={subjForm.color || "#4F46E5"}
+                                onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
+                                className="styled-color-picker"
+                              />
+                              <input
+                                type="text"
+                                value={subjForm.color || ""}
+                                onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
+                                className="styled-input hex-code-input"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Curated academic emoji picker popover (OR-14) */}
+                          <div className="form-group" style={{ position: "relative" }}>
+                            <label>{t("subject_emoji")}</label>
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                              <input
+                                type="text"
+                                value={subjForm.emoji || "📚"}
+                                onChange={e => setSubjForm({ ...subjForm, emoji: e.target.value })}
+                                className="styled-input emoji-input"
+                                style={{ width: "3.5rem", textAlign: "center", fontSize: "1.25rem" }}
+                                readOnly
+                              />
+                              <button
+                                type="button"
+                                className="styled-input"
+                                style={{ padding: "0.5rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                              >
+                                😀
+                              </button>
+                            </div>
+
+                            {showEmojiPicker && (
+                              <div 
+                                className="academic-emoji-grid"
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  zIndex: 100,
+                                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                                  border: "1.5px solid var(--card-border)",
+                                  borderRadius: "8px",
+                                  padding: "0.5rem",
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(6, 1fr)",
+                                  gap: "0.25rem",
+                                  width: "220px",
+                                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                                  backdropFilter: "blur(12px)"
+                                }}
+                              >
+                                {["📚", "📖", "🎓", "🔬", "🧪", "🧮", "🎨", "💻", "🧠", "📐", "📏", "🧭", "🌍", "🪐", "🧬", "🦕", "🏛️", "🖋️", "📝", "📊", "📈", "🛹", "🎭", "🎼"].map(emo => (
+                                  <div
+                                    key={emo}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); // Bypass focus blur events entirely!
+                                      setSubjForm({ ...subjForm, emoji: emo });
+                                      setShowEmojiPicker(false);
+                                    }}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      padding: "0.4rem",
+                                      borderRadius: "4px",
+                                      fontSize: "1.25rem",
+                                      cursor: "pointer",
+                                      transition: "background-color 0.2s"
+                                    }}
+                                    className="emoji-grid-item"
+                                  >
+                                    {emo}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="form-group">
-                          <label>{t("subject_emoji")}</label>
+                          <label>{t("subject_category")}</label>
+                          <select
+                            value={subjForm.category || "Science"}
+                            onChange={e => setSubjForm({ ...subjForm, category: e.target.value })}
+                            className="styled-select"
+                          >
+                            <option value="Science">Science</option>
+                            <option value="Mathematics">Mathematics</option>
+                            <option value="Languages">Languages</option>
+                            <option value="Social Studies">Social Studies</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Business">Business</option>
+                          </select>
+                        </div>
+
+                        {/* Universal side-by-side Save and Discard (OR-13) */}
+                        <div className="form-actions-row">
+                          <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
+                            <FiSave /> {t("save_subject")}
+                          </button>
+                          <button 
+                            type="button" 
+                            className="discard-btn"
+                            onClick={() => {
+                              setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
+                              setEditingSubjectId(null);
+                              setIsCreatingSubjUnderCur(null);
+                              setSelectedSubjectId("");
+                            }}
+                          >
+                            {isAr ? "إلغاء التغييرات" : "Discard"}
+                          </button>
+                        </div>
+                      </form>
+                    </section>
+
+                    {/* Book Assignments in Subject workspace (OR-11) */}
+                    {selectedSubjectId && (
+                      <div className="tab-grid grid-2" style={{ gap: "1.5rem" }}>
+                        <section className="form-card" style={{ margin: 0, padding: "1.5rem" }}>
+                          <h3>🔗 {t("assign_book")}</h3>
+                          <form onSubmit={handleAssignBook} className="standard-form" style={{ marginTop: "1rem" }}>
+                            <div className="form-group">
+                              <label>{t("select_book")}</label>
+                              <select
+                                value={assignBookId}
+                                onChange={e => setAssignBookId(e.target.value)}
+                                className="styled-select"
+                                required
+                              >
+                                <option value="">-- Choose Book from Pool --</option>
+                                {books
+                                  .filter(b => b.subject_id !== selectedSubjectId)
+                                  .map(b => (
+                                    <option key={b._id} value={b._id}>
+                                      {isAr ? b.title_ar : b.title} ({b.language})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+
+                            <div className="form-group">
+                              <label>{t("book_role")}</label>
+                              <select
+                                value={assignRole}
+                                onChange={e => setAssignRole(e.target.value as "core" | "supporting")}
+                                className="styled-select"
+                              >
+                                <option value="core">{t("role_core")}</option>
+                                <option value="supporting">{t("role_supporting")}</option>
+                              </select>
+                            </div>
+
+                            <button type="submit" disabled={loading} className="primary-submit-btn highlight-gold" style={{ margin: 0, width: "100%" }}>
+                              <FiLink /> {t("assign_btn")}
+                            </button>
+                          </form>
+                        </section>
+
+                        <section className="list-card" style={{ margin: 0, padding: "1.5rem" }}>
+                          <h3>📚 {t("assigned_books")}</h3>
+                          <div className="list-scroller-compact" style={{ maxHeight: "250px", marginTop: "1rem" }}>
+                            {books.filter(b => b.subject_id === selectedSubjectId).length === 0 ? (
+                              <p className="empty-state-text" style={{ fontSize: "0.85rem" }}>No books assigned to this subject yet.</p>
+                            ) : (
+                              books
+                                .filter(b => b.subject_id === selectedSubjectId)
+                                .map(b => (
+                                  <div key={b._id} className="item-row-card" style={{ padding: "0.5rem 0.75rem", marginBottom: "0.5rem" }}>
+                                    <div className="item-meta">
+                                      <FiBookOpen style={{ color: subjForm.color || "#4F46E5", flexShrink: 0 }} />
+                                      <div style={{ minWidth: 0 }}>
+                                        <h5 style={{ margin: 0, fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {isAr ? b.title_ar : b.title}
+                                        </h5>
+                                        <small className="badge-role" style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}>
+                                          {b.role === "core" ? t("role_core") : t("role_supporting")}
+                                        </small>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="edit-circle-btn compact"
+                                      style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "none" }}
+                                      onClick={async () => {
+                                        if (confirm(isAr ? `هل أنت متأكد من فصل "${b.title}"؟` : `Are you sure you want to decouple "${b.title}"?`)) {
+                                          setLoading(true);
+                                          try {
+                                            const res = await authedFetch(`/api/books/${b._id}/assign`, {
+                                              method: "PATCH",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ action: "decouple" })
+                                            });
+                                            if (res.ok) {
+                                              triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
+                                              fetchBooks();
+                                              fetchSubjects(selectedCurriculumId);
+                                            } else {
+                                              triggerToast("Failed to decouple book", true);
+                                            }
+                                          } catch (err: any) {
+                                            triggerToast(err.message, true);
+                                          } finally {
+                                            setLoading(false);
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <FiTrash2 />
+                                    </button>
+                                  </div>
+                                ))
+                            )}
+                          </div>
+                        </section>
+                      </div>
+                    )}
+                  </div>
+                ) : (selectedCurriculumId || isCreatingCurUnderLib) ? (
+                  /* 2. Curriculum Form / Create / Edit View */
+                  <section className="form-card" style={{ margin: 0 }}>
+                    <h2>
+                      {selectedCurriculumId ? `📐 ${isAr ? "تعديل المنهج الدراسي" : "Edit Curriculum Unit"}` : `📐 ${isAr ? "منهج دراسي جديد" : "Create Curriculum Unit"}`}
+                    </h2>
+                    <form onSubmit={handleSaveCurriculum} className="standard-form">
+                      <div className="form-group">
+                        <label>{t("cur_id_opt")}</label>
+                        <input
+                          type="text"
+                          disabled={!!selectedCurriculumId}
+                          value={curForm._id}
+                          onChange={e => setCurForm({ ...curForm, _id: e.target.value })}
+                          placeholder="e.g. cur_moe_g12"
+                          className="styled-input"
+                        />
+                      </div>
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>{t("cur_title_en")}</label>
                           <input
                             type="text"
-                            value={subjForm.emoji || "📚"}
-                            onChange={e => setSubjForm({ ...subjForm, emoji: e.target.value })}
-                            className="styled-input emoji-input"
+                            value={curForm.title}
+                            onChange={e => setCurForm({ ...curForm, title: e.target.value })}
+                            className="styled-input"
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>{t("cur_title_ar")}</label>
+                          <input
+                            type="text"
+                            value={curForm.title_ar}
+                            onChange={e => setCurForm({ ...curForm, title_ar: e.target.value })}
+                            className="styled-input"
+                            required
                           />
                         </div>
                       </div>
 
-                      <div className="form-group">
-                        <label>{t("subject_category")}</label>
-                        <select
-                          value={subjForm.category || "Science"}
-                          onChange={e => setSubjForm({ ...subjForm, category: e.target.value })}
-                          className="styled-select"
-                        >
-                          <option value="Science">Science</option>
-                          <option value="Mathematics">Mathematics</option>
-                          <option value="Languages">Languages</option>
-                          <option value="Social Studies">Social Studies</option>
-                          <option value="Computer Science">Computer Science</option>
-                          <option value="Business">Business</option>
-                        </select>
-                      </div>
-
-                      <button type="submit" className="primary-submit-btn">
-                        <FiSave /> {t("save_subject")}
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="empty-state-text">Select a Curriculum Unit to edit subjects.</p>
-                  )}
-                </div>
-
-                <div className="list-card compact-margin max-300">
-                  <h2>Subjects Catalog</h2>
-                  <div className="list-scroller-compact">
-                    {subjects.length === 0 ? (
-                      <p className="empty-state-text">{t("no_subjects")}</p>
-                    ) : (
-                      subjects.map(subj => (
-                        <div key={subj._id} className="item-row-card coloured-left" style={{ borderLeft: `5px solid ${subj.color}`, borderRight: isAr ? `5px solid ${subj.color}` : "none" }}>
-                          <div className="item-meta">
-                            <span className="emoji-span">{subj.emoji}</span>
-                            <div>
-                              <h5>{isAr ? subj.name_ar : subj.name}</h5>
-                              <small className="monospace-id">{subj._id}</small>
+                      {/* Scope Dimensions mapping */}
+                      {activeLibrary && activeLibrary.scopeSchema?.length > 0 && (
+                        <div className="dynamic-scope-fields" style={{ marginTop: "1rem" }}>
+                          <h4 style={{ marginBottom: "0.75rem", fontSize: "0.95rem" }}>🧭 {t("scope_details")}</h4>
+                          {activeLibrary.scopeSchema.map(dim => (
+                            <div key={dim.key} className="form-group">
+                              <label>{isAr ? dim.label_ar : dim.label} ({dim.key})</label>
+                              {dim.type === "enum" ? (
+                                <select
+                                  value={curForm.scope[dim.key] || ""}
+                                  onChange={e => setCurForm({
+                                    ...curForm,
+                                    scope: { ...curForm.scope, [dim.key]: e.target.value }
+                                  })}
+                                  className="styled-select"
+                                >
+                                  <option value="">-- Select Option --</option>
+                                  {dim.options?.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={curForm.scope[dim.key] || ""}
+                                  onChange={e => setCurForm({
+                                    ...curForm,
+                                    scope: { ...curForm.scope, [dim.key]: e.target.value }
+                                  })}
+                                  className="styled-input"
+                                />
+                              )}
                             </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSubjForm(subj);
-                              setEditingSubjectId(subj._id);
-                            }}
-                            className="edit-circle-btn compact"
-                          >
-                            <FiEdit />
-                          </button>
+                          ))}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </section>
+                      )}
 
-              {/* Book Assignments Column */}
-              <section className="column-container">
-                <div className="form-card compact-margin">
-                  <h2>{t("assign_book")}</h2>
-                  {selectedCurriculumId && subjects.length > 0 ? (
-                    <form onSubmit={handleAssignBook} className="standard-form">
-                      <div className="form-group">
-                        <label>{t("select_book")}</label>
-                        <select
-                          value={assignBookId}
-                          onChange={e => setAssignBookId(e.target.value)}
-                          className="styled-select"
+                      {/* Universal Save / Discard Controls */}
+                      <div className="form-actions-row">
+                        <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
+                          <FiSave /> {t("save_curriculum")}
+                        </button>
+                        <button 
+                          type="button" 
+                          className="discard-btn"
+                          onClick={() => {
+                            setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
+                            setIsEditingCur(false);
+                            setIsCreatingCurUnderLib(null);
+                            setSelectedCurriculumId("");
+                          }}
                         >
-                          <option value="">-- Choose Book from Pool --</option>
-                          {books.map(b => (
-                            <option key={b._id} value={b._id}>
-                              {isAr ? b.title_ar : b.title} ({b.language})
-                            </option>
-                          ))}
-                        </select>
+                          {isAr ? "إلغاء التغييرات" : "Discard"}
+                        </button>
                       </div>
-
-                      <div className="form-group">
-                        <label>{t("select_subject")}</label>
-                        <select
-                          value={assignSubjId}
-                          onChange={e => setAssignSubjectId(e.target.value)}
-                          className="styled-select"
-                        >
-                          <option value="">-- Choose Target Subject --</option>
-                          {subjects.map(s => (
-                            <option key={s._id} value={s._id}>{isAr ? s.name_ar : s.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label>{t("book_role")}</label>
-                        <select
-                          value={assignRole}
-                          onChange={e => setAssignRole(e.target.value as "core" | "supporting")}
-                          className="styled-select"
-                        >
-                          <option value="core">{t("role_core")}</option>
-                          <option value="supporting">{t("role_supporting")}</option>
-                        </select>
-                      </div>
-
-                      <button type="submit" className="primary-submit-btn highlight-gold">
-                        <FiLink /> {t("assign_btn")}
-                      </button>
                     </form>
-                  ) : (
-                    <p className="empty-state-text">Select curriculum and configure at least one subject to assign books.</p>
-                  )}
-                </div>
+                  </section>
+                ) : (
+                  /* 3. Empty State Welcome Card */
+                  <div className="empty-workspace-state">
+                    <FiLayers className="large-empty-iconpulse-animation" style={{ fontSize: "4rem", color: "var(--primary)", opacity: 0.25 }} />
+                    <h3>{isAr ? "استوديو بناء وتعديل المناهج" : "Curriculum Workspace"}</h3>
+                    <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.8, color: "#64748b" }}>
+                      {isAr ? "اختر مادة أو منهجاً من المخطط الشجري للمستكشف على اليمين للبدء بالتعديل أو بناء هياكل تعليمية جديدة." : "Select a Library, Curriculum or Subject from the Tree Explorer sidebar to view details, assign textbooks, or configure structures."}
+                    </p>
+                  </div>
+                )}
+              </main>
+              
+            </div>
 
-                <div className="list-card compact-margin max-300">
-                  <h2>{t("assigned_books")}</h2>
-                  <div className="list-scroller-compact">
-                    {books.filter(b => b.curriculum_id === selectedCurriculumId).length === 0 ? (
-                      <p className="empty-state-text">No books assigned to this curriculum yet.</p>
-                    ) : (
-                      books
-                        .filter(b => b.curriculum_id === selectedCurriculumId)
-                        .map(b => {
-                          const sub = subjects.find(s => s._id === b.subject_id);
-                          return (
-                            <div key={b._id} className="item-row-card">
-                              <div className="item-meta">
-                                <FiBookOpen style={{ color: sub?.color || "#ccc" }} />
-                                <div>
-                                  <h5>{isAr ? b.title_ar : b.title}</h5>
-                                  <small className="badge-role">{b.role === "core" ? t("role_core") : t("role_supporting")}</small>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                    )}
+            {/* DELETE SUBJECT CONFIRMATION MODAL OVERLAY (OR-12) */}
+            {showDeleteSubjectConfirm && (
+              <div className="delete-confirm-overlay">
+                <div className="delete-confirm-modal">
+                  <div className="modal-title-row">
+                    <FiAlertCircle style={{ fontSize: "1.5rem" }} />
+                    <span>{isAr ? "تأكيد حذف المادة" : "Confirm Deletion"}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.5, color: "#475569" }}>
+                    {isAr 
+                      ? "هل أنت متأكد من حذف هذه المادة؟ سيتم فك ارتباط جميع الكتب والكتب المنهجية التابعة لها (Decouple) ولكن لن يتم حذف ملفاتها من قاعدة البيانات."
+                      : "Are you sure you want to delete this subject? All associated books and curricula roles will be decoupled (unassigned) gracefully, but their textbook source files will NOT be deleted."}
+                  </p>
+                  <div className="modal-actions">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowDeleteSubjectConfirm(false)}
+                      className="discard-btn"
+                    >
+                      {isAr ? "إلغاء" : "Cancel"}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          const res = await authedFetch(`/api/subjects?id=${selectedSubjectId}`, {
+                            method: "DELETE"
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            triggerToast(isAr ? "🗑️ تم حذف المادة وفصل الكتب بنجاح!" : "🗑️ Subject deleted and books decoupled!");
+                            fetchSubjects(selectedCurriculumId);
+                            fetchBooks();
+                            setSelectedSubjectId("");
+                            setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
+                            setEditingSubjectId(null);
+                          } else {
+                            triggerToast(data.error || "Failed to delete subject", true);
+                          }
+                        } catch (err: any) {
+                          triggerToast(err.message, true);
+                        } finally {
+                          setLoading(false);
+                          setShowDeleteSubjectConfirm(false);
+                        }
+                      }}
+                      className="confirm-delete-btn"
+                    >
+                      {isAr ? "نعم، احذف المادة" : "Confirm Deletion"}
+                    </button>
                   </div>
                 </div>
-              </section>
-            </div>
+              </div>
+            )}
           </div>
         )}
 

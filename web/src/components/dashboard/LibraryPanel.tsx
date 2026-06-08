@@ -2129,6 +2129,22 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
 
     const chaptersMap: Record<string, { titleEn: string; titleAr: string; pages: any[] }> = {};
+    const originalChapterOrder: string[] = [];
+
+    // Initialize chaptersMap with defined book chapters to preserve their order and existence
+    if (selectedBookReader?.chapters && selectedBookReader.chapters.length > 0) {
+      selectedBookReader.chapters.forEach((ch: any) => {
+        const titleEn = ch.titleEn || ch.title || ch.title_en || ch.titleAr || "Chapter";
+        const titleAr = ch.titleAr || ch.title_ar || ch.title || ch.titleEn || "الفصل";
+        chaptersMap[titleEn] = {
+          titleEn,
+          titleAr,
+          pages: []
+        };
+        originalChapterOrder.push(titleEn);
+      });
+    }
+
     allPages.forEach((p: any) => {
       const chTitleEn = p.chapterTitleEn || "General";
       const chTitleAr = p.chapterTitleAr || "عام";
@@ -2156,7 +2172,16 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           pageNum: p.pageNum
         }))
       };
-    }).sort((a, b) => {
+    }).filter(ch => ch.topics.length > 0)
+    .sort((a, b) => {
+      const aIdx = originalChapterOrder.indexOf(a.titleEn);
+      const bIdx = originalChapterOrder.indexOf(b.titleEn);
+      if (aIdx !== -1 && bIdx !== -1) {
+        return aIdx - bIdx;
+      }
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+
       const aMinPage = a.topics[0]?.pageNum || 9999;
       const bMinPage = b.topics[0]?.pageNum || 9999;
       return aMinPage - bMinPage;

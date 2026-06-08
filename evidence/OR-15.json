@@ -1,0 +1,24 @@
+{
+  "task": "OR-15",
+  "builder": "builder-1",
+  "d_box": "D1",
+  "sha": "4af4d6773c6d45094e2ff700b1efe5f7fdb0deb6",
+  "frontend_revision": "2026-06-08T21:11:50.129Z",
+  "backend_revision": "fahem-agent-00150-z9b",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D0 - Version Parity validated",
+      "D1 - Sandbox entry (no auth) succeeded",
+      "D1 - Redirected to /home on submit",
+      "D1 - Asserted no 'not eligible' block displayed"
+    ],
+    "screenshots": [
+      "evidence/shots/D1-landing.png",
+      "evidence/shots/D1-home.png"
+    ]
+  },
+  "vision_verdict": "pass. The screenshot depicts a fully functional and populated dashboard interface. The layout is intact, featuring a structured navigation sidebar (Admin Controls, Academic Space, Language/Theme settings, user profile, and token count) and a main content area that displays a dynamic \"Whitelisted Judge Sandbox\" portal. The content includes functional components like interactive tab selectors, a \"Welcome\" modal overlay, breadcrumb-like navigation, and clear iconography. The presence of specific user data (e.g., email address, token usage \"42/100\") and a well-defined information architecture confirms this is a rendering of a live application interface rather than a blank or broken state.",
+  "timestamp": 1780953486
+}

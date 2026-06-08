@@ -786,6 +786,61 @@ export default function Home() {
         13: "الوراثة والتعدد الشكلي", 14: "الملفات والاستثناءات والمعالجة", 15: "علم البيانات والتحليل"
       };
 
+      // Determine book subject-specific fallback lists
+      const titleLower = ((book.title || "") + " " + (book.titleEn || "") + " " + (book.subject || "") + " " + (book.subject_id || "")).toLowerCase();
+      
+      let subjectFallbackEn: Record<number, string> = {};
+      let subjectFallbackAr: Record<number, string> = {};
+
+      if (titleLower.includes("math") || titleLower.includes("algebra") || titleLower.includes("رياض") || titleLower.includes("جبر") || titleLower.includes("geometry") || titleLower.includes("هندسة")) {
+        subjectFallbackEn = {
+          1: "Introduction to Algebra", 2: "Linear Equations", 3: "Quadratic Equations",
+          4: "Functions & Graphs", 5: "Matrices & Determinants", 6: "Sequences & Series",
+          7: "Limits & Calculus", 8: "Advanced Mathematical Concepts"
+        };
+        subjectFallbackAr = {
+          1: "مقدمة في الجبر", 2: "المعادلات الخطية", 3: "المعادلات التربيعية",
+          4: "الدوال والرسوم البيانية", 5: "المصفوفات والمحددات", 6: "المتتابعات والمتسلسلات",
+          7: "النهايات وحساب التفاضل", 8: "المفاهيم الرياضية المتقدمة"
+        };
+      } else if (titleLower.includes("science") || titleLower.includes("physic") || titleLower.includes("chemistry") || titleLower.includes("biolog") || titleLower.includes("علوم") || titleLower.includes("فيزياء") || titleLower.includes("كيمياء") || titleLower.includes("أحياء")) {
+        subjectFallbackEn = {
+          1: "Physical Sciences Foundations", 2: "Kinetics & Motion", 3: "Forces & Energy",
+          4: "Atomic Structure", 5: "Chemical Bonding", 6: "Thermodynamics",
+          7: "Optics & Light", 8: "Advanced Scientific Inquiry"
+        };
+        subjectFallbackAr = {
+          1: "أسس العلوم الفيزيائية", 2: "الحركة وعلم الحركة", 3: "القوى والطاقة",
+          4: "البنية الذرية للذرة", 5: "الروابط الكيميائية والجزئية", 6: "الديناميكا الحرارية",
+          7: "البصريات والضوء", 8: "البحث العلمي المتقدم"
+        };
+      } else if (titleLower.includes("arabic") || titleLower.includes("عرب") || titleLower.includes("نحو") || titleLower.includes("بلاغة")) {
+        subjectFallbackEn = {
+          1: "Arabic Grammar Basics", 2: "Parts of Speech", 3: "Sentence Structure",
+          4: "Noun States", 5: "Verb Conjugation", 6: "Rhetoric & Literature",
+          7: "Linguistics & Phonetics", 8: "Advanced Arabic Studies"
+        };
+        subjectFallbackAr = {
+          1: "أساسيات النحو وقواعد الإعراب", 2: "أقسام الكلام في اللغة العربية", 3: "تركيب الجملة ومكوناتها",
+          4: "مرفوعات ومنصوبات ومجرورات الأسماء", 5: "تصريف الأفعال والضمائر", 6: "البلاغة العربية والنثر والأدب",
+          7: "علم الأصوات واللغويات والمخارج", 8: "الدراسات العربية المتقدمة"
+        };
+      } else if (titleLower.includes("python") || titleLower.includes("computer") || titleLower.includes("programming") || titleLower.includes("حاسب") || titleLower.includes("برمج")) {
+        subjectFallbackEn = fallbackChapterTitlesEn;
+        subjectFallbackAr = fallbackChapterTitlesAr;
+      } else {
+        subjectFallbackEn = {
+          1: "Foundations & Core Principles", 2: "Key Concepts & Structure", 3: "Analytical Techniques",
+          4: "Practical Applications", 5: "Case Studies & Examples", 6: "Advanced Methodologies",
+          7: "Comprehensive Review & Summary"
+        };
+        subjectFallbackAr = {
+          1: "الأسس والمبادئ الجوهرية", 2: "المفاهيم الأساسية والبنية", 3: "التقنيات التحليلية والتطبيق",
+          4: "التطبيقات العملية والممارسة", 5: "دراسة الحالات والأمثلة المحلولة", 6: "المنهجيات المتقدمة والبحث",
+          7: "المراجعة الشاملة والملخص العام"
+        };
+      }
+
       if (!hasDefinedChapters) {
         let currentChapterNum = 1;
         realPages.forEach((p: any) => {
@@ -852,14 +907,14 @@ export default function Home() {
           
           fallbackChapterTitleEn = discTitle 
             ? `Chapter ${chNum}: ${discTitle}` 
-            : (fallbackChapterTitlesEn[chNum] 
-                ? `Chapter ${chNum}: ${fallbackChapterTitlesEn[chNum]}` 
+            : (subjectFallbackEn[chNum] 
+                ? `Chapter ${chNum}: ${subjectFallbackEn[chNum]}` 
                 : `Chapter ${chNum}`);
                 
           fallbackChapterTitleAr = discTitle 
             ? `الفصل ${chNum}: ${discTitle}` 
-            : (fallbackChapterTitlesAr[chNum] 
-                ? `الفصل ${chNum}: ${fallbackChapterTitlesAr[chNum]}` 
+            : (subjectFallbackAr[chNum] 
+                ? `الفصل ${chNum}: ${subjectFallbackAr[chNum]}` 
                 : `الفصل ${chNum}`);
         }
 
@@ -867,8 +922,8 @@ export default function Home() {
         return {
           pageNum: pageNum,
           page_number: pageNum,
-          titleEn: p.titleEn || p.topic_title || p.pageTopicEn || p.pageTopicAr || p.chapterTitleEn || `Page ${pageNum}`,
-          titleAr: p.titleAr || p.topic_title || p.pageTopicAr || p.pageTopicEn || p.chapterTitleAr || `القسم ${pageNum}`,
+          titleEn: p.titleEn || p.pageTopicEn || p.pageTopicAr || p.topic_title || p.chapterTitleEn || `Page ${pageNum}`,
+          titleAr: p.titleAr || p.pageTopicAr || p.pageTopicEn || p.topic_title || p.chapterTitleAr || `القسم ${pageNum}`,
           contentEn: p.contentEn || (isAr ? "" : p.content) || p.content || "",
           contentAr: p.contentAr || (isAr ? p.content : "") || p.content || "",
           formulas: p.formulas || [],

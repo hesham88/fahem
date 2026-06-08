@@ -13,7 +13,52 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
 
     const { id: bookId } = params;
     const payload = await req.json();
-    const { curriculum_id, subject_id, role } = payload;
+    const { curriculum_id, subject_id, role, action } = payload;
+
+    if (action === "decouple") {
+      if (isLocalEnv()) {
+        const db = getLocalDb();
+        db.books = db.books || [];
+        db.subjects = db.subjects || [];
+
+        const bookIdx = db.books.findIndex((b: any) => b._id === bookId);
+        if (bookIdx < 0) {
+          return new Response(JSON.stringify({ error: `Book with ID '${bookId}' not found` }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const oldSubjectId = db.books[bookIdx].subject_id;
+        db.books[bookIdx] = {
+          ...db.books[bookIdx],
+          curriculum_id: null,
+          library_id: null,
+          subject_id: null,
+          role: null,
+          updated_at: new Date().toISOString()
+        };
+
+        if (oldSubjectId) {
+          const oldSubjIdx = db.subjects.findIndex((s: any) => s._id === oldSubjectId);
+          if (oldSubjIdx >= 0) {
+            const oldSubj = db.subjects[oldSubjIdx];
+            oldSubj.core_book_ids = (oldSubj.core_book_ids || []).filter((bid: string) => bid !== bookId);
+            oldSubj.supporting_book_ids = (oldSubj.supporting_book_ids || []).filter((bid: string) => bid !== bookId);
+            oldSubj.books_count = (oldSubj.core_book_ids.length + oldSubj.supporting_book_ids.length);
+            db.subjects[oldSubjIdx] = oldSubj;
+          }
+        }
+
+        saveLocalDb(db);
+        return new Response(JSON.stringify({ success: true, book: db.books[bookIdx] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return await proxyRequest(`/user/books/${bookId}/assign`, "PATCH", payload, authCtx);
+    }
 
     if (!curriculum_id || !subject_id || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields: curriculum_id, subject_id, role" }), {
