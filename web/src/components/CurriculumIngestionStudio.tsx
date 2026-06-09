@@ -365,7 +365,7 @@ export function DirectoryNode({
   };
 
   return (
-    <div className="directory-branch" style={{ paddingLeft: isAr ? 0 : "4px", paddingRight: isAr ? "4px" : 0 }}>
+    <div className="directory-branch" style={{ paddingInlineStart: "4px" }}>
       <div 
         className="tree-row-folder" 
         style={{ 
@@ -443,8 +443,7 @@ export function DirectoryNode({
               overflow: "hidden", 
               textOverflow: "ellipsis", 
               whiteSpace: "nowrap",
-              marginLeft: isAr ? 0 : "8px",
-              marginRight: isAr ? "8px" : 0
+              marginInlineStart: "8px"
             }}
             title={node.url}
           >
@@ -454,7 +453,7 @@ export function DirectoryNode({
       </div>
 
       {isDir && isExpanded && node.children && node.children.length > 0 && (
-        <div className="directory-children" style={{ marginLeft: isAr ? 0 : "12px", marginRight: isAr ? "12px" : 0 }}>
+        <div className="directory-children" style={{ marginInlineStart: "12px" }}>
           {node.children.map(child => (
             <DirectoryNode
               key={child.key}
@@ -1282,6 +1281,78 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   return (
     <div className="studio-container" style={{ direction: isAr ? "rtl" : "ltr" }}>
+      <style>{`
+        /* Dark mode overrides for Ingestion Studio */
+        html.dark .form-card, 
+        html.dark .list-card, 
+        html.dark .column-container, 
+        html.dark .crawler-card, 
+        html.dark .manual-ingest-card {
+          background: rgba(17, 24, 39, 0.65) !important;
+          border-color: rgba(51, 65, 85, 0.35) !important;
+        }
+        html.dark .tab-btn:hover {
+          background: rgba(255, 255, 255, 0.05) !important;
+        }
+        html.dark .tab-btn.active-tab {
+          background: #111827 !important;
+          color: var(--primary) !important;
+          box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.25) !important;
+        }
+        html.dark .styled-input, 
+        html.dark .styled-select {
+          background: #1f2937 !important;
+          border-color: #374151 !important;
+          color: #f3f4f6 !important;
+        }
+        html.dark .styled-input::placeholder {
+          color: #6b7280 !important;
+        }
+        html.dark .stats-badge {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05)) !important;
+          border-color: rgba(59, 130, 246, 0.3) !important;
+        }
+        html.dark .step-circle {
+          background: #1f2937 !important;
+          border-color: #374151 !important;
+          color: #9ca3af !important;
+        }
+        html.dark .step-circle.completed {
+          background: var(--accent-green) !important;
+          border-color: var(--accent-green) !important;
+          color: #ffffff !important;
+        }
+        html.dark .step-circle.active {
+          background: var(--primary) !important;
+          border-color: var(--primary) !important;
+          color: #ffffff !important;
+        }
+        
+        /* Studio Form Responsiveness & Layout Improvements */
+        @media (max-width: 768px) {
+          .studio-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+          }
+          .studio-tabs {
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+          }
+          .tab-btn {
+            flex: 1;
+            text-align: center;
+          }
+          .tab-grid.grid-2 {
+            grid-template-columns: 1fr !important;
+          }
+          .form-card, .list-card, .column-container, .crawler-card, .manual-ingest-card {
+            padding: 1.25rem !important;
+          }
+        }
+      `}</style>
       {/* Toast feedback notifications */}
       {successMsg && <div className="toast success-toast"><FiCheckCircle /> {successMsg}</div>}
       {errorMsg && <div className="toast error-toast"><FiAlertCircle /> {errorMsg}</div>}
@@ -1677,17 +1748,6 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                                         )}
                                         {curSubjects.map(subj => {
                                           const subjExpanded = !!expandedNodes[`subj_${subj._id}`];
-                                          const subjBooks = books.filter(b => b.subject_id === subj._id);
-                                          return (
-                                            <div key={subj._id} className="tree-branch">
-                                              <div 
-                                                className={`tree-row ${selectedSubjectId === subj._id ? "active-row" : ""}`}
-                                                style={{ borderLeft: `3px solid ${subj.color}`, borderRight: isAr ? `3px solid ${subj.color}` : "none" }}
-                                                onClick={() => {
-                                                  setSelectedLibId(lib._id);
-                                                  setSelectedCurriculumId(cur._id);
-                                                  setSelectedSubjectId(subj._id);
-                                                  setSubjForm(subj);
                                                   setEditingSubjectId(subj._id);
                                                   setIsCreatingCurUnderLib(null);
                                                   setIsCreatingSubjUnderCur(null);

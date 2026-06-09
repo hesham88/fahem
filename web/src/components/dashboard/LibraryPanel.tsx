@@ -2883,6 +2883,32 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <style>{`
+        :root {
+          --card-bg-glass: rgba(255, 255, 255, 0.45);
+          --card-bg-glass-heavy: rgba(255, 255, 255, 0.75);
+          --card-bg-glass-light: rgba(255, 255, 255, 0.35);
+          --card-bg-glass-solid: rgba(255, 255, 255, 0.85);
+          --card-bg-glass-dense: rgba(255, 255, 255, 0.95);
+          --card-bg-glass-card: rgba(255, 255, 255, 0.4);
+          --card-border-glass: rgba(16, 107, 163, 0.08);
+          --glow-color-custom: rgba(16, 107, 163, 0.03);
+          --reader-grid-cols: 280px 1fr;
+        }
+        html.dark, :root.dark {
+          --card-bg-glass: rgba(17, 24, 39, 0.55);
+          --card-bg-glass-heavy: rgba(17, 24, 39, 0.8);
+          --card-bg-glass-light: rgba(17, 24, 39, 0.45);
+          --card-bg-glass-solid: rgba(17, 24, 39, 0.9);
+          --card-bg-glass-dense: rgba(17, 24, 39, 0.98);
+          --card-bg-glass-card: rgba(17, 24, 39, 0.5);
+          --card-border-glass: rgba(59, 130, 246, 0.18);
+          --glow-color-custom: rgba(59, 130, 246, 0.05);
+        }
+        @media (max-width: 768px) {
+          :root {
+            --reader-grid-cols: 1fr;
+          }
+        }
         @keyframes activePulse {
           0% {
             r: 5px;
@@ -2964,8 +2990,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
               flexWrap: "wrap", gap: "1rem",
-              background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(12px)",
-              padding: "1rem 1.5rem", borderRadius: "16px", border: "1px solid rgba(16, 107, 163, 0.08)",
+              background: "var(--card-bg-glass)", backdropFilter: "blur(12px)",
+              padding: "1rem 1.5rem", borderRadius: "16px", border: "1px solid var(--card-border-glass)",
               borderTop: `4px solid ${getSubjectTheme(selectedBookReader.subject || "").primary}`,
               boxShadow: "0 4px 20px rgba(16, 107, 163, 0.02)"
             }}>
@@ -3054,9 +3080,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               {/* Table of Contents Sidebar */}
               {showReaderSidebar && (
                 <div style={{
-                  background: "rgba(255, 255, 255, 0.75)",
+                  background: "var(--card-bg-glass-heavy)",
                   backdropFilter: "blur(14px)",
-                  border: "1px solid rgba(16, 107, 163, 0.1)",
+                  border: "1px solid var(--card-border-glass)",
                   borderRadius: "16px",
                   padding: "1.25rem",
                   display: "flex",
@@ -3337,7 +3363,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               <div key={ch.id} style={{
                                 borderRadius: "10px",
                                 border: "1px solid rgba(16, 107, 163, 0.08)",
-                                background: isChActive ? "rgba(16, 107, 163, 0.02)" : "rgba(255, 255, 255, 0.4)",
+                                background: isChActive ? "var(--glow-color-custom)" : "var(--card-bg-glass-card)",
                                 overflow: "hidden",
                                 transition: "all 0.25s ease"
                               }}>
@@ -3586,8 +3612,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               backgroundImage: `url("data:image/svg+xml;utf8,<svg fill='none' stroke='%23106ba3' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16' height='16' xmlns='http://www.w3.org/2000/svg'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
                               backgroundRepeat: "no-repeat",
                               backgroundPosition: language === "ar" ? "left 8px center" : "right 8px center",
-                              paddingLeft: language === "ar" ? "24px" : "10px",
-                              paddingRight: language === "ar" ? "10px" : "24px",
+                              paddingInlineStart: "10px",
+                              paddingInlineEnd: "24px",
                               minWidth: "100px"
                             }}
                           >
@@ -4672,9 +4698,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {/* Header search controls */}
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              flexWrap: "wrap", gap: "1rem", background: "rgba(255, 255, 255, 0.4)",
+              flexWrap: "wrap", gap: "1rem", background: "var(--card-bg-glass-card)",
               backdropFilter: "blur(10px)", padding: "1rem", borderRadius: "16px",
-              border: "1px solid rgba(16, 107, 163, 0.08)"
+              border: "1px solid var(--card-border-glass)"
             }}>
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 {(() => {
@@ -4720,8 +4746,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 value={librarySearch}
                 onChange={(e) => setLibrarySearch(e.target.value)}
                 style={{
-                  padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid var(--card-border)",
-                  fontSize: "0.85rem", width: "100%", maxWidth: "250px", outline: "none", fontFamily: "var(--font-sans)"
+                  padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid var(--card-border-glass)",
+                  fontSize: "0.85rem", width: "100%", maxWidth: "250px", outline: "none", fontFamily: "var(--font-sans)",
+                  background: "var(--background)", color: "var(--foreground)"
                 }}
               />
             </div>
@@ -4856,10 +4883,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         position: "relative", 
                         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                         background: isBookSelected 
-                          ? "linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(16, 107, 163, 0.03))" 
-                          : "rgba(255, 255, 255, 0.45)",
+                          ? "linear-gradient(135deg, var(--card-bg-glass-heavy), var(--glow-color-custom))" 
+                          : "var(--card-bg-glass)",
                         backdropFilter: "blur(12px)",
-                        border: isBookSelected ? `2px solid ${theme.primary}` : "1px solid rgba(16, 107, 163, 0.08)",
+                        border: isBookSelected ? `2px solid ${theme.primary}` : "1px solid var(--card-border-glass)",
                         borderTop: isBookSelected ? `4px solid ${theme.primary}` : "4px solid " + theme.primary,
                         boxShadow: isBookSelected ? `0 10px 30px ${theme.glowColor}` : "0 8px 32px rgba(16, 107, 163, 0.02)",
                         borderRadius: "20px"
@@ -4885,13 +4912,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         style={{
                           position: "absolute",
                           top: "12px",
-                          [language === "ar" ? "left" : "right"]: "12px",
+                          insetInlineEnd: "12px",
                           zIndex: 10,
                           width: "24px",
                           height: "24px",
                           borderRadius: "50%",
                           border: isBookSelected ? "none" : "2px solid rgba(16, 107, 163, 0.2)",
-                          background: isBookSelected ? theme.gradient : "rgba(255, 255, 255, 0.8)",
+                          background: isBookSelected ? theme.gradient : "var(--card-bg-glass-solid)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -5084,7 +5111,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             }
           `}</style>
           <div style={{
-            background: "rgba(255, 255, 255, 0.95)", border: "1px solid rgba(16, 107, 163, 0.2)",
+            background: "var(--card-bg-glass-dense)", border: "1px solid var(--card-border-glass)",
             borderRadius: "24px", padding: "2.5rem", width: "90%", maxWidth: "500px",
             boxShadow: "0 20px 40px rgba(0,0,0,0.15)", textAlign: "center",
             display: "flex", flexDirection: "column", gap: "1.5rem"
