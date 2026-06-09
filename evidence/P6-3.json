@@ -1,0 +1,28 @@
+{
+  "task": "P6-3",
+  "builder": "builder-1",
+  "d_box": "D3",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
+    ],
+    "screenshots": [
+      "evidence/shots/D3-admin-view.png",
+      "evidence/shots/D3-student-view.png",
+      "evidence/shots/D3-teacher-view.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D3-admin-view.png": "3850ea9180a420754ad0b477bd3e4b0f98f17d324a3c67632ee8f2990f80897a",
+    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
+    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+  },
+  "vision_verdict": "pass The interface displays a fully functional sandbox environment, confirming the presence of the Admin, Student, and Teacher personas within the top-level \"WHITELISTED JUDGE SANDBOX CONSOLE.\" The workspace is clearly active and well-structured, featuring a sidebar menu, a primary \"Interactive Knowledge Library\" module, and a visible \"All Libraries\" catalog area. The user identity and session details are cleanly rendered in the bottom-left sidebar. Additionally, a helpful guided tour overlay is present in the foreground, indicating that the system is responsive and initialized with the onboarding flow.",
+  "timestamp": 1781000010,
+  "run_signature": "164efa5a1a9eec9950fb6ce661e7c424bb02af411cf164d2a7b9b2f8666ad1fc"
+}

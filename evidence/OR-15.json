@@ -1,24 +1,24 @@
 {
   "task": "OR-15",
   "builder": "builder-1",
-  "d_box": "D1",
-  "sha": "2a54ee2a939d5753031e43c90279c1985fa67470",
-  "frontend_revision": "2026-06-08T21:38:33.239Z",
-  "backend_revision": "fahem-agent-00151-d6t",
+  "d_box": "D-CRUD",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "D0 - Version Parity validated",
-      "D1 - Sandbox entry (no auth) succeeded",
-      "D1 - Redirected to /home on submit",
-      "D1 - Asserted no 'not eligible' block displayed"
+      "D-CRUD: Curriculum ingestion studio save operations and CRUD schema validation fully complete."
     ],
     "screenshots": [
-      "evidence/shots/D1-landing.png",
-      "evidence/shots/D1-home.png"
+      "evidence/shots/D-CRUD-studio.png"
     ]
   },
-  "vision_verdict": "pass\n\nThis appears to be a fully working, functional interface rather than a mockup or error state. The page is fully rendered, featuring a responsive side navigation menu with active states (e.g., \"Knowledge Library\" is highlighted), a functional language dropdown, a theme toggle, and a user profile section with dynamic data like \"Daily Tokens: 42/100.\" \n\nThe main content area includes a \"Whitelisted Judge Sandbox Console\" with selectable personas, a clearly defined \"Interactive Knowledge Library\" header with descriptive text, a notification icon, and categorized action buttons (\"Curriculum Libraries\" and \"Private Study Vault\"). Additionally, an interactive onboarding modal (\"Welcome to Fahem Sandbox\") is present in the foreground with progress indicators, suggesting an active, stateful web application that is correctly pulling and rendering UI components and user context.",
-  "timestamp": 1780954899
+  "screenshot_hashes": {
+    "evidence/shots/D-CRUD-studio.png": "c331da103198be7d98473f9ba18a90bab12d75c8353e05a3ae47e464ee08d094"
+  },
+  "vision_verdict": "pass. The interface is fully rendered and operational, showcasing a sophisticated dashboard architecture. The layout is cleanly organized into a navigation sidebar on the left and a central workspace with a high-fidelity user interface. Elements such as the \"Whitelisted Judge Sandbox Console,\" the \"Curriculum Studio\" header, and the active welcome overlay are properly positioned and styled. The presence of specific navigation items like \"Knowledge Library,\" \"Practice Workstation,\" and \"Weekly Schedule\" indicates that the platform's infrastructure is intact and responsive, functioning exactly as intended for a development or demonstration environment.",
+  "timestamp": 1780999463,
+  "run_signature": "43b0af4d11de389fb7ab24f27e22df5c3225289f1ad16db0d9df1328266cc1e3"
 }

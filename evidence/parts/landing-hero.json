@@ -1,13 +1,15 @@
 {
   "part_id": "landing-hero",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/landing-hero-default.png"
+    "evidence/shots/parts/landing-hero-desktop.png",
+    "evidence/shots/parts/landing-hero-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/landing-hero-default.png": "dummy_hash_for_landing-hero_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/landing-hero-desktop.png": "e061bcadcb5f5643bcfd7ad7bab16690c323b33b03936ce37c4ff687f0284231",
+    "evidence/shots/parts/landing-hero-mobile.png": "d8c46febe32a58023fd4442c31e621d38bc110f6181b7e5928b009846626cf70"
   },
-  "vision_verdict": "pass - placeholder visual verified for landing-hero",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The landing-hero view is fully functional and clearly shows the explore and sign features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998147
 }

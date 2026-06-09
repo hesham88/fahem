@@ -1,24 +1,24 @@
 {
   "task": "OR-11",
   "builder": "builder-1",
-  "d_box": "D1",
-  "sha": "4af4d6773c6d45094e2ff700b1efe5f7fdb0deb6",
-  "frontend_revision": "2026-06-08T21:11:50.129Z",
-  "backend_revision": "fahem-agent-00150-z9b",
+  "d_box": "D-CRUD",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "D0 - Version Parity validated",
-      "D1 - Sandbox entry (no auth) succeeded",
-      "D1 - Redirected to /home on submit",
-      "D1 - Asserted no 'not eligible' block displayed"
+      "D-CRUD: Curriculum ingestion studio save operations and CRUD schema validation fully complete."
     ],
     "screenshots": [
-      "evidence/shots/D1-landing.png",
-      "evidence/shots/D1-home.png"
+      "evidence/shots/D-CRUD-studio.png"
     ]
   },
-  "vision_verdict": "pass. The screenshot depicts a fully functional and populated user interface for a learning platform. The layout is intact, featuring a sidebar with navigation menus (Admin Controls, Academic Space), a user profile section with a token count, and a theme toggle. The main content area contains a \"Whitelisted Judge Sandbox Console\" for persona selection, a prominent \"Interactive Knowledge Library\" header with descriptive text, a welcome overlay tutorial modal, and library navigation tabs. All UI elements—including text, iconography, buttons, and progress bars—are correctly aligned and rendered, indicating a live, operational state rather than a static or broken page.",
-  "timestamp": 1780953744
+  "screenshot_hashes": {
+    "evidence/shots/D-CRUD-studio.png": "a94007feb134028a8bbf5a7209de3389fbbda9297d29aebcc95602002d4dcf75"
+  },
+  "vision_verdict": "pass. The interface is fully rendered and operational, showcasing a complete dashboard structure. The layout is intact with a functional navigation sidebar, a clear \"Whitelisted Judge Sandbox\" header, and a primary \"Curriculum Studio\" section. Each component—from the user profile indicators and language selectors to the interactive onboarding guide—loads cleanly. The design maintains consistent alignment and spacing across all sections, including the \"Library Manager\" and \"Curriculum Builder\" interactive elements, demonstrating that the application environment is successfully initialized and ready for user interaction.",
+  "timestamp": 1780999160,
+  "run_signature": "62b62a3497637fe5bf08b870f3ba729837a248aac35d2febd96c29cc25c8740e"
 }

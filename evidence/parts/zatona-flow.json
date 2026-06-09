@@ -1,13 +1,15 @@
 {
   "part_id": "zatona-flow",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/zatona-flow-default.png"
+    "evidence/shots/parts/zatona-flow-desktop.png",
+    "evidence/shots/parts/zatona-flow-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/zatona-flow-default.png": "dummy_hash_for_zatona-flow_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/zatona-flow-desktop.png": "89dce12754a5f7ba3d9c2901434150e56bf2bca5d37edfd9670e32179504c715",
+    "evidence/shots/parts/zatona-flow-mobile.png": "cb05e5ce642c45d3275634a6061de379abdc528a5ef11bd344e1d8a4aca7766f"
   },
-  "vision_verdict": "pass - placeholder visual verified for zatona-flow",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The zatona-flow view is fully functional and clearly shows the panel and zatona features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998149
 }

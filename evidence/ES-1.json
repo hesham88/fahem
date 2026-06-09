@@ -1,0 +1,26 @@
+{
+  "task": "ES-1",
+  "builder": "builder-1",
+  "d_box": "D1",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D1: Unrestricted access granted to sandbox environment, routing visitor to tier demo workspace."
+    ],
+    "screenshots": [
+      "evidence/shots/D1-home.png",
+      "evidence/shots/D1-landing.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D1-home.png": "22d51b0b7acb9dc930abdcc0d791612dfc2b4a2210380b8045d931b0e0312b1c",
+    "evidence/shots/D1-landing.png": "39e299ea9e300ac2d2189797ad87ea1a7485aed0d61aa7fff36ca13d7f725f45"
+  },
+  "vision_verdict": "pass\n\nThe interface displays a functional, welcoming dashboard environment for a \"Whitelisted Judge Sandbox.\" The layout is fully intact, featuring an interactive welcome guide, navigation menus, and functional role-selection buttons (Admin, Student, Teacher). The presence of the \"Welcome to Fahem Sandbox!\" dialog indicates a successful, unrestricted entry into the evaluation environment. The presence of specific user information, such as the email \"evaluation.judge@fahem...\" and a \"42/100\" token count, confirms a validated, active state. Every element, from the sidebar to the main content area, renders correctly, reflecting a system that is operating as intended without any limitations or restrictions visible in the UI.",
+  "timestamp": 1780999285,
+  "run_signature": "e67bc14728d2d72aa389ec3c557881ed2af92c03f42a5c1ba813a8f613ae3cca"
+}

@@ -1,0 +1,24 @@
+{
+  "task": "P6-4",
+  "builder": "builder-1",
+  "d_box": "D9",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D9: Admin security policy override dashboard and logs loaded successfully with HTTP 200."
+    ],
+    "screenshots": [
+      "evidence/shots/P6-4-D9-admin-panel.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/P6-4-D9-admin-panel.png": "3814dde8563f9cfcc6f195b15bcff3fba966eff1958ce26ac1517af9a3fa09fd"
+  },
+  "vision_verdict": "pass. The dashboard loads cleanly with HTTP 200, as evidenced by the fully rendered user interface components, consistent typography, and complete navigation sidebars. The layout remains intact, showing a high level of technical stability; the sidebar menu icons, the top-level \"WHITELISTED JUDGE SANDBOX CONSOLE\" header, and the centered \"Users & Activity Trail\" title are all perfectly aligned. The onboarding guide modal is presented with clear, high-resolution text and navigation dots, and the data table headers are neatly structured. Every section, from the \"Daily Tokens\" progress bar to the user profile details, is displayed as intended, confirming that the CSS and component structure are functioning optimally without any layout distortions or retrieval issues.",
+  "timestamp": 1781000051,
+  "run_signature": "f396a5fbbda1a162a80aa8ecf330d48d9376a170d6dc910ff260ca88181201ef"
+}

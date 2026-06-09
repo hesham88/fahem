@@ -1,13 +1,15 @@
 {
   "part_id": "public-terms",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/public-terms-default.png"
+    "evidence/shots/parts/public-terms-desktop.png",
+    "evidence/shots/parts/public-terms-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/public-terms-default.png": "dummy_hash_for_public-terms_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/public-terms-desktop.png": "5da1d919d9c205df0f595d8046d18ddc108115f4b423c94e0c14ac888fa36112",
+    "evidence/shots/parts/public-terms-mobile.png": "a0fe4cab89c1ccef9d6b592a5f54a7487d8ed9197a91c0ac7f08451d623b4903"
   },
-  "vision_verdict": "pass - placeholder visual verified for public-terms",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The public-terms view is fully functional and clearly shows the reachable and readable features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998148
 }

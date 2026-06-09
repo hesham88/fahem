@@ -1,16 +1,22 @@
 {
   "gate": "GF4",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
-  "timestamp": 1780967758,
-  "assertions": [
-    "Multi-session concurrency database scopes are fully isolated",
-    "Writes inside sandbox do not leak or mutate production collections"
-  ],
-  "details": {
-    "concurrency_isolation": "dbContextStorage_active",
-    "sandbox_target": "fahem_sandbox",
-    "production_safety_check": "passed"
+  "method": "artifact",
+  "proof": {
+    "file": "evidence/func/run/GF4.log",
+    "must_contain": [
+      "[GF4] PHYSICAL DATABASE ISOLATION AUDIT: SUCCESS",
+      "[GF4] Concurrency test: Alice (fahem_sandbox) vs Bob (fahem)",
+      "[GF4] Request-scoped context is perfectly isolated",
+      "[GF4] No leakage detected between concurrent sessions"
+    ]
   },
-  "signature": "8c9f552f94ae8086b3102ed8807c498f14a1c30d719d077d2707768117106810"
+  "timestamp": 1780998116,
+  "assertions": [
+    "Request-scoped db_target ensures physical database read/write isolation",
+    "Demo session writes only to fahem_sandbox; production database is unchanged",
+    "Concurrent sessions do not leak context or identities"
+  ],
+  "signature": "ac6e12b4db64bb32dbd479601e4b97b48ee3e1131f50a102674b0229a0be82f8"
 }

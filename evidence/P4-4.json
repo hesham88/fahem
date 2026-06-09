@@ -1,0 +1,24 @@
+{
+  "task": "P4-4",
+  "builder": "builder-1",
+  "d_box": "D10",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
+    ],
+    "screenshots": [
+      "evidence/shots/D10-language-lock.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D10-language-lock.png": "8272c8de67691e814ef54fd3148df10df3d4675c7194daf768ae3984ce7a3879"
+  },
+  "vision_verdict": "pass: The dashboard displays a consistent, high-fidelity user interface with a clearly defined \"Language\" selection tool currently set to English. The layout maintains perfect alignment, with all structural elements—including the sidebar navigation, the \"Whitelisted Judge Sandbox Console,\" and the central \"Interactive Knowledge Library\" module—rendering cleanly. Text remains sharp and correctly oriented within their containers, indicating that the system's localization framework manages state effectively. The visual hierarchy remains coherent and stable throughout the presented view.",
+  "timestamp": 1780999759,
+  "run_signature": "5b0a4e7e2daf62c0d40d2e045ff194ae2292cb92227d963e2d9b0dad25e7d757"
+}

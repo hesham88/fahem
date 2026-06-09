@@ -2,23 +2,25 @@
   "task": "OR-6",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "cd1639f28de28aa714acb258c577c1cbcc5b40df",
-  "frontend_revision": "2026-06-08T20:35:49.062Z",
-  "backend_revision": "local",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
   "smoke": {
-    "url": "http://localhost:3000",
+    "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "D0 - Version Parity validated",
-      "D1 - Sandbox entry (no auth) succeeded",
-      "D1 - Redirected to /home on submit",
-      "D1 - Asserted no 'not eligible' block displayed"
+      "D1: Unrestricted access granted to sandbox environment, routing visitor to tier demo workspace."
     ],
     "screenshots": [
-      "evidence/shots/D1-landing.png",
-      "evidence/shots/D1-home.png"
+      "evidence/shots/D1-home.png",
+      "evidence/shots/D1-landing.png"
     ]
   },
-  "vision_verdict": "pass. This screenshot depicts a fully functional and populated dashboard interface. The layout is intact, featuring a clear navigation sidebar on the left with functional categories (Admin Controls, Academic Space, Language/Theme settings, and user profile information). The main content area displays a \"Whitelisted Judge Sandbox\" role-selection bar, a well-rendered header for the \"Interactive Knowledge Library,\" and active UI components such as tabbed buttons (Curriculum Libraries, Private Study Vault), a library card with an icon, and an interactive \"Welcome\" onboarding modal overlay with a progress indicator and navigation buttons. The presence of dynamic data—such as the user email \"playwright-test@fahem...\", a token count of \"42/100\", and specific pedagogical labels—confirms that this is a working application view rather than a static or broken mockup.",
-  "timestamp": 1780951250
+  "screenshot_hashes": {
+    "evidence/shots/D1-home.png": "1d36cd33364b48ecc3477c96e10c3fc4dfe463259560e61a78d25699b1a9a22d",
+    "evidence/shots/D1-landing.png": "6e7ba38f9948a6a2c654207f30874165bc8005a905f0126744719e83df1c4c40"
+  },
+  "vision_verdict": "pass. The screenshot displays a fully operational and accessible environment for the user, indicated by the 'Whitelisted Judge Sandbox Console' header. The interface displays all primary navigation elements, including the 'Admin Panel', 'Knowledge Library', and 'Practice Workstation', with the 'Interactive Knowledge Library' section fully rendered and ready for engagement. The 'Welcome to Fahem Sandbox' overlay confirms that the system is functioning as intended, guiding the user through the platform's features, while the sidebar remains stable and functional. The presence of the user's profile and active token count indicates a smooth, authorized entry into the digital space, ensuring all interface components are aligned and ready for use.",
+  "timestamp": 1780999641,
+  "run_signature": "2d9161681dc0883dead7d880bd2098b499a19ca0e43b48d249033b887d1b4503"
 }

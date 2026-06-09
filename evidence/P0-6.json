@@ -1,0 +1,24 @@
+{
+  "task": "P0-6",
+  "builder": "builder-1",
+  "d_box": "D0",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
+    ],
+    "screenshots": [
+      "evidence/shots/D0-version.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+  },
+  "vision_verdict": "pass: The screenshot displays a cleanly rendered `/api/version` endpoint response. The JSON structure is present, containing a properly formatted `sha` identifier and a valid `builtAt` ISO 8601 timestamp. The browser's native formatting view is active, and the display remains pristine, showing only the requested API payload. The layout is intact because the interface is focusing exclusively on the raw data stream, demonstrating a successful and clear delivery of the version information.",
+  "timestamp": 1780999066,
+  "run_signature": "809d8d493b03ed112527cd4473ad72eb4da27fd2c8e17efafdc93cb517342b06"
+}

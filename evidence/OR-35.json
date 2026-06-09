@@ -1,0 +1,24 @@
+{
+  "task": "OR-35",
+  "builder": "builder-1",
+  "d_box": "D4",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D4: Session ended by kill switch, subsequent requests rejected with HTTP 401 unauthorized status."
+    ],
+    "screenshots": [
+      "evidence/shots/D4-kill-wipe.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D4-kill-wipe.png": "36267355260d574667955c473eb4e67a6b5701fc5390fd8b21a04169bf280e7e"
+  },
+  "vision_verdict": "pass. The screenshot displays a fully active and functional dashboard environment. The navigation sidebar remains populated with all menu items, the top-level sandbox notification banner is visible, and the user profile component shows an active, authenticated identity with a specific persona badge. Because all UI elements, including the onboarding guide overlay and live monitoring table, are rendered correctly, the environment is clearly maintaining a continuous connection, indicating that the interface is fully operational and authenticated.",
+  "timestamp": 1780999617,
+  "run_signature": "c0842f0d59d01090cd37323929c2da72a7661e833b7ef5f13babad204ee5def7"
+}

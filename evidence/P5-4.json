@@ -1,0 +1,24 @@
+{
+  "task": "P5-4",
+  "builder": "builder-1",
+  "d_box": "D10",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
+    ],
+    "screenshots": [
+      "evidence/shots/D10-language-lock.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D10-language-lock.png": "0ae3f0ed8f34b961648591b2620e3e2dd0333d5aa3d56f1cdf6289fc191f8457"
+  },
+  "vision_verdict": "pass. The interface displays a highly organized and consistent user experience. In the sidebar, the language selection tool is clearly present and set to English, matching the current text throughout the entire dashboard, including the \"Welcome to Fahem Sandbox\" guide and the navigational headers. The layout remains clean and symmetrical, with all elements rendered precisely in their intended positions. The visual hierarchy is maintained across the entire view, and the integration of the sandbox controls and educational modules demonstrates a stable and responsive design structure that effectively supports multi-lingual functionality without any disruptions in presentation.",
+  "timestamp": 1780999864,
+  "run_signature": "edb3f953210cdf0020dc8b86922576de79b47895667fdcd7477352eb8b9cbe6b"
+}

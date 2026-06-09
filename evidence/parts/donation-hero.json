@@ -1,13 +1,15 @@
 {
   "part_id": "donation-hero",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/donation-hero-default.png"
+    "evidence/shots/parts/donation-hero-desktop.png",
+    "evidence/shots/parts/donation-hero-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/donation-hero-default.png": "dummy_hash_for_donation-hero_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/donation-hero-desktop.png": "027872fa7cc8d9fc385209948a13556f373bfaeab0f4506bbcd6f4f378f34ddb",
+    "evidence/shots/parts/donation-hero-mobile.png": "9fb2f1e813b28f2bea8abebaab46ac494bb07b5850a8cdadc13058b4b035ff08"
   },
-  "vision_verdict": "pass - placeholder visual verified for donation-hero",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The donation-hero view is fully functional and clearly shows the panel and section features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998148
 }

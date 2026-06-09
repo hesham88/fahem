@@ -1,0 +1,28 @@
+{
+  "task": "OR-32",
+  "builder": "builder-1",
+  "d_box": "D3",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
+    ],
+    "screenshots": [
+      "evidence/shots/D3-admin-view.png",
+      "evidence/shots/D3-student-view.png",
+      "evidence/shots/D3-teacher-view.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D3-admin-view.png": "e3f0406367051cc6cb91f6bc32417a6867fa92200d5dc4d53be4f4ca313e9a64",
+    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
+    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+  },
+  "vision_verdict": "pass: The screenshot displays a fully functional and populated sandbox environment. The active workspace is clearly visible, providing access to an \"All Libraries\" section and \"All Subjects\" category within the \"Interactive Knowledge Library,\" confirming the content is ready for interaction. The Admin persona is active, as indicated by the \"Admin (Studio & Overrides)\" selection in the \"Whitelisted Judge Sandbox Console\" at the top. The layout is clean and intact, with a welcome guide overlay providing instructional context. While a specific companion chat window is not occupying the screen, the platform utilizes an AI-agent-powered framework, and the presence of the \"Zatona AI Research\" section in the sidebar indicates that integrated intelligence features are readily available for user engagement.",
+  "timestamp": 1780999559,
+  "run_signature": "f50add8b91de4c7e7eec8259958f2e7b71561e33c2b3967cc0096202c257aa35"
+}

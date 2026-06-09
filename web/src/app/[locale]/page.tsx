@@ -52,6 +52,7 @@ export default function LandingPage() {
   const [selectedPersona, setSelectedPersona] = useState<"student" | "teacher" | "admin">("student");
   const [bypassActive, setBypassActive] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
 
@@ -97,19 +98,18 @@ export default function LandingPage() {
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       const isDemoMode = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+      setIsDemo(isDemoMode);
       
-      if (currentUser || isDemoMode) {
-        if (currentUser) {
-          // Real Firebase user wins: clean up demo mode and any bypass flags
-          localStorage.removeItem("app_mode");
-          localStorage.removeItem("demo_auth_token");
-          localStorage.removeItem("judge_bypass_session");
-          localStorage.removeItem("judge_bypass_email");
-          if (typeof window !== "undefined") {
-            sessionStorage.removeItem("judge_selected_persona");
-          }
+      if (currentUser) {
+        setUser(currentUser);
+        // Real Firebase user wins: clean up demo mode and any bypass flags
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+        localStorage.removeItem("judge_bypass_session");
+        localStorage.removeItem("judge_bypass_email");
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("judge_selected_persona");
         }
-        router.push(`/${language}/home`);
       } else {
         setUser(null);
       }
@@ -162,6 +162,22 @@ export default function LandingPage() {
         console.warn("[reCAPTCHA] Error clearing verifier:", e);
       }
       setRecaptchaVerifier(null);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("app_mode");
+        localStorage.removeItem("demo_auth_token");
+        localStorage.removeItem("judge_bypass_email");
+        sessionStorage.removeItem("judge_selected_persona");
+      }
+      setIsDemo(false);
+      await auth.signOut();
+      setUser(null);
+    } catch (err) {
+      console.error("Sign out failed", err);
     }
   };
 
@@ -406,14 +422,33 @@ export default function LandingPage() {
             </div>
           </li>
           <li>
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={signingIn}
-              className="btn btn-primary btn-nav-signin"
-              style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.2s" }}
-            >
-              {signingIn ? t("nav_signing_in") : t("nav_signin")}
-            </button>
+            {(user || isDemo) ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <button
+                  onClick={() => router.push(`/${language}/home`)}
+                  className="btn btn-primary"
+                  style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.2s", background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff" }}
+                >
+                  {language === "ar" ? "لوحة التحكم" : "My Dashboard"}
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="btn"
+                  style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "1px solid var(--card-border)", cursor: "pointer", transition: "all 0.2s", background: "transparent", color: "var(--foreground)" }}
+                >
+                  {language === "ar" ? "تسجيل الخروج" : "Sign Out"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={signingIn}
+                className="btn btn-primary btn-nav-signin"
+                style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.2s" }}
+              >
+                {signingIn ? t("nav_signing_in") : t("nav_signin")}
+              </button>
+            )}
           </li>
         </ul>
       </nav>
@@ -504,6 +539,14 @@ export default function LandingPage() {
                     localStorage.setItem("app_mode", "demo");
                     localStorage.setItem("demo_auth_token", cleanToken);
                     localStorage.setItem("judge_bypass_email", trimmedEmail);
+                    sessionStorage.setItem("judge_selected_persona", selectedPersona);
+                    setIsDemo(true);
+                    
+                    // Recover button state in case they navigate back or need button restored
+                    setTimeout(() => {
+                      setBypassActive(false);
+                    }, 5000);
+
                     router.push(`/${language}/home`);
                   } else {
                     setErrorMsg(data.error || (language === "ar" ? "فشل دخول البيئة التجريبية." : "Failed to enter sandbox mode."));

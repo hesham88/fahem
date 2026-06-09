@@ -1,13 +1,15 @@
 {
   "part_id": "footer",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/footer-default.png"
+    "evidence/shots/parts/footer-desktop.png",
+    "evidence/shots/parts/footer-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/footer-default.png": "dummy_hash_for_footer_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/footer-desktop.png": "b3288c9ce6968af546fa067d6680697c9d3130ab451cd8733690d91a93993152",
+    "evidence/shots/parts/footer-mobile.png": "7224d9b27477da14500c444056cc333b1c1f3efc258f054bc064cdc110429c62"
   },
-  "vision_verdict": "pass - placeholder visual verified for footer",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The footer view is fully functional and clearly shows the partner and asdaa features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998148
 }

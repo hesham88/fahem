@@ -1,18 +1,22 @@
 {
   "gate": "GF-SEED",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
-  "timestamp": 1780967758,
-  "assertions": [
-    "Sandbox seed database meets minimum required manifest thresholds",
-    "Seeded libraries, subjects, books, and companion profiles are present"
-  ],
-  "details": {
-    "libraries": 2,
-    "curricula": 3,
-    "subjects": 6,
-    "books_with_covers": 12,
-    "companion_grounded_topics": 24
+  "method": "artifact",
+  "proof": {
+    "file": "evidence/func/run/GF-SEED.log",
+    "must_contain": [
+      "[GF-SEED] EVALUATION SANDBOX SEED AUDIT: SUCCESS",
+      "[GF-SEED] Sandbox metrics: libraries >= 2, curricula >= 3, subjects >= 6",
+      "[GF-SEED] Sandbox books: books >= 12 with real chapters and topics",
+      "[GF-SEED] Seeded practice, plan, zatona, insights, social, and assignments validated"
+    ]
   },
-  "signature": "83f596da564776726039eb9bfe77c5ddf697bf0eef07e51ecf2a0da17e5131c4"
+  "timestamp": 1780998116,
+  "assertions": [
+    "fahem_sandbox contains minimum required libraries, curricula, subjects, and books",
+    "All books have real chapters, topics, covers, and embedded page content",
+    "Seeded practice, plan, insights, social, assignments, and companion memory populated"
+  ],
+  "signature": "04651a4a2540f38743cf90e33e4a573272398b9466b7eeb5d133808e05574660"
 }

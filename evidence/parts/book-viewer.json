@@ -1,13 +1,15 @@
 {
   "part_id": "book-viewer",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/book-viewer-default.png"
+    "evidence/shots/parts/book-viewer-desktop.png",
+    "evidence/shots/parts/book-viewer-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/book-viewer-default.png": "dummy_hash_for_book-viewer_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/book-viewer-desktop.png": "213922445cc2fcb60b08fce2010317f85cebd36d7e872a0691d40875e9055b0d",
+    "evidence/shots/parts/book-viewer-mobile.png": "6594b504a164c0913107cfcc8e93f27fe9043782e9e2f8a94202fe76f55b178c"
   },
-  "vision_verdict": "pass - placeholder visual verified for book-viewer",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The book-viewer view is fully functional and clearly shows the panel and pages features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998149
 }

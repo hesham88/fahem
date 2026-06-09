@@ -1,15 +1,22 @@
 {
   "gate": "GF7",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
-  "timestamp": 1780967758,
-  "assertions": [
-    "Active assignments successfully lock normal chat routes (HTTP 423)",
-    "Double submissions by the same user are rejected server-side"
-  ],
-  "details": {
-    "lock_error_code": 423,
-    "submission_uniqueness_enforced": true
+  "method": "artifact",
+  "proof": {
+    "file": "evidence/func/run/GF7.log",
+    "must_contain": [
+      "[GF7] TIMED GROUP ASSIGNMENTS AUDIT: SUCCESS",
+      "[GF7] Focus-lock returns HTTP 423 Locked for companion and messaging",
+      "[GF7] Submissions unique: duplicate asg_id+uid rejected",
+      "[GF7] Answer sheet records answeredAt timestamp per answer"
+    ]
   },
-  "signature": "048af7a243fe1ea6bc621e6dec69797f08f9c33c42ec83a15699b8bd3c5e238d"
+  "timestamp": 1780998116,
+  "assertions": [
+    "Unique submission constraints (asg_id + uid) are enforced on backend",
+    "Focus-lock server enforcement returns 423 Locked during active assignments",
+    "answeredAt timestamp recorded per submitted answer sheet"
+  ],
+  "signature": "28c427fd4a8e1ed1e7f7915aab5d95c3b428f236dda9533be9b95f66d5b0b894"
 }

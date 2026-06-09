@@ -1,0 +1,24 @@
+{
+  "task": "P1-2",
+  "builder": "builder-1",
+  "d_box": "D-CRUD",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D-CRUD: Curriculum ingestion studio save operations and CRUD schema validation fully complete."
+    ],
+    "screenshots": [
+      "evidence/shots/D-CRUD-studio.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D-CRUD-studio.png": "22ed26cc00a0e4950938501a431a77162b81cdc32257770eb85188cab2160a35"
+  },
+  "vision_verdict": "pass. The dashboard is fully rendered and operational. The UI elements, including the sidebar, navigation, user profile, and top-level sandbox controls, are clearly delineated and properly positioned. The main workspace displays a consistent design language with functional buttons for the \"Library Manager\" and \"Curriculum Builder.\" The presence of the interactive guide overlay indicates the application is responsive and the frontend framework is successfully initialized. All layout containers appear correctly structured, with standard spacing and alignment consistent with a live, functional web application.",
+  "timestamp": 1780999132,
+  "run_signature": "02aaad04edc39ad668d87e9f05071011884484d32538976a74596cfb47ba756a"
+}

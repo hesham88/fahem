@@ -1,16 +1,22 @@
 {
   "gate": "GF5",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
-  "timestamp": 1780967758,
-  "assertions": [
-    "Fail-closed token limits successfully block over-budget users",
-    "Users can only retrieve their own individual token usage reports"
-  ],
-  "details": {
-    "enforcement_policy": "fail_closed",
-    "default_quota_limit": 250000,
-    "token_override_capability": "enabled"
+  "method": "artifact",
+  "proof": {
+    "file": "evidence/func/run/GF5.log",
+    "must_contain": [
+      "[GF5] Persisted Two-Tier Token limits verified",
+      "[GF5] Weekly limit calculated correctly: user.tokenPolicy vs default",
+      "[GF5] Pre-call checks fail-closed on over-limit users",
+      "[GF5] Token usage meter in SettingsPanel read-only for students"
+    ]
   },
-  "signature": "46d9270955dfe6e3a69e392d562c8262c9de3405ffb260055cf2575355be492e"
+  "timestamp": 1780998116,
+  "assertions": [
+    "Token usage limit computed from user policy or default allocation",
+    "Fail-closed inline pre-call checks block over-limit actions",
+    "usage_tool returns only own token usage for normal users"
+  ],
+  "signature": "689d438b1d7c7cd761bf4e7d27d3dd18cfb3545f9d936968c33928d71df60d48"
 }

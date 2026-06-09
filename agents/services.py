@@ -3064,20 +3064,30 @@ def register_telemetry_route(app: fastapi.FastAPI):
             session = session_col.find_one({"sandbox_session_id": sandbox_session_id})
             
             if not session:
+                try:
+                    session = client["fahem"]["demo_sessions"].find_one({"sandbox_session_id": sandbox_session_id})
+                except Exception:
+                    pass
+            
+            if not session:
                 client.close()
                 return {"success": False, "error": "Demo session not found"}
                 
             if action == "kill":
-                session_col.update_one(
-                    {"sandbox_session_id": sandbox_session_id},
-                    {
-                        "$set": {
-                            "status": "killed",
-                            "ended_at": int(time.time()),
-                            "kill_reason": "Admin intervention"
-                        }
-                    }
-                )
+                for db_name in ["fahem", "fahem_sandbox"]:
+                    try:
+                        client[db_name]["demo_sessions"].update_one(
+                            {"sandbox_session_id": sandbox_session_id},
+                            {
+                                "$set": {
+                                    "status": "killed",
+                                    "ended_at": int(time.time()),
+                                    "kill_reason": "Admin intervention"
+                                }
+                            }
+                        )
+                    except Exception as update_err:
+                        logger.warning(f"Failed to update session in db {db_name}: {update_err}")
                 
                 # Perform sandbox database clean-up to fully restore the baseline
                 uid = session.get("uid")
@@ -3142,10 +3152,16 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = get_active_db(client)
-            
-            session_col = db["demo_sessions"]
-            session_col.insert_one(payload)
+            doc_id = payload.get("_id")
+            for db_name in ["fahem", "fahem_sandbox"]:
+                try:
+                    client[db_name]["demo_sessions"].update_one(
+                        {"_id": doc_id},
+                        {"$set": payload},
+                        upsert=True
+                    )
+                except Exception as db_err:
+                    logger.warning(f"Failed to write demo session to {db_name}: {db_err}")
             client.close()
             return {"success": True}
         except Exception as err:

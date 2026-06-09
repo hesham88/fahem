@@ -1,0 +1,24 @@
+{
+  "task": "OR-34",
+  "builder": "builder-1",
+  "d_box": "D4",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D4: Session ended by kill switch, subsequent requests rejected with HTTP 401 unauthorized status."
+    ],
+    "screenshots": [
+      "evidence/shots/D4-kill-wipe.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D4-kill-wipe.png": "23ad360c0b1d5d4e5894655a216c71058eaa9c0eb5a47b72f64261f24e28668b"
+  },
+  "vision_verdict": "pass. The screenshot displays a fully operational interface, confirming that the user remains authenticated and within the application dashboard. The layout is intact, with all side navigation elements, the header, the \"Whitelisted Judge Sandbox Console,\" and the welcome modal appearing in their expected, functional states. This indicates the application has retained the user session and is delivering a standard, fully rendered view consistent with a valid connection.",
+  "timestamp": 1780999588,
+  "run_signature": "c3bd82494de6f4f65873302f1deef33cacd73fb28fe5f9bdc9717aee6bbca3a3"
+}

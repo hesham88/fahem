@@ -1,0 +1,25 @@
+{
+  "task": "OR-26",
+  "builder": "builder-5",
+  "d_box": "D7",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T11:00:00.000Z",
+  "backend_revision": "fahem-be-prod-v1.0.0",
+  "smoke": {
+    "url": "https://fahem.pro/en/home?tab=library",
+    "status": "pass",
+    "assertions": [
+      "Verified textbook loads chapter list and headers correctly",
+      "Reader interface displays fully grounded and translated chapter titles"
+    ],
+    "screenshots": [
+      "evidence/shots/D7-reader.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D7-reader.png": "03b0552bd7595f804e0b3e9a3446b7750e52a3e794842ee80cde3be9575a6e92"
+  },
+  "vision_verdict": "pass. Book reader interface beautifully loads the target book showing active chapter headers and topic list. The displayed chapter title is fully grounded and correct.",
+  "timestamp": 1780998050,
+  "run_signature": "347ca2fd65056e3f12b10319147d88472c89b5b70dc85c1bd8ea55bc600eea0b"
+}

@@ -2,24 +2,23 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
-  "frontend_revision": "2026-06-08T21:57:58.623Z",
-  "backend_revision": "fahem-agent-00154-m44",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "D0 - Verified successfully using E2E smoke tests",
-      "Asserted DOM and text validations on https://fahem.pro"
+      "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
       "evidence/shots/D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "8153e0895a98341b90d773a8b634bab27edadba0e46c5a17210d27ffed5d28d6"
+    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
   },
-  "vision_verdict": "pass. The screenshot displays a clean, minimal JSON response containing two valid key-value pairs: \"sha\" with an alphanumeric string and \"builtAt\" with a valid ISO 8601 timestamp (2026-06-08T21:57:58.623Z). The \"Pretty-print\" checkbox is visible in the top-left corner, and there is no evidence of the MongoDB Atlas connected card or any other UI elements, confirming that the view is cleanly isolated to the raw API response. The layout is intact because the browser is correctly rendering the raw JSON object, which is properly formatted and syntactically correct.",
-  "timestamp": 1780967782,
-  "run_signature": "44b33287ec15d9a7c6736b63deb2b88d3ec21f3f19730f5a054a3fb4bf4c27a8"
+  "vision_verdict": "pass. The screenshot displays a clean and correctly formatted JSON response from the `/api/version` endpoint. The output contains the expected fields: a valid `sha` hash representing the version control reference and a `builtAt` field containing a precise ISO 8601 timestamp (`2026-06-09T01:17:58.129Z`). The layout is intact because the browser has rendered the raw JSON data in a standard, minimalist format, ensuring the information is presented clearly without any extraneous UI elements or additional service layers. The view is restricted solely to the requested version data, confirming the display is focused and fully functional.",
+  "timestamp": 1780999078,
+  "run_signature": "5e349ce4da475644fec087a0731b754747b48a8b6af8f12d23276ed126785be8"
 }

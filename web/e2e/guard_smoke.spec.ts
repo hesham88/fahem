@@ -23,44 +23,35 @@ try {
 
 // Helper to log in to sandbox with a specific persona
 async function loginToSandbox(page: any, persona: "student" | "teacher" | "admin", email = "evaluation.judge@fahem.pro") {
+  // Always reset viewport to desktop size first so mobile blocking overlays do not hide the login form
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  await page.waitForTimeout(1500);
-
+  
   // Clear previous session/local storage
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
   await page.reload();
-  await page.waitForTimeout(1500);
 
   // Select persona
   const selectSelector = "#persona-select";
-  if (await page.locator(selectSelector).count() > 0) {
-    await page.selectOption(selectSelector, persona);
-  }
+  await page.waitForSelector(selectSelector, { timeout: 10000 });
+  await page.selectOption(selectSelector, persona);
 
   // Fill email
   const emailSelector = "#sandbox-email-input";
-  if (await page.locator(emailSelector).count() > 0) {
-    await page.fill(emailSelector, email);
-  }
+  await page.fill(emailSelector, email);
 
   // Submit
   const submitBtn = page.locator("#sandbox-submit-button");
-  if (await submitBtn.count() > 0) {
-    await submitBtn.click();
-  } else {
-    const enterSandboxBtn = page.locator("button:has-text('Sandbox'), button:has-text('التجريبية')");
-    if (await enterSandboxBtn.count() > 0) {
-      await enterSandboxBtn.first().click();
-    }
-  }
+  await submitBtn.click();
 
-  await page.waitForTimeout(3000);
+  await page.waitForURL("**/home*", { timeout: 15000 });
 }
 
 test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
+  test.slow();
 
   test("D0: Version Parity - Fetch /api/version and assert SHA matches git HEAD", async ({ page, request, baseURL }) => {
     console.log(`[D0] Checking version parity on base URL: ${baseURL}`);
@@ -87,6 +78,7 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
     // Navigate to /api/version and take screenshot
     await page.goto("/api/version");
     await page.waitForTimeout(1000);
+    await page.setViewportSize({ width: 2560, height: 1600 });
     await page.screenshot({ path: path.join(shotsDir, "D0-version.png") });
 
     // Also verify cluster card is absent from fresh URL
@@ -96,15 +88,32 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
   });
 
   test("D1: Sandbox Entry - Access public Tier-0 sandbox and verify no 'not eligible' banner", async ({ page, baseURL }) => {
-    await loginToSandbox(page, "student");
-
-    // Take landing page screenshot before entering
     await page.goto("/");
-    await page.waitForTimeout(1000);
+    
+    // Clear storage
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await page.reload();
+    
+    // Take landing page screenshot of the form (clean, un-submitted state)
+    await page.waitForSelector("#persona-select", { timeout: 10000 });
     await page.screenshot({ path: path.join(shotsDir, "D1-landing.png") });
 
-    // Enter sandbox
-    await loginToSandbox(page, "student");
+    // Select student persona
+    await page.selectOption("#persona-select", "student");
+
+    // Fill email
+    await page.fill("#sandbox-email-input", "evaluation.judge@fahem.pro");
+
+    // Submit
+    const submitBtn = page.locator("#sandbox-submit-button");
+    await submitBtn.click();
+
+    // Wait for redirect to /home
+    await page.waitForURL("**/home*", { timeout: 15000 });
+    await page.waitForTimeout(1000); // short wait for layout paint
     await page.screenshot({ path: path.join(shotsDir, "D1-home.png") });
 
     const bodyText = await page.innerText("body");
@@ -162,6 +171,7 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
 
   test("D5: Companion Grounding - Verify companion answer citation & library has books", async ({ page }) => {
     await loginToSandbox(page, "student");
+    await page.waitForTimeout(5000);
     await page.screenshot({ path: path.join(shotsDir, "D5-grounding.png") });
 
     // Try to locate book cards or verify library is present
@@ -184,6 +194,7 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
 
   test("D7: Reader Content - Chapter matches current open book", async ({ page }) => {
     await loginToSandbox(page, "student");
+    await page.waitForTimeout(5000);
     await page.screenshot({ path: path.join(shotsDir, "D7-reader.png") });
 
     const bodyText = await page.innerText("body");
@@ -194,6 +205,7 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
 
   test("D8: TTS Read Aloud - Check audio playback trigger", async ({ page }) => {
     await loginToSandbox(page, "student");
+    await page.waitForTimeout(5000);
     await page.screenshot({ path: path.join(shotsDir, "D8-tts.png") });
     
     expect(page.url()).toContain("/home");

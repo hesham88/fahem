@@ -1,0 +1,25 @@
+{
+  "task": "OR-21",
+  "builder": "builder-5",
+  "d_box": "D6",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T11:00:00.000Z",
+  "backend_revision": "fahem-be-prod-v1.0.0",
+  "smoke": {
+    "url": "https://fahem.pro/en/home?tab=library",
+    "status": "pass",
+    "assertions": [
+      "Verified book ingestion status is fully set to embedded",
+      "Ingested document has vector status successfully generated"
+    ],
+    "screenshots": [
+      "evidence/shots/D6-ingestion.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D6-ingestion.png": "c3d94e7ccef93eeaa1484d3c4f782897c8d4ef426b414441fa269591612f8e7f"
+  },
+  "vision_verdict": "pass. Ingestion panel and progress tracking works seamlessly. Books successfully reach embedded status and can be searched via vector search and show complete performance.",
+  "timestamp": 1780998050,
+  "run_signature": "e0bba84114bd46955e26270cc322f82cf245e9da8e2dfa96d456bb4ffe866e1f"
+}

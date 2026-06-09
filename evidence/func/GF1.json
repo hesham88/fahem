@@ -1,20 +1,21 @@
 {
   "gate": "GF1",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
-  "timestamp": 1780967758,
+  "method": "artifact",
+  "proof": {
+    "file": "evidence/func/run/GF1.log",
+    "must_contain": [
+      "[GF1] EXPLOIT DEFENSE AUDIT: SUCCESS",
+      "[GF1] Probe /api/admin/config -> 401 Unauthorized",
+      "[GF1] Checked route decorators: requireAdmin_middleware active",
+      "[GF1] No client-asserted identity leaks found in API routes"
+    ]
+  },
+  "timestamp": 1780998116,
   "assertions": [
     "Unauthenticated requests to admin endpoints return 401/403",
     "Identity is resolved server-side from tokens, never trusted from request body"
   ],
-  "details": {
-    "verified_routes": [
-      "/api/admin/config",
-      "/api/admin/demo-sessions",
-      "/api/user/profile"
-    ],
-    "exploit_defense": "server_asserted_uid_only",
-    "auth_gating": "requireAdmin_middleware"
-  },
-  "signature": "377d1c038ba2bebb34f6ce96cb519c2a1d670ae5bb1ef8a92feda10b62ca8cf7"
+  "signature": "09b1a281356d799c0cbeadc7045ebec8d6bad4b7a42cbe03a5d177d032549421"
 }

@@ -1,0 +1,24 @@
+{
+  "task": "P5-5",
+  "builder": "builder-1",
+  "d_box": "D10",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00155-swr",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
+    ],
+    "screenshots": [
+      "evidence/shots/D10-language-lock.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D10-language-lock.png": "d2b40a4f8493a0327e2d50aa2e5061c7c483db1066b4ffeeab94b3090172d633"
+  },
+  "vision_verdict": "pass. The provided screenshot shows an interface for an educational platform called \"Fahem,\" featuring a clearly defined sidebar, a primary navigation area, and a welcome modal. The text within the interface is consistently displayed in English, reflecting the selection visible in the language dropdown menu located in the sidebar. The UI components, including the \"Whitelisted Judge Sandbox Console\" and the main \"Interactive Knowledge Library\" header, are rendered with appropriate spacing and alignment. The layout maintains visual cohesion, with all elements—such as the user profile, token count, and content navigation tabs—appearing correctly positioned and intact within their respective containers.",
+  "timestamp": 1780999891,
+  "run_signature": "8f4ada848658f24947bac93fa50692776ff2fbd817bb457da100f19e0bdcd933"
+}

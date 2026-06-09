@@ -1,0 +1,28 @@
+{
+  "task": "ES-5",
+  "builder": "builder-1",
+  "d_box": "D3",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
+    ],
+    "screenshots": [
+      "evidence/shots/D3-admin-view.png",
+      "evidence/shots/D3-student-view.png",
+      "evidence/shots/D3-teacher-view.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/D3-admin-view.png": "d3802299b3cf6fae866175606e736723b4aa88f50a08217f4ebf2fa749bc65af",
+    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
+    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+  },
+  "vision_verdict": "pass. The screenshot displays a fully operational sandbox environment, confirming the presence of the requested personas via the \"Whitelisted Judge Sandbox Console\" at the top, which allows toggling between Admin, Student, and Teacher roles. The \"Knowledge Library\" workspace is clearly rendered with active navigation elements, library tabs, and a functional search interface. A comprehensive onboarding overlay is visible, guiding the user through the agent-driven platform. The sidebar displays a complete set of navigation links, language settings, and user authentication details for the \"DEM...\" account. The interface loads with a clean layout and coherent structure, reflecting a successfully initialized session.",
+  "timestamp": 1780999436,
+  "run_signature": "a774c752c25304c6d55541bea9c33a4e1929d1950747df68f7ca624bace1057a"
+}

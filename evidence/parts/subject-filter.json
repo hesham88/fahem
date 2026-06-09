@@ -1,13 +1,15 @@
 {
   "part_id": "subject-filter",
-  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
   "status": "pass",
   "screenshots": [
-    "evidence/shots/parts/subject-filter-default.png"
+    "evidence/shots/parts/subject-filter-desktop.png",
+    "evidence/shots/parts/subject-filter-mobile.png"
   ],
   "screenshot_hashes": {
-    "evidence/shots/parts/subject-filter-default.png": "dummy_hash_for_subject-filter_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+    "evidence/shots/parts/subject-filter-desktop.png": "2e108586b3321ee74787a7c18ea1229eaba45afd8bb31ec21ecdd7decc0285a1",
+    "evidence/shots/parts/subject-filter-mobile.png": "d89e33c9d8e51048d63e81a37778eba8c3da8fa92d56006ad42f744a658d5014"
   },
-  "vision_verdict": "pass - placeholder visual verified for subject-filter",
-  "timestamp": 1717800000
+  "vision_verdict": "pass - The subject-filter view is fully functional and clearly shows the capsules and grid features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1780998148
 }
