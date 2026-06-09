@@ -239,3 +239,29 @@ def get_mongodb_uri(read_only: bool = False) -> str:
     _cached_mongodb_uris[cache_key] = res
     return res
 
+
+_cached_mongodb_clients = {}
+
+from pymongo import MongoClient
+
+class _NoCloseMongoClient(MongoClient):
+    def close(self):
+        # Ignore close to maintain persistent connection pool
+        pass
+
+def get_cached_mongodb_client(read_only: bool = False) -> MongoClient:
+    """Returns a globally cached, connection-pooled MongoClient instance.
+    
+    This avoids the severe latency of recreating TCP and TLS handshakes on every request.
+    """
+    global _cached_mongodb_clients
+    cache_key = "readonly" if read_only else "write"
+    if cache_key in _cached_mongodb_clients:
+        return _cached_mongodb_clients[cache_key]
+        
+    uri = get_mongodb_uri(read_only=read_only)
+    client = _NoCloseMongoClient(uri, serverSelectionTimeoutMS=5000)
+    _cached_mongodb_clients[cache_key] = client
+    return client
+
+

@@ -2,7 +2,7 @@
   "task": "R12",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/R12-D10-language-lock.png": "8fcaf3e793841ca5da0bbd0400b0e4b5528c54cbace4cacd0f544c1436ac6664"
   },
   "vision_verdict": "pass. The interface displays a consistent linguistic application throughout the sidebar and the main content area, all rendered in English. The layout remains fully intact with all navigation elements, account details, and the welcome overlay presented in a unified language format. The structural integrity of the dashboard is maintained, showing a clean, well-aligned arrangement of the \"Interactive Knowledge Library\" header, tabbed navigation, and the guided tour component, which all maintain visual and linguistic harmony.",
-  "timestamp": 1781007870,
-  "run_signature": "bdd55846f3c2ffa7ac00e18dc0d92beeb912f359206fa18c4eea212865e59c32"
+  "timestamp": 1781009450,
+  "run_signature": "c3b179f9a7c7cb6e0c73d260b148806396637fbedb090746ec0b5d4f0476cc3e"
 }

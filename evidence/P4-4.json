@@ -2,7 +2,7 @@
   "task": "P4-4",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P4-4-D10-language-lock.png": "855b33a76afc26884e2d9187f59f53bd8cc383f6dd24cc102f8dd705d6d460d3"
   },
   "vision_verdict": "Pass. The screenshot shows a clean, well-structured interface for the \"Fahem\" academic platform. The language setting is explicitly toggled to English, and all text elements, headers, and UI descriptions are consistently displayed in English, reflecting a stable and unified language state. The layout remains perfectly aligned with no signs of misalignment or rendering issues. The \"Welcome to Fahem Sandbox\" guide is displayed clearly, demonstrating that the platform is fully responsive and functioning as intended within the sandbox environment, maintaining a cohesive user experience.",
-  "timestamp": 1781007870,
-  "run_signature": "351b505e83d5117e874a7ab979ed90fec53c843de36debf296579f9a78c5581a"
+  "timestamp": 1781009450,
+  "run_signature": "01d4f54905e3c0581ba0ca939f78aa97da15a229b597231716e78ed2481b1ae4"
 }

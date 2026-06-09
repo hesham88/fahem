@@ -2,7 +2,7 @@
   "task": "OR-11",
   "builder": "builder-1",
   "d_box": "D-CRUD",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-11-D-CRUD-studio.png": "a62eefd54e0852492b99131712942169d2b873c7a8afb21458ae3da8423db56e"
   },
   "vision_verdict": "pass. This screenshot depicts a fully functional and well-structured interface for the Fahem learning platform. The layout is clean and logically organized, featuring a comprehensive navigation sidebar on the left and a responsive, information-rich dashboard on the right. \n\nVisible elements include:\n- A clearly defined \"Whitelisted Judge Sandbox Console\" at the top, offering distinct role-based views (Admin, Student, Teacher).\n- A primary workspace titled \"Curriculum Studio\" that provides a clear instructional context for managing educational materials.\n- A functional user identity panel, complete with profile status and a token tracking display.\n- An interactive, multi-step onboarding guide that is rendered correctly over the content, indicating that the front-end components are fully operational.\n- Consistent UI elements, such as navigation tabs (e.g., \"Library Manager,\" \"Curriculum Builder\"), which indicate the page is fully integrated and ready for user interaction.\n\nThe design adheres to modern web standards with professional typography and intuitive iconography, reflecting a stable and fully rendered application environment.",
-  "timestamp": 1781007870,
-  "run_signature": "df374aa2a312035382908b1c030ce80668a9acd05a584cf8f14dc2c43922f75b"
+  "timestamp": 1781009450,
+  "run_signature": "759f4c0e0b7ebaec011bd5db5c89b411f5d3724a60371c36842be10ae24e629a"
 }

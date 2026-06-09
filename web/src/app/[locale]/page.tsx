@@ -677,49 +677,25 @@ export default function LandingPage() {
             <div className="tech-stack-grid">
               {/* Gemini */}
               <div className="tech-logo-item tech-logo-gemini">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" fill="url(#gemini-grad)"/>
-                  <defs>
-                    <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#8b5cf6"/>
-                      <stop offset="100%" stopColor="#3b82f6"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <img src="/brand/gemini.png" alt="Gemini" width="18" height="18" style={{ objectFit: "contain" }} />
                 <span className="tech-logo-text">Gemini</span>
               </div>
 
               {/* ADK */}
               <div className="tech-logo-item tech-logo-adk">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" fill="#4285F4" />
-                </svg>
+                <img src="/brand/adk.png" alt="Google ADK" width="18" height="18" style={{ objectFit: "contain" }} />
                 <span className="tech-logo-text">Google ADK</span>
               </div>
 
               {/* Antigravity */}
               <div className="tech-logo-item tech-logo-antigravity">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L4 10h5v12h6V10h5L12 2z" fill="url(#antigravity-grad)"/>
-                  <path d="M6 22h12v-2H6v2z" fill="url(#antigravity-grad)" opacity="0.6"/>
-                  <defs>
-                    <linearGradient id="antigravity-grad" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#f43f5e"/>
-                      <stop offset="100%" stopColor="#ec4899"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <img src="/brand/antigravity.png" alt="Antigravity" width="18" height="18" style={{ objectFit: "contain" }} />
                 <span className="tech-logo-text">Antigravity</span>
               </div>
 
               {/* Firebase */}
               <div className="tech-logo-item tech-logo-firebase">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.9 18.5l9.2-15.6c.3-.5.9-.5 1.2 0l2 3.4L3.9 18.5z" fill="#FFC107"/>
-                  <path d="M16.8 6.9L14.3.4C14.1-.1 13.5-.1 13.3.4L3.9 18.5l12.9-11.6z" fill="#FFC107" opacity="0.8"/>
-                  <path d="M3.9 18.5l10.3 5.8c.4.2.9.2 1.3 0l4.6-5.8L3.9 18.5z" fill="#DD2C00"/>
-                  <path d="M20.1 18.5l-3.3-11.6-12.9 11.6h16.2z" fill="#FF9100"/>
-                </svg>
+                <img src="/brand/firebase.png" alt="Firebase" width="18" height="18" style={{ objectFit: "contain" }} />
                 <span className="tech-logo-text">Firebase</span>
               </div>
 
@@ -743,11 +719,7 @@ export default function LandingPage() {
 
               {/* MongoDB */}
               <div className="tech-logo-item tech-logo-mongodb">
-                <svg width="13" height="18" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M16 0C13.5 6.5 9 13.5 9 19.5C9 28.5 13 33.5 16 38C19 33.5 23 28.5 23 19.5C23 13.5 18.5 6.5 16 0Z" fill="#13AA52"/>
-                  <path d="M16 1.5V36.5C17.5 32.5 21 28 21 19.5C21 14.5 18 8 16 1.5Z" fill="#118843"/>
-                  <path d="M16 38V48L13 42L16 38Z" fill="#13AA52"/>
-                </svg>
+                <img src="/brand/mongodb.png" alt="MongoDB" width="13" height="18" style={{ objectFit: "contain" }} />
                 <span className="tech-logo-text">MongoDB</span>
               </div>
 
@@ -996,9 +968,8 @@ export default function LandingPage() {
           <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
             <FiMail />
           </a>
-          <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Asdaa" style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)", opacity: 0.8, fontSize: "0.9rem", fontWeight: 700, textDecoration: "none", transition: "opacity 0.2s" }}>
-            <span style={{ fontSize: "1.1rem" }}>🎙️</span>
-            <span>Asdaa</span>
+          <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Asdaa" style={{ display: "flex", alignItems: "center", gap: "0.25rem", opacity: 0.8, textDecoration: "none", transition: "opacity 0.2s" }}>
+            <img src="/brand/asdaa.png" alt="Asdaa" height="18" style={{ objectFit: "contain" }} />
           </a>
         </div>
 
@@ -1024,9 +995,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4"/>
-              </svg>
+              <img src="/brand/google_cloud.png" alt="Google Cloud" width="18" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Google Cloud</span>
             </a>
 
@@ -1035,11 +1004,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="16" height="18" viewBox="0 0 116 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M24.3 95.7L0 11.1c-.6-2 1.5-3.5 3.1-2.2L107.5 73 24.3 95.7z" fill="#FFC24C"/>
-                <path d="M43.7 130l63.8-57L24.3 95.7 43.7 130z" fill="#FF9800"/>
-                <path d="M14.6 30.7L0 11.1c-.6-2 1.5-3.5 3.1-2.2L116 112c.9 1-1.3 2.1-2.1 1L14.6 30.7z" fill="#E65100"/>
-              </svg>
+              <img src="/brand/firebase.png" alt="Firebase" width="16" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Firebase</span>
             </a>
 
@@ -1048,10 +1013,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C12 2 12.3 8.3 17.5 12C12.3 15.7 12 22 12 22C12 22 11.7 15.7 6.5 12C11.7 8.3 12 2 12 2Z" fill="#1A73E8"/>
-                <path d="M12 6C12 6 12.15 9.15 14.75 11C12.15 12.85 12 16 12 16C12 16 11.85 12.85 9.25 11C11.85 9.15 12 6 12 6Z" fill="#E8F0FE"/>
-              </svg>
+              <img src="/brand/gemini.png" alt="Gemini" width="18" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Gemini</span>
             </a>
 
@@ -1060,11 +1022,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="12" height="18" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 0C16 0 11.5 11.5 11.5 21C11.5 32 16 48 16 48C16 48 20.5 32 20.5 21C20.5 11.5 16 0 16 0Z" fill="#13AA52"/>
-                <path d="M16 0C16 0 14.5 11.5 14.5 21C14.5 32 16 48 16 48V0Z" fill="#118D47"/>
-                <path d="M16 11V32" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
+              <img src="/brand/mongodb.png" alt="MongoDB" width="12" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>MongoDB</span>
             </a>
 
@@ -1084,14 +1042,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="4" stroke="#106BA3" strokeWidth="2" fill="none"/>
-                <circle cx="12" cy="12" r="4" fill="#106BA3"/>
-                <line x1="12" y1="3" x2="12" y2="7" stroke="#106BA3" strokeWidth="2"/>
-                <line x1="12" y1="17" x2="12" y2="21" stroke="#106BA3" strokeWidth="2"/>
-                <line x1="3" y1="12" x2="7" y2="12" stroke="#106BA3" strokeWidth="2"/>
-                <line x1="17" y1="12" x2="21" y2="12" stroke="#106BA3" strokeWidth="2"/>
-              </svg>
+              <img src="/brand/adk.png" alt="Google ADK" width="18" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>ADK 2.0</span>
             </a>
 
@@ -1100,10 +1051,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="5" fill="none" stroke="#FF6B6B" strokeWidth="2"/>
-                <path d="M4 12C4 12 8 8 12 8C16 8 20 12 20 12C20 12 16 16 12 16C8 16 4 12 4 12Z" stroke="#4D96FF" strokeWidth="1.5" fill="none"/>
-              </svg>
+              <img src="/brand/antigravity.png" alt="Antigravity" width="18" height="18" style={{ objectFit: "contain" }} />
               <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Antigravity</span>
             </a>
 
@@ -1112,8 +1060,7 @@ export default function LandingPage() {
                style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
                onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
                onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <span style={{ fontSize: "1rem" }}>🎙️</span>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Asdaa.co</span>
+              <img src="/brand/asdaa.png" alt="Asdaa.co" height="18" style={{ objectFit: "contain" }} />
             </a>
           </div>
         </div>

@@ -2,7 +2,7 @@
   "task": "P7-4",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T01:17:58.129Z",
   "backend_revision": "fahem-agent-00156-44m",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P7-4-D10-language-lock.png": "59276d10032391f243d8e739c521be9871457911c250777397af67e50a84435d"
   },
   "vision_verdict": "pass. The user interface is consistently presented in English throughout all elements, including headers, descriptive text, and navigation labels. The sidebar, interactive cards, and the onboarding walkthrough maintain linguistic uniformity, ensuring a seamless experience. The layout remains well-structured and organized, with all interface components clearly rendered in the selected language, displaying structural integrity and professional design alignment.",
-  "timestamp": 1781007870,
-  "run_signature": "926d842c17372d8dca8796d5dd950d2bb6691566c1c04d366d45a5201c34392e"
+  "timestamp": 1781009450,
+  "run_signature": "cb5d91a820891d52e0603e721b4d43722f3e55d44c8e38b607dae61c83889498"
 }

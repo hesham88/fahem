@@ -2,7 +2,7 @@
   "task": "P4-1",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P4-1-D10-language-lock.png": "e8e9577a7cac0c869b706df4296136f0c777f7894139ba31cf5b5206a77795c8"
   },
   "vision_verdict": "pass. The interface displays a consistent linguistic application throughout the academic dashboard. The navigation menu, headers, and the instructional tour modal are presented entirely in English, aligning with the \"English\" selection made in the language dropdown menu located in the left sidebar. The layout maintains high structural integrity, with the modal positioned clearly over the interactive knowledge library and all elements aligned properly within their respective containers. The visual consistency remains stable as the user navigates through the sandbox, ensuring that the selected language preference is honored globally across all interface components.",
-  "timestamp": 1781007870,
-  "run_signature": "0b61e0a889f546405f9f210d55abe22fe53d54f3344e0402d4da8b5d2a5b29ef"
+  "timestamp": 1781009450,
+  "run_signature": "8d6d664fb7169af7fb58b0b5849bf492866078b295ee5e61758cb9cf67a471ab"
 }

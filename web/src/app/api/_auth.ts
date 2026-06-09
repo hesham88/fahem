@@ -141,8 +141,8 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
     
     // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
     const config = await getDBConfig();
-    if (config && config.evalSandboxEnabled === false && !payload.uid.startsWith("demo_anon_")) {
-      // Keep it active for anonymous tryouts or judges
+    if (config && config.evalSandboxEnabled === false) {
+      return null; // Reject live tokens!
     }
 
     return {
@@ -168,21 +168,21 @@ export async function verifyAuth(req: Request): Promise<AuthCtx | null> {
     const ctx = await verifyDemoToken(token);
     if (ctx) {
       // Check if this session has been killed or ended by an admin
-      let isKilled = false;
+      let isKilled = true; // Fail closed by default
       if (ctx.sandbox_session_id) {
         if (isLocalEnv()) {
           const db = getLocalDb() as any;
           const session = (db.demo_sessions || []).find((s: any) => s.sandbox_session_id === ctx.sandbox_session_id);
-          if (session && (session.status === "killed" || session.status === "ended")) {
-            isKilled = true;
+          if (session && session.status !== "killed" && session.status !== "ended") {
+            isKilled = false; // Successfully verified as active (not killed/ended)
           }
         } else {
           try {
             const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(ctx.sandbox_session_id)}`, "GET", undefined, ctx);
             if (res.ok) {
               const data = await res.json();
-              if (data.success && (data.status === "killed" || data.status === "ended")) {
-                isKilled = true;
+              if (data.success && data.status !== "killed" && data.status !== "ended") {
+                isKilled = false; // Successfully verified as active (not killed/ended)
               }
             }
           } catch (err) {
@@ -191,7 +191,7 @@ export async function verifyAuth(req: Request): Promise<AuthCtx | null> {
         }
       }
       if (isKilled) {
-        return null; // Token revoked!
+        return null; // Token revoked or unverifiable! Fail closed.
       }
 
       dbContextStorage.enterWith({ db_target: ctx.db_target || "fahem_sandbox" });

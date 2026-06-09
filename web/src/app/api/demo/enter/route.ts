@@ -9,6 +9,16 @@ export async function POST(req: NextRequest) {
     const db = getLocalDb();
     const config = db.config;
 
+    if (config && config.evalSandboxEnabled === false) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Evaluation sandbox is currently disabled"
+      }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // If evalSandboxEnabled is false, we ignore it for Tier-0 (anonymous) access and instead treat it as a budget/capacity message.
     const capacityNotice = (!config || !config.evalSandboxEnabled)
       ? "Demo Sandbox is currently running under low-capacity mode (daily budget ceiling reached). Enjoy exploring!"
@@ -108,22 +118,29 @@ export async function POST(req: NextRequest) {
     // Create or append to demo_sessions if we can model it in db
     const anyDb = db as any;
     anyDb.demo_sessions = anyDb.demo_sessions || [];
-    anyDb.demo_sessions.push(sessionDoc);
 
+    // local TTL cleanup: auto-expire sessions older than 1 hour (3600 seconds)
+    const cutoffTime = Math.floor(Date.now() / 1000) - 3600;
+    anyDb.demo_sessions = anyDb.demo_sessions.map((s: any) => {
+      if (s.status === "active" && s.started_at < cutoffTime) {
+        return {
+          ...s,
+          status: "expired",
+          ended_at: Math.floor(Date.now() / 1000),
+          kill_reason: "TTL expiration"
+        };
+      }
+      return s;
+    });
+
+    anyDb.demo_sessions.push(sessionDoc);
     saveLocalDb(db);
 
     // Also persist to MongoDB demo_sessions if in production
     if (!isLocalEnv()) {
       try {
         const { proxyRequest } = require("../../proxy");
-        // Use a Promise.race with a strict timeout of 1.5s to prevent blocking/hanging entry
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout waiting for demo session write (1.5s limit reached)")), 1500)
-        );
-        await Promise.race([
-          proxyRequest("/admin/create-demo-session", "POST", sessionDoc),
-          timeoutPromise
-        ]);
+        await proxyRequest("/admin/create-demo-session", "POST", sessionDoc);
       } catch (err) {
         console.error("[demo-enter] Failed to write demo session to Mongo audit store:", err);
       }

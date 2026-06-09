@@ -4,7 +4,7 @@ import "../globals.css";
 import { LanguageProvider, Language } from "../../context/LanguageContext";
 import StickyChat from "../../components/StickyChat";
 import AnalyticsProvider from "../../components/AnalyticsProvider";
-import ScreenLock from "../../components/ScreenLock";
+
 import React from "react";
 import Script from "next/script";
 
@@ -128,7 +128,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       siteName: "Fahem",
       images: [
         {
-          url: "/favicon.svg",
+          url: "/brand/logo_compressed.png",
           width: 512,
           height: 512,
           alt: "Fahem Logo",
@@ -139,14 +139,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       card: "summary",
       title: t.ogTitle,
       description: t.ogDescription,
-      images: ["/favicon.svg"],
+      images: ["/brand/logo_compressed.png"],
     },
     icons: {
       icon: [
-        { url: "/favicon.svg", type: "image/svg+xml" }
+        { url: "/brand/logo_compressed.png", type: "image/png" }
       ],
-      shortcut: "/favicon.svg",
-      apple: "/favicon.svg",
+      shortcut: "/brand/logo_compressed.png",
+      apple: "/brand/logo_compressed.png",
     }
   };
 }
@@ -204,9 +204,9 @@ export default async function LocaleLayout({
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/brand/logo_compressed.png" type="image/png" />
+        <link rel="shortcut icon" href="/brand/logo_compressed.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/brand/logo_compressed.png" type="image/png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -216,9 +216,7 @@ export default async function LocaleLayout({
       <body>
         <LanguageProvider locale={locale as Language}>
           <AnalyticsProvider>
-            <ScreenLock>
-              {children}
-            </ScreenLock>
+            {children}
             <StickyChat />
           </AnalyticsProvider>
         </LanguageProvider>

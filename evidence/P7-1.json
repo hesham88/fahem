@@ -2,7 +2,7 @@
   "task": "P7-1",
   "builder": "builder-1",
   "d_box": "D12",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -21,6 +21,6 @@
     "evidence/shots/P7-1-D12-mobile-landing.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf"
   },
   "vision_verdict": "pass. The page is successfully rendered within the viewport. The content is well-aligned, with the heading \"Fahem Educational Platform\" and the subsequent text wrapping neatly to fit the width. All elements, including the small icons at the top and bottom, appear within the intended boundaries, ensuring the user can clearly read the instruction to use a desktop or tablet device for the best experience.",
-  "timestamp": 1781007870,
-  "run_signature": "b44bcfa231daba08a6b16c2496c783b5e63c65c3c156a65be5f027711c9e24f4"
+  "timestamp": 1781009450,
+  "run_signature": "f67b266bc5c9e6858d77cc62cb1326b3bb5e3aa47351ff38e61126cedb980e07"
 }

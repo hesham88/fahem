@@ -3766,7 +3766,7 @@ export default function Home() {
           uid: "demo_evaluation_uid_01",
           email: savedBypassEmail,
           displayName: "⭐ DEMO",
-          photoURL: "/avatars/golden_crown.svg",
+          photoURL: "/avatars/space_explorer.svg",
           phoneNumber: "+15555555555",
         } as unknown as User);
 
@@ -3793,6 +3793,7 @@ export default function Home() {
             email: currentUser.email || "demo.evaluation@fahem.edu",
             name: "⭐ DEMO (Sandbox)",
             username: "demo_evaluation",
+            avatar: "/avatars/space_explorer.svg",
             onboardingCompleted: true,
             userType: savedPersona === "teacher" ? "teacher" : "student",
             role: savedPersona === "admin" ? "admin" : savedPersona,
@@ -6260,94 +6261,7 @@ export default function Home() {
       {/* Main Content Area */}
       <main className="main-content" style={{ position: "relative", zIndex: 2 }}>
         {/* Judge Sandbox Persona Switcher */}
-        {isJudge && (
-          <div
-            style={{
-              background: "linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(16, 107, 163, 0.95))",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(212, 175, 55, 0.35)",
-              borderRadius: "16px",
-              padding: "1rem 1.5rem",
-              marginBottom: "2rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem",
-              boxShadow: "0 10px 30px -5px rgba(16, 107, 163, 0.25), 0 0 15px rgba(212, 175, 55, 0.1)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span style={{ fontSize: "1.5rem" }}>⚖️</span>
-              <div>
-                <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#ffd700" }}>
-                  {language === "ar" ? "لوحة محاكاة فحص المحكمين المعتمدين" : "WHITELISTED JUDGE SANDBOX CONSOLE"}
-                </h4>
-                <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>
-                  {language === "ar" 
-                    ? "أنت في بيئة آمنة وقابلة للتبديل السلس للاختبار الشامل." 
-                    : "You are in a secure, ephemeral playground. Select a role persona below to audit different views."}
-                </p>
-              </div>
-            </div>
 
-            {/* Persona buttons */}
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              {[
-                { id: "admin", labelAr: "المشرف (Studio & Limits)", labelEn: "Admin (Studio & Overrides)", icon: "🛠️" },
-                { id: "student", labelAr: "طالب متفوق (Gamification)", labelEn: "Student (Gamification)", icon: "🎓" },
-                { id: "teacher", labelAr: "معلم (Assignments)", labelEn: "Teacher (Assignments)", icon: "🏫" }
-              ].map((p) => {
-                const isSelected = (userProfile?.role === p.id) || (p.id === "admin" && userProfile?.role === "super-admin") || (p.id === "admin" && userProfile?.role === "admin");
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      sessionStorage.setItem("judge_selected_persona", p.id);
-                      
-                      // Dynamically switch the active profile
-                      const updatedProfile = {
-                        ...userProfile,
-                        role: p.id === "admin" ? "admin" : p.id,
-                        userType: p.id === "teacher" ? "teacher" : "student",
-                      };
-                      setUserProfile(updatedProfile);
-                      setIsAdmin(p.id === "admin");
-                      
-                      // Auto route or toggle to the most interesting tab for the role
-                      if (p.id === "admin") {
-                        setActiveTab("admin");
-                      } else if (p.id === "student") {
-                        setActiveTab("library");
-                      } else {
-                        setActiveTab("social");
-                      }
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.4rem",
-                      padding: "0.5rem 1rem",
-                      borderRadius: "10px",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      border: isSelected ? "2px solid #ffd700" : "1px solid rgba(255, 255, 255, 0.15)",
-                      background: isSelected ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.04)",
-                      color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.8)",
-                      boxShadow: isSelected ? "0 0 10px rgba(255, 215, 0, 0.2)" : "none",
-                      transition: "all 0.2s ease",
-                    }}
-                    type="button"
-                  >
-                    <span>{p.icon}</span>
-                    <span>{language === "ar" ? p.labelAr : p.labelEn}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Page Title Section */}
         <header className="page-title-section" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>

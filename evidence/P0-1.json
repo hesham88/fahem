@@ -2,7 +2,7 @@
   "task": "P0-1",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P0-1-D0-version.png": "b75cd022fe728252add61e0d58dfe86397011112e4788e897b8e71b0fd626665"
   },
   "vision_verdict": "pass\nThe screenshot displays a valid and intact JSON response from the `/api/version` endpoint. The data structure includes a valid 'sha' hash (34443c0fc350976905064918c00918b75c519ada) and a clear 'builtAt' timestamp (2026-06-09T10:25:31.654Z). The system reports a 'healthy' status and confirms compliance with 'Bible Guard G-series' security standards. The display is clean and presents the version information in a structured, standard format. There are no additional interface elements or service cards overlaying this raw data view, ensuring a pure and direct presentation of the API output.",
-  "timestamp": 1781007870,
-  "run_signature": "488a0bb2f4febc9b36ce1f7408e1459de4f622e4da32caef02c89d6a1ad0b3d8"
+  "timestamp": 1781009450,
+  "run_signature": "c24efbbdf9ce0aa896566146793ff8847e45054e5d71dfc8c877102901d35ee2"
 }

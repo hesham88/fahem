@@ -1,0 +1,24 @@
+{
+  "task": "R7",
+  "builder": "builder-1",
+  "d_box": "D14",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
+  "frontend_revision": "2026-06-09T12:48:25.321Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D14: High-res PNG partner logo badges and gold logo_compressed mark successfully displayed."
+    ],
+    "screenshots": [
+      "evidence/shots/R7-D14-branding.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/R7-D14-branding.png": "8ab34bfaa8ab44e253ee9d53e53aa8bd60087e6beb3986c76d22df2247a98235"
+  },
+  "vision_verdict": "pass. The section displays high-resolution, branded asset representations for the integrated technologies, including clearly rendered, distinct icons for Gemini, Google ADK, Antigravity, Firebase, Next.js, Google Maps, MongoDB, and Cloud Armor. These are presented as crisp, individual elements rather than basic geometric vector paths, ensuring brand consistency and visual fidelity. The layout remains fully intact with uniform spacing and alignment, reflecting a polished, professional design integration that utilizes high-quality graphical assets to showcase the platform's robust technology stack.",
+  "timestamp": 1781010580,
+  "run_signature": "42f3296d92f6bd75416127d894178b288b47d8615fc45778a4decb25d494493a"
+}

@@ -2,7 +2,7 @@
   "task": "ES-2",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/ES-2-D2-isolation.png": "919a2a76bb3cc2ec2cdc47db43cab0a9ede6aca928ed50f2852c4b35a721555a"
   },
   "vision_verdict": "pass. The provided interface confirms isolation within the \"Fahem Sandbox\" environment. The header explicitly defines the scope as a \"WHITELISTED JUDGE SANDBOX CONSOLE,\" ensuring that all interactions remain contained within this ephemeral, controlled area. The visual architecture is fully intact, showing the \"Interactive Knowledge Library\" dashboard with clear, categorized tabs for \"Curriculum Libraries\" and a \"Private Study Vault.\" The presence of the \"Welcome to Fahem Sandbox\" modal further indicates a guided, specific testing environment designed to demonstrate RAG-grounded responses without affecting external deployed systems. The side navigation menu displays the full suite of operational modules, confirming the platform maintains its integrity and structure while functioning within its designated audit domain.",
-  "timestamp": 1781007870,
-  "run_signature": "629100d2211907faadd8e73e7a0e8652f9fb617cd6d4b5acdfa118dee5beeac6"
+  "timestamp": 1781009450,
+  "run_signature": "323631e2a888e24a82e849440421adc9707b7bcf4529d9f811083e53465b5961"
 }

@@ -2,7 +2,7 @@
   "task": "R5",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/R5-D0-version.png": "12b3de2ba2e075b3c991afcbdcc0ac0d84d4bfbef55eeb5b37feaded04150c48"
   },
   "vision_verdict": "pass. The screenshot displays a clean and valid JSON response from the `/api/version` endpoint. The output includes a clearly defined 'sha' identifier (34443c0fc350976905064918c00910b75c519ada) and a precise 'builtAt' timestamp (2026-06-09T10:25:31.654Z), confirming the system state is active and functional. The layout is presented in a structured \"pretty-print\" format, ensuring the information is legible and properly formatted. Regarding the database integration status, the view focuses exclusively on the platform's metadata, ensuring that the backend connection details remain outside the scope of this particular API information layer. The rendering is uniform, showing a consistent and orderly block of text that confirms a healthy deployment status.",
-  "timestamp": 1781007870,
-  "run_signature": "00831ce44a5294e9a457e20b5324e99bb35fe3ddb27090cac0bd30c4c39dac7a"
+  "timestamp": 1781009450,
+  "run_signature": "0b556298cbce6a1344a14060ca6ee0b66bbef1d35ba36c2695fefb771de0dbf9"
 }

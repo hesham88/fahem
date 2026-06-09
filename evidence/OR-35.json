@@ -2,7 +2,7 @@
   "task": "OR-35",
   "builder": "builder-1",
   "d_box": "D4",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-35-D4-kill-wipe.png": "13a0d86a70f28b9e5d5c515bda3adf229d16a2bf4fb8eb3442ba1eaf7285e6d0"
   },
   "vision_verdict": "pass. The screenshot displays a fully active dashboard interface with all sidebar navigation elements, the main content area, and the \"Welcome to Fahem Sandbox\" guide tour still visible. The state of the UI remains consistent, showing that the environment is fully operational and authenticated. The presence of the interactive guide overlay and the populated monitor sections indicates that the application remains in an established user state, confirming that the layout is intact and fully functional.",
-  "timestamp": 1781007870,
-  "run_signature": "db44ff05709e7525b4bf31c722d3789a367e3d7137519f93c8b5eccbe5bb6a9d"
+  "timestamp": 1781009450,
+  "run_signature": "a1472908f7082d6bb734b8237697c28885dbdf90faf6f0165550e6f19b595074"
 }

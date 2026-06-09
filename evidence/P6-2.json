@@ -2,7 +2,7 @@
   "task": "P6-2",
   "builder": "builder-1",
   "d_box": "D9",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P6-2-D9-admin-panel.png": "227a9f05420a2c5cc4415a4bc34d8206b0f91094e5265e3d28958849969c9535"
   },
   "vision_verdict": "pass. The dashboard displays a clean, professional user interface consistent with a successful page render (HTTP 200). The layout remains perfectly aligned, with all UI components—including the sidebar navigation, the top-level persona selector, the primary content area, and the welcome overlay—rendered in their intended positions. The typography is legible, the color scheme is consistent, and the interactive elements (such as the tabs and the onboarding carousel) are clearly visible and appropriately spaced, indicating a stable and functional state for the application environment.",
-  "timestamp": 1781007870,
-  "run_signature": "b949723cdba7e74179a7cf0c379f94993f14e42fb951c04fc39c0721f9756829"
+  "timestamp": 1781009450,
+  "run_signature": "8aec354524508a1438a7747fb7cad7e3b968c3a6b36e353bc6c8f0853e0c37dc"
 }

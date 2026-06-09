@@ -2234,24 +2234,19 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [libraryCounts, setLibraryCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const fetchCounts = async (libs: any[]) => {
+  const fetchCounts = (libs: any[]) => {
     const counts: Record<string, number> = {};
     for (const lib of libs) {
-      try {
-        const res = await authedFetch(`/api/knowledge?library_id=${encodeURIComponent(lib._id)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success) {
-            counts[lib._id] = data.total_books || 0;
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch count for library " + lib._id, err);
-      }
+      const libBooks = (dynamicBooks || []).filter((b: any) => b.library_id === lib._id || b.libraryId === lib._id);
+      counts[lib._id] = libBooks.length;
     }
-    counts["all"] = Object.values(counts).reduce((a, b) => a + b, 0);
+    counts["all"] = (dynamicBooks || []).length;
     setLibraryCounts(counts);
   };
+
+  useEffect(() => {
+    fetchCounts(libraries);
+  }, [dynamicBooks, libraries]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2263,7 +2258,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         const data = await res.json();
         if (isMounted && data.success) {
           setLibraries(data.libraries || []);
-          fetchCounts(data.libraries || []);
         }
       } catch (err) {
         console.error("Error loading libraries:", err);

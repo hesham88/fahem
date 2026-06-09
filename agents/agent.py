@@ -137,16 +137,11 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
     
     # 1. Try high-fidelity MongoDB Atlas vector search first
     try:
-        from tools import get_mongodb_uri
-        from pymongo import MongoClient
+        from tools import get_cached_mongodb_client
         from guardrails import verified_principal_ctx
         
-        uri = get_mongodb_uri()
-        if uri:
-            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-            # Verify connectivity
-            client.admin.command('ping')
-            mdb = get_active_db(client)
+        client = get_cached_mongodb_client()
+        mdb = get_active_db(client)
             
             # Retrieve embedding using Gemini v2 API
             from ingestion_v2.utils import get_gemini_embedding_v2

@@ -2,7 +2,7 @@
   "task": "P1-4",
   "builder": "builder-1",
   "d_box": "D12",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -21,6 +21,6 @@
     "evidence/shots/P1-4-D12-mobile-landing.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf"
   },
   "vision_verdict": "pass. The layout remains fully intact and structured correctly at this width. The text is contained within the viewport margins, ensuring the content is easily readable without requiring any panning. The messaging clearly directs the user to an appropriate device type while maintaining a clean, professional aesthetic. All elements are centered and neatly stacked vertically, providing a consistent experience within the constraints of the screen size.",
-  "timestamp": 1781007870,
-  "run_signature": "0762675001e38211c8b61fdc06f6cd6b4630aca4503584b9ea6fc35e3406f01f"
+  "timestamp": 1781009450,
+  "run_signature": "4e755c4777d5c8fd9e89ac20181ca6e5b110932905083a677e49ad2a1f05e12f"
 }

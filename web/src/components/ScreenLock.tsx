@@ -10,8 +10,8 @@ export default function ScreenLock({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const handleResize = () => {
-      // Threshold: 1024px to lock for mobile and small portrait tablets, allowing only PC/tablet landscape viewports (>=1024px)
-      setIsSmallScreen(window.innerWidth < 1024);
+      // Threshold: 480px to lock for small phone views, allowing tablet/desktop landscapes
+      setIsSmallScreen(window.innerWidth < 480);
     };
 
     // Initial check
@@ -47,12 +47,12 @@ export default function ScreenLock({ children }: { children: React.ReactNode }) 
               {isAr ? "منصة فاهم التعليمية" : "Fahem Educational Platform"}
             </h1>
             <p className="text-indigo-400 font-semibold text-sm uppercase tracking-wider">
-              {isAr ? "الهواتف الذكية قريباً" : "Mobile View Coming Soon"}
+              {isAr ? "دعم الهواتف قريباً" : "Phone Support Coming Soon"}
             </p>
             <p className="text-slate-300 text-sm leading-relaxed">
               {isAr
-                ? "نحن حالياً ندعم أجهزة الكمبيوتر والأجهزة اللوحية (التابلت) بوضوح كامل لضمان أفضل تجربة تعليمية تفاعلية وقراءة مدعومة بالذكاء الاصطناعي. ترقبوا إطلاق نسخة الهواتف المحمولة قريباً!"
-                : "To ensure the absolute best reading and interactive AI learning experience, Fahem is currently optimized for PC, desktop, and tablet screens. Stay tuned for our mobile application release soon!"}
+                ? "لضمان أفضل تجربة قراءة وتعلم تفاعلي بالذكاء الاصطناعي، تم تحسين المنصة حالياً لتناسب الشاشات اللوحية وأجهزة الكمبيوتر. دعم كامل للهواتف المحمولة قريباً!"
+                : "To ensure the absolute best reading and interactive AI learning experience, Fahem is currently optimized for tablet and desktop screens. Full phone support coming soon!"}
             </p>
           </div>
 
@@ -64,8 +64,8 @@ export default function ScreenLock({ children }: { children: React.ReactNode }) 
             <FiMonitor className="w-4 h-4 text-[#1e96a0]" />
             <span>
               {isAr
-                ? "يرجى فتح المنصة من جهاز لوحي أو كمبيوتر"
-                : "Please open Fahem on a Tablet or Desktop"}
+                ? "يرجى فتح لوحة التحكم من جهاز لوحي أو كمبيوتر"
+                : "Please open the dashboard on a Tablet or Desktop"}
             </span>
           </div>
         </div>

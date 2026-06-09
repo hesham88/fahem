@@ -2225,11 +2225,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
     @app.get("/user/books")
     async def get_books_endpoint(subject_id: str = None):
         try:
-            from tools import get_mongodb_uri
-            from pymongo import MongoClient
+            from tools import get_cached_mongodb_client
             
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client = get_cached_mongodb_client()
             db = get_active_db(client)
             
             query = {}
@@ -2245,12 +2243,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
     @app.get("/user/knowledge")
     async def get_knowledge_endpoint(request: fastapi.Request):
         try:
-            from tools import get_mongodb_uri
-            from pymongo import MongoClient
+            from tools import get_cached_mongodb_client
             from bson import ObjectId
             
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client = get_cached_mongodb_client()
             db = get_active_db(client)
             
             # Extract query params
@@ -2412,11 +2408,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
     @app.get("/user/books/pages")
     async def get_book_pages_endpoint(book_id: str):
         try:
-            from tools import get_mongodb_uri
-            from pymongo import MongoClient
+            from tools import get_cached_mongodb_client
             
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client = get_cached_mongodb_client()
             db = get_active_db(client)
             
             pages = list(db["book_pages"].find({"book_id": book_id}).sort("page_number", 1))
@@ -3159,19 +3153,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
         try:
             from tools import get_mongodb_uri
             from pymongo import MongoClient
+            import time
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             doc_id = payload.get("_id")
-            for db_name in ["fahem", "fahem_sandbox"]:
-                try:
-                    client[db_name]["demo_sessions"].update_one(
-                        {"_id": doc_id},
-                        {"$set": payload},
-                        upsert=True
-                    )
-                except Exception as db_err:
-                    logger.warning(f"Failed to write demo session to {db_name}: {db_err}")
+            
+            # Write only to fahem_sandbox (never prod fahem)
+            try:
+                client["fahem_sandbox"]["demo_sessions"].update_one(
+                    {"_id": doc_id},
+                    {"$set": payload},
+                    upsert=True
+                )
+            except Exception as db_err:
+                logger.warning(f"Failed to write demo session to fahem_sandbox: {db_err}")
+            
+            # TTL Cleanup: auto-expire sessions older than 1 hour (3600s)
+            try:
+                cutoff = int(time.time()) - 3600
+                client["fahem_sandbox"]["demo_sessions"].update_many(
+                    {"status": "active", "started_at": {"$lt": cutoff}},
+                    {"$set": {
+                        "status": "expired",
+                        "ended_at": int(time.time()),
+                        "kill_reason": "TTL expiration"
+                    }}
+                )
+            except Exception as ttl_err:
+                logger.warning(f"Failed to run TTL cleanup in fahem_sandbox: {ttl_err}")
+                
             client.close()
             return {"success": True}
         except Exception as err:
@@ -5943,7 +5954,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     content={"success": False, "error": "Gemini API key is not configured"}
                 )
                 
-            model_name = "gemini-2.5-flash"
+            model_name = "gemini-3.1-flash-tts-preview"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
             
             selected_voice = voice or "Aoede"
@@ -5997,9 +6008,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 
                 if total_tokens > 0:
                     import datetime
-                    from pymongo import MongoClient
-                    from tools import get_mongodb_uri
-                    db_local = MongoClient(get_mongodb_uri()).get_database(getDbTarget())
+                    from tools import get_cached_mongodb_client
+                    client = get_cached_mongodb_client()
+                    db_local = get_active_db(client)
                     usage_doc = {
                         "userId": principal.get("uid"),
                         "userEmail": principal.get("email") or "anonymous@fahem.ai",

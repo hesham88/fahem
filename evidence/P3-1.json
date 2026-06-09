@@ -2,9 +2,9 @@
   "task": "P3-1",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
-  "frontend_revision": "2026-06-09T10:25:31.654Z",
-  "backend_revision": "fahem-agent-00157-q96",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
+  "frontend_revision": "2026-06-09T12:48:25.321Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -16,9 +16,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/P3-1-D7-reader.png": "ff20bb9b6cf785da3c82f3560b4aa46e17d2349a2e9230e8ea17ea3e0a9cf04b"
+    "evidence/shots/P3-1-D7-reader.png": "f8e0fe480c0b321660074744590b69c113e3d061f8d062b8588563cd84586bb6"
   },
-  "vision_verdict": "pass. The screenshot presents a clean, well-organized interface for the Fahem Sandbox, focusing on the Knowledge Library module. The layout is professional and logically structured, with the sidebar navigation, primary content area, and role-based sandbox console appearing properly aligned and responsive. The \"All Libraries\" section is clearly designated, and the onboarding walkthrough is positioned correctly in the foreground to guide the user. All UI elements, including the profile section, status indicators, and navigation tabs, render with appropriate padding and spacing, confirming that the interface is fully functional and consistent across its modules.",
-  "timestamp": 1781007870,
-  "run_signature": "cd4c5351c509b9c679c7eef903a0454228686581c98d1bedc4226c2eb5ec84ce"
+  "vision_verdict": "pass\nThe interface is clean and fully functional, presenting a clear organizational structure. The \"All Libraries\" section is visible as a primary container, and the navigation sidebar provides direct access to various features like the Knowledge Library, Course Subjects, and Practice Workstation. The search bar is correctly positioned for users to query materials, and the user profile information, including the token count, is properly displayed. The layout maintains consistent spacing and a logical flow throughout the dashboard.",
+  "timestamp": 1781010507,
+  "run_signature": "d4ca183f2b6a382c8aa38dd3f7bfa739cb48f7eadfe1429c7ef41fdc8112f900"
 }

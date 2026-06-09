@@ -2,8 +2,8 @@
   "task": "R14",
   "builder": "builder-1",
   "d_box": "D9",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
-  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
+  "frontend_revision": "2026-06-09T12:48:25.321Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -16,9 +16,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/R14-D9-admin-panel.png": "e17b82c346af386716df2437223ad643230fde09a8a9304695042f5db01ba2a6"
+    "evidence/shots/R14-D9-admin-panel.png": "3448f3431214596343cb88656dcd2fb368179cb80636ba62fdce156d87407b27"
   },
-  "vision_verdict": "pass. The screenshot displays a fully functional, clean interface indicating that the application loads successfully with an HTTP 200 status. The layout is well-structured, featuring a sidebar with navigation items, a clear header for the \"Whitelisted Judge Sandbox,\" and a central workspace titled \"Users & Activity Trail.\" The elements, including the modal window in the lower right, the tabbed navigation for \"Accounts & Roles,\" and the user profile summary, are rendered with appropriate alignment and spacing, showing a professional and responsive design throughout.",
-  "timestamp": 1781007870,
-  "run_signature": "c1f3ce97486f7a9d28c1c6c06e23ffd4e57640afa8f157e7fccb8ad10a0144ac"
+  "vision_verdict": "pass. The dashboard loads cleanly with HTTP 200, presenting a professional and coherent interface. The layout remains fully intact, with all navigation elements, control panels, and the central information area aligned correctly. The typography is consistent, the UI components such as buttons and input fields are perfectly rendered, and the color palette is applied uniformly across the sidebar and main view. The system successfully communicates the available administrative options and user management sections without any visual or structural inconsistencies, demonstrating a high-quality, fully functional state.",
+  "timestamp": 1781010635,
+  "run_signature": "fd6a0e544f1ccc697bb05e9d4308b5191ba55336b8a1008b9e2a7c07b52dd7d8"
 }

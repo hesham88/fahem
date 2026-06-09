@@ -2,7 +2,7 @@
   "task": "ES-4",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -23,6 +23,6 @@
     "evidence/shots/ES-4-D3-teacher-view.png": "4fa7b17f287370f65c6e4245aadd34cdf0f16d28df12c8411c330419c599d973"
   },
   "vision_verdict": "pass The screenshot displays a functional and fully rendered sandbox interface. The \"Whitelisted Judge Sandbox Console\" is clearly visible at the top, confirming that the persona-based auditing system is active, with the \"Admin (Studio & Overrides)\" selection currently highlighted. The sidebar navigation, user profile information, and the \"Interactive Knowledge Library\" main content area are all presented with a clean, consistent design that indicates the environment is operating correctly within its intended parameters. While the specific list of resources shows a count of items reflecting a base state, the layout of the UI elements—including the search bar, category tabs, and navigation menus—is completely intact, well-aligned, and responsive. There is no presence of a companion chat window, as the interface focuses on curriculum management and library exploration tools.",
-  "timestamp": 1781007870,
-  "run_signature": "cb695f3cc3f595b99e9fb62e9730e8d428d596ddc55d7d5f0198ed099cc0d87a"
+  "timestamp": 1781009450,
+  "run_signature": "88666486847c5cad7aab8ccdfc73311ef0d523e3b6c9df95f91bd37b6ab59e6e"
 }

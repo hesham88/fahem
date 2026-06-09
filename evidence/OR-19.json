@@ -2,7 +2,7 @@
   "task": "OR-19",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
+  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-19-D2-isolation.png": "436d827f6d3b37239cbb75019f0fb118bb128baf37ae69e38d4dd3d1dacb752c"
   },
   "vision_verdict": "pass. The interface clearly designates itself as a \"WHITELISTED JUDGE SANDBOX CONSOLE.\" The UI elements, including the navigation menu, user profile, and pedagogical resources, are fully rendered and logically organized within a singular, contained viewing environment. The layout maintains high structural integrity, ensuring that all components—from the \"Curriculum Libraries\" tab to the \"All Libraries\" directory—are positioned correctly and remain responsive within the designated sandbox container. The presence of these specific controls confirms that the operational scope is localized to the testing instance, ensuring a clean, stable, and distinct user experience isolated from other operational environments.",
-  "timestamp": 1781007870,
-  "run_signature": "8c32b8bd92c6d2ddbfecea85bb10236433d65ca37955f72af9f5362e0a8c0521"
+  "timestamp": 1781009450,
+  "run_signature": "581c1dabda2defbe204e3908c25374ae495afd84d21a551355c197088837291d"
 }
