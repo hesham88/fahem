@@ -178,7 +178,7 @@ export async function verifyAuth(req: Request): Promise<AuthCtx | null> {
           }
         } else {
           try {
-            const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(ctx.sandbox_session_id)}`, "GET");
+            const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(ctx.sandbox_session_id)}`, "GET", undefined, ctx);
             if (res.ok) {
               const data = await res.json();
               if (data.success && (data.status === "killed" || data.status === "ended")) {

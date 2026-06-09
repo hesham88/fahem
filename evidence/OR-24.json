@@ -2,7 +2,7 @@
   "task": "OR-24",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-24-D2-isolation.png": "767bddbc34c0a54146cfec6053d4f8e3db5d3a6afa2b6c3b9a40a5f79d250014"
   },
   "vision_verdict": "pass. The sandbox environment is distinctly isolated and clearly labeled as a \"WHITELISTED JUDGE SANDBOX CONSOLE.\" The interface provides dedicated role-based switching (Admin, Student, Teacher) within this contained environment, ensuring all interactions remain within the intended demonstration space. The layout remains fully intact and responsive, with all navigational elements and the \"Interactive Knowledge Library\" module properly aligned. The \"Welcome to Fahem Sandbox\" modal sits correctly over the main dashboard, indicating that the system is functioning as a clean, controlled environment for audit and demonstration purposes. All visual components are accurately rendered and appropriately placed.",
-  "timestamp": 1781006845,
-  "run_signature": "2e17c56e965a0c3b31b7f62feb24bd532ba856c4bc73a8aa8a96a119a166a8b0"
+  "timestamp": 1781007870,
+  "run_signature": "4f843b8f8ce907053145d4aa7f2883bf211612b4f99192a9f9edf23ccfa9f3da"
 }

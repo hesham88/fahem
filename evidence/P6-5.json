@@ -2,7 +2,7 @@
   "task": "P6-5",
   "builder": "builder-1",
   "d_box": "D14",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P6-5-D14-branding.png": "8ae08c13a2b30c46278036fed739b539807070897dbd6cf60aa0fa2769ec9602"
   },
   "vision_verdict": "pass. The logos and icons presented in the \"LEADING TECH INTEGRATIONS & STACK\" section are rendered as sharp, high-resolution visual assets. These elements, including the MongoDB, Google ADK, Firebase, Gemini, Antigravity, Next.js, Google Maps, and Cloud Armor badges, appear as distinct, professional graphic files rather than simple vector paths or basic text representations. The layout is fully intact, exhibiting a uniform, grid-based arrangement with consistent spacing and clear, legible typography. The Fahem logo at the top also appears as a high-fidelity image asset, maintaining precise branding clarity. The overall presentation is cohesive, with all components effectively integrated into the UI design to provide a polished and modern aesthetic.",
-  "timestamp": 1781006845,
-  "run_signature": "4b737e0e4ad359ba2fbfaed44e9e942732ed96fe479eec0fdd9910d0bf578af2"
+  "timestamp": 1781007870,
+  "run_signature": "f60562bd66c0c46c467eb6d35c0160c66bf3f85aff811d43cef39d1b275a5bc6"
 }

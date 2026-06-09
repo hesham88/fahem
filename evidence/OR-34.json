@@ -2,7 +2,7 @@
   "task": "OR-34",
   "builder": "builder-1",
   "d_box": "D4",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-34-D4-kill-wipe.png": "2b99b25a39f574dcddd320d78d01148c25f8193ca0745cc4a6f5a88c544022a6"
   },
   "vision_verdict": "pass. The screenshot displays a fully active and functional dashboard environment. The navigation sidebar remains populated with all menu items, the \"Welcome to Fahem Sandbox\" modal is visible and interactive, and the administrative controls for the \"Whitelisted Judge Sandbox\" are clearly rendered. The state of the interface indicates that the application remains in an established, authenticated state, with all UI components rendering as expected, suggesting the environment is fully operational and responsive to user input.",
-  "timestamp": 1781006845,
-  "run_signature": "55817b4df0d0ef1898ab1037ff8541f9145a376b2725437815a6524f71e9a27e"
+  "timestamp": 1781007870,
+  "run_signature": "4badc292608fe34249c4756b03d1f7b16820aaa3223e9fbc4d5148d8b8df9078"
 }

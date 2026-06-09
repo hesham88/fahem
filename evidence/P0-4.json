@@ -2,7 +2,7 @@
   "task": "P0-4",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P0-4-D0-version.png": "3fc8e13f10ed4dd176bf5775ac9860cbe95c1c125ad00bc5e43a5ce5f1806381"
   },
   "vision_verdict": "pass. The screenshot displays a cleanly formatted JSON response originating from the `/api/version` endpoint. The output contains a valid `sha` identifier and a precise `builtAt` timestamp, confirming that the system state is correctly reported. The platform information, system name, and status are clearly visible and indicate a healthy operational state. The response layout is perfectly preserved, consisting solely of structured metadata and a repetitive padding sequence, ensuring that the interface remains focused entirely on the versioning information without any additional dashboard components or external database status elements present in this view.",
-  "timestamp": 1781006845,
-  "run_signature": "cb05cfb3cf0e302e04ea48aa99f7b33264e745fa99f28a4c74b8ec0933d7fb15"
+  "timestamp": 1781007870,
+  "run_signature": "47360b6958f109d2115df889918371581ee7ef81279d179ba95f8fd94969fe1f"
 }

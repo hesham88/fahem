@@ -2707,9 +2707,19 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = get_active_db(client)
             
-            session = db["demo_sessions"].find_one({"sandbox_session_id": sandbox_session_id})
+            # Double-redundant check: check both fahem_sandbox and fahem databases, prioritizing killed/ended state
+            session = None
+            for db_name in ["fahem_sandbox", "fahem"]:
+                try:
+                    s = client[db_name]["demo_sessions"].find_one({"sandbox_session_id": sandbox_session_id})
+                    if s:
+                        session = s
+                        if s.get("status") in ["killed", "ended"]:
+                            break
+                except Exception as e:
+                    logger.warning(f"Error reading session status from {db_name}: {e}")
+            
             client.close()
             
             status = "active"

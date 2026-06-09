@@ -2,7 +2,7 @@
   "task": "R13",
   "builder": "builder-1",
   "d_box": "D11",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/R13-D11-theme.png": "893726addd87285359bd12b0560739e6d24792b1325d3e3116c99396df0645dc"
   },
   "vision_verdict": "pass. The platform displays a clean, professional aesthetic using a light theme characterized by a high-contrast combination of a white background and dark-colored text. The visual hierarchy is well-maintained, with a clear header containing navigation links, a prominent central section highlighting the platform's value proposition, and a clear call-to-action button for sign-in functionality. The use of soft gradients, icons, and structured text creates a cohesive and professional appearance, indicating that the page layout is fully intact and rendering as intended by the developers.",
-  "timestamp": 1781006845,
-  "run_signature": "af4644ee3cfd4adca0882a0db37897fda69ae272d31ae348ff4c09284fcb7496"
+  "timestamp": 1781007870,
+  "run_signature": "af8359b58323a286fb5226421971016278c4fd62a8227f5193e8ac2b1b161430"
 }

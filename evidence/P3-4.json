@@ -2,7 +2,7 @@
   "task": "P3-4",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
+  "sha": "39ba7298715250e180000fbcbebd2a4096f20685",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P3-4-D7-reader.png": "70a88a0ad2f7420bf89305abf5a918a6c93de6231a72fde0137b0b81f88d7013"
   },
   "vision_verdict": "pass. The screenshot displays a functional interface for the \"Fahem\" academic platform. The main dashboard is clearly populated with navigational elements such as \"Curriculum Libraries\" and \"All Libraries,\" which are visible and correctly aligned within the UI. The \"Interactive Knowledge Library\" header provides a coherent title for the current view, and the modal overlay functions as a guided tour sequence, maintaining consistent spacing and formatting. All UI components appear to be fully rendered and logically organized, indicating a stable and correctly functioning layout.",
-  "timestamp": 1781006845,
-  "run_signature": "538c08a4aef762356fa25b56c8d5b9b36a852720b3998db479178ec5ade5e75a"
+  "timestamp": 1781007870,
+  "run_signature": "40389c7325daeaf49169fb7ad38222f007617605aaa7f591e7490e4664893c61"
 }
