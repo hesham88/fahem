@@ -4,8 +4,9 @@ import { GIT_SHA } from "./git_sha";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const currentSha = process.env.NEXT_PUBLIC_BUILD_SHA || GIT_SHA || "unknown";
   const response = NextResponse.json({
-    sha: GIT_SHA || "unknown",
+    sha: currentSha,
     builtAt: process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString(),
     system: "Fahem Educational Platform - Production",
     status: "healthy",
