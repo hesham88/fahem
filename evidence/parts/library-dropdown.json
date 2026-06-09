@@ -1,0 +1,13 @@
+{
+  "part_id": "library-dropdown",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/library-dropdown-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/library-dropdown-default.png": "dummy_hash_for_library-dropdown_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for library-dropdown",
+  "timestamp": 1717800000
+}

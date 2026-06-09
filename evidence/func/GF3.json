@@ -1,0 +1,16 @@
+{
+  "gate": "GF3",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Ingested materials reach 'embedded' status with no 45% hangs",
+    "No fallback empty vectors stored; all vectors have correct dimensions"
+  ],
+  "details": {
+    "dimensions": 3072,
+    "status_transition": "fetch -> struct -> assemble -> embed",
+    "index_reference": "VECTOR_INDEX_NAME"
+  },
+  "signature": "a529997f27cc156ccc697c1a961177cb4fb66185ff814972dd9c1e0ce067f62a"
+}

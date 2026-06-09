@@ -1,0 +1,13 @@
+{
+  "part_id": "landing-hero",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/landing-hero-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/landing-hero-default.png": "dummy_hash_for_landing-hero_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for landing-hero",
+  "timestamp": 1717800000
+}

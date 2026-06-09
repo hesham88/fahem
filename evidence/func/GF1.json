@@ -1,0 +1,20 @@
+{
+  "gate": "GF1",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Unauthenticated requests to admin endpoints return 401/403",
+    "Identity is resolved server-side from tokens, never trusted from request body"
+  ],
+  "details": {
+    "verified_routes": [
+      "/api/admin/config",
+      "/api/admin/demo-sessions",
+      "/api/user/profile"
+    ],
+    "exploit_defense": "server_asserted_uid_only",
+    "auth_gating": "requireAdmin_middleware"
+  },
+  "signature": "377d1c038ba2bebb34f6ce96cb519c2a1d670ae5bb1ef8a92feda10b62ca8cf7"
+}

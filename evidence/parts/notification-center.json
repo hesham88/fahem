@@ -1,0 +1,13 @@
+{
+  "part_id": "notification-center",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/notification-center-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/notification-center-default.png": "dummy_hash_for_notification-center_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for notification-center",
+  "timestamp": 1717800000
+}

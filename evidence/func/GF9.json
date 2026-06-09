@@ -1,0 +1,17 @@
+{
+  "gate": "GF9",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "fail",
+  "timestamp": 1780967758,
+  "assertions": [
+    "No duplicated subject slugs exist grouped by curriculum",
+    "All book.subject_id values resolve to a valid subject"
+  ],
+  "details": {
+    "subjects_count": 3,
+    "libraries_count": 3,
+    "books_count": 2,
+    "has_subject_duplicates": true
+  },
+  "signature": "eb2ef60ad91c6aba5de3385672c50739b143a17fce761c62e4c682139694ad52"
+}

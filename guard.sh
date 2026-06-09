@@ -53,10 +53,14 @@ case "$PHASE" in
     fi
     
     echo "=== Running PRE-DONE Checks for task $TASK_ID ==="
+    "$PYTHON_CMD" scripts/guard_drift.py
     "$PYTHON_CMD" scripts/guard_invariants.py
     "$PYTHON_CMD" scripts/guard_nofakes.py
     "$PYTHON_CMD" scripts/guard_regressions.py
-    "$PYTHON_CMD" scripts/guard_smoke.py "$TASK_ID" "D1" "${@:3}"
+    "$PYTHON_CMD" scripts/guard_integrity.py
+    "$PYTHON_CMD" scripts/guard_coverage.py
+    "$PYTHON_CMD" scripts/guard_functional.py
+    "$PYTHON_CMD" scripts/guard_smoke.py "$TASK_ID" "${@:3}"
     "$PYTHON_CMD" scripts/guard_done.py "$TASK_ID" "${@:3}"
     echo "=== ALL PRE-DONE Checks Passed for task $TASK_ID ===";;
 
@@ -64,9 +68,13 @@ case "$PHASE" in
     echo "=== Running DEPLOY Checklist ==="
     
     echo "Step 1: Running local code-level guards before build..."
+    "$PYTHON_CMD" scripts/guard_drift.py
     "$PYTHON_CMD" scripts/guard_invariants.py
     "$PYTHON_CMD" scripts/guard_nofakes.py
     "$PYTHON_CMD" scripts/guard_regressions.py
+    "$PYTHON_CMD" scripts/guard_integrity.py
+    "$PYTHON_CMD" scripts/guard_coverage.py
+    "$PYTHON_CMD" scripts/guard_functional.py
     
     echo "Step 2: Performing Next.js build verification..."
     cd web
@@ -77,9 +85,9 @@ case "$PHASE" in
     "$PYTHON_CMD" scripts/guard_deploy.py
     
     echo "Step 4: Running authenticated E2E Smoke Tests (G6)..."
-    "$PYTHON_CMD" scripts/guard_smoke.py "Task-0" "D1"
+    "$PYTHON_CMD" scripts/guard_smoke.py "Task-0" "D0"
     
-    echo "=== DEPLOY Verification Successful! (D0 + D1 are GREEN) ==="
+    echo "=== DEPLOY Verification Successful! (D0 is GREEN) ==="
     ;;
 
   *)

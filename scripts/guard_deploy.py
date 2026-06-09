@@ -46,15 +46,16 @@ def main():
     
     # Check if testing locally or prod
     use_local = "--local" in sys.argv
+    first_deploy = "--first-deploy" in sys.argv
     
     if use_local:
         fe_url = "http://localhost:3000/api/version"
         be_url = "http://localhost:8000/health"
     else:
         fe_url = "https://fahem.pro/api/version"
-        be_url = "https://fahem-agent-sbqsl5tfga-uk.a.run.app/health"
+        be_url = "https://fahem-agent-1061555578804.us-east4.run.app/health"
         
-    allowed_shas = {local_sha, "2a54ee2a939d5753031e43c90279c1985fa67470", "fcc1f2e983ad9764e132222f256bba2393978b20", "cd1639f28de28aa714acb258c577c1cbcc5b40df", "b46ff8bceb77a25bb23b58998d5298f86b525e35"}
+    allowed_shas = {local_sha}
     print(f"[DEPLOY] Allowed SHAs: {allowed_shas}")
 
     fe_data = fetch_json(fe_url, "Frontend Version")
@@ -63,8 +64,11 @@ def main():
     failed = False
     
     if not fe_data:
-        print(f"[DEPLOY][WARN] Frontend version endpoint is unreachable. If this is the initial deployment of /api/version, this is normal and expected.")
-        print("[DEPLOY][WARN] Continuing deployment to allow /api/version to become live.")
+        if first_deploy:
+            print(f"[DEPLOY][WARN] Frontend version endpoint is unreachable. Continuing deployment because --first-deploy was provided.")
+        else:
+            print(f"[DEPLOY][FAIL] Frontend version endpoint is unreachable and --first-deploy was not specified.")
+            failed = True
     else:
         fe_sha = fe_data.get("sha", "unknown").strip().replace("\ufeff", "")
         print(f"[DEPLOY] Deployed Frontend SHA: {fe_sha}")

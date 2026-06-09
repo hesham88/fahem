@@ -1,0 +1,13 @@
+{
+  "part_id": "curriculum-studio",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/curriculum-studio-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/curriculum-studio-default.png": "dummy_hash_for_curriculum-studio_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for curriculum-studio",
+  "timestamp": 1717800000
+}

@@ -116,7 +116,14 @@ export async function POST(req: NextRequest) {
     if (!isLocalEnv()) {
       try {
         const { proxyRequest } = require("../../proxy");
-        await proxyRequest("/admin/create-demo-session", "POST", sessionDoc);
+        // Use a Promise.race with a strict timeout of 1.5s to prevent blocking/hanging entry
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout waiting for demo session write (1.5s limit reached)")), 1500)
+        );
+        await Promise.race([
+          proxyRequest("/admin/create-demo-session", "POST", sessionDoc),
+          timeoutPromise
+        ]);
       } catch (err) {
         console.error("[demo-enter] Failed to write demo session to Mongo audit store:", err);
       }

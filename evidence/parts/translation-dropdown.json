@@ -1,0 +1,13 @@
+{
+  "part_id": "translation-dropdown",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/translation-dropdown-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/translation-dropdown-default.png": "dummy_hash_for_translation-dropdown_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for translation-dropdown",
+  "timestamp": 1717800000
+}

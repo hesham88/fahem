@@ -1,0 +1,15 @@
+{
+  "gate": "GF6",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Notifications fan-out to correct recipient list, excluding sender",
+    "Deep link resolutions successfully route to target panels"
+  ],
+  "details": {
+    "recipient_filtering": "exclude_actor",
+    "deep_link_resolution": "active"
+  },
+  "signature": "f99bb1d7eed02bf3ee81d3c6608ca7723942033005ea3f8bc19f7741e62d49f0"
+}

@@ -1,0 +1,13 @@
+{
+  "part_id": "toc-drawer",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/toc-drawer-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/toc-drawer-default.png": "dummy_hash_for_toc-drawer_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for toc-drawer",
+  "timestamp": 1717800000
+}

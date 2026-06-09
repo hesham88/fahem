@@ -1,24 +1,25 @@
 {
   "task": "Task-0",
   "builder": "builder-1",
-  "d_box": "D1",
-  "sha": "e6f40e455746bbaca8a01b3e0023851c01eff7c0",
-  "frontend_revision": "2026-06-08T21:50:46.250Z",
-  "backend_revision": "fahem-agent-00153-xk2",
+  "d_box": "D0",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "frontend_revision": "2026-06-08T21:57:58.623Z",
+  "backend_revision": "fahem-agent-00154-m44",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "D0 - Version Parity validated",
-      "D1 - Sandbox entry (no auth) succeeded",
-      "D1 - Redirected to /home on submit",
-      "D1 - Asserted no 'not eligible' block displayed"
+      "D0 - Verified successfully using E2E smoke tests",
+      "Asserted DOM and text validations on https://fahem.pro"
     ],
     "screenshots": [
-      "evidence/shots/D1-landing.png",
-      "evidence/shots/D1-home.png"
+      "evidence/shots/D0-version.png"
     ]
   },
-  "vision_verdict": "pass. This is a fully functional, rendered interface for the Fahem platform. \n\nThe layout is intact and demonstrates a high level of complexity, featuring:\n*   **Active Navigation Menu:** The left sidebar contains fully styled navigation items (e.g., \"Knowledge Library,\" \"Course Subjects,\" \"Admin Panel\") with appropriate icons.\n*   **User/System State:** The bottom left shows a specific user profile (\"DEM...\") with a \"JUDGE\" badge, a functional token counter showing \"42/100,\" and a \"Sign Out\" button.\n*   **Interactive Controls:** A language dropdown, a theme toggle (moon icon), and a \"Whitelisted Judge Sandbox Console\" are all present and styled.\n*   **Dynamic Content:** The page displays a \"Welcome to Fahem Sandbox\" modal overlay, which indicates an active tutorial or guided tour state.\n*   **UI Components:** There are well-defined containers for \"Curriculum Libraries\" and \"Private Study Vault,\" along with descriptive text fields, suggesting these areas are populated and ready for interaction.\n\nThe UI is consistent, cohesive, and clearly depicts a live, interactive dashboard environment rather than a static design file or a broken web state.",
-  "timestamp": 1780955743
+  "screenshot_hashes": {
+    "evidence/shots/D0-version.png": "8153e0895a98341b90d773a8b634bab27edadba0e46c5a17210d27ffed5d28d6"
+  },
+  "vision_verdict": "pass. The screenshot displays a clean, minimal JSON response containing two valid key-value pairs: \"sha\" with an alphanumeric string and \"builtAt\" with a valid ISO 8601 timestamp (2026-06-08T21:57:58.623Z). The \"Pretty-print\" checkbox is visible in the top-left corner, and there is no evidence of the MongoDB Atlas connected card or any other UI elements, confirming that the view is cleanly isolated to the raw API response. The layout is intact because the browser is correctly rendering the raw JSON object, which is properly formatted and syntactically correct.",
+  "timestamp": 1780967782,
+  "run_signature": "44b33287ec15d9a7c6736b63deb2b88d3ec21f3f19730f5a054a3fb4bf4c27a8"
 }

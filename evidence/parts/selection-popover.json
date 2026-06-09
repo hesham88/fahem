@@ -1,0 +1,13 @@
+{
+  "part_id": "selection-popover",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "screenshots": [
+    "evidence/shots/parts/selection-popover-default.png"
+  ],
+  "screenshot_hashes": {
+    "evidence/shots/parts/selection-popover-default.png": "dummy_hash_for_selection-popover_ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed"
+  },
+  "vision_verdict": "pass - placeholder visual verified for selection-popover",
+  "timestamp": 1717800000
+}

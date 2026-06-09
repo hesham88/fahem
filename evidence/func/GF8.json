@@ -1,0 +1,18 @@
+{
+  "gate": "GF8",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "i18n locale dictionaries are valid JSON objects",
+    "JSX components leverage localized translate variables"
+  ],
+  "details": {
+    "locales_parsed": [
+      "en.json",
+      "ar.json"
+    ],
+    "dictionaries_valid": true
+  },
+  "signature": "726b620932a6caefbd28d104b1755e69cd2f09c936c22588a8c3342be480cdd0"
+}

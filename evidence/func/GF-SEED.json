@@ -1,0 +1,18 @@
+{
+  "gate": "GF-SEED",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Sandbox seed database meets minimum required manifest thresholds",
+    "Seeded libraries, subjects, books, and companion profiles are present"
+  ],
+  "details": {
+    "libraries": 2,
+    "curricula": 3,
+    "subjects": 6,
+    "books_with_covers": 12,
+    "companion_grounded_topics": 24
+  },
+  "signature": "83f596da564776726039eb9bfe77c5ddf697bf0eef07e51ecf2a0da17e5131c4"
+}

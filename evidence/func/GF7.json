@@ -1,0 +1,15 @@
+{
+  "gate": "GF7",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Active assignments successfully lock normal chat routes (HTTP 423)",
+    "Double submissions by the same user are rejected server-side"
+  ],
+  "details": {
+    "lock_error_code": 423,
+    "submission_uniqueness_enforced": true
+  },
+  "signature": "048af7a243fe1ea6bc621e6dec69797f08f9c33c42ec83a15699b8bd3c5e238d"
+}

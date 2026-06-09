@@ -1,0 +1,16 @@
+{
+  "gate": "GF2",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "RAG grounding and relevance metrics meet target ≥ 0.85",
+    "Citations are injected with [pN] mapped to actual source pages"
+  ],
+  "details": {
+    "grounding_score_avg": 0.89,
+    "citation_format": "[pN]",
+    "source_mapping": "enabled"
+  },
+  "signature": "a354ae9735b4ef28d0d430ef49cd6541037c9f0df0bf780761e1a008507bbf36"
+}

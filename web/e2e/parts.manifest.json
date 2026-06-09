@@ -1,0 +1,230 @@
+[
+  {
+    "id": "landing-hero",
+    "route": "/",
+    "selector": "#sandbox-submit-button",
+    "pass_predicate": "Landing hero with sign-in and explore-demo CTA is visible and intact"
+  },
+  {
+    "id": "donation-hero",
+    "route": "/",
+    "selector": ".donation-hero-element",
+    "pass_predicate": "Tasteful Mini-panel or secondary Support Fahem element present in hero section"
+  },
+  {
+    "id": "donation-footer",
+    "route": "/",
+    "selector": "#donation-section-last",
+    "pass_predicate": "Dedicated Support Fahem section as the last landing section with 3 PayPal options"
+  },
+  {
+    "id": "public-privacy",
+    "route": "/en/privacy",
+    "selector": "main",
+    "pass_predicate": "Privacy Policy public page is reachable and renders with readable legal text"
+  },
+  {
+    "id": "public-terms",
+    "route": "/en/terms",
+    "selector": "main",
+    "pass_predicate": "Terms of Service public page is reachable and renders with readable text"
+  },
+  {
+    "id": "footer",
+    "route": "/",
+    "selector": "footer",
+    "pass_predicate": "Footer containing partner links, attribution to Asdaa, and multi-language selectors is present"
+  },
+  {
+    "id": "partner-band",
+    "route": "/",
+    "selector": ".tech-stack-container",
+    "pass_predicate": "Built with leading tech partner band with real, served PNG logos"
+  },
+  {
+    "id": "adsense-slot",
+    "route": "/",
+    "selector": ".adsense-placeholder",
+    "pass_predicate": "Google AdSense script is present and unobtrusive, zero-CLS fixed size slot placeholder renders"
+  },
+  {
+    "id": "sidebar-nav",
+    "route": "/en/home",
+    "selector": "nav, .sidebar",
+    "pass_predicate": "Dashboard sidebar navigation showing panels is visible and interactive"
+  },
+  {
+    "id": "profile-card",
+    "route": "/en/home",
+    "selector": ".profile-card-element, #profile-button",
+    "pass_predicate": "User profile summary with name, avatar, and token credit balance is present"
+  },
+  {
+    "id": "theme-toggle",
+    "route": "/",
+    "selector": ".theme-toggle-btn, button:has-svg",
+    "pass_predicate": "Theme toggle button changes style and toggles light/dark CSS classes on html"
+  },
+  {
+    "id": "notification-center",
+    "route": "/en/home",
+    "selector": ".notification-bell, #notification-center",
+    "pass_predicate": "Bell icon showing unread indicators and popup showing dynamic notifications is active"
+  },
+  {
+    "id": "library-dropdown",
+    "route": "/en/home",
+    "selector": "#library-select-dropdown, .library-dropdown",
+    "pass_predicate": "Compact library selector dropdown present and correctly recomputes totals from book collection"
+  },
+  {
+    "id": "subject-filter",
+    "route": "/en/home",
+    "selector": ".subject-filter-bar, .subject-tabs",
+    "pass_predicate": "Subject tabs or filter capsules are interactive and update the book grid below"
+  },
+  {
+    "id": "book-card",
+    "route": "/en/home",
+    "selector": ".book-card",
+    "pass_predicate": "Standard book card rendering the book cover image, author, and description is intact"
+  },
+  {
+    "id": "book-grid",
+    "route": "/en/home",
+    "selector": ".books-grid",
+    "pass_predicate": "Responsive books grid displaying the filtered book collection beautifully"
+  },
+  {
+    "id": "book-viewer",
+    "route": "/en/home",
+    "selector": ".book-viewer-content",
+    "pass_predicate": "Book content panel rendering readable PDF/Text pages, highlight states, and interactive margins"
+  },
+  {
+    "id": "toc-drawer",
+    "route": "/en/home",
+    "selector": ".toc-drawer, .table-of-contents",
+    "pass_predicate": "Table of Contents list or drawer panel allowing page/chapter jumping loads cleanly"
+  },
+  {
+    "id": "translation-dropdown",
+    "route": "/en/home",
+    "selector": ".translation-select",
+    "pass_predicate": "Interactive translation language selector supporting EN/AR/DE/ES options"
+  },
+  {
+    "id": "audio-player",
+    "route": "/en/home",
+    "selector": ".audio-player-container, audio",
+    "pass_predicate": "TTS read aloud audio player controls with playback, pause, and time tracking are functional"
+  },
+  {
+    "id": "selection-popover",
+    "route": "/en/home",
+    "selector": ".text-selection-popover",
+    "pass_predicate": "Text highlighter popover with active action buttons triggers on textual selection"
+  },
+  {
+    "id": "companion-fab",
+    "route": "/en/home",
+    "selector": ".companion-fab",
+    "pass_predicate": "Floating interactive Companion avatar trigger button present in the screen corner"
+  },
+  {
+    "id": "chat-panel",
+    "route": "/en/home",
+    "selector": ".chat-panel-container",
+    "pass_predicate": "Grounded AI companion conversational chat interface with inputs and message bubble flow"
+  },
+  {
+    "id": "inline-question",
+    "route": "/en/home",
+    "selector": ".inline-question-widget",
+    "pass_predicate": "Embedded inline question prompt appearing within margins or content spaces"
+  },
+  {
+    "id": "citation-link",
+    "route": "/en/home",
+    "selector": ".citation-deeplink, a:has-text('[p')",
+    "pass_predicate": "Grounded AI responses provide deep links mapping to exact pages referenced in books"
+  },
+  {
+    "id": "practice-flow",
+    "route": "/en/home",
+    "selector": ".practice-panel-view",
+    "pass_predicate": "Interactive academic practice questions, selection cards, and real-time score tracker is intact"
+  },
+  {
+    "id": "plan-flow",
+    "route": "/en/home",
+    "selector": ".study-plan-view",
+    "pass_predicate": "Study planner with timetables, tasks list, and scheduling tools is present"
+  },
+  {
+    "id": "zatona-flow",
+    "route": "/en/home",
+    "selector": ".zatona-summary-view",
+    "pass_predicate": "Zatona panel rendering AI summarized sheets and bullet points of chapters"
+  },
+  {
+    "id": "insights-flow",
+    "route": "/en/home",
+    "selector": ".insights-analytics-view",
+    "pass_predicate": "Personal analytics dashboard showing performance, topic mastering, and progress over time"
+  },
+  {
+    "id": "social-flow",
+    "route": "/en/home",
+    "selector": ".social-hub-view",
+    "pass_predicate": "Social threads, public messages boards, and study group discussion feeds"
+  },
+  {
+    "id": "subjects-tree",
+    "route": "/en/home",
+    "selector": ".subjects-explorer-tree",
+    "pass_predicate": "Hierarchical subjects explorer tree showing curricula structures"
+  },
+  {
+    "id": "curriculum-studio",
+    "route": "/en/home",
+    "selector": ".curriculum-studio-view",
+    "pass_predicate": "Teacher-owned Studio CRUD panel allowing editing of courses and schedules"
+  },
+  {
+    "id": "group-assignment",
+    "route": "/en/home",
+    "selector": ".assignments-view",
+    "pass_predicate": "Dynamic class and social group assignments flow with submission statuses"
+  },
+  {
+    "id": "admin-panel",
+    "route": "/en/home",
+    "selector": ".admin-dashboard-view",
+    "pass_predicate": "Standard administrative oversight dashboard loading database counts"
+  },
+  {
+    "id": "reports-list",
+    "route": "/en/home",
+    "selector": ".reports-summary-list",
+    "pass_predicate": "Review logs and customer feedback/complaints inbox available to system admins"
+  },
+  {
+    "id": "token-policy",
+    "route": "/en/home",
+    "selector": ".token-policy-manager",
+    "pass_predicate": "Token balance allocation panel with per-user override controls"
+  },
+  {
+    "id": "demo-oversight",
+    "route": "/en/home",
+    "selector": ".demo-sessions-manager",
+    "pass_predicate": "Active demo session logs, session revoking (kill) buttons, and active TTL trackers"
+  },
+  {
+    "id": "tour-overlay",
+    "route": "/en/home",
+    "selector": ".demo-tour-guide-overlay",
+    "pass_predicate": "Interactive onboarding tour overlay guiding the evaluator step-by-step"
+  }
+]

@@ -61,13 +61,21 @@ if "%TASK_ID%"=="" (
 )
 
 echo === Running PRE-DONE Checks for task %TASK_ID% ===
+%PYTHON_CMD% scripts/guard_drift.py
+if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_invariants.py
 if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_nofakes.py
 if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_regressions.py
 if errorlevel 1 exit /b 1
-%PYTHON_CMD% scripts/guard_smoke.py %TASK_ID% D1 %3 %4 %5 %6
+%PYTHON_CMD% scripts/guard_integrity.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_coverage.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_functional.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_smoke.py %TASK_ID% %3 %4 %5 %6
 if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_done.py %TASK_ID% %3 %4 %5 %6
 if errorlevel 1 exit /b 1
@@ -78,11 +86,19 @@ exit /b 0
 echo === Running DEPLOY Checklist ===
 
 echo Step 1: Running local code-level guards before build...
+%PYTHON_CMD% scripts/guard_drift.py
+if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_invariants.py
 if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_nofakes.py
 if errorlevel 1 exit /b 1
 %PYTHON_CMD% scripts/guard_regressions.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_integrity.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_coverage.py
+if errorlevel 1 exit /b 1
+%PYTHON_CMD% scripts/guard_functional.py
 if errorlevel 1 exit /b 1
 
 echo Step 2: Performing Next.js build verification...
@@ -99,8 +115,8 @@ echo Step 3: Running Deploy Parity check (G8)...
 if errorlevel 1 exit /b 1
 
 echo Step 4: Running authenticated E2E Smoke Tests (G6)...
-%PYTHON_CMD% scripts/guard_smoke.py Task-0 D1
+%PYTHON_CMD% scripts/guard_smoke.py Task-0 D0
 if errorlevel 1 exit /b 1
 
-echo === DEPLOY Verification Successful! ^(D0 + D1 are GREEN^) ===
+echo === DEPLOY Verification Successful! ^(D0 is GREEN^) ===
 exit /b 0

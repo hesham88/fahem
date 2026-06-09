@@ -1,0 +1,16 @@
+{
+  "gate": "GF5",
+  "sha": "ddb5daf99a44bf4f24cba4bfe97db8b1e23356ed",
+  "status": "pass",
+  "timestamp": 1780967758,
+  "assertions": [
+    "Fail-closed token limits successfully block over-budget users",
+    "Users can only retrieve their own individual token usage reports"
+  ],
+  "details": {
+    "enforcement_policy": "fail_closed",
+    "default_quota_limit": 250000,
+    "token_override_capability": "enabled"
+  },
+  "signature": "46d9270955dfe6e3a69e392d562c8262c9de3405ffb260055cf2575355be492e"
+}
