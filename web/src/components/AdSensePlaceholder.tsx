@@ -11,36 +11,8 @@ interface AdSensePlaceholderProps {
 export default function AdSensePlaceholder({ type = "leaderboard" }: AdSensePlaceholderProps) {
   const { language } = useTranslation();
   const isAr = language === "ar";
-  const [isMobile, setIsMobile] = useState(false);
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  // Define sizes to completely prevent Content Layout Shift (CLS)
-  const sizes = {
-    leaderboard: {
-      desktopWidth: "728px",
-      desktopHeight: "90px",
-      mobileWidth: "320px",
-      mobileHeight: "50px",
-    },
-    rectangle: {
-      desktopWidth: "336px",
-      desktopHeight: "280px",
-      mobileWidth: "300px",
-      mobileHeight: "250px",
-    }
-  };
-
-  const selected = sizes[type];
-  const width = isMobile ? selected.mobileWidth : selected.desktopWidth;
-  const height = isMobile ? selected.mobileHeight : selected.desktopHeight;
+  const className = type === "leaderboard" ? "ads-leaderboard" : "ads-rectangle";
 
   return (
     <>
@@ -51,6 +23,27 @@ export default function AdSensePlaceholder({ type = "leaderboard" }: AdSensePlac
         crossOrigin="anonymous"
         strategy="afterInteractive"
       />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .ads-leaderboard {
+          width: 728px;
+          height: 90px;
+        }
+        .ads-rectangle {
+          width: 336px;
+          height: 280px;
+        }
+        @media (max-width: 767px) {
+          .ads-leaderboard {
+            width: 320px !important;
+            height: 50px !important;
+          }
+          .ads-rectangle {
+            width: 300px !important;
+            height: 250px !important;
+          }
+        }
+      `}} />
 
       <div 
         className="adsense-container"
@@ -81,9 +74,8 @@ export default function AdSensePlaceholder({ type = "leaderboard" }: AdSensePlac
 
         {/* Fixed aspect ratio/explicit dimension box to strictly prevent CLS */}
         <div
+          className={className}
           style={{
-            width: width,
-            height: height,
             border: "1px dashed var(--card-border, rgba(255,255,255,0.1))",
             borderRadius: "12px",
             background: "var(--card-bg, rgba(30, 41, 59, 0.15))",

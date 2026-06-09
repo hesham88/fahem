@@ -1748,6 +1748,17 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                                         )}
                                         {curSubjects.map(subj => {
                                           const subjExpanded = !!expandedNodes[`subj_${subj._id}`];
+                                          const subjBooks = books.filter(b => b.subject_id === subj._id);
+                                          return (
+                                            <div key={subj._id} className="tree-branch">
+                                              <div 
+                                                className={`tree-row ${selectedSubjectId === subj._id ? "active-row" : ""}`}
+                                                style={{ borderInlineStart: `3px solid ${subj.color}` }}
+                                                onClick={() => {
+                                                  setSelectedLibId(lib._id);
+                                                  setSelectedCurriculumId(cur._id);
+                                                  setSelectedSubjectId(subj._id);
+                                                  setSubjForm(subj);
                                                   setEditingSubjectId(subj._id);
                                                   setIsCreatingCurUnderLib(null);
                                                   setIsCreatingSubjUnderCur(null);

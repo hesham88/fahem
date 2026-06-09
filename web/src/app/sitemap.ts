@@ -6,7 +6,7 @@ const BASE_URL = "https://fahem.pro";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes: MetadataRoute.Sitemap = [];
 
-  // Add static public pages (landing, terms, privacy) for each locale
+  // Add static public pages (landing, terms, privacy, contact, report) for each locale
   for (const locale of LOCALES) {
     // Landing
     routes.push({
@@ -14,6 +14,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 1.0,
+    });
+
+    // Contact Us
+    routes.push({
+      url: `${BASE_URL}/${locale}/contact`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    });
+
+    // Report Issues
+    routes.push({
+      url: `${BASE_URL}/${locale}/report`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.7,
     });
 
     // Terms

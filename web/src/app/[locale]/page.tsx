@@ -464,7 +464,7 @@ export default function LandingPage() {
             <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(37, 99, 235, 0.15)" }}>
               <FiKey style={{ fontSize: "1.25rem", color: "#ffffff" }} />
             </div>
-            <h2 style={{ fontSize: "1.85rem", fontWeight: 800, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.2, margin: 0 }}>{t("welcome_to_fahem")}</h2>
+            <h1 style={{ fontSize: "1.85rem", fontWeight: 800, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.2, margin: 0 }}>{t("welcome_to_fahem")}</h1>
             <p style={{ fontSize: "0.92rem", color: "var(--foreground)", opacity: 0.8, lineHeight: 1.5, margin: 0 }}>{t("hero_subtitle")}</p>
 
             <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "0.4rem", width: "100%", maxWidth: "420px", padding: "0.6rem 0", margin: "0.4rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)", borderBottom: "1px solid rgba(235, 220, 185, 0.2)" }}>
