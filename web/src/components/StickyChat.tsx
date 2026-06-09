@@ -846,14 +846,67 @@ export default function StickyChat() {
   // Interactivity, Feedback & Pacing States
   const [selectedMcqs, setSelectedMcqs] = useState<Record<string, string>>({});
   const [likedMessages, setLikedMessages] = useState<Record<string, "like" | "dislike">>({});
+  const [fillInAnswers, setFillInAnswers] = useState<Record<string, string>>({});
+  const [awardedBlanks, setAwardedBlanks] = useState<Record<string, boolean>>({});
   const [chatPacing, setChatPacing] = useState<"instant" | "pedagogical">("instant");
+  const [lockedLanguage, setLockedLanguage] = useState<"auto" | "en" | "ar">("auto");
+
+  // Helper to parse standard MCQs
+  const parseMcqFromText = (text: string) => {
+    if (!text) return { isMcq: false, choices: [], correctKey: null, cleanText: "" };
+
+    const choices: { key: string; text: string }[] = [];
+    let correctKey: string | null = null;
+
+    // Split text by lines
+    const lines = text.split("\n");
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Match choice markers: e.g., A) Option, B. Option, or Arabic equivalents أ) الاختيار, ب) الاختيار
+      const choiceMatch = trimmedLine.match(/^([A-D|أ|ب|ج|د|ه])[\)\.-]\s*(.+)$/i);
+      if (choiceMatch) {
+        const key = choiceMatch[1].toUpperCase();
+        const choiceText = choiceMatch[2].trim();
+        // Avoid duplicate choices
+        if (!choices.some(c => c.key === key)) {
+          choices.push({ key, text: choiceText });
+        }
+      }
+    }
+
+    // Extract correct answer: [Correct: B] or [Correct:ب]
+    const correctMatch = text.match(/\[Correct:\s*([A-D|أ|ب|ج|د|ه])\s*\]/i);
+    if (correctMatch) {
+      correctKey = correctMatch[1].toUpperCase();
+    }
+
+    // If we have choices and a correct answer, it's an MCQ!
+    const isMcq = choices.length > 0 && correctKey !== null;
+
+    // Clean text for display - remove the bracketed Correct label
+    const cleanText = text.replace(/\[Correct:\s*[A-D|أ|ب|ج|د|ه]\s*\]/gi, "").trim();
+
+    return {
+      isMcq,
+      choices,
+      correctKey,
+      cleanText
+    };
+  };
 
 
   // Mentions Dropdown States
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);
   const [mentionSearch, setMentionQuery] = useState<string>("");
   const [showMentionsDropdown, setShowMentionsDropdown] = useState<boolean>(false);
+  const [activeMentionIndex, setActiveMentionIndex] = useState<number>(0);
   const [dbSubjects, setDbSubjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    setActiveMentionIndex(0);
+  }, [showMentionsDropdown, mentionSearch]);
   const [dbBooks, setDbBooks] = useState<any[]>([]);
 
 
@@ -980,6 +1033,7 @@ export default function StickyChat() {
       if (detail && detail.text) {
         setIsOpen(true);
         setLayoutMode("side");
+        setUseGrounded(true); // Auto-enable grounding for selection explain/summary (OR-25)
         
         // Ensure active page/book context is set for grounding
         if (detail.book) {
@@ -1518,9 +1572,64 @@ export default function StickyChat() {
     setMentionQuery("");
   };
 
-  const parseInlineMarkdown = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[pP]\d+\])/g);
+  const parseInlineMarkdown = (text: string, msgId?: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[pP]\d+\]|\[Blank:[^\]]+\])/gi);
     return parts.map((part, pIdx) => {
+      if (!part) return null;
+      if (/^\[Blank:\s*(.+)\s*\]$/i.test(part)) {
+        const expectedAnswer = part.match(/^\[Blank:\s*(.+)\s*\]$/i)![1].trim();
+        const expectedAnswers = expectedAnswer.split("|").map(a => a.trim().toLowerCase());
+        const blankKey = `${msgId || "default"}-${pIdx}`;
+        const userAnswer = (fillInAnswers[blankKey] || "").trim().toLowerCase();
+        const isCorrect = expectedAnswers.includes(userAnswer);
+        
+        return (
+          <input
+            key={pIdx}
+            type="text"
+            value={fillInAnswers[blankKey] || ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              setFillInAnswers(prev => ({ ...prev, [blankKey]: val }));
+              
+              const isUserCorrect = expectedAnswers.includes(val.trim().toLowerCase());
+              if (isUserCorrect) {
+                setAwardedBlanks(prev => {
+                  if (!prev[blankKey]) {
+                    const xpEvent = new CustomEvent("fahemXpGained", { detail: { xp: 10 } });
+                    window.dispatchEvent(xpEvent);
+                    return { ...prev, [blankKey]: true };
+                  }
+                  return prev;
+                });
+              }
+            }}
+            placeholder="..."
+            style={{
+              display: "inline-block",
+              border: "none",
+              borderBottom: isCorrect 
+                ? "2px solid var(--accent-green, #2ecc71)" 
+                : ((fillInAnswers[blankKey] || "").trim() ? "2px solid var(--accent-orange, #e74c3c)" : "2px dashed var(--primary)"),
+              borderRadius: "4px",
+              padding: "2px 8px",
+              margin: "0 4px",
+              width: `${Math.max(expectedAnswer.length * 10, 80)}px`,
+              backgroundColor: isCorrect 
+                ? "rgba(46, 204, 113, 0.1)" 
+                : ((fillInAnswers[blankKey] || "").trim() ? "rgba(231, 76, 60, 0.05)" : "rgba(16, 107, 163, 0.03)"),
+              color: isCorrect ? "#2ecc71" : "inherit",
+              fontSize: "0.85rem",
+              textAlign: "center",
+              outline: "none",
+              transition: "all 0.25s ease",
+              fontWeight: isCorrect ? "700" : "400"
+            }}
+            title={isCorrect ? (language === "ar" ? "إجابة صحيحة! (+10 XP)" : "Correct answer! (+10 XP)") : ""}
+            disabled={isCorrect}
+          />
+        );
+      }
       if (part.startsWith("**") && part.endsWith("**")) {
         return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
       }
@@ -1633,7 +1742,138 @@ export default function StickyChat() {
     });
   };
 
-  const formatMessageText = (txt: string) => {
+  const renderDeepLinkChips = (text: string) => {
+    if (!text) return null;
+    const lowerText = text.toLowerCase();
+    const chips: React.ReactNode[] = [];
+    
+    // OR-3: Practice Workstation
+    const hasPractice = lowerText.includes("/practice") || 
+                        lowerText.includes("practice workstation") || 
+                        lowerText.includes("practice tab") || 
+                        lowerText.includes("منصة التدريب") || 
+                        lowerText.includes("جلسة التدريب") ||
+                        lowerText.includes("التدريب");
+                        
+    // OR-29: Study Plans
+    const hasPlan = lowerText.includes("/plan") || 
+                    lowerText.includes("study plan") || 
+                    lowerText.includes("plans & zatona") || 
+                    lowerText.includes("خطة الدراسة") || 
+                    lowerText.includes("الخطط الدراسية") ||
+                    lowerText.includes("الخطة");
+                    
+    // OR-29: Zatona
+    const hasZatona = lowerText.includes("/zatona") || 
+                      lowerText.includes("zatona") || 
+                      lowerText.includes("الزتونة") || 
+                      lowerText.includes("ملخص الزتونة") ||
+                      lowerText.includes("زتونة");
+                      
+    if (hasPractice) {
+      chips.push(
+        <button
+          key="practice-chip"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "practice" } }));
+          }}
+          className="deep-link-chip"
+          style={{
+            background: "linear-gradient(135deg, rgba(46, 204, 113, 0.1) 0%, rgba(39, 174, 96, 0.15) 100%)",
+            border: "1px solid rgba(46, 204, 113, 0.3)",
+            color: "#27ae60",
+            padding: "0.5rem 0.9rem",
+            borderRadius: "14px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            fontSize: "0.8rem",
+            fontWeight: 700,
+            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 6px rgba(46, 204, 113, 0.05)"
+          }}
+        >
+          🎯 {language === "ar" ? "منصة التدريب" : "Practice Workstation"}
+        </button>
+      );
+    }
+    
+    if (hasPlan) {
+      chips.push(
+        <button
+          key="plan-chip"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "plan" } }));
+          }}
+          className="deep-link-chip"
+          style={{
+            background: "linear-gradient(135deg, rgba(155, 89, 182, 0.1) 0%, rgba(142, 68, 173, 0.15) 100%)",
+            border: "1px solid rgba(155, 89, 182, 0.3)",
+            color: "#8e44ad",
+            padding: "0.5rem 0.9rem",
+            borderRadius: "14px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            fontSize: "0.8rem",
+            fontWeight: 700,
+            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 6px rgba(155, 89, 182, 0.05)"
+          }}
+        >
+          📅 {language === "ar" ? "خطة الدراسة" : "Study Plans"}
+        </button>
+      );
+    }
+    
+    if (hasZatona) {
+      chips.push(
+        <button
+          key="zatona-chip"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "zatona" } }));
+          }}
+          className="deep-link-chip"
+          style={{
+            background: "linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(243, 156, 18, 0.15) 100%)",
+            border: "1px solid rgba(241, 196, 15, 0.3)",
+            color: "#d4ac0d",
+            padding: "0.5rem 0.9rem",
+            borderRadius: "14px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            fontSize: "0.8rem",
+            fontWeight: 700,
+            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 2px 6px rgba(241, 196, 15, 0.05)"
+          }}
+        >
+          ⚡ {language === "ar" ? "ملخص الزتونة" : "Zatona Summary"}
+        </button>
+      );
+    }
+    
+    if (chips.length === 0) return null;
+    
+    return (
+      <div style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.6rem",
+        marginTop: "0.75rem",
+        paddingTop: "0.5rem",
+        borderTop: "1px dashed rgba(16, 107, 163, 0.1)"
+      }}>
+        {chips}
+      </div>
+    );
+  };
+
+  const formatMessageText = (txt: string, msgId?: string) => {
     if (!txt) return "";
     
     const lines = txt.split("\n");
@@ -1786,12 +2026,40 @@ export default function StickyChat() {
           continue;
         }
 
+        if (trimmed.toLowerCase().startsWith("hint:") || trimmed.startsWith("تلميح:")) {
+          const prefixLen = trimmed.toLowerCase().startsWith("hint:") ? 5 : 6;
+          const hintText = trimmed.substring(prefixLen).trim();
+          formattedElements.push(
+            <details 
+              key={`hint-${i}`}
+              style={{ 
+                background: "rgba(212, 175, 55, 0.05)", 
+                border: "1px solid rgba(212, 175, 55, 0.2)", 
+                borderInlineStart: "4px solid #d4af37", 
+                margin: "0.5rem 0", 
+                padding: "0.5rem 0.75rem", 
+                borderRadius: "10px", 
+                textAlign: "start",
+                outline: "none"
+              }}
+            >
+              <summary style={{ cursor: "pointer", fontWeight: "700", fontSize: "0.85rem", color: "#b58d1d", outline: "none", userSelect: "none" }}>
+                💡 {language === "ar" ? "عرض التلميح" : "Reveal Hint"}
+              </summary>
+              <div style={{ marginTop: "0.4rem", fontSize: "0.82rem", color: "var(--foreground)" }}>
+                {parseInlineMarkdown(hintText, msgId)}
+              </div>
+            </details>
+          );
+          continue;
+        }
+
         if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
           const rest = trimmed.substring(2);
           formattedElements.push(
             <ul key={`ul-${i}`} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "disc", textAlign: "start" }}>
               <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
-                {parseInlineMarkdown(rest)}
+                {parseInlineMarkdown(rest, msgId)}
               </li>
             </ul>
           );
@@ -1804,7 +2072,7 @@ export default function StickyChat() {
           formattedElements.push(
             <ol key={`ol-${i}`} style={{ margin: "0.25rem 0 0.25rem 1.25rem", padding: 0, listStyleType: "decimal", textAlign: "start" }}>
               <li style={{ fontSize: "0.85rem", color: "inherit", lineHeight: "1.5" }}>
-                {parseInlineMarkdown(rest)}
+                {parseInlineMarkdown(rest, msgId)}
               </li>
             </ol>
           );
@@ -1813,7 +2081,7 @@ export default function StickyChat() {
 
         formattedElements.push(
           <p key={`p-${i}`} style={{ margin: "0.25rem 0", fontSize: "0.85rem", lineHeight: "1.5", textAlign: "start" }}>
-            {parseInlineMarkdown(trimmed)}
+            {parseInlineMarkdown(trimmed, msgId)}
           </p>
         );
       }
@@ -1842,6 +2110,8 @@ export default function StickyChat() {
       setInputValue("");
     }
 
+    const activeLanguage = lockedLanguage === "auto" ? language : lockedLanguage;
+
     const isSearchCommand = queryText.startsWith("/search ") || queryText.startsWith("/بحث ");
     if (isSearchCommand) {
       const searchSpaceIdx = queryText.indexOf(" ");
@@ -1864,7 +2134,7 @@ export default function StickyChat() {
         { 
           id: assistantMsgId, 
           role: "assistant", 
-          text: language === "ar" ? "جاري البحث في مكتبة الكتب والصفحات... 🔍" : "Searching book library pages... 🔍", 
+          text: activeLanguage === "ar" ? "جاري البحث في مكتبة الكتب والصفحات... 🔍" : "Searching book library pages... 🔍", 
           timestamp: new Date(), 
           activeAgent: "Retrieval Agent" 
         }
@@ -1877,7 +2147,7 @@ export default function StickyChat() {
         let responseText = "";
         
         if (data.success && data.results && data.results.length > 0) {
-          if (language === "ar") {
+          if (activeLanguage === "ar") {
             responseText = `لقد بحثت في مكتبة المناهج الدراسية عن "**${searchQuery}**". إليك الصفحات المطابقة التي عثرت عليها بدقة:\n\n`;
             data.results.forEach((res: any) => {
               const bookTitle = res.bookTitleAr || res.bookTitleEn || res.bookTitle;
@@ -1903,7 +2173,7 @@ export default function StickyChat() {
             responseText += `💡 *Click any of the of the links above to open the book and navigate to that page instantly and securely!*`;
           }
         } else {
-          if (language === "ar") {
+          if (activeLanguage === "ar") {
             responseText = `عذراً، لم أعثر على أي صفحات مطابقة تماماً للبحث عن "**${searchQuery}**" في مكتبة الكتب النشطة حالياً.\n\n💡 *نصيحة: جرب استخدام كلمات مفتاحية أكثر عمومية أو تأكد من إملاء الكلمة بشكل صحيح.*`;
           } else {
             responseText = `No exact matching pages were found in the textbooks library for "**${searchQuery}**".\n\n💡 *Tip: Try searching with more general keywords or double-check the spelling.*`;
@@ -1918,7 +2188,7 @@ export default function StickyChat() {
         setSessionLogs((prev) => [...prev, `[Search Command] Found ${data.results?.length || 0} page matches. Rendered results.`]);
       } catch (err) {
         console.error("Search command failure:", err);
-        const errMsg = language === "ar" ? "عذراً، حدث خطأ أثناء تنفيذ عملية البحث في المناهج." : "Sorry, an error occurred while searching the textbook archives.";
+        const errMsg = activeLanguage === "ar" ? "عذراً، حدث خطأ أثناء تنفيذ عملية البحث في المناهج." : "Sorry, an error occurred while searching the textbook archives.";
         setMessages((prev) => 
           prev.map((msg) => 
             msg.id === assistantMsgId ? { ...msg, text: errMsg, activeAgent: undefined } : msg
@@ -1974,7 +2244,7 @@ export default function StickyChat() {
     // Construct Context-Enriched Prompt Payload for RAG Grounding
     let promptPayload = queryText;
     if (bookContext) {
-      const isArabic = language === "ar";
+      const isArabic = activeLanguage === "ar";
       const title = isArabic ? (bookContext.book?.titleAr || bookContext.book?.title) : (bookContext.book?.titleEn || bookContext.book?.title);
       const chapter = isArabic ? bookContext.chapterTitleAr : bookContext.chapterTitleEn;
       const pageTitle = isArabic ? bookContext.titleAr : bookContext.titleEn;
@@ -2001,7 +2271,7 @@ User Question: ${queryText}`;
         },
         body: JSON.stringify({
           prompt: promptPayload,
-          language: (bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language,
+          language: lockedLanguage !== "auto" ? lockedLanguage : ((bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language),
           sessionId: currentSessionId || undefined,
           selected_book_ids: selectedBookIds
         }),
@@ -2019,6 +2289,9 @@ User Question: ${queryText}`;
       let inFinalOutput = false;
 
       while (!done) {
+        if (chatPacing === "pedagogical") {
+          await new Promise((resolve) => setTimeout(resolve, 80));
+        }
         const { value, done: isDone } = await reader.read();
         done = isDone;
         let chunk = "";
@@ -2740,15 +3013,29 @@ User Question: ${queryText}`;
             >
               {/* Message Bubble */}
               <div
+                className={msg.role === "user" ? "user-bubble" : "message-bubble-wrapper"}
                 style={{
                   maxWidth: "85%",
                   padding: "0.85rem 1rem",
+                  position: "relative",
                   borderRadius: msg.role === "user" 
                     ? (dir === "rtl" ? "16px 16px 16px 0" : "16px 16px 0 16px") 
                     : (dir === "rtl" ? "16px 16px 0 16px" : "16px 16px 16px 0"),
-                  backgroundColor: msg.role === "user" ? "var(--primary)" : "rgba(255, 255, 255, 0.85)",
+                  backgroundColor: msg.role === "user" 
+                    ? "var(--primary)" 
+                    : likedMessages[msg.id] === "like"
+                      ? "rgba(46, 204, 113, 0.07)"
+                      : likedMessages[msg.id] === "dislike"
+                        ? "rgba(231, 76, 60, 0.07)"
+                        : "rgba(255, 255, 255, 0.85)",
                   color: msg.role === "user" ? "#ffffff" : "var(--foreground)",
-                  border: msg.role === "user" ? "none" : "1px solid var(--card-border)",
+                  border: msg.role === "user" 
+                    ? "none" 
+                    : likedMessages[msg.id] === "like"
+                      ? "1px solid rgba(46, 204, 113, 0.35)"
+                      : likedMessages[msg.id] === "dislike"
+                        ? "1px solid rgba(231, 76, 60, 0.35)"
+                        : "1px solid var(--card-border)",
                   boxShadow: msg.role === "user" ? "0 4px 12px rgba(16,107,163,0.15)" : "var(--shadow-sm)",
                   fontSize: "0.9rem",
                   lineHeight: "1.5",
@@ -2757,6 +3044,33 @@ User Question: ${queryText}`;
                   whiteSpace: "pre-wrap"
                 }}
               >
+                {msg.role === "assistant" && (
+                  <button
+                    type="button"
+                    className="floating-copy-btn"
+                    onClick={(e) => {
+                      try {
+                        const mcqData = parseMcqFromText(msg.text);
+                        navigator.clipboard.writeText(mcqData.cleanText);
+                        const btn = e.currentTarget;
+                        const origHtml = btn.innerHTML;
+                        btn.innerHTML = "✓";
+                        btn.style.backgroundColor = "#2ecc71";
+                        btn.style.color = "#ffffff";
+                        setTimeout(() => {
+                          btn.innerHTML = origHtml;
+                          btn.style.backgroundColor = "";
+                          btn.style.color = "";
+                        }, 1500);
+                      } catch (err) {
+                        console.error("Copy failed:", err);
+                      }
+                    }}
+                    title={language === "ar" ? "نسخ النص" : "Copy to clipboard"}
+                  >
+                    <FiCopy style={{ fontSize: "0.8rem" }} />
+                  </button>
+                )}
                 {msg.role === "user" ? (
                   <p style={{ margin: 0 }}>{msg.text}</p>
                 ) : msg.showFeedbackCard ? (
@@ -2768,14 +3082,154 @@ User Question: ${queryText}`;
                     userId={user?.uid || ""} 
                   />
                 ) : (
-                  msg.text ? formatMessageText(msg.text) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span className="dot-typing"></span>
-                      <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
-                        {ct("thinking_fetching")}
-                      </span>
-                    </div>
-                  )
+                  <>
+                    {msg.text ? (
+                      (() => {
+                        const mcqData = parseMcqFromText(msg.text);
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            <div>{formatMessageText(mcqData.cleanText, msg.id)}</div>
+                            {renderDeepLinkChips(msg.text)}
+                            
+                            {mcqData.isMcq && (
+                              <div style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.4rem",
+                                marginTop: "0.5rem",
+                                borderTop: "1px dashed rgba(212, 175, 55, 0.2)",
+                                paddingTop: "0.5rem",
+                                width: "100%"
+                              }}>
+                                {mcqData.choices.map((choice) => {
+                                  const isSelected = selectedMcqs[msg.id] === choice.key;
+                                  const showAnswer = !!selectedMcqs[msg.id];
+                                  const isCorrect = choice.key === mcqData.correctKey;
+                                  
+                                  let btnStyle: React.CSSProperties = {
+                                    width: "100%",
+                                    padding: "0.6rem 0.8rem",
+                                    borderRadius: "10px",
+                                    border: "1px solid var(--card-border)",
+                                    background: "rgba(255, 255, 255, 0.6)",
+                                    color: "var(--foreground)",
+                                    fontSize: "0.8rem",
+                                    textAlign: "start",
+                                    cursor: showAnswer ? "default" : "pointer",
+                                    transition: "all 0.2s ease",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem"
+                                  };
+
+                                  if (showAnswer) {
+                                    if (isCorrect) {
+                                      btnStyle.background = "rgba(46, 204, 113, 0.15)";
+                                      btnStyle.borderColor = "rgba(46, 204, 113, 0.5)";
+                                      btnStyle.color = "#27ae60";
+                                      btnStyle.fontWeight = 700;
+                                    } else if (isSelected) {
+                                      btnStyle.background = "rgba(231, 76, 60, 0.15)";
+                                      btnStyle.borderColor = "rgba(231, 76, 60, 0.5)";
+                                      btnStyle.color = "#c0392b";
+                                      btnStyle.fontWeight = 700;
+                                    } else {
+                                      btnStyle.opacity = 0.6;
+                                    }
+                                  }
+
+                                  return (
+                                    <button
+                                      key={choice.key}
+                                      type="button"
+                                      disabled={showAnswer}
+                                      onClick={() => {
+                                        if (showAnswer) return;
+                                        const isChoiceCorrect = choice.key === mcqData.correctKey;
+                                        setSelectedMcqs(prev => ({ ...prev, [msg.id]: choice.key }));
+                                        
+                                        // Telemetry Post to /api/activity
+                                        authedFetch("/api/activity", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            action: "practice_attempt",
+                                            status: isChoiceCorrect ? "correct" : "incorrect",
+                                            details: {
+                                              question: mcqData.cleanText.substring(0, 300),
+                                              subject: bookContext?.book?.subject?.name || "General Companion",
+                                              subtopic: bookContext?.titleEn || bookContext?.titleAr || "Chat Practice",
+                                              isCorrect: isChoiceCorrect,
+                                              xpGained: isChoiceCorrect ? 10 : 0
+                                            }
+                                          })
+                                        }).catch(err => console.error("Activity telemetry failed:", err));
+
+                                        if (isChoiceCorrect) {
+                                          // Dispatch gamification event
+                                          const xpEvent = new CustomEvent("fahemXpGained", { detail: { xp: 10 } });
+                                          window.dispatchEvent(xpEvent);
+                                        }
+                                      }}
+                                      style={btnStyle}
+                                      className="mcq-option-btn"
+                                    >
+                                      <span style={{
+                                        width: "1.5rem",
+                                        height: "1.5rem",
+                                        borderRadius: "50%",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 800,
+                                        background: isSelected 
+                                          ? (isCorrect ? "#2ecc71" : "#e74c3c") 
+                                          : (showAnswer && isCorrect ? "#2ecc71" : "rgba(16, 107, 163, 0.08)"),
+                                        color: isSelected || (showAnswer && isCorrect) ? "#ffffff" : "var(--primary)",
+                                        border: "1px solid rgba(212, 175, 55, 0.2)"
+                                      }}>
+                                        {choice.key}
+                                      </span>
+                                      <span style={{ flex: 1 }}>{choice.text}</span>
+                                      {showAnswer && isCorrect && <span style={{ color: "#27ae60", fontWeight: 800 }}>✓</span>}
+                                      {showAnswer && isSelected && !isCorrect && <span style={{ color: "#c0392b", fontWeight: 800 }}>✗</span>}
+                                    </button>
+                                  );
+                                })}
+
+                                {selectedMcqs[msg.id] && (
+                                  <div style={{
+                                    fontSize: "0.8rem",
+                                    fontWeight: 700,
+                                    color: selectedMcqs[msg.id] === mcqData.correctKey ? "var(--accent-green, #2ecc71)" : "var(--accent-orange, #e74c3c)",
+                                    textAlign: "center",
+                                    marginTop: "0.25rem",
+                                    padding: "0.4rem",
+                                    borderRadius: "8px",
+                                    background: selectedMcqs[msg.id] === mcqData.correctKey ? "rgba(46, 204, 113, 0.1)" : "rgba(231, 76, 60, 0.1)",
+                                    animation: "fadeIn 0.2s"
+                                  }}>
+                                    {selectedMcqs[msg.id] === mcqData.correctKey 
+                                      ? (language === "ar" ? "🎉 إجابة صحيحة! أحسنت صنعاً (+10 نقاط خبرة)" : "🎉 Correct Answer! Excellent job (+10 XP)")
+                                      : (language === "ar" ? `❌ إجابة غير صحيحة. الإجابة الصحيحة هي: ${mcqData.correctKey}` : `❌ Incorrect. The correct answer is: ${mcqData.correctKey}`)
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span className="dot-typing"></span>
+                        <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                          {ct("thinking_fetching")}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -2819,6 +3273,97 @@ User Question: ${queryText}`;
                           ? ct("speech_stop") 
                           : ct("speech_listen")}
                       </span>
+                    </button>
+
+                    <span>•</span>
+                    {/* Copy Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          const mcqData = parseMcqFromText(msg.text);
+                          navigator.clipboard.writeText(mcqData.cleanText);
+                        } catch (err) {
+                          console.error("Copy failed:", err);
+                        }
+                      }}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "#8fa1ad",
+                        cursor: "pointer",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "2px",
+                        transition: "all 0.2s"
+                      }}
+                      title={language === "ar" ? "نسخ النص" : "Copy to clipboard"}
+                    >
+                      <FiCopy />
+                    </button>
+
+                    <span>•</span>
+                    {/* Like Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLikedMessages(prev => {
+                          const current = prev[msg.id];
+                          const next = current === "like" ? undefined : "like";
+                          const updated = { ...prev };
+                          if (next) updated[msg.id] = next;
+                          else delete updated[msg.id];
+                          return updated;
+                        });
+                      }}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: likedMessages[msg.id] === "like" ? "var(--accent-green, #2ecc71)" : "#8fa1ad",
+                        cursor: "pointer",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "2px",
+                        transition: "all 0.2s"
+                      }}
+                      title={language === "ar" ? "أعجبني" : "Like"}
+                    >
+                      <FiThumbsUp />
+                    </button>
+
+                    <span>•</span>
+                    {/* Dislike Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLikedMessages(prev => {
+                          const current = prev[msg.id];
+                          const next = current === "dislike" ? undefined : "dislike";
+                          const updated = { ...prev };
+                          if (next) updated[msg.id] = next;
+                          else delete updated[msg.id];
+                          return updated;
+                        });
+                      }}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: likedMessages[msg.id] === "dislike" ? "var(--accent-orange, #e74c3c)" : "#8fa1ad",
+                        cursor: "pointer",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "2px",
+                        transition: "all 0.2s"
+                      }}
+                      title={language === "ar" ? "لم يعجبني" : "Dislike"}
+                    >
+                      <FiThumbsDown />
                     </button>
                   </>
                 )}
@@ -2957,6 +3502,108 @@ User Question: ${queryText}`;
             position: "relative"
           }}
         >
+          {/* Premium Chat Controls: Output Pacing & Language Lock */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            marginBottom: "0.25rem",
+            padding: "0.4rem 0.75rem",
+            backgroundColor: "rgba(255, 255, 255, 0.65)",
+            border: "1px solid rgba(16, 107, 163, 0.12)",
+            borderRadius: "14px",
+            backdropFilter: "blur(12px)",
+            fontSize: "0.8rem",
+            color: "var(--foreground)",
+            animation: "fadeIn 0.25s ease-out"
+          }}>
+            {/* Output Pacing Selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontWeight: 600, color: "var(--primary)", fontSize: "0.75rem" }}>
+                {language === "ar" ? "سرعة الاستجابة:" : "Output Pacing:"}
+              </span>
+              <div style={{
+                display: "inline-flex",
+                background: "rgba(16, 107, 163, 0.06)",
+                padding: "2px",
+                borderRadius: "8px",
+                border: "1px solid rgba(16, 107, 163, 0.1)"
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setChatPacing("instant")}
+                  style={{
+                    padding: "3px 10px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: chatPacing === "instant" ? "var(--primary)" : "transparent",
+                    color: chatPacing === "instant" ? "#ffffff" : "var(--primary)",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease-out",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem"
+                  }}
+                >
+                  ⚡ {language === "ar" ? "فوري" : "Instant"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatPacing("pedagogical")}
+                  style={{
+                    padding: "3px 10px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: chatPacing === "pedagogical" ? "var(--primary)" : "transparent",
+                    color: chatPacing === "pedagogical" ? "#ffffff" : "var(--primary)",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease-out",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem"
+                  }}
+                >
+                  🐢 {language === "ar" ? "بيداغوجي" : "Pedagogical"}
+                </button>
+              </div>
+            </div>
+
+            {/* Language Lock Selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontWeight: 600, color: "var(--primary)", fontSize: "0.75rem" }}>
+                {language === "ar" ? "قفل اللغة:" : "Language Lock:"}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <span style={{ fontSize: "0.8rem" }}>🔒</span>
+                <select
+                  value={lockedLanguage}
+                  onChange={(e) => setLockedLanguage(e.target.value as "auto" | "en" | "ar")}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(16, 107, 163, 0.2)",
+                    background: "rgba(255, 255, 255, 0.95)",
+                    fontSize: "0.75rem",
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                    outline: "none",
+                    fontWeight: 700,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                  }}
+                >
+                  <option value="auto">✨ {language === "ar" ? "تلقائي" : "Auto"}</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="ar">🇸🇦 العربية</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Mentions Dropdown Popover */}
           {showMentionsDropdown && getMentionOptions().length > 0 && (
             <div style={{
@@ -2975,30 +3622,35 @@ User Question: ${queryText}`;
               maxHeight: "180px",
               overflowY: "auto"
             }} className="custom-scrollbar">
-              {getMentionOptions().map((opt) => (
-                <div
-                  key={opt.id}
-                  onClick={() => handleSelectMention(opt.id)}
-                  style={{
-                    padding: "0.6rem 1rem",
-                    borderRadius: "10px",
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    transition: "background 0.2s",
-                    textAlign: "start"
-                  }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = "none"; }}
-                >
-                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>{opt.id}</span>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>{opt.label}</span>
-                    <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{opt.desc}</span>
+              {getMentionOptions().map((opt, idx) => {
+                const isActive = idx === activeMentionIndex;
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => handleSelectMention(opt.id)}
+                    style={{
+                      padding: "0.6rem 1rem",
+                      borderRadius: "10px",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      transition: "background 0.2s",
+                      textAlign: "start",
+                      background: isActive ? "rgba(16, 107, 163, 0.12)" : "none",
+                      border: isActive ? "1px solid rgba(16, 107, 163, 0.25)" : "1px solid transparent"
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.08)"; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = isActive ? "rgba(16, 107, 163, 0.12)" : "none"; }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>{opt.id}</span>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>{opt.label}</span>
+                      <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{opt.desc}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -3122,6 +3774,28 @@ User Question: ${queryText}`;
                   setMentionQuery("");
                 }
               }}
+              onKeyDown={(e) => {
+                if (showMentionsDropdown) {
+                  const options = getMentionOptions();
+                  if (options.length > 0) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setActiveMentionIndex((prev) => (prev + 1) % options.length);
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setActiveMentionIndex((prev) => (prev - 1 + options.length) % options.length);
+                    } else if (e.key === "Tab" || e.key === "Enter") {
+                      e.preventDefault();
+                      handleSelectMention(options[activeMentionIndex].id);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setShowMentionsDropdown(false);
+                      setMentionType(null);
+                      setMentionQuery("");
+                    }
+                  }
+                }
+              }}
               disabled={isSending}
               placeholder={ct("input_placeholder")}
               style={{
@@ -3203,6 +3877,47 @@ User Question: ${queryText}`;
         .history-session-item:hover {
           background-color: rgba(16, 107, 163, 0.04) !important;
           border-color: rgba(16, 107, 163, 0.12) !important;
+        }
+        .message-bubble-wrapper {
+          position: relative;
+        }
+        .floating-copy-btn {
+          position: absolute;
+          top: 0.5rem;
+          inset-inline-end: 0.5rem;
+          opacity: 0;
+          pointer-events: none;
+          background: rgba(255, 255, 255, 0.85) !important;
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(16, 107, 163, 0.15) !important;
+          border-radius: 8px !important;
+          width: 1.8rem;
+          height: 1.8rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: var(--primary) !important;
+          transition: all 0.2s ease-out !important;
+          z-index: 10;
+          box-shadow: var(--shadow-sm);
+          padding: 0 !important;
+        }
+        .message-bubble-wrapper:hover .floating-copy-btn {
+          opacity: 1;
+          pointer-events: auto;
+          transform: scale(1.05);
+        }
+        .floating-copy-btn:hover {
+          background: var(--primary) !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 10px rgba(16, 107, 163, 0.2);
+          transform: scale(1.1) translateY(-1px);
+        }
+        .deep-link-chip:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(16, 107, 163, 0.2) !important;
+          filter: brightness(1.05);
         }
       `}</style>
     </>

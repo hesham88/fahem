@@ -99,6 +99,26 @@ export default function ReportPage() {
         console.log("[reCAPTCHA Enterprise] SDK load failure or bypassed. Continuing submission (Fail-Open).");
       }
 
+      // Actually write the report directly to the DB so it is recorded reliably
+      try {
+        await authedFetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name || "Anonymous",
+            email: email,
+            title: subject,
+            body: description,
+            category: "Complaint",
+            source: "footer",
+            context: { name: name || "Anonymous", email: email }
+          })
+        });
+        console.log("[Report Submission] Report successfully recorded to database directly.");
+      } catch (dbErr) {
+        console.error("[Report Submission] Direct DB write failed (falling back to agent only):", dbErr);
+      }
+
       const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {

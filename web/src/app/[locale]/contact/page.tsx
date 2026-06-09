@@ -79,21 +79,44 @@ export default function ContactPage() {
     setLogs([isAr ? "جاري بدء اتصال آمن مع وكيل MongoDB..." : "Initiating secure stream to MongoDB agent..."]);
 
     const prompt = `
-      Please record this Contact Us message inside the 'reports' collection within the 'fahem' database.
-      Here are the fields to write:
+      Please record this Contact Us message inside the 'reports' collection within the 'fahem' database if not already present.
+      Here are the fields:
       - name: "${name || 'Anonymous'}"
       - email: "${email}"
       - subject: "Contact Us: ${subject || 'General Inquiry'}"
       - description: "${message}"
       - timestamp: "${new Date().toISOString()}"
 
-      Make sure to insert it into MongoDB using your insert-many/update-many tools and then respond in "${language}" with a short, extremely polite professional confirmation.
+      We have already dispatched a direct write to /api/feedback. Please verify or ensure alignment in MongoDB and then respond in "${language}" with a short, extremely polite professional confirmation.
     `;
 
     try {
       console.log("[reCAPTCHA Enterprise] Securing contact us action...");
       const token = await executeRecaptcha();
       
+      setLogs((prev) => [...prev, isAr ? "جاري حفظ استفسارك بشكل آمن..." : "Saving your inquiry securely..."]);
+      const feedbackResponse = await authedFetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name || "Anonymous",
+          email: email,
+          title: "Contact Us: " + (subject || "General Inquiry"),
+          body: message,
+          category: "Inquiry",
+          source: "contact_us"
+        })
+      });
+
+      if (!feedbackResponse.ok) {
+        const errText = await feedbackResponse.text();
+        throw new Error(errText || "Database write failed");
+      }
+
+      setLogs((prev) => [...prev, isAr ? "تم استلام استفسارك بنجاح. جاري بدء اتصال مع وكيل الذكاء الاصطناعي للرد..." : "Inquiry saved successfully. Initiating secure stream to MongoDB agent..."]);
+
       const response = await authedFetch("/api/agent", {
         method: "POST",
         headers: {

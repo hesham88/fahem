@@ -143,7 +143,8 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
     // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
     const config = await getDBConfig();
     if (config && config.evalSandboxEnabled === false) {
-      if (payload.tier !== 0) {
+      const tokenTier = payload.tier !== undefined ? Number(payload.tier) : 0;
+      if (tokenTier !== 0) {
         return null; // Reject live verified Tier-1 tokens! But bypass/allow for public Tier-0 (payload.tier === 0).
       }
     }

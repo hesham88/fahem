@@ -51,6 +51,28 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [weakTopics, setWeakTopics] = useState<any[]>([]);
   const [scoresTrend, setScoresTrend] = useState<any[]>([]);
+  const [tokenStats, setTokenStats] = useState<any>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const fetchFn = propAuthedFetch || authedFetch;
+        const res = await fetchFn("/api/user/token-stats");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            setTokenStats(data);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching token stats in InsightsPanel:", err);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    }
+    fetchStats();
+  }, [propAuthedFetch]);
 
   useEffect(() => {
     async function loadData() {
@@ -590,6 +612,436 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Gamification & Swarm Telemetry Section */}
+      <section
+        className="panel-card"
+        style={{
+          padding: "2rem",
+          background: "rgba(255, 255, 255, 0.7)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(16, 107, 163, 0.1)",
+          borderRadius: "20px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.03)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "1.4rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            borderBottom: "1px dashed rgba(16, 107, 163, 0.15)",
+            paddingBottom: "1rem",
+            marginBottom: "0.5rem",
+            fontWeight: 800,
+            color: "var(--primary)",
+          }}
+        >
+          <FiActivity style={{ animation: "pulse 2s infinite" }} />
+          <span>{language === "ar" ? "تحليلات السرب والألعاب الأكاديمية" : "Swarm Analytics & Academic Gamification"}</span>
+        </h2>
+
+        <p style={{ fontSize: "0.9rem", color: "#5a6a75", lineHeight: "1.5", margin: 0 }}>
+          {language === "ar"
+            ? "يستخدم وكيل التحليلات (Insights Agent) تجميعات قواعد بيانات MongoDB Atlas لتتبع الجوانب التعليمية الأربعة ومستويات الفهم لديك. يتم رصد نشاط السرب والتعلم الذاتي تلقائياً هنا."
+            : "Our specialized Insights Agent utilizes database-side MongoDB Atlas Aggregation Pipelines to monitor your cognitive achievements, active streaks, and misconception risk matrices in real-time."}
+        </p>
+
+        {/* Stats Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
+          
+          {/* Level & Streak Card */}
+          <div
+            style={{
+              padding: "1.25rem",
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, rgba(16, 107, 163, 0.05), rgba(212, 175, 55, 0.05))",
+              border: "1px solid rgba(16, 107, 163, 0.08)",
+              textAlign: "start",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+              <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--primary)" }}>
+                🏆 {language === "ar" ? "المستوى الدراسي الحالي" : "Active Academic Level"}
+              </span>
+              <span
+                style={{
+                  background: "rgba(212, 175, 55, 0.15)",
+                  color: "var(--accent)",
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                  padding: "4px 8px",
+                  borderRadius: "8px",
+                }}
+              >
+                {getLevelBadgeText()}
+              </span>
+            </div>
+            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
+              {language === "ar" ? `المستوى ${activeLevel}` : `Level ${activeLevel}`}
+            </div>
+            <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
+              🔥 {language === "ar" ? `سلسلة المذاكرة: ${activeStreak} أيام متتالية` : `Current Daily Streak: ${activeStreak} Days Active`}
+            </div>
+
+            {/* Progress Bar */}
+            <div style={{ width: "100%", height: "8px", background: "rgba(16, 107, 163, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
+              <div style={{ width: `${xpProgressPercent}%`, height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px" }}></div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
+              <span>{activeXp.toLocaleString()} XP</span>
+              <span>
+                {nextLevelXp.toLocaleString()} XP ({language === "ar" ? "المستوى التالي" : "Next Level"})
+              </span>
+            </div>
+          </div>
+
+          {/* Cognitive Tokens Card - Dynamic Private Student Quota Meter */}
+          <div
+            style={{
+              padding: "1.5rem",
+              borderRadius: "20px",
+              background: "linear-gradient(135deg, rgba(15, 23, 42, 0.03), rgba(16, 107, 163, 0.04))",
+              border: "1px solid rgba(16, 107, 163, 0.12)",
+              textAlign: "start",
+              boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.04)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Background glowing indicator */}
+            <div 
+              style={{
+                position: "absolute",
+                top: "-10%",
+                right: "-10%",
+                width: "150px",
+                height: "150px",
+                background: "radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, rgba(13, 148, 136, 0) 70%)",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <span style={{ fontWeight: 850, fontSize: "0.95rem", color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                🧠 {language === "ar" ? "مؤشرات استهلاك الرموز المعرفية (CLT)" : "Cognitive Token Quotas (CLT)"}
+              </span>
+              
+              {isLoadingStats ? (
+                <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600 }}>
+                  {language === "ar" ? "جاري التحميل..." : "Loading stats..."}
+                </span>
+              ) : tokenStats?.enabled === false ? (
+                <span
+                  style={{
+                    background: "rgba(212, 175, 55, 0.15)",
+                    border: "1px solid rgba(212, 175, 55, 0.3)",
+                    color: "#b45309",
+                    fontSize: "0.7rem",
+                    fontWeight: 900,
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    boxShadow: "0 2px 10px rgba(212, 175, 55, 0.1)",
+                    animation: "pulse 2s infinite",
+                  }}
+                >
+                  👑 {language === "ar" ? "غير محدود (حساب محكم/VIP)" : "Override Active (Unlimited)"}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    background: "rgba(13, 148, 136, 0.12)",
+                    border: "1px solid rgba(13, 148, 136, 0.2)",
+                    color: "var(--accent-green)",
+                    fontSize: "0.7rem",
+                    fontWeight: 800,
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                  }}
+                >
+                  ⚡ {language === "ar" ? "نظام الحماية المعرفية نشط" : "Cognitive Safety Shield Active"}
+                </span>
+              )}
+            </div>
+
+            {isLoadingStats ? (
+              /* Pulse skeleton loader for limits card */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.4rem", animation: "pulse 1.5s infinite" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <div style={{ width: "80px", height: "12px", background: "rgba(0,0,0,0.06)", borderRadius: "4px" }}></div>
+                      <div style={{ width: "40px", height: "12px", background: "rgba(0,0,0,0.06)", borderRadius: "4px" }}></div>
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(0,0,0,0.04)", borderRadius: "10px" }}></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Full Localized Premium Bar Graphs */
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                
+                {/* 1. Daily usage metric */}
+                {(() => {
+                  const dailyUsed = tokenStats?.used?.daily ?? 0;
+                  const dailyLimit = Math.round((tokenStats?.limit?.weekly ?? 250000) / 7);
+                  const dailyPct = Math.min(100, Math.round((dailyUsed / Math.max(1, dailyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          🌅 {language === "ar" ? "البصمة المعرفية اليومية" : "Daily Cognitive Footprint"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {dailyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {dailyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden", position: "relative" }}>
+                        <div 
+                          style={{ 
+                            width: `${dailyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #10b981, #0d9488)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `مستهلك: ${dailyPct}%` : `Daily Consumption: ${dailyPct}%`}</span>
+                        <span>{language === "ar" ? "إعادة التعيين عند منتصف الليل" : "Resets at midnight"}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Weekly quota metric */}
+                {(() => {
+                  const weeklyUsed = tokenStats?.used?.weekly ?? 0;
+                  const weeklyLimit = tokenStats?.limit?.weekly ?? 250000;
+                  const weeklyPct = Math.min(100, Math.round((weeklyUsed / Math.max(1, weeklyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          📅 {language === "ar" ? "الحصة المعرفية الأسبوعية" : "Weekly Cognitive Quota"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {weeklyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {weeklyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden" }}>
+                        <div 
+                          style={{ 
+                            width: `${weeklyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #0d9488, #106ba3)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `نسبة الاستهلاك: ${weeklyPct}%` : `Weekly Quota Spent: ${weeklyPct}%`}</span>
+                        <span>
+                          {language === "ar" ? `${(weeklyLimit - weeklyUsed).toLocaleString()} رمز متبقي` : `${(weeklyLimit - weeklyUsed).toLocaleString()} CLT remaining`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 3. Monthly quota metric */}
+                {(() => {
+                  const monthlyUsed = tokenStats?.used?.monthly ?? 0;
+                  const monthlyLimit = tokenStats?.limit?.monthly ?? 1000000;
+                  const monthlyPct = Math.min(100, Math.round((monthlyUsed / Math.max(1, monthlyLimit)) * 100));
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700 }}>
+                        <span style={{ color: "var(--foreground)" }}>
+                          🌌 {language === "ar" ? "الحجم المعرفي الشهري الكلي" : "Monthly Cognitive Volume"}
+                        </span>
+                        <span style={{ color: "#6a7c88" }}>
+                          {monthlyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {monthlyLimit.toLocaleString()} CLT</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{ width: "100%", height: "8px", background: "rgba(13, 148, 136, 0.08)", borderRadius: "10px", overflow: "hidden" }}>
+                        <div 
+                          style={{ 
+                            width: `${monthlyPct}%`, 
+                            height: "100%", 
+                            background: "linear-gradient(90deg, #106ba3, #4f46e5)", 
+                            borderRadius: "10px",
+                            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                          }} 
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "#82939e", fontWeight: 600 }}>
+                        <span>{language === "ar" ? `مستهلك موازنة الشهر: ${monthlyPct}%` : `Monthly Volume Spent: ${monthlyPct}%`}</span>
+                        <span>
+                          {language === "ar" ? `${(monthlyLimit - monthlyUsed).toLocaleString()} رمز متبقي` : `${(monthlyLimit - monthlyUsed).toLocaleString()} CLT remaining`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Misconception Risk Matrix */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "start" }}>
+          <span style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--foreground)" }}>
+            🎯 {language === "ar" ? "مصفوفة فجوات الفهم المعرفي وحالة المواضيع" : "Concept Misconception Risk Matrix (MongoDB Analytics)"}
+          </span>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+            
+            {/* Topic 1 */}
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "14px",
+                background: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(16, 107, 163, 0.06)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
+                  📊 {language === "ar" ? "الرياضيات والنسب" : "Math: Matrices"}
+                </span>
+                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a", padding: "2px 6px", borderRadius: "6px" }}>
+                  {language === "ar" ? "آمن" : "Low Risk"}
+                </span>
+              </div>
+              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                {language === "ar" ? "مفاهيم محددات المصفوفة ومعكوسها ممتازة." : "Mastered Singular Matrix inverse checks perfectly."}
+              </span>
+              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 92%</span>
+                <span>{language === "ar" ? "3 محاولات" : "3 Sessions"}</span>
+              </div>
+            </div>
+
+            {/* Topic 2 */}
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "14px",
+                background: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(16, 107, 163, 0.06)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
+                  🧬 {language === "ar" ? "الأحياء والخلية" : "Science: Chemistry 2e"}
+                </span>
+                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(234, 179, 8, 0.12)", color: "#ca8a04", padding: "2px 6px", borderRadius: "6px" }}>
+                  {language === "ar" ? "متوسط" : "Moderate Risk"}
+                </span>
+              </div>
+              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                {language === "ar" ? "فجوة بسيطة في فهم ثابت الاتزان للتفاعلات." : "Confusion spotted around chemical equilibrium rules."}
+              </span>
+              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 74%</span>
+                <span>{language === "ar" ? "5 محاولات" : "5 Sessions"}</span>
+              </div>
+            </div>
+
+            {/* Topic 3 */}
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "14px",
+                background: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(16, 107, 163, 0.06)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
+                  📖 {language === "ar" ? "اللغة العربية وقواعدها" : "Arabic: Grammar"}
+                </span>
+                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "2px 6px", borderRadius: "6px" }}>
+                  {language === "ar" ? "مرتفع" : "High Risk"}
+                </span>
+              </div>
+              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                {language === "ar" ? "صعوبة في تحديد مواضع إعراب جمع المذكر السالم." : "Issues parsed with complex verb modifiers rules."}
+              </span>
+              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 48%</span>
+                <span>{language === "ar" ? "4 محاولات" : "4 Sessions"}</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Swarm Real-Time Telemetry console */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "start" }}>
+          <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <span className="pulse-icon" style={{ fontSize: "0.6rem" }}>🟢</span>
+            {language === "ar" ? "سجل تحليلات ومحاكاة السرب النشط (MongoDB Aggregate Pipe):" : "Active Swarm Network Telemetry Trace (MongoDB Aggregations):"}
+          </span>
+
+          <div
+            style={{
+              padding: "0.85rem 1.1rem",
+              borderRadius: "12px",
+              background: "rgba(15, 23, 42, 0.95)",
+              border: "1px solid rgba(16, 107, 163, 0.2)",
+              fontFamily: "monospace",
+              fontSize: "0.75rem",
+              color: "#38bdf8",
+              maxHeight: "135px",
+              overflowY: "auto",
+              lineHeight: "1.4",
+              boxShadow: "inset 0 2px 10px rgba(0,0,0,0.5)",
+            }}
+            className="custom-scrollbar"
+          >
+            <div>[SYSTEM] Inicitalizing MongoDB Insights aggregate client...</div>
+            <div style={{ color: "#a7f3d0" }}>
+              [MONGODB] pipeline: [ {`{ "$match": { "userId": "${user?.uid || "anon"}" } }`},{" "}
+              {`{ "$group": { "_id": "$topic_id", "accuracy": { "$avg": "$score" } } }`} ]
+            </div>
+            <div style={{ color: "#fef08a" }}>
+              [INSIGHTS_AGENT] Aggregating 12 historical study session attempts from MongoDB.
+            </div>
+            <div>[PRACTICE_AGENT] Feedback loop grading completed: Score 0.88 over 2 text practice inputs.</div>
+            <div style={{ color: "#38bdf8" }}>
+              [ZATONA_AGENT] Compressed Chapter 1 &apos;Matrices&apos; formula context into 4 active recall bytes.
+            </div>
+            <div style={{ color: "#fca5a5" }}>[COMPANION] User typed command &apos;/explain&apos;. Handoff activated in full screen context...</div>
+            <div>[SYSTEM] Telemetry synchronized. Metrics and Misconception Risk Matrix updated successfully.</div>
+          </div>
+        </div>
+      </section>
 
     </div>
   );

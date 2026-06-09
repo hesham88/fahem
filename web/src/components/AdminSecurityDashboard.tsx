@@ -2303,6 +2303,27 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                             <p style={{ margin: 0, fontSize: "0.85rem", color: "#4f6371" }}>
                               <strong>{language === "ar" ? "المستعلم:" : "Reporter UID:"}</strong> <code style={{ fontFamily: "var(--font-mono)" }}>{rep.userId}</code>
                             </p>
+                            
+                            {/* OR-40: Render email and message directly on the surface */}
+                            <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                              {(rep.email || (rep.context && rep.context.email)) && (
+                                <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--primary)", fontWeight: 600 }}>
+                                  <strong>{language === "ar" ? "البريد الإلكتروني:" : "Reporter Email:"}</strong> {rep.email || rep.context.email}
+                                </p>
+                              )}
+                              <div style={{ 
+                                margin: "0.25rem 0 0 0", 
+                                fontSize: "0.88rem", 
+                                color: "var(--foreground)", 
+                                background: "rgba(16, 107, 163, 0.04)", 
+                                borderLeft: "3px solid var(--primary)", 
+                                padding: "0.6rem 0.75rem", 
+                                borderRadius: "4px",
+                                whiteSpace: "pre-wrap"
+                              }}>
+                                {rep.body || rep.description || rep.message || (language === "ar" ? "لا توجد تفاصيل للمشكلة." : "No report details provided.")}
+                              </div>
+                            </div>
                           </div>
 
                           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>

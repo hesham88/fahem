@@ -119,7 +119,82 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { url, maxDepth = 3 } = body;
+    const { url, maxDepth = 3, jobId, action } = body;
+
+    const requesterEmail = ctx.email || "";
+
+    // 1. Cooperative/force crawl job controls (pause/resume/stop/kill)
+    if (jobId && action) {
+      if (!isLocalEnv()) {
+        return await proxyRequest("/admin/crawl", "POST", { jobId, action, requesterEmail }, ctx);
+      }
+
+      const db = getLocalDb() as any;
+      const crawlJobs = db.crawl_jobs || [];
+      const job = crawlJobs.find((j: any) => j._id === jobId);
+
+      if (!job) {
+        return new Response(JSON.stringify({ error: "Crawl job not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const timestamp = new Date().toLocaleTimeString();
+
+      if (action === "pause") {
+        job.status = "paused";
+        if (!job.logs) job.logs = [];
+        job.logs.push(`[${timestamp}] [CONTROL] ⏸️ Ingestion crawl paused cooperatively.`);
+        job.updated_at = Date.now() / 1000;
+        saveLocalDb(db);
+        return new Response(JSON.stringify({ success: true, message: "Crawl job paused." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (action === "resume") {
+        job.status = "harvesting";
+        if (!job.logs) job.logs = [];
+        job.logs.push(`[${timestamp}] [CONTROL] ▶️ Ingestion crawl resumed.`);
+        job.updated_at = Date.now() / 1000;
+        saveLocalDb(db);
+        return new Response(JSON.stringify({ success: true, message: "Crawl job resumed." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (action === "kill" || action === "stop") {
+        let processKilled = false;
+        if (job.active_pid) {
+          try {
+            process.kill(job.active_pid, "SIGKILL");
+            processKilled = true;
+          } catch (killErr: any) {
+            console.error(`[Crawl Job Control] Failed to kill process ${job.active_pid}: ${killErr.message}`);
+          }
+        }
+        job.status = action === "kill" ? "killed" : "failed";
+        if (!job.logs) job.logs = [];
+        job.logs.push(`[${timestamp}] [CONTROL] 🛑 Ingestion crawl manually ${action === "kill" ? "force-killed" : "stopped"}.`);
+        job.updated_at = Date.now() / 1000;
+        saveLocalDb(db);
+        return new Response(JSON.stringify({
+          success: true,
+          message: processKilled ? "Crawl process terminated." : "Crawl job status updated."
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return new Response(JSON.stringify({ error: `Unrecognized action: ${action}` }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
     if (!url) {
       return new Response(JSON.stringify({ error: "Missing crawl URL" }), {

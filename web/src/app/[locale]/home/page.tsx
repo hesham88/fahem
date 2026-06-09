@@ -1188,6 +1188,23 @@ export default function Home() {
     };
   }, [dynamicBooks]);
 
+  // Global listener for navigating to specific tabs and updating subject context
+  useEffect(() => {
+    const handleNavigateTab = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.tab) {
+        setActiveTab(detail.tab);
+        if (detail.subjectId) {
+          setSelectedSubjectId(detail.subjectId);
+        }
+      }
+    };
+    window.addEventListener("fahemNavigateTab", handleNavigateTab);
+    return () => {
+      window.removeEventListener("fahemNavigateTab", handleNavigateTab);
+    };
+  }, []);
+
   // Deep-linking: initial URL query load on app startup
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -6277,27 +6294,103 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Token-Usage Indicator (W-9) */}
+              {/* Token-Usage Indicator (W-9 / OR-16 Quick-Snap) */}
               <div style={{ 
-                padding: "8px 12px", 
-                background: "rgba(16, 107, 163, 0.04)", 
-                borderRadius: "12px", 
-                border: "1px solid rgba(16, 107, 163, 0.08)",
+                padding: "12px 14px", 
+                background: "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(99, 102, 241, 0.06))", 
+                borderRadius: "14px", 
+                border: "1px solid rgba(16, 107, 163, 0.22)",
+                boxShadow: "0 4px 20px rgba(16, 107, 163, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
                 fontSize: "0.75rem",
-                width: "100%"
+                width: "100%",
+                position: "relative",
+                overflow: "hidden"
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontWeight: 700 }}>
-                  <span style={{ color: "#6a7c88" }}>⚡ {language === "ar" ? "الرموز اليومية:" : "Daily Tokens:"}</span>
-                  <span style={{ color: "var(--foreground)" }}>{consumedClt} / {totalAllocatedClt}</span>
+                {/* Micro-glow backdrop overlay */}
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: "1px",
+                  background: "linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.4), transparent)"
+                }} />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ 
+                    color: "var(--primary)", 
+                    fontWeight: 850, 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "0.35rem",
+                    textShadow: "0 0 10px rgba(16, 107, 163, 0.15)"
+                  }}>
+                    🧠 {language === "ar" ? "الحصة المعرفية" : "CLT Budget"}
+                  </span>
+                  <span style={{ 
+                    fontWeight: 800, 
+                    color: "var(--foreground)", 
+                    background: "rgba(16, 107, 163, 0.1)", 
+                    padding: "2px 8px", 
+                    borderRadius: "8px",
+                    fontFamily: "monospace"
+                  }}>
+                    {consumedClt.toLocaleString()} <span style={{ fontSize: "0.65rem", opacity: 0.6 }}>/ {totalAllocatedClt.toLocaleString()}</span>
+                  </span>
                 </div>
-                <div style={{ width: "100%", height: "6px", background: "rgba(16, 107, 163, 0.1)", borderRadius: "10px", overflow: "hidden" }}>
+
+                <div style={{ 
+                  width: "100%", 
+                  height: "8px", 
+                  background: "rgba(16, 107, 163, 0.12)", 
+                  borderRadius: "10px", 
+                  position: "relative",
+                  boxShadow: "inset 0 1px 2px rgba(0, 0, 0, 0.1)",
+                  overflow: "hidden"
+                }}>
                   <div style={{ 
                     width: `${Math.min(100, Math.max(0, tokenProgressPercent))}%`, 
                     height: "100%", 
-                    background: `linear-gradient(90deg, ${tokenProgressPercent > 80 ? "var(--secondary)" : "var(--primary)"}, ${tokenProgressPercent > 80 ? "var(--secondary-hover)" : "var(--accent-green)"})`, 
+                    background: `linear-gradient(90deg, #106ba3, #6366f1, #0d9488)`, 
                     borderRadius: "10px",
-                    transition: "width 0.4s ease"
-                  }}></div>
+                    boxShadow: "0 0 8px rgba(99, 102, 241, 0.5)",
+                    transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+                    position: "relative"
+                  }}>
+                    {/* Glowing highlight streak */}
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      right: 0,
+                      background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
+                      animation: "pulse 2s infinite"
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", marginTop: "6px", fontWeight: 700 }}>
+                  <span style={{ color: "#6a7c88" }}>
+                    {language === "ar" ? "مؤشر الاستهلاك السريع" : "Usage Quick-Snap"}
+                  </span>
+                  <span style={{ 
+                    color: tokenProgressPercent > 80 ? "var(--accent)" : "var(--accent-green)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px"
+                  }}>
+                    <span style={{
+                      display: "inline-block",
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: tokenProgressPercent > 80 ? "var(--accent)" : "var(--accent-green)",
+                      boxShadow: `0 0 8px ${tokenProgressPercent > 80 ? "var(--accent)" : "var(--accent-green)"}`,
+                      animation: "pulse 1.5s infinite"
+                    }} />
+                    {tokenProgressPercent}%
+                  </span>
                 </div>
               </div>
             </div>

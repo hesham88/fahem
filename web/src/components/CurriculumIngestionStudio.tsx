@@ -20,7 +20,11 @@ import {
   FiLink,
   FiActivity,
   FiCheckCircle,
-  FiCpu
+  FiCpu,
+  FiPause,
+  FiPlay,
+  FiSquare,
+  FiSlash
 } from "react-icons/fi";
 
 interface Library {
@@ -591,6 +595,20 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   const [showDeleteSubjectConfirm, setShowDeleteSubjectConfirm] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [isCreatingCurUnderLib, setIsCreatingCurUnderLib] = useState<string | null>(null);
   const [isCreatingSubjUnderCur, setIsCreatingSubjUnderCur] = useState<string | null>(null);
 
@@ -647,11 +665,17 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
             setCrawlProgress(100);
             addTerminalLog(`[CRAWLER] Completed! Discovered ${poll.discovered?.length || 0} valid assets.`);
             fetchPastCrawls();
-          } else if (poll.status === "failed") {
+          } else if (poll.status === "failed" || poll.status === "killed" || poll.status === "stopped") {
             clearInterval(interval);
             crawlIntervalRef.current = null;
             setIsCrawling(false);
-            addTerminalLog(`[CRAWLER ERROR] Async web exploration job reported failed status.`);
+            addTerminalLog(`[CRAWLER] Async web exploration job reported ${poll.status} status.`);
+            fetchPastCrawls();
+          } else if (poll.status === "paused") {
+            clearInterval(interval);
+            crawlIntervalRef.current = null;
+            setIsCrawling(false);
+            addTerminalLog(`[CRAWLER] Async web exploration job was paused.`);
             fetchPastCrawls();
           }
         }
@@ -864,8 +888,11 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
         library_id: selectedLibId,
         visibility: "public"
       };
-      const res = await authedFetch("/api/curricula", {
-        method: "POST",
+      const isEdit = !!selectedCurriculumId;
+      const url = isEdit ? `/api/curricula/${selectedCurriculumId}` : "/api/curricula";
+      const method = isEdit ? "PATCH" : "POST";
+      const res = await authedFetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
@@ -875,8 +902,74 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
         fetchCurricula(selectedLibId);
         setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
         setIsEditingCur(false);
+        setIsCreatingCurUnderLib(null);
+        setSelectedCurriculumId("");
       } else {
         triggerToast(data.error || "Failed to save curriculum", true);
+      }
+    } catch (err: any) {
+      triggerToast(err.message, true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteLibrary = async () => {
+    if (!libForm._id) return;
+    if (!confirm(isAr 
+      ? `هل أنت متأكد من حذف هذه المكتبة (${libForm.name})؟ سيتم فصل الكتب التابعة لها ولكن لن يتم حذف ملفاتها.` 
+      : `Are you sure you want to delete this library (${libForm.name})? Associated books will be decoupled gracefully, but their textbook source files will NOT be deleted.`
+    )) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authedFetch(`/api/libraries?id=${libForm._id}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        triggerToast(isAr ? "🗑️ تم حذف المكتبة وفصل الكتب بنجاح!" : "🗑️ Library deleted and books decoupled gracefully!");
+        fetchLibraries();
+        setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+        setIsEditingLib(false);
+        setSelectedLibId("");
+        setSelectedCurriculumId("");
+        setSelectedSubjectId("");
+      } else {
+        triggerToast(data.error || "Failed to delete library", true);
+      }
+    } catch (err: any) {
+      triggerToast(err.message, true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCurriculum = async () => {
+    if (!selectedCurriculumId) return;
+    if (!confirm(isAr 
+      ? `هل أنت متأكد من حذف هذا المنهج؟ سيتم حذف المواد وفصل الكتب التابعة لها ولكن لن يتم حذف ملفاتها.` 
+      : `Are you sure you want to delete this curriculum? Associated subjects will be deleted and books decoupled gracefully, but their textbook source files will NOT be deleted.`
+    )) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authedFetch(`/api/curricula/${selectedCurriculumId}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        triggerToast(isAr ? "🗑️ تم حذف المنهج بنجاح!" : "🗑️ Curriculum deleted successfully!");
+        fetchCurricula(selectedLibId);
+        setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
+        setIsEditingCur(false);
+        setIsCreatingCurUnderLib(null);
+        setSelectedCurriculumId("");
+        setSelectedSubjectId("");
+      } else {
+        triggerToast(data.error || "Failed to delete curriculum", true);
       }
     } catch (err: any) {
       triggerToast(err.message, true);
@@ -925,7 +1018,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Assign Book
   const handleAssignBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!assignBookId || !assignSubjId || !selectedCurriculumId) {
+    const targetSubjId = assignSubjId || selectedSubjectId;
+    if (!assignBookId || !targetSubjId || !selectedCurriculumId) {
       triggerToast("Please select a book, target subject, and active curriculum", true);
       return;
     }
@@ -936,7 +1030,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           curriculum_id: selectedCurriculumId,
-          subject_id: assignSubjId,
+          subject_id: targetSubjId,
           role: assignRole
         })
       });
@@ -990,6 +1084,43 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     } catch (err: any) {
       setIsCrawling(false);
       addTerminalLog(`[CRAWLER FAULT] ${err.message}`);
+    }
+  };
+
+  const handleControlCrawlJob = async (jobId: string, action: "pause" | "resume" | "stop" | "kill") => {
+    try {
+      addTerminalLog(`[CRAWLER] Sending command ${action.toUpperCase()} to job ${jobId}...`);
+      const res = await authedFetch("/api/admin/crawl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, action })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        let msg = "";
+        if (action === "pause") {
+          msg = isAr ? "⏸️ تم إيقاف الزحف مؤقتاً!" : "⏸️ Web crawling job paused cooperatively!";
+          addTerminalLog(`[CRAWLER] Job paused: ${jobId}`);
+        } else if (action === "resume") {
+          msg = isAr ? "▶️ تم استئناف الزحف بنجاح!" : "▶️ Web crawling job resumed successfully!";
+          addTerminalLog(`[CRAWLER] Job resumed: ${jobId}`);
+          startCrawlPolling(jobId);
+        } else if (action === "stop") {
+          msg = isAr ? "⏹️ تم إيقاف الزحف!" : "⏹️ Web crawling job stopped cooperatively!";
+          addTerminalLog(`[CRAWLER] Job stopped: ${jobId}`);
+        } else {
+          msg = isAr ? "🛑 تم إنهاء عملية الزحف!" : "🛑 Web crawling job force-terminated!";
+          addTerminalLog(`[CRAWLER] Job killed: ${jobId}`);
+        }
+        triggerToast(msg);
+        fetchPastCrawls();
+      } else {
+        triggerToast(data.error || "Failed to control crawler", true);
+        addTerminalLog(`[CRAWLER ERROR] Control action ${action} failed: ${data.error}`);
+      }
+    } catch (err: any) {
+      triggerToast(err.message, true);
+      addTerminalLog(`[CRAWLER FAULT] Control action ${action} faulted: ${err.message}`);
     }
   };
 
@@ -1146,6 +1277,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const activeLibrary = libraries.find(l => l._id === selectedLibId);
+  const activeCrawlJob = pastCrawls.find(j => j._id === selectedCrawlId);
+  const crawlStatus = activeCrawlJob ? activeCrawlJob.status : (isCrawling ? "harvesting" : "idle");
 
   return (
     <div className="studio-container" style={{ direction: isAr ? "rtl" : "ltr" }}>
@@ -1309,9 +1442,32 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   ))}
                 </div>
 
-                <button type="submit" disabled={loading} className="primary-submit-btn">
-                  <FiSave /> {t("save_library")}
-                </button>
+                <div className="form-actions-row">
+                  <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
+                    <FiSave /> {t("save_library")}
+                  </button>
+                  {isEditingLib && (
+                    <button
+                      type="button"
+                      className="discard-btn"
+                      style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
+                      onClick={handleDeleteLibrary}
+                    >
+                      <FiTrash2 /> {isAr ? "حذف المكتبة" : "Delete Library"}
+                    </button>
+                  )}
+                  <button 
+                    type="button" 
+                    className="discard-btn"
+                    style={{ margin: 0 }}
+                    onClick={() => {
+                      setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+                      setIsEditingLib(false);
+                    }}
+                  >
+                    {isAr ? "إلغاء التغييرات" : "Discard"}
+                  </button>
+                </div>
               </form>
             </section>
 
@@ -1681,7 +1837,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                           </div>
 
                           {/* Curated academic emoji picker popover (OR-14) */}
-                          <div className="form-group" style={{ position: "relative" }}>
+                          <div className="form-group" style={{ position: "relative" }} ref={emojiPickerRef}>
                             <label>{t("subject_emoji")}</label>
                             <div style={{ display: "flex", gap: "0.5rem" }}>
                               <input
@@ -1689,8 +1845,9 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                                 value={subjForm.emoji || "📚"}
                                 onChange={e => setSubjForm({ ...subjForm, emoji: e.target.value })}
                                 className="styled-input emoji-input"
-                                style={{ width: "3.5rem", textAlign: "center", fontSize: "1.25rem" }}
+                                style={{ width: "3.5rem", textAlign: "center", fontSize: "1.25rem", cursor: "pointer" }}
                                 readOnly
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                               />
                               <button
                                 type="button"
@@ -1972,9 +2129,20 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                         <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
                           <FiSave /> {t("save_curriculum")}
                         </button>
+                        {selectedCurriculumId && (
+                          <button
+                            type="button"
+                            className="discard-btn"
+                            style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
+                            onClick={handleDeleteCurriculum}
+                          >
+                            <FiTrash2 /> {isAr ? "حذف المنهج" : "Delete Curriculum"}
+                          </button>
+                        )}
                         <button 
                           type="button" 
                           className="discard-btn"
+                          style={{ margin: 0 }}
                           onClick={() => {
                             setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
                             setIsEditingCur(false);
@@ -2118,28 +2286,126 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                         value={crawlMaxDepth}
                         onChange={e => setCrawlMaxDepth(Number(e.target.value))}
                         className="styled-select"
+                        disabled={isCrawling || crawlStatus === "paused"}
                       >
                         <option value={1}>1 - Shallow Target Link Only</option>
                         <option value={2}>2 - Standard Folder Depth</option>
                         <option value={3}>3 - Complete Portal Crawl</option>
                       </select>
                     </div>
-                    <button
-                      type="button"
-                      disabled={isCrawling}
-                      onClick={handleStartCrawling}
-                      className="primary-submit-btn crawl-start-btn"
-                    >
-                      {isCrawling ? (
-                        <>
-                          <FiRefreshCw className="spin-animation" /> {t("crawler_running")} ({crawlProgress}%)
-                        </>
+
+                    <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                      {!isCrawling && crawlStatus !== "paused" ? (
+                        <button
+                          type="button"
+                          onClick={handleStartCrawling}
+                          className="primary-submit-btn crawl-start-btn"
+                          style={{ height: "42px", display: "flex", alignItems: "center", gap: "6px" }}
+                        >
+                          <FiSearch /> {t("start_crawl")}
+                        </button>
                       ) : (
                         <>
-                          <FiSearch /> {t("start_crawl")}
+                          {crawlStatus === "paused" ? (
+                            <button
+                              type="button"
+                              onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "resume")}
+                              className="control-btn resume-btn"
+                              style={{
+                                height: "42px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "0 1.25rem",
+                                borderRadius: "8px",
+                                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                                border: "1.5px solid rgb(16, 185, 129)",
+                                color: "rgb(52, 211, 153)",
+                                cursor: "pointer",
+                                fontWeight: "600",
+                                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                                textShadow: "0 0 8px rgba(16, 185, 129, 0.5)",
+                                boxShadow: "0 0 12px rgba(16, 185, 129, 0.1)"
+                              }}
+                            >
+                              <FiPlay /> {isAr ? "استئناف" : "Resume"}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "pause")}
+                              className="control-btn pause-btn"
+                              style={{
+                                height: "42px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "0 1.25rem",
+                                borderRadius: "8px",
+                                backgroundColor: "rgba(245, 158, 11, 0.15)",
+                                border: "1.5px solid rgb(245, 158, 11)",
+                                color: "rgb(251, 191, 36)",
+                                cursor: "pointer",
+                                fontWeight: "600",
+                                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                                textShadow: "0 0 8px rgba(245, 158, 11, 0.5)",
+                                boxShadow: "0 0 12px rgba(245, 158, 11, 0.1)"
+                              }}
+                            >
+                              <FiPause /> {isAr ? "إيقاف مؤقت" : "Pause"}
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "stop")}
+                            className="control-btn stop-btn"
+                            style={{
+                              height: "42px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "0 1.25rem",
+                              borderRadius: "8px",
+                              backgroundColor: "rgba(239, 68, 68, 0.12)",
+                              border: "1.5px solid rgb(239, 68, 68)",
+                              color: "rgb(248, 113, 113)",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textShadow: "0 0 8px rgba(239, 68, 68, 0.4)",
+                              boxShadow: "0 0 12px rgba(239, 68, 68, 0.08)"
+                            }}
+                          >
+                            <FiSquare /> {isAr ? "إيقاف" : "Stop"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "kill")}
+                            className="control-btn kill-btn"
+                            style={{
+                              height: "42px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "0 1.25rem",
+                              borderRadius: "8px",
+                              backgroundColor: "rgba(185, 28, 28, 0.2)",
+                              border: "1.5px solid rgb(220, 38, 38)",
+                              color: "rgb(252, 165, 165)",
+                              cursor: "pointer",
+                              fontWeight: "700",
+                              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textShadow: "0 0 8px rgba(220, 38, 38, 0.6)",
+                              boxShadow: "0 0 15px rgba(220, 38, 38, 0.15)"
+                            }}
+                          >
+                            <FiSlash /> {isAr ? "إنهاء بالقوة" : "Kill"}
+                          </button>
                         </>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </div>
 

@@ -457,222 +457,228 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%", scrollMarginTop: "100px" }}>
-        <div className="glass-card" style={{ background: isDarkMode ? "rgba(17, 24, 39, 0.45)" : "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(20px)", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-lg)", padding: "1.25rem 2rem", boxShadow: "var(--shadow-lg)", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
-          <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(37, 99, 235, 0.15)" }}>
-            <FiKey style={{ fontSize: "1.25rem", color: "#ffffff" }} />
-          </div>
-          <h2 style={{ fontSize: "1.85rem", fontWeight: 800, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.2 }}>{t("welcome_to_fahem")}</h2>
-          <p style={{ fontSize: "0.92rem", color: "var(--foreground)", opacity: 0.8, maxWidth: "800px", margin: "0 auto", lineHeight: 1.5 }}>{t("hero_subtitle")}</p>
-
-          <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "0.4rem", width: "100%", maxWidth: "420px", padding: "0.6rem 0", margin: "0.4rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)", borderBottom: "1px solid rgba(235, 220, 185, 0.2)" }}>
-            <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
-              <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--primary)" }}><FiLayers /></span>
-              <span>{t("bullet_1")}</span>
+        <div className="glass-card" style={{ background: isDarkMode ? "rgba(17, 24, 39, 0.45)" : "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(20px)", border: "1px solid var(--card-border)", borderRadius: "var(--border-radius-lg)", padding: "2.5rem 2.25rem", boxShadow: "var(--shadow-lg)", display: "flex", flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", justifyContent: "space-between", gap: "2rem", maxWidth: "100%", width: "100%", textAlign: "start" }}>
+          
+          {/* Left Column: Welcome, Key Features, Sign-In, and Sandbox Console */}
+          <div style={{ flex: "1 1 500px", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "start" }}>
+            <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(37, 99, 235, 0.15)" }}>
+              <FiKey style={{ fontSize: "1.25rem", color: "#ffffff" }} />
             </div>
-            <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
-              <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--secondary)" }}><FiActivity /></span>
-              <span>{t("bullet_2")}</span>
-            </div>
-            <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
-              <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--accent-green)" }}><FiShield /></span>
-              <span>{t("bullet_3")}</span>
-            </div>
-          </div>
+            <h2 style={{ fontSize: "1.85rem", fontWeight: 800, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.2, margin: 0 }}>{t("welcome_to_fahem")}</h2>
+            <p style={{ fontSize: "0.92rem", color: "var(--foreground)", opacity: 0.8, lineHeight: 1.5, margin: 0 }}>{t("hero_subtitle")}</p>
 
-          {errorMsg && (
-            <div style={{ color: "var(--secondary)", fontSize: "0.9rem", fontWeight: 600, padding: "0.4rem 0.8rem", borderRadius: "8px", background: "rgba(249, 115, 22, 0.1)", width: "100%", maxWidth: "340px", margin: "0.25rem 0" }}>
-              {errorMsg}
-            </div>
-          )}
-
-          <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", marginTop: "1rem" }}>
-            {/* Official Google branded sign-in button */}
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={signingIn || bypassActive}
-              className="google-btn"
-              id="google-signin-button"
-              type="button"
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s", opacity: (signingIn || bypassActive) ? 0.6 : 1 }}
-            >
-              {/* Embedded Google Color Logo SVG */}
-              <svg className="google-icon-svg" viewBox="0 0 24 24" width="16" height="18" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-              </svg>
-              <span style={{ color: "var(--foreground)" }}>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
-            </button>
-
-            {/* Custom Divider */}
-            <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: "340px", margin: "0.75rem 0" }}>
-              <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
-              <span style={{ padding: "0 10px", fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>{language === "ar" ? "أو للتقييم" : "OR FOR EVALUATION"}</span>
-              <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
+            <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "0.4rem", width: "100%", maxWidth: "420px", padding: "0.6rem 0", margin: "0.4rem 0", borderTop: "1px solid rgba(235, 220, 185, 0.2)", borderBottom: "1px solid rgba(235, 220, 185, 0.2)" }}>
+              <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
+                <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--primary)" }}><FiLayers /></span>
+                <span>{t("bullet_1")}</span>
+              </div>
+              <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
+                <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--secondary)" }}><FiActivity /></span>
+                <span>{t("bullet_2")}</span>
+              </div>
+              <div className="feature-bullet-item" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", color: "var(--foreground)", fontWeight: 500 }}>
+                <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--accent-green)" }}><FiShield /></span>
+                <span>{t("bullet_3")}</span>
+              </div>
             </div>
 
-            {/* Judge Evaluation Console Panel */}
-            <form 
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  setBypassActive(true);
-                  setErrorMsg("");
-                  
-                  const trimmedEmail = judgeEmail.trim();
+            {errorMsg && (
+              <div style={{ color: "var(--secondary)", fontSize: "0.9rem", fontWeight: 600, padding: "0.4rem 0.8rem", borderRadius: "8px", background: "rgba(249, 115, 22, 0.1)", width: "100%", maxWidth: "340px", margin: "0.25rem 0" }}>
+                {errorMsg}
+              </div>
+            )}
 
-                  // Call /api/demo/enter directly
-                  const response = await fetch("/api/demo/enter", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      email: trimmedEmail,
-                      persona: selectedPersona
-                    })
-                  });
-                  const data = await response.json();
-                  
-                  if (response.ok && data.success) {
-                    const cleanToken = data.token.startsWith("demo-token:") 
-                      ? data.token.slice("demo-token:".length) 
-                      : data.token;
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "start", gap: "1rem", marginTop: "0.5rem" }}>
+              {/* Official Google branded sign-in button */}
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={signingIn || bypassActive}
+                className="google-btn"
+                id="google-signin-button"
+                type="button"
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "30px", padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)", transition: "transform 0.2s, box-shadow 0.2s", opacity: (signingIn || bypassActive) ? 0.6 : 1 }}
+              >
+                {/* Embedded Google Color Logo SVG */}
+                <svg className="google-icon-svg" viewBox="0 0 24 24" width="16" height="18" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                </svg>
+                <span style={{ color: "var(--foreground)" }}>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
+              </button>
+
+              {/* Custom Divider */}
+              <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: "340px", margin: "0.5rem 0" }}>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
+                <span style={{ padding: "0 10px", fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>{language === "ar" ? "أو للتقييم" : "OR FOR EVALUATION"}</span>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "var(--card-border)", opacity: 0.5 }}></div>
+              </div>
+
+              {/* Judge Evaluation Console Panel */}
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    setBypassActive(true);
+                    setErrorMsg("");
                     
-                    localStorage.setItem("app_mode", "demo");
-                    localStorage.setItem("demo_auth_token", cleanToken);
-                    localStorage.setItem("judge_bypass_email", trimmedEmail);
-                    sessionStorage.setItem("judge_selected_persona", selectedPersona);
-                    setIsDemo(true);
+                    const trimmedEmail = judgeEmail.trim();
+
+                    // Call /api/demo/enter directly
+                    const response = await fetch("/api/demo/enter", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        email: trimmedEmail,
+                        persona: selectedPersona
+                      })
+                    });
+                    const data = await response.json();
                     
-                    // Recover button state in case they navigate back or need button restored
-                    setTimeout(() => {
+                    if (response.ok && data.success) {
+                      const cleanToken = data.token.startsWith("demo-token:") 
+                        ? data.token.slice("demo-token:".length) 
+                        : data.token;
+                      
+                      localStorage.setItem("app_mode", "demo");
+                      localStorage.setItem("demo_auth_token", cleanToken);
+                      localStorage.setItem("judge_bypass_email", trimmedEmail);
+                      sessionStorage.setItem("judge_selected_persona", selectedPersona);
+                      setIsDemo(true);
+                      
+                      // Recover button state in case they navigate back or need button restored
+                      setTimeout(() => {
+                        setBypassActive(false);
+                      }, 5000);
+
+                      router.push(`/${language}/home`);
+                    } else {
+                      setErrorMsg(data.error || (language === "ar" ? "فشل دخول البيئة التجريبية." : "Failed to enter sandbox mode."));
                       setBypassActive(false);
-                    }, 5000);
-
-                    router.push(`/${language}/home`);
-                  } else {
-                    setErrorMsg(data.error || (language === "ar" ? "فشل دخول البيئة التجريبية." : "Failed to enter sandbox mode."));
+                    }
+                  } catch (err) {
+                    setErrorMsg(language === "ar" ? "حدث خطأ في الاتصال بالخادم." : "Connection error occurred.");
                     setBypassActive(false);
                   }
-                } catch (err) {
-                  setErrorMsg(language === "ar" ? "حدث خطأ في الاتصال بالخادم." : "Connection error occurred.");
-                  setBypassActive(false);
-                }
-              }}
-              style={{
-                width: "100%",
-                maxWidth: "340px",
-                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.07), rgba(249, 115, 22, 0.05))",
-                border: "1px solid rgba(218, 165, 32, 0.4)",
-                borderRadius: "16px",
-                padding: "1.25rem",
-                boxShadow: "0 4px 20px rgba(218, 165, 32, 0.08)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.85rem",
-                backdropFilter: "blur(10px)",
-                textAlign: "start"
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "1.1rem", color: "#d4af37" }}>⭐</span>
-                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#b8860b", letterSpacing: "0.5px" }}>
-                  {language === "ar" ? "البيئة التجريبية للمحكمين" : "EXPLORE DEMO SANDBOX"}
-                </span>
-              </div>
-              <p style={{ fontSize: "0.75rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
-                {language === "ar" 
-                  ? "اختر دورك التجريبي وأدخل بريدًا إلكترونيًا اختياريًا لاستكشاف فاهم بأمان."
-                  : "Select your evaluation role and provide an optional email to explore."
-                }
-              </p>
-
-              {/* Persona Selector Dropdown */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                <label htmlFor="persona-select" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
-                  {language === "ar" ? "الدور / الشخصية" : "CHOOSE PERSONA"}
-                </label>
-                <select
-                  id="persona-select"
-                  value={selectedPersona}
-                  onChange={(e) => setSelectedPersona(e.target.value as any)}
-                  style={{
-                    padding: "0.5rem",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(218, 165, 32, 0.4)",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    fontSize: "0.85rem",
-                    color: "var(--foreground)",
-                    outline: "none",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="student">
-                    {language === "ar" ? "طالب (مساعد أكاديمي)" : "Student Persona"}
-                  </option>
-                  <option value="teacher">
-                    {language === "ar" ? "معلم (أدوات المدرسين)" : "Teacher Persona"}
-                  </option>
-                  <option value="admin">
-                    {language === "ar" ? "مدير (لوحة التحكم)" : "Admin Preview Persona"}
-                  </option>
-                </select>
-              </div>
-
-              {/* Optional Email Input */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                <label htmlFor="sandbox-email-input" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
-                  {language === "ar" ? "البريد الإلكتروني (اختياري)" : "EMAIL ADDRESS (OPTIONAL)"}
-                </label>
-                <input
-                  id="sandbox-email-input"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={judgeEmail}
-                  onChange={(e) => setJudgeEmail(e.target.value)}
-                  style={{
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(218, 165, 32, 0.4)",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    fontSize: "0.85rem",
-                    color: "var(--foreground)",
-                    outline: "none"
-                  }}
-                />
-              </div>
-
-              <button
-                id="sandbox-submit-button"
-                type="submit"
-                disabled={bypassActive}
+                }}
                 style={{
-                  padding: "0.6rem 1rem",
-                  borderRadius: "10px",
-                  border: "none",
-                  background: "linear-gradient(135deg, #ffd700, #ffa500)",
-                  color: "#5c4033",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(255, 215, 0, 0.3)",
-                  transition: "all 0.15s",
-                  marginTop: "0.25rem",
+                  width: "100%",
+                  maxWidth: "340px",
+                  background: "linear-gradient(135deg, rgba(255, 215, 0, 0.07), rgba(249, 115, 22, 0.05))",
+                  border: "1px solid rgba(218, 165, 32, 0.4)",
+                  borderRadius: "16px",
+                  padding: "1.25rem",
+                  boxShadow: "0 4px 20px rgba(218, 165, 32, 0.08)",
                   display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center"
+                  flexDirection: "column",
+                  gap: "0.85rem",
+                  backdropFilter: "blur(10px)",
+                  textAlign: "start"
                 }}
               >
-                {bypassActive 
-                  ? (language === "ar" ? "جاري التحميل..." : "Entering...") 
-                  : (language === "ar" ? "دخول البيئة التجريبية" : "Enter Sandbox")
-                }
-              </button>
-            </form>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "1.1rem", color: "#d4af37" }}>⭐</span>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#b8860b", letterSpacing: "0.5px" }}>
+                    {language === "ar" ? "البيئة التجريبية للمحكمين" : "EXPLORE DEMO SANDBOX"}
+                  </span>
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                  {language === "ar" 
+                    ? "اختر دورك التجريبي وأدخل بريدًا إلكترونيًا اختياريًا لاستكشاف فاهم بأمان."
+                    : "Select your evaluation role and provide an optional email to explore."
+                  }
+                </p>
+
+                {/* Persona Selector Dropdown */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                  <label htmlFor="persona-select" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                    {language === "ar" ? "الدور / الشخصية" : "CHOOSE PERSONA"}
+                  </label>
+                  <select
+                    id="persona-select"
+                    value={selectedPersona}
+                    onChange={(e) => setSelectedPersona(e.target.value as any)}
+                    style={{
+                      padding: "0.5rem",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(218, 165, 32, 0.4)",
+                      background: "rgba(255, 255, 255, 0.95)",
+                      fontSize: "0.85rem",
+                      color: "var(--foreground)",
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="student">
+                      {language === "ar" ? "طالب (مساعد أكاديمي)" : "Student Persona"}
+                    </option>
+                    <option value="teacher">
+                      {language === "ar" ? "معلم (أدوات المدرسين)" : "Teacher Persona"}
+                    </option>
+                    <option value="admin">
+                      {language === "ar" ? "مدير (لوحة التحكم)" : "Admin Preview Persona"}
+                    </option>
+                  </select>
+                </div>
+
+                {/* Optional Email Input */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                  <label htmlFor="sandbox-email-input" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#854d0e" }}>
+                    {language === "ar" ? "البريد الإلكتروني (اختياري)" : "EMAIL ADDRESS (OPTIONAL)"}
+                  </label>
+                  <input
+                    id="sandbox-email-input"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    value={judgeEmail}
+                    onChange={(e) => setJudgeEmail(e.target.value)}
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(218, 165, 32, 0.4)",
+                      background: "rgba(255, 255, 255, 0.95)",
+                      fontSize: "0.85rem",
+                      color: "var(--foreground)",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+
+                <button
+                  id="sandbox-submit-button"
+                  type="submit"
+                  disabled={bypassActive}
+                  style={{
+                    padding: "0.6rem 1rem",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "linear-gradient(135deg, #ffd700, #ffa500)",
+                    color: "#5c4033",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(255, 215, 0, 0.3)",
+                    transition: "all 0.15s",
+                    marginTop: "0.25rem",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                  }}
+                >
+                  {bypassActive 
+                    ? (language === "ar" ? "جاري التحميل..." : "Entering...") 
+                    : (language === "ar" ? "دخول البيئة التجريبية" : "Enter Sandbox")
+                  }
+                </button>
+              </form>
+            </div>
           </div>
 
-          {/* Micro-donation support section integrated directly into the Hero card without overriding primary CTAs */}
-          <DonationCard variant="hero" />
+          {/* Right Column: Beautiful integrated/woven DonationCard */}
+          <div style={{ flex: "1 1 340px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: "100%", alignSelf: "center" }}>
+            <DonationCard variant="hero" />
+          </div>
 
           {/* Built with Partner Band */}
           <div className="tech-stack-container">
@@ -1070,28 +1076,28 @@ export default function LandingPage() {
           {/* Line 2: Premium Social Icons (X, Instagram, Facebook, Email) */}
           <div style={{ display: "flex", justifyContent: "center", gap: "1.75rem", alignItems: "center" }}>
             <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" 
-               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--primary)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
-              <FiTwitter />
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_x.png" alt="X" width="22" height="22" style={{ objectFit: "contain", filter: isDarkMode ? "invert(1)" : "none" }} />
             </a>
             <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" 
-               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--secondary)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
-              <FiInstagram />
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_instagram.png" alt="Instagram" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" 
-               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#1877f2"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
-              <FiFacebook />
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_facebook.png" alt="Facebook" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
             <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
-               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--primary)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
-              <FiMail />
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_email.png" alt="Email" width="22" height="22" style={{ objectFit: "contain", filter: isDarkMode ? "invert(1)" : "none" }} />
             </a>
           </div>
 
