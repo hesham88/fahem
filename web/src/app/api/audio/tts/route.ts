@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: {
-              responseModalalities: ["AUDIO"],
+              responseModalities: ["AUDIO"],
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
