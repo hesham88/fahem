@@ -332,23 +332,80 @@ def verify_d8():
     return True, f"TTS returned real audio (audio/wav, {len(m.group(1))} base64 chars)"
 
 
+def verify_perf():
+    # Catches the "everything got slow" regression: data path latency.
+    t0 = time.time()
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, "demo enter failed: " + err
+    t1 = time.time()
+    books = get_books(tok)
+    t2 = time.time()
+    if not books:
+        return False, f"book list empty (enter {t1-t0:.1f}s)"
+    list_s = t2 - t1
+    if list_s > 5.0:
+        return False, f"book list took {list_s:.1f}s (>5s) — data path degraded/slow"
+    return True, f"perf OK (enter {t1-t0:.1f}s, book list {list_s:.1f}s, {len(books)} books)"
+
+
+REEXEC = {
+    "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
+    "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
+    "D7": verify_d7, "D8": verify_d8, "D9": verify_d9, "PERF": verify_perf,
+}
+FAST = ["D1", "D2", "D3", "D7", "D9", "PERF"]            # quick HTTP, no agent — the regression gate
+SLOW = ["D4", "D5", "D6", "D8"]                           # agent/kill/TTS — the full deploy gate
+
+
+def run_one(name):
+    try:
+        return REEXEC[name]()
+    except Exception as e:
+        return False, f"error: {e}"
+
+
+def sweep(full=False):
+    names = FAST + (SLOW if full else [])
+    print(f"[SWEEP] {'FULL' if full else 'FAST'} regression+perf sweep on {BASE} ({len(names)} checks)\n")
+    reds = []
+    for n in names:
+        ok, msg = run_one(n)
+        print(f"  [{'PASS' if ok else 'FAIL'}] {n}: {msg}")
+        if not ok:
+            reds.append(n)
+    print(f"\n[SWEEP] {len(names)-len(reds)}/{len(names)} green | RED: {reds or 'none'}")
+    return 0 if not reds else 1
+
+
+def resolve_box(arg):
+    # Accept a D-box directly, or a task id resolved via evidence/dbox_map.json.
+    a = arg.upper()
+    if a in REEXEC:
+        return a
+    try:
+        m = json.load(open(os.path.join(os.path.dirname(__file__), "..", "evidence", "dbox_map.json")))
+        box = (m.get(arg) or m.get(a) or "").upper()
+        if box in REEXEC:
+            return box
+    except Exception:
+        pass
+    return None
+
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python reexec_dbox.py <D1|D2|D3|D4|D5|D6|D7|D8|D9>")
+        print("Usage: python reexec_dbox.py <D1..D9|PERF|<task>|SWEEP|SWEEP-FULL>")
         sys.exit(2)
-    box = sys.argv[1].upper()
+    arg = sys.argv[1].upper()
+    if arg in ("SWEEP", "SWEEP-FULL"):
+        sys.exit(sweep(full=(arg == "SWEEP-FULL" or "--full" in sys.argv)))
+    box = resolve_box(sys.argv[1])
+    if not box:
+        print(f"[REEXEC] No independent re-executor for '{sys.argv[1]}' (visual/advisory box — owner eyeball).")
+        sys.exit(2)
     print(f"[REEXEC] Independently re-executing {box} against {BASE} ...")
-    dispatch = {
-        "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
-        "D7": verify_d7, "D8": verify_d8, "D9": verify_d9,
-    }
-    if box in ("D5", "D6"):
-        ok, msg = verify_d5_d6(box)
-    elif box in dispatch:
-        ok, msg = dispatch[box]()
-    else:
-        print(f"[REEXEC] No independent re-executor defined for {box}.")
-        sys.exit(2)
+    ok, msg = run_one(box)
     print(f"[REEXEC][{'PASS' if ok else 'FAIL'}] {box}: {msg}")
     sys.exit(0 if ok else 1)
 

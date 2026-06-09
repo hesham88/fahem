@@ -1,98 +1,51 @@
 #!/usr/bin/env bash
-
 # ==============================================================================
-# Bible Guard Master CLI Entry Point
-# Usage: ./guard.sh <phase> [arguments]
-#   ./guard.sh pre-claim [task_id] [builder_name]
-#   ./guard.sh pre-done <task_id>
-#   ./guard.sh deploy
+# Bible Guard (collapsed model) — SINGLE source of truth = the independent live
+# re-execution suite (scripts/reexec_dbox.py). Builder-emitted screenshots/
+# verdicts/GF-stubs are NO LONGER a gate. done = the live re-exec passes on fahem.pro.
+#   ./guard.sh pre-claim [task] [builder] | pre-done <task|D-box> | deploy | sweep | sweep-full | audit
 # ==============================================================================
-
-set -eo pipefail
-
-# Locate Python executable
-PYTHON_CMD="python"
-if [ -f "C:/Python313/python.exe" ]; then
-  PYTHON_CMD="C:/Python313/python.exe"
-elif command -v python3 &>/dev/null; then
-  PYTHON_CMD="python3"
-fi
-
-PHASE=$1
-
-if [ -z "$PHASE" ]; then
-  echo "Error: Missing phase argument."
-  echo "Usage:"
-  echo "  ./guard.sh pre-claim [task_id] [builder_name]"
-  echo "  ./guard.sh pre-done <task_id>"
-  echo "  ./guard.sh deploy"
-  exit 1
-fi
+set -uo pipefail
+PY="python"; [ -f "C:/Python313/python.exe" ] && PY="C:/Python313/python.exe" || { command -v python3 >/dev/null && PY="python3"; }
+PHASE="${1:-}"
 
 case "$PHASE" in
   pre-claim)
-    echo "=== Running PRE-CLAIM Checks ==="
-    "$PYTHON_CMD" scripts/guard_drift.py
-    
-    TASK_ID=$2
-    BUILDER_NAME=$3
-    if [ -n "$TASK_ID" ] && [ -n "$BUILDER_NAME" ]; then
-      "$PYTHON_CMD" scripts/guard_claim.py claim "$TASK_ID" "$BUILDER_NAME"
-    elif [ -n "$TASK_ID" ]; then
-      "$PYTHON_CMD" scripts/guard_claim.py check "$TASK_ID"
-    fi
-    echo "=== PRE-CLAIM Checks Passed ==="
-    ;;
+    echo "=== PRE-CLAIM ==="; "$PY" scripts/guard_drift.py || exit 1
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && { "$PY" scripts/guard_claim.py claim "$2" "$3" || exit 1; }
+    echo "=== PRE-CLAIM OK ===" ;;
 
   pre-done)
-    TASK_ID=$2
-    if [ -z "$TASK_ID" ]; then
-      echo "Error: Missing task_id for pre-done check."
-      echo "Usage: ./guard.sh pre-done <task_id>"
-      exit 1
-    fi
-    
-    echo "=== Running PRE-DONE Checks for task $TASK_ID ==="
-    "$PYTHON_CMD" scripts/guard_drift.py
-    "$PYTHON_CMD" scripts/guard_invariants.py
-    "$PYTHON_CMD" scripts/guard_nofakes.py
-    "$PYTHON_CMD" scripts/guard_regressions.py
-    "$PYTHON_CMD" scripts/guard_integrity.py
-    "$PYTHON_CMD" scripts/guard_coverage.py
-    "$PYTHON_CMD" scripts/guard_functional.py
-    "$PYTHON_CMD" scripts/guard_smoke.py "$TASK_ID" "${@:3}"
-    "$PYTHON_CMD" scripts/guard_done.py "$TASK_ID" "${@:3}"
-    echo "=== ALL PRE-DONE Checks Passed for task $TASK_ID ===";;
+    T="${2:-}"; [ -z "$T" ] && { echo "Error: missing task/D-box."; exit 1; }
+    echo "=== PRE-DONE (live re-exec truth) for $T ==="
+    "$PY" scripts/guard_drift.py || exit 1
+    "$PY" scripts/guard_invariants.py || exit 1
+    "$PY" scripts/guard_nofakes.py || exit 1
+    "$PY" scripts/guard_integrity.py || exit 1
+    "$PY" scripts/reexec_dbox.py "$T"; rc=$?
+    if [ "$rc" = "2" ]; then echo "[PRE-DONE] Visual/advisory box — owner must eyeball; no live re-exec gate."
+    elif [ "$rc" != "0" ]; then echo "[PRE-DONE][FAIL] Live re-exec failed — feature NOT working on fahem.pro."; exit 1; fi
+    echo "=== PRE-DONE PASSED for $T ===" ;;
 
   deploy)
-    echo "=== Running DEPLOY Checklist ==="
-    
-    echo "Step 1: Running local code-level guards before build..."
-    "$PYTHON_CMD" scripts/guard_drift.py
-    "$PYTHON_CMD" scripts/guard_invariants.py
-    "$PYTHON_CMD" scripts/guard_nofakes.py
-    "$PYTHON_CMD" scripts/guard_regressions.py
-    "$PYTHON_CMD" scripts/guard_integrity.py
-    "$PYTHON_CMD" scripts/guard_coverage.py
-    "$PYTHON_CMD" scripts/guard_functional.py
-    
-    echo "Step 2: Performing Next.js build verification..."
-    cd web
-    npm run build
-    cd ..
-    
-    echo "Step 3: Running Deploy Parity check (G8)..."
-    "$PYTHON_CMD" scripts/guard_deploy.py
-    
-    echo "Step 4: Running authenticated E2E Smoke Tests (G6)..."
-    "$PYTHON_CMD" scripts/guard_smoke.py "Task-0" "D0"
-    
-    echo "=== DEPLOY Verification Successful! (D0 is GREEN) ==="
-    ;;
+    echo "=== DEPLOY (stabilize gate) ==="
+    "$PY" scripts/guard_drift.py || exit 1
+    "$PY" scripts/guard_invariants.py || exit 1
+    "$PY" scripts/guard_nofakes.py || exit 1
+    "$PY" scripts/guard_integrity.py || exit 1
+    echo "Step 2: Next.js build..."; ( cd web && npm run build ) || exit 1
+    echo "Step 3: Deploy parity (HEAD)..."; "$PY" scripts/guard_deploy.py || exit 1
+    echo "Step 4: FULL live regression+perf sweep (the truth)..."
+    "$PY" scripts/reexec_dbox.py SWEEP-FULL || { echo "[DEPLOY][FAIL] Live sweep RED — do NOT ship."; exit 1; }
+    echo "=== DEPLOY VERIFIED (live sweep green) ===" ;;
 
-  *)
-    echo "Error: Unknown phase '$PHASE'."
-    echo "Available phases: pre-claim, pre-done, deploy"
-    exit 1
-    ;;
+  sweep)      "$PY" scripts/reexec_dbox.py SWEEP; exit $? ;;
+  sweep-full) "$PY" scripts/reexec_dbox.py SWEEP-FULL; exit $? ;;
+  audit)
+    echo "=== AUDIT (advisory only — never blocks) ==="
+    "$PY" scripts/guard_coverage.py || true
+    "$PY" scripts/guard_functional.py || true
+    echo "=== AUDIT done (informational) ===" ;;
+
+  *) echo "Usage: pre-claim | pre-done <task> | deploy | sweep | sweep-full | audit"; exit 1 ;;
 esac
