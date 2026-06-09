@@ -22,6 +22,7 @@ import { SocialPanel } from "../../../components/dashboard/SocialPanel";
 import { SettingsPanel } from "../../../components/dashboard/SettingsPanel";
 import { InsightsPanel } from "../../../components/dashboard/InsightsPanel";
 import { DemoTourGuide } from "../../../components/DemoTourGuide";
+import ScreenLock from "../../../components/ScreenLock";
 
 
 import { 
@@ -5860,7 +5861,8 @@ export default function Home() {
   }
 
   return (
-    <div className="app-layout" dir={language === "ar" ? "rtl" : "ltr"} style={{ direction: language === "ar" ? "rtl" : "ltr" }}>
+    <ScreenLock>
+      <div className="app-layout" dir={language === "ar" ? "rtl" : "ltr"} style={{ direction: language === "ar" ? "rtl" : "ltr" }}>
       {/* Background ambient light */}
       <div className="ambient-background" style={{ zIndex: 1 }}>
         <div className="sphere sphere-1"></div>
@@ -6635,5 +6637,6 @@ export default function Home() {
       </main>
       <DemoTourGuide activeTab={activeTab} setActiveTab={setActiveTab} language={language} />
     </div>
+    </ScreenLock>
   );
 }

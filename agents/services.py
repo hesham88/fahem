@@ -2274,26 +2274,27 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 return {"$in": filters}
 
             # 1. Fetch curricula
-            curricula_query = {}
-            if library_id:
-                curricula_query["library_id"] = make_id_filter(library_id)
-            
-            curricula = list(db["curricula"].find(curricula_query))
-            
-            # Filter curricula by scope
-            if scope_filters:
-                filtered_curricula = []
-                for c in curricula:
-                    scope = c.get("scope")
-                    if isinstance(scope, dict) and all(scope.get(k) == v for k, v in scope_filters.items()):
-                        filtered_curricula.append(c)
-                curricula = filtered_curricula
-            
             valid_curriculum_ids = set()
-            for c in curricula:
-                if "_id" in c:
-                    valid_curriculum_ids.add(c["_id"])
-                    valid_curriculum_ids.add(str(c["_id"]))
+            if library_id or scope_filters:
+                curricula_query = {}
+                if library_id:
+                    curricula_query["library_id"] = make_id_filter(library_id)
+                
+                curricula = list(db["curricula"].find(curricula_query))
+                
+                # Filter curricula by scope
+                if scope_filters:
+                    filtered_curricula = []
+                    for c in curricula:
+                        scope = c.get("scope")
+                        if isinstance(scope, dict) and all(scope.get(k) == v for k, v in scope_filters.items()):
+                            filtered_curricula.append(c)
+                    curricula = filtered_curricula
+                
+                for c in curricula:
+                    if "_id" in c:
+                        valid_curriculum_ids.add(c["_id"])
+                        valid_curriculum_ids.add(str(c["_id"]))
             
             # 2. Fetch books
             books_query = {}
@@ -2359,6 +2360,17 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 subjects_query["_id"] = make_id_filter(subject_id)
             elif curriculum_id:
                 subjects_query["curriculum_id"] = make_id_filter(curriculum_id)
+            else:
+                # Query ONLY the active subjects directly from MongoDB
+                ids_to_query = []
+                for x in active_subject_ids:
+                    ids_to_query.append(x)
+                    if isinstance(x, str) and len(x) == 24:
+                        try:
+                            ids_to_query.append(ObjectId(x))
+                        except Exception:
+                            pass
+                subjects_query["_id"] = {"$in": ids_to_query}
                 
             subjects = list(db["subjects"].find(subjects_query))
             
@@ -5219,7 +5231,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         explanation = f"Incorrect. The correct answer is '{q.get('answer')}'."
                         
                 elif q_type == "open_ended":
-                    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+                    from tools import get_gemini_api_key
+                    gemini_api_key = get_gemini_api_key()
                     if gemini_api_key:
                         try:
                             from google.genai import GoogleGenAI
@@ -5708,13 +5721,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 }
                 
             # Gemini translation is needed
-            gemini_api_key = os.environ.get("GEMINI_API_KEY")
-            if not gemini_api_key:
-                try:
-                    from tools import get_gemini_api_key
-                    gemini_api_key = get_gemini_api_key()
-                except Exception:
-                    pass
+            from tools import get_gemini_api_key
+            gemini_api_key = get_gemini_api_key()
             
             # Call Google GenAI
             from google import genai
@@ -5940,13 +5948,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     content={"success": False, "error": "Text contains no readable speech after stripping emoticons"}
                 )
                 
-            gemini_api_key = os.environ.get("GEMINI_API_KEY")
-            if not gemini_api_key:
-                try:
-                    from tools import get_gemini_api_key
-                    gemini_api_key = get_gemini_api_key()
-                except Exception:
-                    pass
+            from tools import get_gemini_api_key
+            gemini_api_key = get_gemini_api_key()
                     
             if not gemini_api_key:
                 return fastapi.responses.JSONResponse(

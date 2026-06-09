@@ -265,3 +265,37 @@ def get_cached_mongodb_client(read_only: bool = False) -> MongoClient:
     return client
 
 
+def get_gemini_api_key() -> str:
+    """Retrieves the Gemini API key from environment variables or local env files, stripping any whitespace."""
+    # 1. Environment variable
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("NEXT_PUBLIC_FIREBASE_API_KEY")
+    if key:
+        return key.strip()
+        
+    # 2. Local Next.js env files
+    try:
+        agents_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths = [
+            os.path.join(os.path.dirname(agents_dir), "web", ".env.local"),
+            os.path.join(os.path.dirname(agents_dir), ".env.local"),
+            os.path.join(agents_dir, ".env.local"),
+            os.path.join(os.path.dirname(agents_dir), "web", ".env.production"),
+            os.path.join(os.path.dirname(agents_dir), ".env.production"),
+            os.path.join(agents_dir, ".env.production")
+        ]
+        for env_path in possible_paths:
+            if os.path.exists(env_path):
+                with open(env_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("GEMINI_API_KEY=") or line.startswith("NEXT_PUBLIC_FIREBASE_API_KEY="):
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                return val.strip()
+    except Exception:
+        pass
+        
+    return ""
+
+
+

@@ -10,6 +10,11 @@ try {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    turbopack: {
+      root: "./",
+    },
+  } as any,
   env: {
     NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || gitSha,
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),

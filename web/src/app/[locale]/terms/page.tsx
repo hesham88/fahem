@@ -3,6 +3,8 @@
 import { useTranslation } from "../../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiFileText, FiAlertTriangle, FiCpu, FiShield } from "react-icons/fi";
+import DonationCard from "../../../components/DonationCard";
+import AdSensePlaceholder from "../../../components/AdSensePlaceholder";
 import Link from "next/navigation";
 
 export default function TermsPage() {
@@ -94,6 +96,12 @@ export default function TermsPage() {
             </section>
 
           </div>
+
+          {/* Compact donation strip integrated at the footer of the document card */}
+          <DonationCard variant="compact" />
+
+          {/* Dedicated zero-CLS leaderboard ad unit */}
+          <AdSensePlaceholder type="leaderboard" />
         </div>
       </main>
 

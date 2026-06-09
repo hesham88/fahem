@@ -105,6 +105,8 @@ def get_gemini_config():
                     model = data.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
     except Exception as e:
         print(f"[Config Error] Could not load gemini_secrets.json: {e}", file=sys.stderr)
+    if api_key:
+        api_key = api_key.strip()
     return api_key, model
 
 def execute_with_retry(func, *args, max_retries=5, base_delay=2.0, **kwargs):
@@ -141,6 +143,7 @@ def get_gemini_embedding_v2(text, api_key):
     try:
         from google import genai
         if api_key:
+            api_key = api_key.strip()
             client = genai.Client(api_key=api_key)
         else:
             client = genai.Client()

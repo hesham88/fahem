@@ -2929,56 +2929,7 @@ User Question: ${queryText}`;
             </select>
           </div>
 
-          {/* Session Logs Toggle */}
-          <button
-            onClick={() => setShowLogs(!showLogs)}
-            style={{
-              border: "none",
-              background: "none",
-              color: showLogs ? "var(--accent-orange)" : "#5a6e7c",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.25rem",
-              fontSize: "0.75rem"
-            }}
-          >
-            <FiTerminal />
-            <span>{ct("logs_label")} ({sessionLogs.length})</span>
-          </button>
         </div>
-
-        {/* Collapsible Session Console Log View */}
-        {showLogs && (
-          <div
-            style={{
-              maxHeight: "100px",
-              backgroundColor: "#1c2226",
-              borderTop: "1px solid rgba(235, 220, 185, 0.4)",
-              padding: "0.5rem",
-              overflowY: "auto",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.65rem",
-              color: "#a4b3c0"
-            }}
-          >
-            {sessionLogs.length === 0 ? (
-              <div style={{ color: "#6a7c88", fontStyle: "italic" }}>
-                {ct("no_logs")}
-              </div>
-            ) : (
-              sessionLogs.map((log, i) => (
-                <div key={i} style={{ marginBottom: "0.2rem", display: "flex", gap: "0.25rem" }} dir="ltr">
-                  <span style={{ color: "var(--secondary)" }}><FiCornerDownRight style={{ display: "inline" }} /></span>
-                  <span style={{
-                    color: log.includes("[Error]") ? "#f44336" : log.includes("[Telemetry]") ? "var(--secondary)" : "#a4b3c0"
-                  }}>{log}</span>
-                </div>
-              ))
-            )}
-            <div ref={chatLogsEndRef} />
-          </div>
-        )}
 
         <form
           onSubmit={(e) => {

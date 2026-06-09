@@ -2237,7 +2237,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const fetchCounts = (libs: any[]) => {
     const counts: Record<string, number> = {};
     for (const lib of libs) {
-      const libBooks = (dynamicBooks || []).filter((b: any) => b.library_id === lib._id || b.libraryId === lib._id);
+      const libBooks = (dynamicBooks || []).filter((b: any) => {
+        if (b.library_id === lib._id || b.libraryId === lib._id) return true;
+        if (lib.subject_id && (b.subject_id === lib.subject_id || b.subjectId === lib.subject_id)) return true;
+        if (lib._id === "lib_moe" && (b.isMoeIngested || (b.subject_id && b.subject_id.includes("moe")) || (b.curriculum_id && b.curriculum_id.includes("moe")))) return true;
+        if (lib._id === "lib_openstax" && ((b.titleEn && b.titleEn.toLowerCase().includes("openstax")) || (b.title && b.title.toLowerCase().includes("openstax")) || (b.sourceUrl && b.sourceUrl.includes("openstax")) || b.library_id === "lib_openstax")) return true;
+        return false;
+      });
       counts[lib._id] = libBooks.length;
     }
     counts["all"] = (dynamicBooks || []).length;
@@ -3304,6 +3310,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                         [ch.id]: !isExpanded
                                       }));
                                     }
+                                    if (ch.topics && ch.topics.length > 0) {
+                                      setReaderCurrentPage(ch.topics[0].pageNum);
+                                    }
                                   }}
                                   style={{
                                     display: "flex",
@@ -4325,187 +4334,79 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {/* Glassmorphic Library Selector Sub-Bar inside Curriculum tab */}
             {activeLibraryTab === "curriculum" && (
               <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
                 background: "rgba(255, 255, 255, 0.35)",
                 backdropFilter: "blur(16px)",
-                padding: "1.25rem",
-                borderRadius: "24px",
+                padding: "1rem 1.25rem",
+                borderRadius: "20px",
                 border: "1px solid rgba(16, 107, 163, 0.12)",
-                boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)"
+                boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)",
+                width: "100%",
+                maxWidth: "380px",
+                margin: "0 0 1rem 0"
               }}>
-                {consolidatedLibraries.map((lib) => {
-                  const isSelected = selectedLibraryId === lib._id;
-                  const count = libraryCounts[lib._id] || 0;
-                  const description = getLibraryDescription(lib._id, lib.name, lib.name_ar, language);
-                  return (
-                    <div
-                      key={lib._id}
-                      onClick={() => setSelectedLibraryId(lib._id)}
-                      style={{
-                        padding: "1rem",
-                        borderRadius: "18px",
-                        background: isSelected 
-                          ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.04))" 
-                          : "rgba(255, 255, 255, 0.5)",
-                        border: isSelected 
-                          ? "2px solid var(--primary)" 
-                          : "1px solid rgba(16, 107, 163, 0.06)",
-                        boxShadow: isSelected 
-                          ? "0 8px 24px rgba(16, 107, 163, 0.08), inset 0 0 12px rgba(16, 107, 163, 0.02)" 
-                          : "none",
-                        cursor: "pointer",
-                        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        gap: "0.5rem",
-                        position: "relative",
-                        overflow: "hidden"
-                      }}
-                      onMouseOver={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.8)";
-                          e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.2)";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)";
-                          e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.06)";
-                          e.currentTarget.style.transform = "none";
-                        }
-                      }}
-                    >
-                      {isSelected && (
-                        <div style={{
-                          position: "absolute",
-                          top: "-20px", right: "-20px",
-                          width: "50px", height: "50px",
-                          background: "rgba(16, 107, 163, 0.15)",
-                          filter: "blur(20px)",
-                          borderRadius: "50%"
-                        }} />
-                      )}
-
-                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                        <span style={{
-                          fontSize: "1.2rem",
-                          padding: "0.4rem",
-                          borderRadius: "12px",
-                          background: isSelected ? "rgba(16, 107, 163, 0.1)" : "rgba(16, 107, 163, 0.04)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: "bold",
-                          color: "var(--primary)",
-                          width: "2.2rem",
-                          height: "2.2rem",
-                          flexShrink: 0
-                        }}>
-                          {renderLibraryLogo(lib.logo, language === "ar" ? lib.name_ar : lib.name, isSelected)}
-                          <span className="logo-fallback" style={{ display: "none", fontSize: "1.2rem" }}>🏫</span>
-                        </span>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{
-                            margin: 0,
-                            fontSize: "0.85rem",
-                            fontWeight: 800,
-                            color: isSelected ? "var(--primary)" : "var(--foreground)",
-                            fontFamily: "Cairo, var(--font-sans), sans-serif",
-                            textAlign: language === "ar" ? "right" : "left"
-                          }}>
-                            {language === "ar" ? lib.name_ar : lib.name}
-                          </h4>
-                          <p style={{
-                            margin: "0.15rem 0 0 0",
-                            fontSize: "0.7rem",
-                            color: "#6a7c88",
-                            lineHeight: "1.4",
-                            fontFamily: "Cairo, var(--font-sans), sans-serif",
-                            textAlign: language === "ar" ? "right" : "left"
-                          }}>
-                            {description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        borderTop: "1px solid rgba(16, 107, 163, 0.05)",
-                        paddingTop: "0.5rem",
-                        marginTop: "0.25rem"
-                      }}>
-                        {lib.source && lib.source !== "all" && lib.source !== "moe" && lib.source !== "openstax" && lib.source !== "general" ? (
-                          <span style={{
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            color: "var(--primary)",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "0.2rem"
-                          }}>
-                            🏛️ Custom
-                          </span>
-                        ) : lib.source === "moe" ? (
-                          <a
-                            href="https://ellibrary.moe.gov.eg/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              color: "var(--primary)",
-                              textDecoration: "none",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.2rem",
-                              transition: "opacity 0.2s"
-                            }}
-                          >
-                            🔗 Portal
-                          </a>
-                        ) : lib.source === "openstax" ? (
-                          <a
-                            href="https://openstax.org/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              color: "var(--primary)",
-                              textDecoration: "none",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.2rem",
-                              transition: "opacity 0.2s"
-                            }}
-                          >
-                            🔗 Portal
-                          </a>
-                        ) : (
-                          <span />
-                        )}
-                        <span style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 800,
-                          color: "var(--primary)",
-                          background: "rgba(16, 107, 163, 0.08)",
-                          padding: "2px 8px",
-                          borderRadius: "10px"
-                        }}>
-                          {count} {language === "ar" ? "كتب" : "Books"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                <label style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 800,
+                  color: "var(--primary)",
+                  fontFamily: "Cairo, var(--font-sans), sans-serif",
+                  textAlign: language === "ar" ? "right" : "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem"
+                }}>
+                  🏫 {language === "ar" ? "المكتبة النشطة" : "Active Library"}
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <select
+                    value={selectedLibraryId}
+                    onChange={(e) => setSelectedLibraryId(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 16px",
+                      paddingRight: language === "ar" ? "16px" : "36px",
+                      paddingLeft: language === "ar" ? "36px" : "16px",
+                      borderRadius: "12px",
+                      background: "rgba(255, 255, 255, 0.8)",
+                      border: "1px solid rgba(16, 107, 163, 0.15)",
+                      color: "var(--foreground)",
+                      fontSize: "0.85rem",
+                      fontWeight: 700,
+                      fontFamily: "Cairo, var(--font-sans), sans-serif",
+                      cursor: "pointer",
+                      appearance: "none",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      boxShadow: "0 4px 12px rgba(16, 107, 163, 0.02)"
+                    }}
+                  >
+                    {consolidatedLibraries.map((lib) => {
+                      const count = libraryCounts[lib._id] || 0;
+                      const libName = language === "ar" ? lib.name_ar : lib.name;
+                      return (
+                        <option key={lib._id} value={lib._id} style={{ color: "#1e293b", fontWeight: 600 }}>
+                          {libName} ({count} {language === "ar" ? "كتب" : "Books"})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div style={{
+                    position: "absolute",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    right: language === "ar" ? "auto" : "12px",
+                    left: language === "ar" ? "12px" : "auto",
+                    pointerEvents: "none",
+                    color: "var(--primary)",
+                    fontSize: "0.8rem",
+                    display: "flex",
+                    alignItems: "center"
+                  }}>
+                    ▼
+                  </div>
+                </div>
               </div>
             )}
 

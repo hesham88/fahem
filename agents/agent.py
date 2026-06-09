@@ -142,105 +142,104 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
         
         client = get_cached_mongodb_client()
         mdb = get_active_db(client)
+        
+        from tools import get_gemini_api_key
+        api_key = get_gemini_api_key()
+        query_vector = get_gemini_embedding_v2(query, api_key)
+        
+        if query_vector:
+            # Determine principal scoping
+            principal = verified_principal_ctx.get() or {}
+            uid = principal.get("uid")
+            selected_book_ids = principal.get("selected_book_ids")
+            if isinstance(selected_book_ids, str):
+                selected_book_ids = [selected_book_ids]
             
-            # Retrieve embedding using Gemini v2 API
-            from ingestion_v2.utils import get_gemini_embedding_v2
-            api_key = os.environ.get("GEMINI_API_KEY")
-            query_vector = get_gemini_embedding_v2(query, api_key)
-            
-            if query_vector:
-                # Determine principal scoping
-                principal = verified_principal_ctx.get() or {}
-                uid = principal.get("uid")
-                selected_book_ids = principal.get("selected_book_ids")
-                if isinstance(selected_book_ids, str):
-                    selected_book_ids = [selected_book_ids]
-                
-                # Retrieve all books matching ownership/visibility to enforce security scoping
-                book_query = {
-                    "$or": [
-                        {"visibility": "public"},
-                        {"visibility": {"$exists": False}},
-                        {"visibility": None}
-                    ]
-                }
-                if uid:
-                    book_query["$or"].append({"owner_uid": uid})
-                    
-                books_cursor = mdb["books"].find(book_query, {"_id": 1})
-                allowed_book_ids = [str(b["_id"]) for b in books_cursor]
-                
-                # Determine book scoping based on scope, principal, or context var
-                book_ids = None
-                if scope:
-                    if "book_ids" in scope:
-                        book_ids = scope["book_ids"]
-                        if isinstance(book_ids, str):
-                            book_ids = [book_ids]
-                    elif "book_id" in scope:
-                        book_ids = [scope["book_id"]]
-                
-                if not book_ids:
-                    if selected_book_ids is not None:
-                        book_ids = selected_book_ids
-                
-                if not book_ids:
-                    try:
-                        from agents.mongodb_engine import selected_book_ids_var
-                    except ImportError:
-                        from mongodb_engine import selected_book_ids_var
-                    try:
-                        book_ids = selected_book_ids_var.get()
-                        if isinstance(book_ids, str):
-                            book_ids = [book_ids]
-                    except Exception:
-                        pass
-                
-                # Apply intersection for security verification, or fallback to all allowed
-                if book_ids is not None:
-                    book_ids = [b for b in book_ids if b in allowed_book_ids]
-                else:
-                    book_ids = allowed_book_ids
-                
-                vs_stage = {
-                    "index": os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages"),
-                    "path": "embedding",
-                    "queryVector": query_vector,
-                    "numCandidates": 100,
-                    "limit": k
-                }
-                
-                # Always restrict search to authorized book IDs
-                vs_stage["filter"] = {
-                    "book_id": {"$in": book_ids}
-                }
-                
-                pipeline = [
-                    {"$vectorSearch": vs_stage},
-                    {
-                        "$project": {
-                            "text": {"$ifNull": ["$content", {"$ifNull": ["$contentEn", {"$ifNull": ["$contentAr", ""]}]}]},
-                            "book_id": 1,
-                            "page_number": 1,
-                            "score": {"$meta": "vectorSearchScore"}
-                        }
-                    }
+            # Retrieve all books matching ownership/visibility to enforce security scoping
+            book_query = {
+                "$or": [
+                    {"visibility": "public"},
+                    {"visibility": {"$exists": False}},
+                    {"visibility": None}
                 ]
+            }
+            if uid:
+                book_query["$or"].append({"owner_uid": uid})
                 
-                cur = mdb["book_pages"].aggregate(pipeline)
-                results = []
-                for doc in cur:
-                    results.append({
-                        "text": doc.get("text") or "",
-                        "book_id": doc.get("book_id"),
-                        "page_number": doc.get("page_number", 1),
-                        "score": round(doc.get("score", 1.0), 4)
-                    })
-                
-                client.close()
-                if results:
-                    logger.info(f"[TOOL] rag_tool Atlas Vector search returned {len(results)} results successfully.")
-                    return results
+            books_cursor = mdb["books"].find(book_query, {"_id": 1})
+            allowed_book_ids = [str(b["_id"]) for b in books_cursor]
+            
+            # Determine book scoping based on scope, principal, or context var
+            book_ids = None
+            if scope:
+                if "book_ids" in scope:
+                    book_ids = scope["book_ids"]
+                    if isinstance(book_ids, str):
+                        book_ids = [book_ids]
+                elif "book_id" in scope:
+                    book_ids = [scope["book_id"]]
+            
+            if not book_ids:
+                if selected_book_ids is not None:
+                    book_ids = selected_book_ids
+            
+            if not book_ids:
+                try:
+                    from agents.mongodb_engine import selected_book_ids_var
+                except ImportError:
+                    from mongodb_engine import selected_book_ids_var
+                try:
+                    book_ids = selected_book_ids_var.get()
+                    if isinstance(book_ids, str):
+                        book_ids = [book_ids]
+                except Exception:
+                    pass
+            
+            # Apply intersection for security verification, or fallback to all allowed
+            if book_ids is not None:
+                book_ids = [b for b in book_ids if b in allowed_book_ids]
+            else:
+                book_ids = allowed_book_ids
+            
+            vs_stage = {
+                "index": os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages"),
+                "path": "embedding",
+                "queryVector": query_vector,
+                "numCandidates": 100,
+                "limit": k
+            }
+            
+            # Always restrict search to authorized book IDs
+            vs_stage["filter"] = {
+                "book_id": {"$in": book_ids}
+            }
+            
+            pipeline = [
+                {"$vectorSearch": vs_stage},
+                {
+                    "$project": {
+                        "text": {"$ifNull": ["$content", {"$ifNull": ["$contentEn", {"$ifNull": ["$contentAr", ""]}]}]},
+                        "book_id": 1,
+                        "page_number": 1,
+                        "score": {"$meta": "vectorSearchScore"}
+                    }
+                }
+            ]
+            
+            cur = mdb["book_pages"].aggregate(pipeline)
+            results = []
+            for doc in cur:
+                results.append({
+                    "text": doc.get("text") or "",
+                    "book_id": doc.get("book_id"),
+                    "page_number": doc.get("page_number", 1),
+                    "score": round(doc.get("score", 1.0), 4)
+                })
+            
+            client.close()
+            if results:
+                logger.info(f"[TOOL] rag_tool Atlas Vector search returned {len(results)} results successfully.")
+                return results
     except Exception as mongo_err:
         logger.warning(f"[TOOL] rag_tool Atlas Vector search failed or unconfigured ({mongo_err}). Falling back to local search.")
 
@@ -837,7 +836,8 @@ async def search_tool(query: str) -> Dict[str, Any]:
         from google import genai
         from google.genai import types
         
-        api_key = os.environ.get("GEMINI_API_KEY")
+        from tools import get_gemini_api_key
+        api_key = get_gemini_api_key()
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set.")
             

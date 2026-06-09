@@ -5,6 +5,8 @@ import { auth, googleProvider } from "../../lib/firebase";
 import { signInWithPopup, onAuthStateChanged, User, signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
+import DonationCard from "../../components/DonationCard";
+import AdSensePlaceholder from "../../components/AdSensePlaceholder";
 import { 
   FiGithub,
   FiGlobe,
@@ -429,14 +431,14 @@ export default function LandingPage() {
                   className="btn btn-primary"
                   style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: "pointer", transition: "all 0.2s", background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#ffffff" }}
                 >
-                  {language === "ar" ? "لوحة التحكم" : "My Dashboard"}
+                  {t("go_to_dashboard")}
                 </button>
                 <button
                   onClick={handleSignOut}
                   className="btn"
                   style={{ padding: "0.5rem 1.25rem", borderRadius: "30px", fontSize: "0.9rem", fontWeight: 600, border: "1px solid var(--card-border)", cursor: "pointer", transition: "all 0.2s", background: "transparent", color: "var(--foreground)" }}
                 >
-                  {language === "ar" ? "تسجيل الخروج" : "Sign Out"}
+                  {t("btn_signout")}
                 </button>
               </div>
             ) : (
@@ -669,6 +671,9 @@ export default function LandingPage() {
             </form>
           </div>
 
+          {/* Micro-donation support section integrated directly into the Hero card without overriding primary CTAs */}
+          <DonationCard variant="hero" />
+
           {/* Built with Partner Band */}
           <div className="tech-stack-container">
             <span className="tech-stack-title">
@@ -789,6 +794,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Non-intrusive AdSense Placeholder container to prevent CLS */}
+      <AdSensePlaceholder type="leaderboard" />
 
       {/* System Features Section */}
       <section id="features" style={{ zIndex: 1, padding: "4rem 1.5rem", background: isDarkMode ? "rgba(17, 24, 39, 0.3)" : "rgba(255, 255, 255, 0.3)", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)", width: "100%", scrollMarginTop: "100px" }}>
@@ -944,6 +952,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Dedicated Last Landing Section - Warm and informative Support Fahem section */}
+      <DonationCard variant="section" />
+
       {/* Styled Interactive Footer with Asdaa.co Attribution */}
       <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: isDarkMode ? "rgba(9, 13, 22, 0.9)" : "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
         <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
@@ -952,6 +963,9 @@ export default function LandingPage() {
           </a>
           <a href={`/${language}/privacy`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
             <FiLock /> {t("nav_privacy")}
+          </a>
+          <a href={`/${language}/contact`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
+            <FiMail /> {language === "ar" ? "اتصل بنا" : "Contact Us"}
           </a>
         </div>
 

@@ -35,7 +35,12 @@ export async function GET(req: NextRequest) {
 
       // 1. Filter curricula by library_id
       if (libraryId) {
-        curricula = curricula.filter((c: any) => c.library_id === libraryId);
+        const lib = (db.libraries || []) .find((l: any) => l._id === libraryId);
+        curricula = curricula.filter((c: any) => {
+          if (c.library_id === libraryId) return true;
+          if (lib && lib.subject_id && c.subject_id === lib.subject_id) return true;
+          return false;
+        });
       }
 
       // 2. Filter curricula by dynamic scope filters
@@ -59,7 +64,17 @@ export async function GET(req: NextRequest) {
         if (!isPublic && !isOwner) return false;
 
         // Library check
-        if (libraryId && book.library_id !== libraryId) return false;
+        if (libraryId) {
+          const lib = (db.libraries || []).find((l: any) => l._id === libraryId);
+          const isDirectMatch = book.library_id === libraryId;
+          const isSubjectMatch = lib && lib.subject_id && book.subject_id === lib.subject_id;
+          const isMoeFallback = libraryId === "lib_moe" && (book.isMoeIngested || (book.subject_id && book.subject_id.includes("moe")) || (book.curriculum_id && book.curriculum_id.includes("moe")));
+          const isOpenstaxFallback = libraryId === "lib_openstax" && ((book.titleEn && book.titleEn.toLowerCase().includes("openstax")) || (book.title && book.title.toLowerCase().includes("openstax")) || book.library_id === "lib_openstax");
+          
+          if (!isDirectMatch && !isSubjectMatch && !isMoeFallback && !isOpenstaxFallback) {
+            return false;
+          }
+        }
 
         // Curriculum check (either direct curriculumId filter or via scoped curricula list)
         if (curriculumId) {
