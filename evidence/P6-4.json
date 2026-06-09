@@ -2,9 +2,9 @@
   "task": "P6-4",
   "builder": "builder-1",
   "d_box": "D9",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -16,9 +16,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/P6-4-D9-admin-panel.png": "3814dde8563f9cfcc6f195b15bcff3fba966eff1958ce26ac1517af9a3fa09fd"
+    "evidence/shots/P6-4-D9-admin-panel.png": "f985974293b8585ec0513283b5891add0ee23f3402f3117b9587eed3d249e477"
   },
-  "vision_verdict": "pass. The dashboard loads cleanly with HTTP 200, as evidenced by the fully rendered user interface components, consistent typography, and complete navigation sidebars. The layout remains intact, showing a high level of technical stability; the sidebar menu icons, the top-level \"WHITELISTED JUDGE SANDBOX CONSOLE\" header, and the centered \"Users & Activity Trail\" title are all perfectly aligned. The onboarding guide modal is presented with clear, high-resolution text and navigation dots, and the data table headers are neatly structured. Every section, from the \"Daily Tokens\" progress bar to the user profile details, is displayed as intended, confirming that the CSS and component structure are functioning optimally without any layout distortions or retrieval issues.",
-  "timestamp": 1781000051,
-  "run_signature": "f396a5fbbda1a162a80aa8ecf330d48d9376a170d6dc910ff260ca88181201ef"
+  "vision_verdict": "pass. The interface loads cleanly, exhibiting a stable and professional design consistent with a standard HTTP 200 response. The layout remains fully intact, showing a well-structured sidebar navigation on the left, a primary content area featuring a \"Whitelisted Judge Sandbox Console,\" and a clear \"Users & Activity Trail\" header. The interactive elements, including the onboarding welcome card and role selection buttons, are rendered with proper alignment and spacing. Typography is legible across the entire screen, and the visual hierarchy effectively organizes the admin controls, ensuring all interface components appear operational and correctly positioned within the browser viewport.",
+  "timestamp": 1781003292,
+  "run_signature": "645b2d7434e315eea32ba6e1212076b141ca67c26ea3545606658d813b9c403b"
 }

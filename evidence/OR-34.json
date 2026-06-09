@@ -2,9 +2,9 @@
   "task": "OR-34",
   "builder": "builder-1",
   "d_box": "D4",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "Cloud Run",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D4: Session ended by kill switch, subsequent requests rejected with HTTP 401 unauthorized status."
     ],
     "screenshots": [
-      "evidence/shots/D4-kill-wipe.png"
+      "evidence/shots/OR-34-D4-kill-wipe.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D4-kill-wipe.png": "23ad360c0b1d5d4e5894655a216c71058eaa9c0eb5a47b72f64261f24e28668b"
+    "evidence/shots/OR-34-D4-kill-wipe.png": "2b99b25a39f574dcddd320d78d01148c25f8193ca0745cc4a6f5a88c544022a6"
   },
-  "vision_verdict": "pass. The screenshot displays a fully operational interface, confirming that the user remains authenticated and within the application dashboard. The layout is intact, with all side navigation elements, the header, the \"Whitelisted Judge Sandbox Console,\" and the welcome modal appearing in their expected, functional states. This indicates the application has retained the user session and is delivering a standard, fully rendered view consistent with a valid connection.",
-  "timestamp": 1780999588,
-  "run_signature": "c3bd82494de6f4f65873302f1deef33cacd73fb28fe5f9bdc9717aee6bbca3a3"
+  "vision_verdict": "pass. The screenshot displays a fully active and functional dashboard environment. The navigation sidebar remains populated with all menu items, the \"Welcome to Fahem Sandbox\" modal is visible and interactive, and the administrative controls for the \"Whitelisted Judge Sandbox\" are clearly rendered. The state of the interface indicates that the application remains in an established, authenticated state, with all UI components rendering as expected, suggesting the environment is fully operational and responsive to user input.",
+  "timestamp": 1781002175,
+  "run_signature": "66277f62895b697abc6c80cbd3b6f9fc3085df2fe549920f5c9e57e2891204ec"
 }

@@ -30,7 +30,7 @@ req = urllib.request.Request(url, data=b"{}", headers=headers, method="POST")
 
 print(f"Triggering database seed at {url}...")
 try:
-    with urllib.request.urlopen(req, timeout=30.0) as response:
+    with urllib.request.urlopen(req, timeout=240.0) as response:
         status_code = response.getcode()
         body = response.read().decode("utf-8")
         print(f"Status Code: {status_code}")

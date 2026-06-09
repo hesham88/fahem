@@ -2,9 +2,9 @@
   "task": "P0-3",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-3-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-3-D0-version.png": "005df5b1a6eaca50fe895631685408f07d6002fb34583ca46b64299c08fcdda9"
   },
-  "vision_verdict": "pass. The screenshot displays a clean and correctly formatted JSON response from the /api/version endpoint. The data includes a valid 'sha' hexadecimal string and a 'builtAt' ISO 8601 timestamp, confirming the service is returning the expected version metadata. The interface is presented in a minimalist raw-text style, which indicates that the request was processed successfully and returned as a standard API object. All auxiliary UI components, panels, or secondary interface elements that might typically accompany a dashboard view are absent, resulting in a streamlined display that focuses entirely on the JSON payload. The layout is intact because the browser is rendering the raw API output directly, maintaining strict adherence to the data structure provided by the server.",
-  "timestamp": 1780999002,
-  "run_signature": "b34906dd663df65aaef3c752bed6879b5da9a7e4222c0c6b9760214d227dc45f"
+  "vision_verdict": "pass. The screenshot displays a clean and valid JSON object returned from the `/api/version` endpoint. The data is properly formatted, confirming that the `sha` field contains a valid hexadecimal identifier and the `builtAt` field shows a timestamp corresponding to June 9, 2026. The layout is presented as a structured text block with a consistent visual presentation, and the requested external infrastructure interface is entirely absent from this view. The output demonstrates a direct, raw response from the server, indicating the system is operating as intended.",
+  "timestamp": 1781002325,
+  "run_signature": "019d2e37653e5ee1a476acafc834157c30d9c40bf9823d47cc6c005dc0aa1801"
 }

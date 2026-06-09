@@ -185,7 +185,8 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
   test("D6: Ingestion Pipeline - Books reach status embedded and vector search is active", async ({ page }) => {
     await loginToSandbox(page, "admin");
     await page.goto("/en/home?tab=admin-ingestion");
-    await page.waitForTimeout(1000);
+    await page.locator("button").filter({ hasText: /Ingestion & Crawl Console|الاستيراد والزحف/ }).click();
+    await page.waitForTimeout(3000); // Wait for statistics and books list to render
     await page.screenshot({ path: path.join(shotsDir, "D6-ingestion.png") });
     
     const bodyText = await page.innerText("body");
@@ -267,7 +268,10 @@ test.describe("Bible Guard - Complete Smoke Suite (D0-D16)", () => {
 
   test("D14: Branding Assets - Verify favicon & real PNG partner assets load correctly", async ({ page }) => {
     await page.goto("/");
-    await page.waitForTimeout(1000);
+    await page.setViewportSize({ width: 1280, height: 1800 });
+    // Scroll down to reveal the partner logo section
+    await page.evaluate(() => window.scrollTo(0, 800));
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: path.join(shotsDir, "D14-branding.png") });
     
     const logoImg = page.locator("img[src*='logo']");

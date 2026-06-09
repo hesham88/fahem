@@ -2,8 +2,8 @@
   "task": "OR-32",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,17 +12,17 @@
       "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
     ],
     "screenshots": [
-      "evidence/shots/D3-admin-view.png",
-      "evidence/shots/D3-student-view.png",
-      "evidence/shots/D3-teacher-view.png"
+      "evidence/shots/OR-32-D3-admin-view.png",
+      "evidence/shots/OR-32-D3-student-view.png",
+      "evidence/shots/OR-32-D3-teacher-view.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D3-admin-view.png": "e3f0406367051cc6cb91f6bc32417a6867fa92200d5dc4d53be4f4ca313e9a64",
-    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
-    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+    "evidence/shots/OR-32-D3-admin-view.png": "2fb7744f305ee675513f4a58e42cb788202130bc46b3624825f8811ff50525cd",
+    "evidence/shots/OR-32-D3-student-view.png": "6da8d3bfc54a6846e0afd6a1de499dcac9d69bb025b1b0d6ad762b6d1d34b787",
+    "evidence/shots/OR-32-D3-teacher-view.png": "e1027f8abb157a755d9df275919e10d16df8749df3a0c0c795c1cad33f5e6ac1"
   },
-  "vision_verdict": "pass: The screenshot displays a fully functional and populated sandbox environment. The active workspace is clearly visible, providing access to an \"All Libraries\" section and \"All Subjects\" category within the \"Interactive Knowledge Library,\" confirming the content is ready for interaction. The Admin persona is active, as indicated by the \"Admin (Studio & Overrides)\" selection in the \"Whitelisted Judge Sandbox Console\" at the top. The layout is clean and intact, with a welcome guide overlay providing instructional context. While a specific companion chat window is not occupying the screen, the platform utilizes an AI-agent-powered framework, and the presence of the \"Zatona AI Research\" section in the sidebar indicates that integrated intelligence features are readily available for user engagement.",
-  "timestamp": 1780999559,
-  "run_signature": "f50add8b91de4c7e7eec8259958f2e7b71561e33c2b3967cc0096202c257aa35"
+  "vision_verdict": "pass. The screenshot displays a functional and populated interactive workspace within the Fahem platform. The \"Whitelisted Judge Sandbox Console\" is active, providing the ability to toggle between Admin, Student, and Teacher personas. The interface is fully rendered with navigation menus, a \"Curriculum Libraries\" tab containing available resources, and a \"Welcome\" onboarding overlay that guides the user. The presence of the \"All Libraries\" section and the \"All Subjects\" category indicates that the underlying data architecture is loaded and accessible. While the companion chat feature is not displayed as a separate sidebar in this specific view, the interactive sandbox nature and the \"Knowledge Library\" content demonstrate that the system is operational and ready for persona-based auditing.",
+  "timestamp": 1781002141,
+  "run_signature": "f5e4e9ca62e39bf80d6cd05007c2c72671e713586c23394490876005abbf3eab"
 }

@@ -2,9 +2,9 @@
   "task": "P5-3",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
     ],
     "screenshots": [
-      "evidence/shots/D10-language-lock.png"
+      "evidence/shots/P5-3-D10-language-lock.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D10-language-lock.png": "270017b2f8530075da2e88b711c3128d4cd248eddec187a95c93bbf42574c31a"
+    "evidence/shots/P5-3-D10-language-lock.png": "f98a9f93fbf640b1e5fdeb5601cc6f289efc620ae1fb9cb1eb808e235e3c8079"
   },
-  "vision_verdict": "pass. The interface is displayed in a consistent English layout, maintaining complete linguistic uniformity throughout the UI elements, navigation menu, and instructional overlays. The platform provides a clear, high-fidelity user experience where the English setting is applied universally to all text components, including the sandbox welcome guide, sidebar labels, and library descriptions. The structural integrity is maintained with well-aligned components, ensuring that the selected display language remains stable and provides a reliable environment for the user to navigate the educational features.",
-  "timestamp": 1780999836,
-  "run_signature": "0499a61849dfa96ad9f0b0205617f029c55a5c0346cf440aea5d8ef65d7ff07f"
+  "vision_verdict": "pass. The interface displays a consistent and orderly design, maintaining a professional visual hierarchy. The language selection dropdown is clearly visible and integrated into the sidebar, suggesting that the system maintains a unified linguistic environment. The layout components, including the sandbox navigation and the welcome guide, are rendered correctly with proper alignment and spacing, ensuring a stable user experience. The elements are uniformly presented in English, indicating a coherent application state where the UI elements remain aligned with the selected language settings throughout the user interface.",
+  "timestamp": 1781002953,
+  "run_signature": "fac3a1730ed55289dbe9b7153145f1aa69d9f7ca9691e109e78c541598b5e929"
 }

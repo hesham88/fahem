@@ -2,8 +2,8 @@
   "task": "ES-1",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,15 +12,15 @@
       "D1: Unrestricted access granted to sandbox environment, routing visitor to tier demo workspace."
     ],
     "screenshots": [
-      "evidence/shots/D1-home.png",
-      "evidence/shots/D1-landing.png"
+      "evidence/shots/ES-1-D1-home.png",
+      "evidence/shots/ES-1-D1-landing.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D1-home.png": "22d51b0b7acb9dc930abdcc0d791612dfc2b4a2210380b8045d931b0e0312b1c",
-    "evidence/shots/D1-landing.png": "39e299ea9e300ac2d2189797ad87ea1a7485aed0d61aa7fff36ca13d7f725f45"
+    "evidence/shots/ES-1-D1-home.png": "64c8697afe62a27daf8c3e64817b2c68be000b3d0bdae1d5d502e5ab4d3d5d0f",
+    "evidence/shots/ES-1-D1-landing.png": "3af3a31eac15bc9a1b456f0cd6dc7d6fd6ca6746b10e317105bdd62d3ac8bc0c"
   },
-  "vision_verdict": "pass\n\nThe interface displays a functional, welcoming dashboard environment for a \"Whitelisted Judge Sandbox.\" The layout is fully intact, featuring an interactive welcome guide, navigation menus, and functional role-selection buttons (Admin, Student, Teacher). The presence of the \"Welcome to Fahem Sandbox!\" dialog indicates a successful, unrestricted entry into the evaluation environment. The presence of specific user information, such as the email \"evaluation.judge@fahem...\" and a \"42/100\" token count, confirms a validated, active state. Every element, from the sidebar to the main content area, renders correctly, reflecting a system that is operating as intended without any limitations or restrictions visible in the UI.",
-  "timestamp": 1780999285,
-  "run_signature": "e67bc14728d2d72aa389ec3c557881ed2af92c03f42a5c1ba813a8f613ae3cca"
+  "vision_verdict": "pass\n\nThe interface displays a fully functional and unrestricted environment. The presence of the \"Whitelisted Judge Sandbox Console\" and the active onboarding overlay indicate that a user has successfully initialized the session. The layout is completely intact, featuring a clear navigation sidebar, an interactive main content area, and a functional progress indicator within the welcome guide. All UI components, including the \"Knowledge Library\" header and the \"Curriculum Libraries\" button, appear correctly rendered and responsive, confirming that the platform is operating within its intended parameters with full access to the sandbox features.",
+  "timestamp": 1781001220,
+  "run_signature": "50e21ce32d13be7350060ed750e395f936b19a1d605ba2059ed69a08f2578d11"
 }

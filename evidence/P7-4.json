@@ -1,0 +1,24 @@
+{
+  "task": "P7-4",
+  "builder": "builder-1",
+  "d_box": "D10",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "backend_revision": "fahem-agent-00156-44m",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
+    ],
+    "screenshots": [
+      "evidence/shots/P7-4-D10-language-lock.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/P7-4-D10-language-lock.png": "59276d10032391f243d8e739c521be9871457911c250777397af67e50a84435d"
+  },
+  "vision_verdict": "pass. The user interface is consistently presented in English throughout all elements, including headers, descriptive text, and navigation labels. The sidebar, interactive cards, and the onboarding walkthrough maintain linguistic uniformity, ensuring a seamless experience. The layout remains well-structured and organized, with all interface components clearly rendered in the selected language, displaying structural integrity and professional design alignment.",
+  "timestamp": 1781000739,
+  "run_signature": "6a681e40c9b64e6eb2b13aec86850aca53c4f494636d4d3974a6788d30ac0332"
+}

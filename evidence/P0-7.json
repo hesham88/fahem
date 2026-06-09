@@ -2,9 +2,9 @@
   "task": "P0-7",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-7-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-7-D0-version.png": "4fe88c671bc8ea81291381c3ae268fbb5de3c7afb408284a2b6dad8a699b92f8"
   },
-  "vision_verdict": "pass. The screenshot displays a clean and correctly formatted JSON response from the /api/version endpoint. The object contains two valid fields: 'sha', which holds the hash string, and 'builtAt', which provides a timestamp in ISO 8601 format. The \"Pretty-print\" checkbox is visible in the upper-left corner, and the interface appears to be a standard browser rendering of raw JSON data. The view is minimalist and contains only the requested metadata, confirming that the layout is intact and displays the expected system information without any additional dashboard interface elements or secondary display components.",
-  "timestamp": 1780999089,
-  "run_signature": "a248a0f8fa69b2a153a80f33a3b828cb09b2b9a8b60934d088c9caef6aebc767"
+  "vision_verdict": "pass. The API response for the /api/version endpoint is displayed in a clean, formatted JSON structure. The metadata includes a valid alphanumeric 'sha' identifier and a specific 'builtAt' timestamp (2026-06-09T10:25:31.654Z). The system status is confirmed as healthy, and the licensing information is present. The view is entirely focused on this versioning data, maintaining a consistent and professional layout. The document area is filled with a repetitive, decorative text pattern that remains stable, ensuring that all structural elements are properly contained within the display area.",
+  "timestamp": 1781002461,
+  "run_signature": "89b3c752c853749684cc4668454ca9c13e55d3242de21393116be1a10e19d52e"
 }

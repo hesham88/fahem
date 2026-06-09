@@ -2,9 +2,9 @@
   "task": "P1-4",
   "builder": "builder-1",
   "d_box": "D12",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "Cloud Run",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,15 +12,15 @@
       "D12: Mobile responsive layout renders properly at 360 width with no horizontal overflow."
     ],
     "screenshots": [
-      "evidence/shots/D12-mobile-app-notice.png",
-      "evidence/shots/D12-mobile-landing.png"
+      "evidence/shots/P1-4-D12-mobile-app-notice.png",
+      "evidence/shots/P1-4-D12-mobile-landing.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D12-mobile-app-notice.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf",
-    "evidence/shots/D12-mobile-landing.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf"
+    "evidence/shots/P1-4-D12-mobile-app-notice.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf",
+    "evidence/shots/P1-4-D12-mobile-landing.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf"
   },
-  "vision_verdict": "pass. The landing page is fully responsive at 360px width. The layout maintains perfect alignment within the viewport boundaries without any horizontal displacement. The content, including the header \"Fahem Educational Platform\" and the informational notice regarding mobile compatibility, is rendered cleanly with proper text wrapping. The design effectively utilizes the available screen space to present a clear, readable message, ensuring that the user is informed about the optimal viewing requirements in a professional and accessible format.",
-  "timestamp": 1780999181,
-  "run_signature": "63f57238abd4545c67250403c1dbe6143bebb81ed3f034366564dc44cd806242"
+  "vision_verdict": "pass. The layout remains fully intact and structured correctly at this width. The text is contained within the viewport margins, ensuring the content is easily readable without requiring any panning. The messaging clearly directs the user to an appropriate device type while maintaining a clean, professional aesthetic. All elements are centered and neatly stacked vertically, providing a consistent experience within the constraints of the screen size.",
+  "timestamp": 1781002520,
+  "run_signature": "bf43e2bbfe12756f7d83058e8470e66f08c637835e3498af6125a1fef12a657b"
 }

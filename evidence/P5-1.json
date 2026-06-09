@@ -2,9 +2,9 @@
   "task": "P5-1",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
     ],
     "screenshots": [
-      "evidence/shots/D10-language-lock.png"
+      "evidence/shots/P5-1-D10-language-lock.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D10-language-lock.png": "76e95a897f39df3437f926dbb08caa681969e5c13c442e1805141e5601930de4"
+    "evidence/shots/P5-1-D10-language-lock.png": "7003a504db18a15fb00d48f9b67e7f7893589beb1fdd0976a6bcaef050595491"
   },
-  "vision_verdict": "pass. The screenshot displays a cleanly rendered user interface for the Fahem platform. The \"Language\" dropdown menu is clearly visible in the sidebar, currently set to English, and the entire interface remains consistent with this selection. All text elements, including the \"Welcome to Fahem Sandbox\" guide and the dashboard navigational headers, are uniform in their presentation. The layout is stable, with all components, including the \"Whitelisted Judge Sandbox Console\" and the \"Interactive Knowledge Library,\" appearing fully integrated and responsive. The interface maintains a cohesive design language throughout, ensuring a seamless user experience.",
-  "timestamp": 1780999783,
-  "run_signature": "2c828e906ef903d88c16a535d9c33d7b891eab0f48df11325280332566cd5ca8"
+  "vision_verdict": "pass. The interface is visually coherent and displays the English language setting consistently across the UI elements, including the sidebar, navigation headers, and the active welcome modal. The layout remains stable, with all components—such as the sandbox console toggles, the main content area, and the user profile section—properly aligned and responsive. The system maintains a unified linguistic consistency throughout the visible workspace, ensuring a clean and professional user experience.",
+  "timestamp": 1781002848,
+  "run_signature": "69a4b25c157e800d3f900f9f302ac330b642d8a01e438e01b42c6f53b3fe3149"
 }

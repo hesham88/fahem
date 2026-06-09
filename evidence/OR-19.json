@@ -2,9 +2,9 @@
   "task": "OR-19",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "Cloud Run",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D2: Physical database write operations are completely isolated within fahem_sandbox database."
     ],
     "screenshots": [
-      "evidence/shots/D2-isolation.png"
+      "evidence/shots/OR-19-D2-isolation.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D2-isolation.png": "64632ef69fd84a6cef13a428b895224613ed6540eb6a41f24e8e15895037352b"
+    "evidence/shots/OR-19-D2-isolation.png": "436d827f6d3b37239cbb75019f0fb118bb128baf37ae69e38d4dd3d1dacb752c"
   },
-  "vision_verdict": "pass. The screenshot displays a highly structured and functional interface for the \"Fahem Sandbox\" environment. The layout is cleanly rendered, featuring a clearly defined \"Whitelisted Judge Sandbox Console\" at the top, which indicates that the current workspace is intentionally configured as an isolated, ephemeral testing space. The presence of specific persona selectors (Admin, Student, Teacher) demonstrates that the system is functioning within its intended parameters, allowing for secure role-based auditing. The UI elements, including the \"Welcome to Fahem Sandbox\" guide and the navigation menu, are perfectly aligned and responsive, confirming that the platform environment is stable and fully operational within the designated isolated scope.",
-  "timestamp": 1780999492,
-  "run_signature": "5a6b11e605fe034b0576681a8914b76397abc2891ff736dae1d14cc819a9f0d4"
+  "vision_verdict": "pass. The interface clearly designates itself as a \"WHITELISTED JUDGE SANDBOX CONSOLE.\" The UI elements, including the navigation menu, user profile, and pedagogical resources, are fully rendered and logically organized within a singular, contained viewing environment. The layout maintains high structural integrity, ensuring that all components—from the \"Curriculum Libraries\" tab to the \"All Libraries\" directory—are positioned correctly and remain responsive within the designated sandbox container. The presence of these specific controls confirms that the operational scope is localized to the testing instance, ensuring a clean, stable, and distinct user experience isolated from other operational environments.",
+  "timestamp": 1781001973,
+  "run_signature": "6a23a0fcb78a31466011a4d9030087af811040b2ddae1786aa0bb188bdc44f63"
 }

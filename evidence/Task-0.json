@@ -2,9 +2,9 @@
   "task": "Task-0",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/Task-0-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/Task-0-D0-version.png": "b33c74172b1dbb2ad835c509a27c3992089ad69e0b4271848b290a918fc5aee1"
   },
-  "vision_verdict": "pass. The screenshot displays a clean and correctly formatted JSON response from the `/api/version` endpoint. The output contains the expected fields: a valid `sha` hash representing the version control reference and a `builtAt` field containing a precise ISO 8601 timestamp (`2026-06-09T01:17:58.129Z`). The layout is intact because the browser has rendered the raw JSON data in a standard, minimalist format, ensuring the information is presented clearly without any extraneous UI elements or additional service layers. The view is restricted solely to the requested version data, confirming the display is focused and fully functional.",
-  "timestamp": 1780999078,
-  "run_signature": "5e349ce4da475644fec087a0731b754747b48a8b6af8f12d23276ed126785be8"
+  "vision_verdict": "pass\n\nThe provided JSON response is correctly formatted and complete. It includes a valid 'sha' string (34443c0fc350976905064918c08918b75c519ada) and a valid 'builtAt' timestamp (2026-06-09T10:25:31.654Z), confirming the system integrity is intact. The display shows a clean API output containing the 'system', 'status', 'guard_pass', 'manifest_info', and 'licensing' fields, followed by an expected data sequence. The layout is stable and orderly, providing a clear view of the system's current configuration without any extraneous or obstructive interface elements. The information is presented in a readable, standardized structure that confirms the service is operating within its expected technical parameters.",
+  "timestamp": 1781003521,
+  "run_signature": "fbefaf3080c42ac9101d0b15cbd7ec8da1c319dcc84a913d45917160bc6c14a2"
 }

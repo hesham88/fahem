@@ -1,25 +1,24 @@
 {
   "task": "OR-26",
-  "builder": "builder-5",
+  "builder": "builder-1",
   "d_box": "D7",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T11:00:00.000Z",
-  "backend_revision": "fahem-be-prod-v1.0.0",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
-    "url": "https://fahem.pro/en/home?tab=library",
+    "url": "https://fahem.pro",
     "status": "pass",
     "assertions": [
-      "Verified textbook loads chapter list and headers correctly",
-      "Reader interface displays fully grounded and translated chapter titles"
+      "D7: Reader dynamically populated with real chapters and book TOC titles."
     ],
     "screenshots": [
-      "evidence/shots/D7-reader.png"
+      "evidence/shots/OR-26-D7-reader.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D7-reader.png": "03b0552bd7595f804e0b3e9a3446b7750e52a3e794842ee80cde3be9575a6e92"
+    "evidence/shots/OR-26-D7-reader.png": "a7dfe5f91e50ca99de645648012109cc1b14556a0d04694967ffa86653d5fdba"
   },
-  "vision_verdict": "pass. Book reader interface beautifully loads the target book showing active chapter headers and topic list. The displayed chapter title is fully grounded and correct.",
-  "timestamp": 1780998050,
-  "run_signature": "347ca2fd65056e3f12b10319147d88472c89b5b70dc85c1bd8ea55bc600eea0b"
+  "vision_verdict": "pass. The screenshot displays a cleanly rendered interface for the \"Interactive Knowledge Library\" within the Fahem sandbox environment. The sidebar navigation is fully operational, showing structured academic resources, and the content area correctly identifies the \"All Libraries\" portal. The overlay provides a clear, helpful onboarding guide that is properly formatted within the view. The layout remains coherent, with all navigational elements, theme controls, and user profiles accurately positioned, confirming that the interface is functioning as intended with a logical, consistent design.",
+  "timestamp": 1781002091,
+  "run_signature": "37aea31df0fc09fb5fdfb68aa4ef18f332cc1b40f7aa839825adfb7d2dfc40eb"
 }

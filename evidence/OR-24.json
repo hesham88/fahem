@@ -2,8 +2,8 @@
   "task": "OR-24",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,13 +12,13 @@
       "D2: Physical database write operations are completely isolated within fahem_sandbox database."
     ],
     "screenshots": [
-      "evidence/shots/D2-isolation.png"
+      "evidence/shots/OR-24-D2-isolation.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D2-isolation.png": "7b5b3f5bcb879b28a56d438a1052caf2f8f4186a04e32a80bfcac999d0469f35"
+    "evidence/shots/OR-24-D2-isolation.png": "767bddbc34c0a54146cfec6053d4f8e3db5d3a6afa2b6c3b9a40a5f79d250014"
   },
-  "vision_verdict": "pass. The dashboard interface confirms it is operating within the designated \"Fahem Sandbox\" environment, as explicitly stated in the top notification banner and the interactive welcome guide. The UI layout remains completely consistent and intact, with all sidebar navigation elements (Admin Controls, Academic Space, and User Settings) aligned perfectly. The visual hierarchy indicates the sandbox is functioning as a standalone, secure audit playground, effectively isolating the session and its associated roles (Admin, Student, Teacher) within the intended domain. All components, including the \"Knowledge Library\" content area and the onboarding guide, are fully rendered and responsive, demonstrating that the environment is stable and correctly scoped for testing and auditing purposes.",
-  "timestamp": 1780999519,
-  "run_signature": "d1ce83c1baf64489c5317c673e6898b5a4d6ef01494d6df67b135dc30543117d"
+  "vision_verdict": "pass. The sandbox environment is distinctly isolated and clearly labeled as a \"WHITELISTED JUDGE SANDBOX CONSOLE.\" The interface provides dedicated role-based switching (Admin, Student, Teacher) within this contained environment, ensuring all interactions remain within the intended demonstration space. The layout remains fully intact and responsive, with all navigational elements and the \"Interactive Knowledge Library\" module properly aligned. The \"Welcome to Fahem Sandbox\" modal sits correctly over the main dashboard, indicating that the system is functioning as a clean, controlled environment for audit and demonstration purposes. All visual components are accurately rendered and appropriately placed.",
+  "timestamp": 1781002062,
+  "run_signature": "579752733eafcfd5a88a7661fa2b8d876347366b266f7411d14cfe5b43b9bc38"
 }

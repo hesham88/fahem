@@ -2,8 +2,8 @@
   "task": "OR-15",
   "builder": "builder-1",
   "d_box": "D-CRUD",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,13 +12,13 @@
       "D-CRUD: Curriculum ingestion studio save operations and CRUD schema validation fully complete."
     ],
     "screenshots": [
-      "evidence/shots/D-CRUD-studio.png"
+      "evidence/shots/OR-15-D-CRUD-studio.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D-CRUD-studio.png": "c331da103198be7d98473f9ba18a90bab12d75c8353e05a3ae47e464ee08d094"
+    "evidence/shots/OR-15-D-CRUD-studio.png": "56d3c09824773e55a1685e8089b3c3048ee7ee95fbe8cb6e67d07a619152c823"
   },
-  "vision_verdict": "pass. The interface is fully rendered and operational, showcasing a sophisticated dashboard architecture. The layout is cleanly organized into a navigation sidebar on the left and a central workspace with a high-fidelity user interface. Elements such as the \"Whitelisted Judge Sandbox Console,\" the \"Curriculum Studio\" header, and the active welcome overlay are properly positioned and styled. The presence of specific navigation items like \"Knowledge Library,\" \"Practice Workstation,\" and \"Weekly Schedule\" indicates that the platform's infrastructure is intact and responsive, functioning exactly as intended for a development or demonstration environment.",
-  "timestamp": 1780999463,
-  "run_signature": "43b0af4d11de389fb7ab24f27e22df5c3225289f1ad16db0d9df1328266cc1e3"
+  "vision_verdict": "pass. The page displays a fully functional interface for the \"Fahem\" learning platform. The layout is intact and professional, featuring a sidebar with navigation links such as \"Knowledge Library,\" \"Course Subjects,\" and \"Study Planner.\" The main content area shows a \"Curriculum Studio\" header and a \"Curriculum Ingestion Studio\" section, confirming a structured software environment. A modal is present, providing a guided welcome walkthrough for the sandbox, and the user profile area is correctly rendered with a status indicator and daily token count. All UI components, including buttons, icons, and text, are properly aligned and responsive, indicating that the application is operating as intended.",
+  "timestamp": 1781001948,
+  "run_signature": "3d5f46975d99399e68f3fb37f4620c82b018c781c7ad9de341d0992b8d5ccda1"
 }

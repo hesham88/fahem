@@ -2,8 +2,8 @@
   "task": "ES-2",
   "builder": "builder-1",
   "d_box": "D2",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,13 +12,13 @@
       "D2: Physical database write operations are completely isolated within fahem_sandbox database."
     ],
     "screenshots": [
-      "evidence/shots/D2-isolation.png"
+      "evidence/shots/ES-2-D2-isolation.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D2-isolation.png": "e7e025b285c4a352c6a4bb3a8eed833c713bda3b67d3fd9f13d668a2455243f9"
+    "evidence/shots/ES-2-D2-isolation.png": "919a2a76bb3cc2ec2cdc47db43cab0a9ede6aca928ed50f2852c4b35a721555a"
   },
-  "vision_verdict": "pass. The dashboard interface is clearly identified as a \"WHITELISTED JUDGE SANDBOX CONSOLE\" at the top, confirming the environment is specifically isolated for auditing and persona testing. The layout remains fully intact and responsive, with all primary navigation elements—such as \"Knowledge Library,\" \"Curriculum Studio,\" and the user-specific profile section—rendering with clean, consistent spacing and alignment. The \"Welcome to Fahem Sandbox\" overlay is appropriately positioned, and the integration of the RAG-grounded system components appears seamless, suggesting the sandbox environment is functioning as a fully operational, contained instance of the platform. All UI elements load precisely within their defined containers, and the visual hierarchy supports a successful, stable user experience throughout the simulated session.",
-  "timestamp": 1780999314,
-  "run_signature": "be69d2a2ddbad5e9e278c88da21bcc87876d26c3b0d9104611bbf7706fa68421"
+  "vision_verdict": "pass. The provided interface confirms isolation within the \"Fahem Sandbox\" environment. The header explicitly defines the scope as a \"WHITELISTED JUDGE SANDBOX CONSOLE,\" ensuring that all interactions remain contained within this ephemeral, controlled area. The visual architecture is fully intact, showing the \"Interactive Knowledge Library\" dashboard with clear, categorized tabs for \"Curriculum Libraries\" and a \"Private Study Vault.\" The presence of the \"Welcome to Fahem Sandbox\" modal further indicates a guided, specific testing environment designed to demonstrate RAG-grounded responses without affecting external deployed systems. The side navigation menu displays the full suite of operational modules, confirming the platform maintains its integrity and structure while functioning within its designated audit domain.",
+  "timestamp": 1781001746,
+  "run_signature": "a2a02e4828af020b341b8babfbd84f890c6134efd8279d41f3e93addb30ac257"
 }

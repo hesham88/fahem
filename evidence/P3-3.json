@@ -2,9 +2,9 @@
   "task": "P3-3",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "Cloud Run",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D7: Reader dynamically populated with real chapters and book TOC titles."
     ],
     "screenshots": [
-      "evidence/shots/D7-reader.png"
+      "evidence/shots/P3-3-D7-reader.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D7-reader.png": "495c89c7985eb0a3402543c436428d524025fe54acb039eb26fd1503e061e0c3"
+    "evidence/shots/P3-3-D7-reader.png": "20a4e664737f1642a26b58f1778ee571442b29cb054f7b3c4dc18382cb2080f8"
   },
-  "vision_verdict": "pass. The screenshot displays a cleanly rendered interface titled \"Interactive Knowledge Library,\" where the navigation sidebar and the main content area are well-aligned. The \"All Libraries\" card is correctly positioned within its container, and the educational resource elements appear consistent with a standard digital portal layout. The onboarding overlay is rendered with proper contrast and clarity, ensuring that the primary dashboard components remain visible and organized as intended.",
-  "timestamp": 1780999602,
-  "run_signature": "fd688244258e651b176bce15e39b4aa79577792d3680446ad7da02d4da1c74c2"
+  "vision_verdict": "pass. The layout displayed in the screenshot is consistent and functioning as intended within the sandbox environment. The interface correctly loads the \"All Libraries\" section, and the \"Interactive Knowledge Library\" header is clearly defined. The visual hierarchy is maintained, showing a clean, well-structured dashboard with active navigation elements and a fully functional welcome guide. The system components, including the role-selection console and sidebar, are aligned and present, indicating that the interface is rendering correctly for the user's current session.",
+  "timestamp": 1781002616,
+  "run_signature": "164c4fa8259ec3eb7564912bc9a9b157b1f283ad923dfac6fba38994b2f9e28b"
 }

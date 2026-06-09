@@ -2,9 +2,9 @@
   "task": "P7-1",
   "builder": "builder-1",
   "d_box": "D12",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -20,7 +20,7 @@
     "evidence/shots/P7-1-D12-mobile-app-notice.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf",
     "evidence/shots/P7-1-D12-mobile-landing.png": "ba960145af968369b51b5aff4bf60c9aae2d0576dce93a53f89784fc0c9784bf"
   },
-  "vision_verdict": "pass. The page is successfully rendered for mobile users with a clean, single-column layout that fits the width perfectly. All text elements, including the platform title and the advisory notice, are properly aligned within the viewport, ensuring clear readability and a seamless user experience. The design efficiently communicates the site's current status, with text wrapping appropriately to maintain vertical flow and ensure the entire message is visible without requiring any side-to-side movement.",
-  "timestamp": 1781000647,
-  "run_signature": "fbd257760293122ff8fc0cdcb644ceeb47f59a90a89cc6bfffef017b3dc591aa"
+  "vision_verdict": "pass. The page is successfully rendered within the viewport. The content is well-aligned, with the heading \"Fahem Educational Platform\" and the subsequent text wrapping neatly to fit the width. All elements, including the small icons at the top and bottom, appear within the intended boundaries, ensuring the user can clearly read the instruction to use a desktop or tablet device for the best experience.",
+  "timestamp": 1781003397,
+  "run_signature": "04bff7e14424a2a4780c3edca0b8ca9b85edaff508fe74ab0161645e14a2e88e"
 }

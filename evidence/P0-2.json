@@ -2,9 +2,9 @@
   "task": "P0-2",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-2-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-2-D0-version.png": "ecbdc32d1fbf2d93754267a46ba473e4c5304221ab4148ba444cd3417ccab292"
   },
-  "vision_verdict": "pass. The screen displays a raw JSON object containing the `sha` identifier and the `builtAt` timestamp, confirming that the version information is present and accurately formatted. The layout is clean and minimalist, showing only the JSON response data at the top left of the browser window. The interface is unobstructed, demonstrating that the connection to the data source is direct and free from additional UI elements or auxiliary display cards, resulting in an uncluttered view of the system metadata.",
-  "timestamp": 1780998978,
-  "run_signature": "1f8f22111d3adc87609ea87638c80b68f3fd0f4c2a4b122bb889f057679b4746"
+  "vision_verdict": "pass. The screenshot displays a cleanly formatted JSON response originating from the `/api/version` endpoint. The metadata is present and valid, featuring a specific 'sha' identifier and a 'builtAt' timestamp recorded as \"2026-06-09T10:25:31.654Z\". The system status is confirmed as \"healthy,\" and the manifest information verifies compliance with security standards. The layout is fully intact, displaying the expected technical metadata followed by a repeating string pattern, confirming that the view is restricted solely to this version data without any external dashboard elements, service cards, or database connection indicators present on the screen.",
+  "timestamp": 1781002297,
+  "run_signature": "785bdb8d86ce4ebf596c20c5a308aa8aa03fef5099d01ad3fc1670328e3987be"
 }

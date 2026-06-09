@@ -2,9 +2,9 @@
   "task": "P4-4",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
     ],
     "screenshots": [
-      "evidence/shots/D10-language-lock.png"
+      "evidence/shots/P4-4-D10-language-lock.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D10-language-lock.png": "8272c8de67691e814ef54fd3148df10df3d4675c7194daf768ae3984ce7a3879"
+    "evidence/shots/P4-4-D10-language-lock.png": "855b33a76afc26884e2d9187f59f53bd8cc383f6dd24cc102f8dd705d6d460d3"
   },
-  "vision_verdict": "pass: The dashboard displays a consistent, high-fidelity user interface with a clearly defined \"Language\" selection tool currently set to English. The layout maintains perfect alignment, with all structural elements—including the sidebar navigation, the \"Whitelisted Judge Sandbox Console,\" and the central \"Interactive Knowledge Library\" module—rendering cleanly. Text remains sharp and correctly oriented within their containers, indicating that the system's localization framework manages state effectively. The visual hierarchy remains coherent and stable throughout the presented view.",
-  "timestamp": 1780999759,
-  "run_signature": "5b0a4e7e2daf62c0d40d2e045ff194ae2292cb92227d963e2d9b0dad25e7d757"
+  "vision_verdict": "Pass. The screenshot shows a clean, well-structured interface for the \"Fahem\" academic platform. The language setting is explicitly toggled to English, and all text elements, headers, and UI descriptions are consistently displayed in English, reflecting a stable and unified language state. The layout remains perfectly aligned with no signs of misalignment or rendering issues. The \"Welcome to Fahem Sandbox\" guide is displayed clearly, demonstrating that the platform is fully responsive and functioning as intended within the sandbox environment, maintaining a cohesive user experience.",
+  "timestamp": 1781002795,
+  "run_signature": "0feb49b2f0fb84d5cacb3450489204ddd2c8551bc921fb9db60069024890b3f1"
 }

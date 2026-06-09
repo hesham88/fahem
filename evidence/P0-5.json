@@ -2,9 +2,9 @@
   "task": "P0-5",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-5-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-5-D0-version.png": "eb8b8566ba82c99a89e03d4948ca6ee6c9ef230399ecb43d4e9e4811da101808"
   },
-  "vision_verdict": "pass. The screenshot displays a clean and minimalist JSON response from the `/api/version` endpoint. The output contains a valid `sha` identifier and a precise `builtAt` ISO 8601 timestamp. The browser view is completely unobstructed, presenting the data in its raw, structural form with a single \"Pretty-print\" toggle box available at the top left. The layout is intact and fully optimized, ensuring a direct and unhindered view of the versioning metadata without any additional interface elements or supplementary panels.",
-  "timestamp": 1780999043,
-  "run_signature": "86ead44e6f71b9de347735de6776fbefaa052e6a59be02bd973123c8c85917f1"
+  "vision_verdict": "pass. The API response displays a valid JSON object structure, correctly containing the `sha` identifier (34443c0fc350976905064918c00910b75c519ada) and a `builtAt` timestamp (2026-06-09T10:25:31.654Z). The system reports a healthy status, and the manifestation information confirms adherence to security invariants. The layout remains clean, displaying the requested platform version metadata and an array of repetitive branding strings (\"FAHEM\") as part of the data body. The view is uncluttered and focused strictly on the requested version information, confirming that all infrastructure or secondary interface components are entirely hidden from this display.",
+  "timestamp": 1781002404,
+  "run_signature": "cfd67b8b96b5f0c623a25428aeffa7643722bd81befd9308307e6176e1f39d4d"
 }

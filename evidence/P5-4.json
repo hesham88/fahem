@@ -2,9 +2,9 @@
   "task": "P5-4",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D10: Multi-turn chatbot conversation remains consistent, respecting same selected language."
     ],
     "screenshots": [
-      "evidence/shots/D10-language-lock.png"
+      "evidence/shots/P5-4-D10-language-lock.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D10-language-lock.png": "0ae3f0ed8f34b961648591b2620e3e2dd0333d5aa3d56f1cdf6289fc191f8457"
+    "evidence/shots/P5-4-D10-language-lock.png": "a2976a304e1a65cd8898d9b58ed92c7209dfb47066c73fb046a2e83bc2c7f0d9"
   },
-  "vision_verdict": "pass. The interface displays a highly organized and consistent user experience. In the sidebar, the language selection tool is clearly present and set to English, matching the current text throughout the entire dashboard, including the \"Welcome to Fahem Sandbox\" guide and the navigational headers. The layout remains clean and symmetrical, with all elements rendered precisely in their intended positions. The visual hierarchy is maintained across the entire view, and the integration of the sandbox controls and educational modules demonstrates a stable and responsive design structure that effectively supports multi-lingual functionality without any disruptions in presentation.",
-  "timestamp": 1780999864,
-  "run_signature": "edb3f953210cdf0020dc8b86922576de79b47895667fdcd7477352eb8b9cbe6b"
+  "vision_verdict": "pass. The interface is displayed in English, with the language selection dropdown clearly set to English. The layout remains stable and consistent, with all dashboard elements, navigation menus, and the interactive welcome guide correctly rendered in the selected language. The visual hierarchy, from the \"Whitelisted Judge Sandbox Console\" down to the \"All Libraries\" portal, is properly aligned, indicating a clean and cohesive user experience that respects the chosen localization settings.",
+  "timestamp": 1781003002,
+  "run_signature": "a8b0bfb91d8db6123726a44a3e7abd0f1742181303f1f640950ce9ca41eef14b"
 }

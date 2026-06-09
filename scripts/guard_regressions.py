@@ -59,7 +59,7 @@ def main():
     # Run unittest discovery
     cmd = [sys.executable, "-m", "unittest", "discover", "-s", "tests/regressions", "-p", "test_*.py"]
     try:
-        result = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+        result = subprocess.run(cmd, cwd=root, capture_output=True, text=True, encoding="utf-8", errors="ignore")
         print(result.stdout)
         if result.returncode != 0:
             print(result.stderr)

@@ -2,8 +2,8 @@
   "task": "ES-5",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,17 +12,17 @@
       "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
     ],
     "screenshots": [
-      "evidence/shots/D3-admin-view.png",
-      "evidence/shots/D3-student-view.png",
-      "evidence/shots/D3-teacher-view.png"
+      "evidence/shots/ES-5-D3-admin-view.png",
+      "evidence/shots/ES-5-D3-student-view.png",
+      "evidence/shots/ES-5-D3-teacher-view.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D3-admin-view.png": "d3802299b3cf6fae866175606e736723b4aa88f50a08217f4ebf2fa749bc65af",
-    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
-    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+    "evidence/shots/ES-5-D3-admin-view.png": "a94a4c2ba4201296b42c4fa1fefa710024864761e8d49f5eb443e535e1d1439c",
+    "evidence/shots/ES-5-D3-student-view.png": "27596ab1ad96cf794690a62b44441c500428be806dc364527abe0ab22b0ac67c",
+    "evidence/shots/ES-5-D3-teacher-view.png": "536668501b727b7e2f62c10354ddfe79fc815398781f4a37aa7b6281a0cd10c8"
   },
-  "vision_verdict": "pass. The screenshot displays a fully operational sandbox environment, confirming the presence of the requested personas via the \"Whitelisted Judge Sandbox Console\" at the top, which allows toggling between Admin, Student, and Teacher roles. The \"Knowledge Library\" workspace is clearly rendered with active navigation elements, library tabs, and a functional search interface. A comprehensive onboarding overlay is visible, guiding the user through the agent-driven platform. The sidebar displays a complete set of navigation links, language settings, and user authentication details for the \"DEM...\" account. The interface loads with a clean layout and coherent structure, reflecting a successfully initialized session.",
-  "timestamp": 1780999436,
-  "run_signature": "a774c752c25304c6d55541bea9c33a4e1929d1950747df68f7ca624bace1057a"
+  "vision_verdict": "pass. The screenshot displays a functional and fully operational sandbox environment. The active workspace is clearly populated with the \"Knowledge Library\" module, which is accessible and ready for interaction. The UI includes a persistent navigation sidebar and a top \"Whitelisted Judge Sandbox Console\" that allows seamless switching between Admin, Student, and Teacher personas. The layout is clean and remains intact, with the central \"Welcome\" guide confirming that the RAG-grounded system is ready to adapt to specific user roles. The presence of the onboarding modal suggests that the platform is initialization-complete and awaiting user input, confirming a stable and fully responsive environment.",
+  "timestamp": 1781001881,
+  "run_signature": "0e4099983d591a68549a5279d4af0936b9fa08df8b98b6b21b289dec2a81fcfa"
 }

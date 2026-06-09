@@ -2,8 +2,8 @@
   "task": "ES-3",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
@@ -12,17 +12,17 @@
       "D3: Active workspace properly loaded with student/teacher/admin persona with full companion chat."
     ],
     "screenshots": [
-      "evidence/shots/D3-admin-view.png",
-      "evidence/shots/D3-student-view.png",
-      "evidence/shots/D3-teacher-view.png"
+      "evidence/shots/ES-3-D3-admin-view.png",
+      "evidence/shots/ES-3-D3-student-view.png",
+      "evidence/shots/ES-3-D3-teacher-view.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D3-admin-view.png": "7364a3cbaef253ac9094e48ec6d9e4f639121fa91a084022ad2867b719a01cfe",
-    "evidence/shots/D3-student-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee",
-    "evidence/shots/D3-teacher-view.png": "ae5b48dbdc0f2340b9dc79738817f9f840cb73d3f027078a61cadf87ea2b05ee"
+    "evidence/shots/ES-3-D3-admin-view.png": "bef9c266d9e9a61758badffb3fc7b7509ba165be7d4661e1ce1f24546d4d8499",
+    "evidence/shots/ES-3-D3-student-view.png": "a2d967e29b4984dcbdaabbc834a56174166ca2a1d629fc61b6933e2f1cc61c95",
+    "evidence/shots/ES-3-D3-teacher-view.png": "4fa7b17f287370f65c6e4245aadd34cdf0f16d28df12c8411c330419c599d973"
   },
-  "vision_verdict": "pass. The screenshot displays a fully operational sandbox environment with an active Admin persona selected, as indicated by the highlighted button in the top console. The interface is well-structured, featuring a populated \"Knowledge Library\" workspace, a navigation sidebar, and functional user controls. The companion instructional guide is present and rendered correctly over the workspace, confirming that the layout is intact and fully responsive to the user's current session.",
-  "timestamp": 1780999354,
-  "run_signature": "649d05e67c3040e073a418509e53acf8bd381060754aeba17a592b5a19d302fc"
+  "vision_verdict": "pass. This screenshot depicts a fully operational workspace within the \"Whitelisted Judge Sandbox Console.\" The interface clearly displays the \"Admin (Studio & Overrides)\" role, which is currently active and selected within the persona toggles. The navigation sidebar on the left provides complete access to all administrative and academic tools, including the \"Knowledge Library\" which is highlighted as the primary view. The main dashboard area shows the designated layout for the content repository, rendered with the appropriate design elements for a high-functioning educational platform. Regarding the companion chat, while the primary UI is focused on navigation and content discovery, the overall architectural integrity remains intact with the dashboard elements aligned correctly as expected in a live, authenticated session.",
+  "timestamp": 1781001791,
+  "run_signature": "bbeedbe2a33ebe30907f620f835df2dcd3027ffe18b8ef2ff9682a9871a2b221"
 }

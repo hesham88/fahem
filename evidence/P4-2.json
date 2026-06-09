@@ -2,9 +2,9 @@
   "task": "P4-2",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -16,9 +16,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/P4-2-D10-language-lock.png": "ea9c605f638ae7aab73c2c07b6319c0d77ac21bab44035c40115c3e614995be4"
+    "evidence/shots/P4-2-D10-language-lock.png": "84ec9b0c083752d560e2711156a4381afb9065861a2add8ccc253452e4f0d9e6"
   },
-  "vision_verdict": "pass. The interface displays a consistent linguistic application, as the primary navigation menus, instructional labels, and interactive components are presented in English throughout the screenshot. The layout maintains structural integrity, with the sidebar, top-tier sandbox controls, and the central informational hub aligned perfectly. The content demonstrates a stable user experience where the UI elements remain uniform, ensuring that the chosen language remains the standard for all visible text and functional indicators within the workspace.",
-  "timestamp": 1781000218,
-  "run_signature": "2f5aa8120262eada4a193793d4d158fbbc4b19b009007c2479e2a9923714a68e"
+  "vision_verdict": "pass. The interface displays a consistent linguistic application, as the primary navigation menus, instructional tooltips, and dashboard headers are presented in English throughout the screenshot. The layout remains fully intact, with well-aligned containers and clear hierarchical organization. Each element, from the sidebar navigation to the contextual guide, maintains a uniform visual structure that successfully supports the intended user workflow.",
+  "timestamp": 1781002713,
+  "run_signature": "e02791087efbea4461f9b23d24783fe84ae7c765854a0d02700c9d8d0d480c33"
 }

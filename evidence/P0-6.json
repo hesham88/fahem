@@ -2,9 +2,9 @@
   "task": "P0-6",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-6-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-6-D0-version.png": "7f46be62549c725bb4e12febe1dea6b2c9aeade759cf1f436e68c8057ba72512"
   },
-  "vision_verdict": "pass: The screenshot displays a cleanly rendered `/api/version` endpoint response. The JSON structure is present, containing a properly formatted `sha` identifier and a valid `builtAt` ISO 8601 timestamp. The browser's native formatting view is active, and the display remains pristine, showing only the requested API payload. The layout is intact because the interface is focusing exclusively on the raw data stream, demonstrating a successful and clear delivery of the version information.",
-  "timestamp": 1780999066,
-  "run_signature": "809d8d493b03ed112527cd4473ad72eb4da27fd2c8e17efafdc93cb517342b06"
+  "vision_verdict": "pass. The screenshot displays a clean and valid JSON response from the `/api/version` endpoint. The data includes a properly formatted 'sha' string, a 'builtAt' timestamp, a 'healthy' status, and the 'manifest_info' field confirming compliance with security standards. The 'padding' field contains a large, repetitive sequence of text, which is typical for specific internal formatting requirements. The interface shows a standard, raw JSON output consistent with a direct API call. There is no additional UI, administrative dashboard, or external integration component present, indicating that the view is restricted solely to the requested JSON data structure. The layout is intact and fully operational as a standard machine-readable response.",
+  "timestamp": 1781002432,
+  "run_signature": "97a889fb3fb3071d6c14cdf984acd2fa178700781fffb0b4e2e20f4001f879b8"
 }

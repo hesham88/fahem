@@ -2,9 +2,9 @@
   "task": "P0-4",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D0: API version response is fully parsed, returning valid Git SHA and build time payload."
     ],
     "screenshots": [
-      "evidence/shots/D0-version.png"
+      "evidence/shots/P0-4-D0-version.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D0-version.png": "b66be210b3ab2a83405a514266bb06a0276e8c90725587ca609fe3ccdc32b393"
+    "evidence/shots/P0-4-D0-version.png": "3fc8e13f10ed4dd176bf5775ac9860cbe95c1c125ad00bc5e43a5ce5f1806381"
   },
-  "vision_verdict": "pass. The screenshot displays a clean and correctly formatted JSON object containing the `sha` identifier and the `builtAt` timestamp. The layout is presented in a raw browser view, indicating the API is returning the requested data successfully and directly. The interface is focused entirely on the raw data response, which appears as expected for a standard version endpoint, confirming that the view is restricted to the essential system information requested.",
-  "timestamp": 1780999023,
-  "run_signature": "620039f09d40a0fa29a4e712fb8457a106514465691a4b140b1e66da9a58f38e"
+  "vision_verdict": "pass. The screenshot displays a cleanly formatted JSON response originating from the `/api/version` endpoint. The output contains a valid `sha` identifier and a precise `builtAt` timestamp, confirming that the system state is correctly reported. The platform information, system name, and status are clearly visible and indicate a healthy operational state. The response layout is perfectly preserved, consisting solely of structured metadata and a repetitive padding sequence, ensuring that the interface remains focused entirely on the versioning information without any additional dashboard components or external database status elements present in this view.",
+  "timestamp": 1781002384,
+  "run_signature": "6c9a8ff670ced3039cc3d6c393c6714490843f49930884e48fa97a50eac4abfb"
 }

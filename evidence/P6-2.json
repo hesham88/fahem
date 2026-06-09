@@ -2,9 +2,9 @@
   "task": "P6-2",
   "builder": "builder-1",
   "d_box": "D9",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
-  "frontend_revision": "2026-06-09T01:17:58.129Z",
-  "backend_revision": "fahem-agent-00155-swr",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "Cloud Run",
   "smoke": {
     "url": "https://fahem.pro",
     "status": "pass",
@@ -12,13 +12,13 @@
       "D9: Admin security policy override dashboard and logs loaded successfully with HTTP 200."
     ],
     "screenshots": [
-      "evidence/shots/D9-admin-panel.png"
+      "evidence/shots/P6-2-D9-admin-panel.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D9-admin-panel.png": "8291bb101102296fe525c4854d9b7883119a1700654778762052b29642a3fff2"
+    "evidence/shots/P6-2-D9-admin-panel.png": "227a9f05420a2c5cc4415a4bc34d8206b0f91094e5265e3d28958849969c9535"
   },
-  "vision_verdict": "pass. The interface loads cleanly, exhibiting a stable and cohesive layout. The navigation sidebar, header, and primary content regions are correctly aligned and rendered. The inclusion of the welcome tour modal is fully functional, indicating that the front-end successfully initialized and processed the necessary scripts. Each UI component, including the tabbed navigation for \"Accounts & Roles,\" \"Token Limit Overrides,\" and \"Demo Oversight Console,\" appears properly structured, suggesting that all assets and data fetches returned a successful HTTP 200 status. The visual hierarchy is maintained, reflecting a well-rendered application state.",
-  "timestamp": 1780999961,
-  "run_signature": "b09857c3d03709f1561b4dd9c852e7cfee678dd2389f52b38094661d24f765b0"
+  "vision_verdict": "pass. The dashboard displays a clean, professional user interface consistent with a successful page render (HTTP 200). The layout remains perfectly aligned, with all UI components—including the sidebar navigation, the top-level persona selector, the primary content area, and the welcome overlay—rendered in their intended positions. The typography is legible, the color scheme is consistent, and the interactive elements (such as the tabs and the onboarding carousel) are clearly visible and appropriately spaced, indicating a stable and functional state for the application environment.",
+  "timestamp": 1781003164,
+  "run_signature": "2ab7350ddcdbff22d6102fb94f55641149b1c34f2a6b8444c6e77cb74c61d057"
 }

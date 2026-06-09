@@ -1,0 +1,24 @@
+{
+  "task": "R14",
+  "builder": "builder-1",
+  "d_box": "D9",
+  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "frontend_revision": "2026-06-09T10:25:31.654Z",
+  "backend_revision": "Cloud Run",
+  "smoke": {
+    "url": "https://fahem.pro",
+    "status": "pass",
+    "assertions": [
+      "D9: Admin security policy override dashboard and logs loaded successfully with HTTP 200."
+    ],
+    "screenshots": [
+      "evidence/shots/R14-D9-admin-panel.png"
+    ]
+  },
+  "screenshot_hashes": {
+    "evidence/shots/R14-D9-admin-panel.png": "e17b82c346af386716df2437223ad643230fde09a8a9304695042f5db01ba2a6"
+  },
+  "vision_verdict": "pass. The screenshot displays a fully functional, clean interface indicating that the application loads successfully with an HTTP 200 status. The layout is well-structured, featuring a sidebar with navigation items, a clear header for the \"Whitelisted Judge Sandbox,\" and a central workspace titled \"Users & Activity Trail.\" The elements, including the modal window in the lower right, the tabbed navigation for \"Accounts & Roles,\" and the user profile summary, are rendered with appropriate alignment and spacing, showing a professional and responsive design throughout.",
+  "timestamp": 1781001158,
+  "run_signature": "fbf1b34ef5c585ed839f1863ee0b4475a3e619c5f12a2df73a7fc777ff571bdd"
+}
