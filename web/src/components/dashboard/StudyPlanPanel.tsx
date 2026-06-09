@@ -369,6 +369,7 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
               {language === "ar" ? "✍️ توجيهات أو أهداف خاصة لتصميم الخطة (اختياري):" : "✍️ Custom Planner Instructions / Target Horizon (Optional):"}
             </label>
             <textarea
+              id="planner-instructions-input"
               value={planPrompt}
               onChange={(e) => setPlanPrompt(e.target.value)}
               placeholder={

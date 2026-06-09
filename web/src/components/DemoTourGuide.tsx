@@ -17,6 +17,7 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [isMinimized, setIsVisibleMinimized] = useState<boolean>(false);
+  const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
 
   // Initialize: Check localStorage and fetch/sync state on mount
   useEffect(() => {
@@ -44,7 +45,7 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
     setIsVisible(true);
   }, []);
 
-  // Synchronize active tab based on step changes
+  // Synchronize active tab & companion chat drawer based on step changes
   useEffect(() => {
     if (!isVisible) return;
     
@@ -53,11 +54,23 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
       case 3:
         if (activeTab !== "library") setActiveTab("library");
         break;
+      case 4:
+      case 5:
+        // Force expand the companion chat drawer
+        window.dispatchEvent(new CustomEvent("fahem_chat_open"));
+        break;
       case 6:
         if (activeTab !== "practice") setActiveTab("practice");
+        // Force-close the companion chat drawer to prevent overlap with the Planner
+        window.dispatchEvent(new CustomEvent("fahem_chat_close"));
         break;
       case 7:
+        if (activeTab !== "social") setActiveTab("social");
+        window.dispatchEvent(new CustomEvent("fahem_chat_close"));
+        break;
+      case 8:
         if (activeTab !== "insights") setActiveTab("insights");
+        window.dispatchEvent(new CustomEvent("fahem_chat_close"));
         break;
       default:
         break;
@@ -79,8 +92,63 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
 
   }, [currentStep, isVisible]);
 
+  // Track coordinates of the current step's highlighted element
+  useEffect(() => {
+    if (!isVisible) {
+      setSpotlightRect(null);
+      return;
+    }
+
+    let selector = "";
+    switch (currentStep) {
+      case 4:
+      case 5:
+        // Companion & Command input box in StickyChat
+        selector = "#sticky-chat-input";
+        break;
+      case 6:
+        // Planning text area input in StudyPlanPanel
+        selector = "#planner-instructions-input";
+        break;
+      case 7:
+        // Social chat message input in SocialPanel
+        selector = "#social-chat-input";
+        break;
+      default:
+        break;
+    }
+
+    if (!selector) {
+      setSpotlightRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const el = document.querySelector(selector);
+      if (el) {
+        setSpotlightRect(el.getBoundingClientRect());
+      } else {
+        setSpotlightRect(null);
+      }
+    };
+
+    // Delay first measurement slightly to allow Next.js tab transition and slide rendering
+    const timer = setTimeout(updateRect, 300);
+
+    const interval = setInterval(updateRect, 150);
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [currentStep, isVisible, activeTab]);
+
   const handleNext = () => {
-    if (currentStep < 7) {
+    if (currentStep < 8) {
       setCurrentStep(prev => prev + 1);
     } else {
       handleComplete();
@@ -214,6 +282,14 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
       badgeAr: "📝 الممارسة النشطة"
     },
     {
+      titleEn: "Social Network & Interactive Chat",
+      titleAr: "شبكة التواصل الاجتماعي والدردشة التفاعلية",
+      descEn: "Connect and debate with peers, teachers, and study groups in real-time. Use the secure messenger input highlighted here to ask questions, solve challenges together, and share custom study worksheets.",
+      descAr: "تواصل وتناقش مع زملائك، معلميك، ومجموعات الدراسة في الوقت الفعلي. استخدم صندوق الرسائل الآمن المظلل هنا لإرسال الأسئلة، ومشاركة أوراق العمل وحل التحديات معاً.",
+      badge: "💬 Social Core",
+      badgeAr: "💬 منتدى التواصل"
+    },
+    {
       titleEn: "Insights, Gamification & Live Signup",
       titleAr: "لوحة التحصيل العلمي والاشتراك",
       descEn: "Watch your knowledge grow! Earn experience points (XP), collect learning streak badges, and map out your academic proficiency. Sign up for a free personal account anytime to load your own custom books!",
@@ -236,6 +312,16 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
         @keyframes tourFadeInUp {
           from { opacity: 0; transform: translateY(20px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes tourSpotlightPulse {
+          0% {
+            border-color: #00f0ff;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.55), inset 0 0 6px rgba(0, 240, 255, 0.3);
+          }
+          100% {
+            border-color: #106ba3;
+            box-shadow: 0 0 25px rgba(16, 107, 163, 0.8), inset 0 0 12px rgba(16, 107, 163, 0.55);
+          }
         }
         .tour-glass-card {
           backdrop-filter: blur(20px);
@@ -266,6 +352,71 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
           border-radius: 4px;
         }
       `}</style>
+
+      {/* Dynamic Interactive Spotlight Overlay */}
+      {isVisible && spotlightRect && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 9999,
+            pointerEvents: "none",
+            transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+          }}
+        >
+          {/* Backdrop SVG containing the mask cutout */}
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              pointerEvents: "none"
+            }}
+          >
+            <defs>
+              <mask id="tour-spotlight-mask">
+                <rect width="100%" height="100%" fill="white" />
+                <rect
+                  x={spotlightRect.left - 8}
+                  y={spotlightRect.top - 8}
+                  width={spotlightRect.width + 16}
+                  height={spotlightRect.height + 16}
+                  rx={12}
+                  fill="black"
+                />
+              </mask>
+            </defs>
+            <rect
+              width="100%"
+              height="100%"
+              fill="rgba(8, 15, 28, 0.65)"
+              mask="url(#tour-spotlight-mask)"
+              style={{ pointerEvents: "auto" }}
+            />
+          </svg>
+
+          {/* Glowing neon pulse outline around the targeted input */}
+          <div
+            style={{
+              position: "fixed",
+              top: spotlightRect.top - 8,
+              left: spotlightRect.left - 8,
+              width: spotlightRect.width + 16,
+              height: spotlightRect.height + 16,
+              borderRadius: "12px",
+              border: "2px solid #00f0ff",
+              pointerEvents: "none",
+              boxShadow: "0 0 15px rgba(0, 240, 255, 0.6), inset 0 0 8px rgba(0, 240, 255, 0.4)",
+              animation: "tourSpotlightPulse 1.5s infinite alternate ease-in-out"
+            }}
+          />
+        </div>
+      )}
 
       {/* Main Guided Card Panel */}
       <div
@@ -358,7 +509,7 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
         >
           {/* Progress Indicator dots */}
           <div style={{ display: "flex", gap: "5px" }}>
-            {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
               <div
                 key={s}
                 className={`tour-progress-dot ${s === currentStep ? "active" : ""}`}
@@ -417,7 +568,7 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
                 e.currentTarget.style.boxShadow = "0 4px 10px rgba(16, 107, 163, 0.25)";
               }}
             >
-              {currentStep === 7 ? (isAr ? "إنهاء الدليل" : "Finish") : (isAr ? "التالي" : "Next")}
+              {currentStep === 8 ? (isAr ? "إنهاء الدليل" : "Finish") : (isAr ? "التالي" : "Next")}
             </button>
           </div>
         </div>

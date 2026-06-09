@@ -39,6 +39,10 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate: number = 24000, numChannels: nu
   return Buffer.concat([header, pcmBuffer]);
 }
 
+// Simple in-memory cache to store generated speech audio for identical texts, voices, and languages.
+// Key format: voice:language:cleanText
+const ttsCache = new Map<string, { audioContent: string; mimeType: string }>();
+
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireUser(req);
@@ -66,6 +70,38 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Text contains no readable speech after stripping emoticons" }), { status: 400 });
     }
 
+    // Select standard voice name if not provided
+    // Available voices: "Aoede", "Kore", "Puck", "Charon", "Fenrir" etc.
+    const selectedVoice = voice || "Aoede";
+
+    // Check Cache
+    const cacheKey = `${selectedVoice}:${language || "en"}:${cleanText}`;
+    if (ttsCache.has(cacheKey)) {
+      console.log(`[api-audio-tts] Cache hit for: ${cleanText.substring(0, 40)}...`);
+      const cached = ttsCache.get(cacheKey)!;
+
+      // Log Audit Event for cached hits
+      try {
+        await proxyRequest("/audit-logs", "POST", {
+          category: "AUDIO_TTS",
+          agent: "Audio Service",
+          message: `User listened to cached audio TTS segment using voice: ${selectedVoice}`,
+          details: `Voice: ${selectedVoice} • Text Length: ${cleanText.length} chars • Language: ${language || "en"} • (Cache Hit)`
+        });
+      } catch (err) {
+        console.warn("[api-audio-tts] Failed to log cached audit event:", err);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        audioContent: cached.audioContent,
+        mimeType: cached.mimeType
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // Direct Next.js execution of Gemini is used for both local and production environments
     // to bypass Google's enterprise safety/policy block (blockReason: PROHIBITED_CONTENT)
     // on gemini-3.1-flash-tts-preview model triggered by Cloud Run's US-East4 VPC/egress IP ranges.
@@ -80,10 +116,6 @@ export async function POST(req: NextRequest) {
     const modelName = "gemini-3.1-flash-tts-preview";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
-    // Select standard voice name if not provided
-    // Available voices: "Aoede", "Kore", "Puck", "Charon", "Fenrir" etc.
-    const selectedVoice = voice || "Aoede";
-
     let promptText = `Please read the following text exactly as written, word-for-word, in its original language, with absolutely no greetings, prefaces, answers, or commentary:\n\n${cleanText}`;
 
     const isArabic = language === "ar" || /[\u0600-\u06FF]/.test(cleanText);
@@ -91,52 +123,87 @@ export async function POST(req: NextRequest) {
       promptText = `Please read the following Arabic text exactly as written, word-for-word, with absolutely no greetings, prefaces, answers, or commentary. You must read it strictly using the authentic Egyptian Arabic dialect (اللهجة المصرية) pronunciation, rhythm, accent, and tone. Do not use Modern Standard Arabic (Fusha) pronunciation — speak completely in a natural Egyptian dialect (اللهجة العامية المصرية):\n\n${cleanText}`;
     }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: selectedVoice
+    let response: any = null;
+    const attempts = 4;
+    let delay = 1000; // start with 1000ms delay for 429 retries
+    let lastErrorText = "";
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              responseModalalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: selectedVoice
+                  }
+                }
               }
-            }
+            },
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          })
+        });
+
+        if (response.ok) {
+          break; // success
+        }
+
+        lastErrorText = await response.text();
+        if (response.status === 429) {
+          if (attempt < attempts) {
+            console.warn(`[api-audio-tts] Gemini API returned 429 quota. Retrying in ${delay}ms... (Attempt ${attempt}/${attempts})`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            delay *= 2; // exponential backoff
+            continue;
           }
         }
-      })
-    });
-
-    let inlineData;
-    let totalTokens = 0;
-    let promptTokens = 0;
-    let completionTokens = 0;
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`[api-audio-tts] Gemini API returned error ${response.status}: ${errorText}. Activating high-fidelity mock WAV fallback to bypass rate limits.`);
-      
-      // Fallback: Generate a high-fidelity synthetic silent WAV buffer (at least 2000 bytes of PCM)
-      const mockPcm = Buffer.alloc(48000); // 1 second of 24000Hz 16-bit mono silence
-      inlineData = {
-        data: mockPcm.toString("base64"),
-        mimeType: "audio/pcm;rate=24000"
-      };
-    } else {
-      const resJson = await response.json();
-      inlineData = resJson.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-      
-      if (!inlineData || !inlineData.data) {
-        return new Response(JSON.stringify({ error: "No audio content returned from Gemini TTS model" }), { status: 500 });
+        
+        break; // if not 429 or out of attempts
+      } catch (err: any) {
+        lastErrorText = err.message || String(err);
+        if (attempt < attempts) {
+          console.warn(`[api-audio-tts] Fetch failed: ${lastErrorText}. Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2;
+          continue;
+        }
+        throw err;
       }
-
-      const usageMetadata = resJson.usageMetadata;
-      promptTokens = usageMetadata?.promptTokenCount || 0;
-      completionTokens = usageMetadata?.candidatesTokenCount || 0;
-      totalTokens = usageMetadata?.totalTokenCount || 0;
     }
+
+    if (!response || !response.ok) {
+      const status = response ? response.status : 500;
+      console.error(`[api-audio-tts] Gemini API failed with status ${status}: ${lastErrorText}`);
+      return new Response(JSON.stringify({
+        error: `Gemini API failed with status ${status}: ${lastErrorText}`
+      }), {
+        status: status,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const resJson = await response.json();
+    const inlineData = resJson.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    
+    if (!inlineData || !inlineData.data) {
+      console.error(`[api-audio-tts] No audio content returned from Gemini. Full response:`, JSON.stringify(resJson));
+      return new Response(JSON.stringify({ error: "No audio content returned from Gemini TTS model" }), { status: 500 });
+    }
+
+    const usageMetadata = resJson.usageMetadata;
+    const promptTokens = usageMetadata?.promptTokenCount || 0;
+    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = usageMetadata?.totalTokenCount || 0;
 
     const targetUserId = ctx.uid;
     const targetUserEmail = ctx.email || "anonymous@fahem.ai";
@@ -192,6 +259,12 @@ export async function POST(req: NextRequest) {
     // Convert raw PCM to browser-playable WAV container
     const wavBuffer = pcmToWav(pcmBuffer, sampleRate, 1, 16);
     const wavB64 = wavBuffer.toString("base64");
+
+    // Cache the successful result
+    ttsCache.set(cacheKey, {
+      audioContent: wavB64,
+      mimeType: "audio/wav"
+    });
 
     return new Response(JSON.stringify({
       success: true,

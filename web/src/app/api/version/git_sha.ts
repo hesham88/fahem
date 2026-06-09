@@ -1,1 +1,1 @@
-export const GIT_SHA = "7d2c8e1cba0c3a16d4b2db6c9de01477a90e0217";
+export const GIT_SHA = "6ce5a6dd22cccafa49855843aa610ef7b39413bc";

@@ -1027,6 +1027,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                     }}
                   >
                     <input
+                      id="social-chat-input"
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}

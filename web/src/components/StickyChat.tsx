@@ -521,6 +521,15 @@ export default function StickyChat() {
       if (persisted === "true") {
         setIsOpen(true);
       }
+
+      const handleForceOpen = () => setIsOpen(true);
+      const handleForceClose = () => setIsOpen(false);
+      window.addEventListener("fahem_chat_open", handleForceOpen);
+      window.addEventListener("fahem_chat_close", handleForceClose);
+      return () => {
+        window.removeEventListener("fahem_chat_open", handleForceOpen);
+        window.removeEventListener("fahem_chat_close", handleForceClose);
+      };
     }
   }, []);
 
@@ -3749,6 +3758,7 @@ User Question: ${queryText}`;
             </button>
 
             <input
+              id="sticky-chat-input"
               type="text"
               value={inputValue}
               onChange={(e) => {
