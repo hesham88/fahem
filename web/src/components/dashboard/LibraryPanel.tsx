@@ -2234,16 +2234,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [libraryCounts, setLibraryCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  const isBookInLibrary = (b: any, libId: string) => {
+    if (b.library_id === libId || b.libraryId === libId) return true;
+    const lib = libraries.find(l => l._id === libId);
+    if (!lib) return false;
+    if (lib.subject_id && (b.subject_id === lib.subject_id || b.subjectId === lib.subject_id)) return true;
+    if (libId === "lib_moe" && (b.isMoeIngested || (b.subject_id && b.subject_id.includes("moe")) || (b.curriculum_id && b.curriculum_id.includes("moe")))) return true;
+    if (libId === "lib_openstax" && ((b.titleEn && b.titleEn.toLowerCase().includes("openstax")) || (b.title && b.title.toLowerCase().includes("openstax")) || (b.sourceUrl && b.sourceUrl.includes("openstax")) || b.library_id === "lib_openstax")) return true;
+    return false;
+  };
+
   const fetchCounts = (libs: any[]) => {
     const counts: Record<string, number> = {};
     for (const lib of libs) {
-      const libBooks = (dynamicBooks || []).filter((b: any) => {
-        if (b.library_id === lib._id || b.libraryId === lib._id) return true;
-        if (lib.subject_id && (b.subject_id === lib.subject_id || b.subjectId === lib.subject_id)) return true;
-        if (lib._id === "lib_moe" && (b.isMoeIngested || (b.subject_id && b.subject_id.includes("moe")) || (b.curriculum_id && b.curriculum_id.includes("moe")))) return true;
-        if (lib._id === "lib_openstax" && ((b.titleEn && b.titleEn.toLowerCase().includes("openstax")) || (b.title && b.title.toLowerCase().includes("openstax")) || (b.sourceUrl && b.sourceUrl.includes("openstax")) || b.library_id === "lib_openstax")) return true;
-        return false;
-      });
+      const libBooks = (dynamicBooks || []).filter((b: any) => isBookInLibrary(b, lib._id));
       counts[lib._id] = libBooks.length;
     }
     counts["all"] = (dynamicBooks || []).length;
@@ -4229,7 +4233,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         
         if (activeLibraryTab === "curriculum") {
           curriculumSubjects.forEach((subj: any) => {
-            const subjectBooks = subj.books || [];
+            const subjectBooks = (dynamicBooks || []).filter((b: any) => {
+              const matchesSubject = b.subject_id === subj._id || b.subjectId === subj._id;
+              if (!matchesSubject) return false;
+              if (selectedLibraryId && selectedLibraryId !== "all") {
+                return isBookInLibrary(b, selectedLibraryId);
+              }
+              return true;
+            });
             subjectBooks.forEach((b: any) => {
               list.push({
                 ...b,

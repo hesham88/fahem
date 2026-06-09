@@ -240,8 +240,28 @@ const AvatarImage = ({ src, size }: { src: string, size: string }) => {
   useEffect(() => {
     setError(false);
   }, [src]);
-  if (error) {
-    return <span style={{ fontSize: `calc(${size} * 0.75)`, display: "inline-block", verticalAlign: "middle", fontFamily: "var(--font-sans)" }}>👤</span>;
+  if (error || !src) {
+    return (
+      <span 
+        style={{ 
+          fontSize: `calc(${size} * 0.6)`, 
+          display: "inline-flex", 
+          alignItems: "center", 
+          justifyContent: "center",
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: "rgba(16, 107, 163, 0.1)",
+          color: "var(--primary)",
+          verticalAlign: "middle", 
+          fontFamily: "var(--font-sans)",
+          border: "1px solid rgba(16, 107, 163, 0.2)"
+        }} 
+        className="avatar-fallback"
+      >
+        👤
+      </span>
+    );
   }
   return (
     <img
@@ -261,17 +281,56 @@ const AvatarImage = ({ src, size }: { src: string, size: string }) => {
 };
 
 const renderAvatar = (avatarVal?: string, fontSize?: string) => {
-  if (!avatarVal) return <span style={{ fontSize }} className="avatar-fallback">👤</span>;
-  const isImage = avatarVal.startsWith("http") || avatarVal.startsWith("/") || avatarVal.includes(".") || avatarVal.includes("data:image");
   const size = fontSize === "2.5rem" ? "60px" :
                fontSize === "2.2rem" ? "48px" :
                fontSize === "1.8rem" ? "36px" :
                fontSize === "1.5rem" ? "30px" : 
                fontSize === "1.1rem" ? "22px" : "36px";
+  if (!avatarVal) {
+    return (
+      <span 
+        style={{ 
+          fontSize: `calc(${size} * 0.6)`, 
+          display: "inline-flex", 
+          alignItems: "center", 
+          justifyContent: "center",
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: "rgba(16, 107, 163, 0.1)",
+          color: "var(--primary)",
+          verticalAlign: "middle", 
+          fontFamily: "var(--font-sans)",
+          border: "1px solid rgba(16, 107, 163, 0.2)"
+        }} 
+        className="avatar-fallback"
+      >
+        👤
+      </span>
+    );
+  }
+  const isImage = avatarVal.startsWith("http") || avatarVal.startsWith("/") || avatarVal.includes(".") || avatarVal.includes("data:image");
   if (isImage) {
     return <AvatarImage src={avatarVal} size={size} />;
   }
-  return <span style={{ fontSize: fontSize || "1.5rem", display: "inline-block", verticalAlign: "middle", fontFamily: "var(--font-sans)" }}>{avatarVal}</span>;
+  return (
+    <span 
+      style={{ 
+        fontSize: fontSize || "1.5rem", 
+        display: "inline-flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: "rgba(16, 107, 163, 0.05)",
+        verticalAlign: "middle", 
+        fontFamily: "var(--font-sans)" 
+      }}
+    >
+      {avatarVal}
+    </span>
+  );
 };
 
 const avatarCategories = {
