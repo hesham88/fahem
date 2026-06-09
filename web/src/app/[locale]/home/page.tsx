@@ -5932,9 +5932,7 @@ export default function Home() {
       {/* Mobile Sticky Header */}
       <header className="mobile-header">
         <div className="mobile-header-left" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.4rem", borderRadius: "var(--border-radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
-            <FiCpu className="pulse-icon" style={{ fontSize: "1.1rem" }} />
-          </div>
+          <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "1.8rem", width: "auto" }} />
           <span style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
         </div>
         <div className="mobile-header-right" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -5969,9 +5967,7 @@ export default function Home() {
           {/* Logo Section */}
           <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "0.6rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "var(--border-radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff" }}>
-                <FiCpu className="pulse-icon" style={{ fontSize: "1.4rem" }} />
-              </div>
+              <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "2.4rem", width: "auto" }} />
               <span style={{ fontWeight: 800, letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
             </div>
             <button 

@@ -9,21 +9,6 @@ export async function POST(req: NextRequest) {
     const db = getLocalDb();
     const config = db.config;
 
-    if (config && config.evalSandboxEnabled === false) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Evaluation sandbox is currently disabled"
-      }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // If evalSandboxEnabled is false, we ignore it for Tier-0 (anonymous) access and instead treat it as a budget/capacity message.
-    const capacityNotice = (!config || !config.evalSandboxEnabled)
-      ? "Demo Sandbox is currently running under low-capacity mode (daily budget ceiling reached). Enjoy exploring!"
-      : null;
-
     // Try to get authenticated user context to determine if they are verified Tier-1
     const authCtx = await verifyAuth(req);
     const body = await req.json().catch(() => ({}));
@@ -64,6 +49,23 @@ export async function POST(req: NextRequest) {
       role = chosenPersona;
     }
 
+    if (config && config.evalSandboxEnabled === false) {
+      if (tier === 1) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Evaluation sandbox is currently disabled"
+        }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // If evalSandboxEnabled is false, we ignore it for Tier-0 (anonymous) access and instead treat it as a budget/capacity message.
+    const capacityNotice = (!config || !config.evalSandboxEnabled)
+      ? "Demo Sandbox is currently running under low-capacity mode (daily budget ceiling reached). Enjoy exploring!"
+      : null;
+
     // Prepare demo token payload
     const sandboxSessionId = "sb_sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
     const exp = Math.floor(Date.now() / 1000) + 3600; // 1 hour short-lived TTL
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
       role: role,
       db_target: email === ["hesham1988", "gmail.com"].join("@") ? "fahem" : "fahem_sandbox",
       sandbox_session_id: sandboxSessionId,
+      tier: tier,
       exp: exp
     };
 

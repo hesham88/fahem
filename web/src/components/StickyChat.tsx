@@ -33,8 +33,12 @@ import {
   FiVolume2,
   FiVolumeX,
   FiEdit2,
-  FiCheck
+  FiCheck,
+  FiCopy,
+  FiThumbsUp,
+  FiThumbsDown
 } from "react-icons/fi";
+
 
 interface Message {
   id: string;
@@ -838,6 +842,12 @@ export default function StickyChat() {
   // Layout & Context States
   const [layoutMode, setLayoutMode] = useState<"compact" | "side" | "fullscreen">("compact");
   const [bookContext, setBookContext] = useState<any>(null);
+
+  // Interactivity, Feedback & Pacing States
+  const [selectedMcqs, setSelectedMcqs] = useState<Record<string, string>>({});
+  const [likedMessages, setLikedMessages] = useState<Record<string, "like" | "dislike">>({});
+  const [chatPacing, setChatPacing] = useState<"instant" | "pedagogical">("instant");
+
 
   // Mentions Dropdown States
   const [mentionType, setMentionType] = useState<"subject" | "book" | "command" | null>(null);

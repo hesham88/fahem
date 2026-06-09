@@ -203,21 +203,7 @@ synthetic_db = {
     ],
     "admin_change_requests": [],
     "user_activities": [],
-    "crawl_jobs": [
-        {
-            "_id": "crawl_job_mock_1",
-            "url": "https://openstax.org/books/introduction-python",
-            "status": "completed",
-            "triggered_by": "hesham1988@gmail.com",
-            "created_at": "2026-06-05T05:00:00Z",
-            "completed_at": "2026-06-05T05:10:00Z",
-            "logs": [
-                "[INIT] Starting job crawl...",
-                "[INFO] Navigated to table of contents.",
-                "[SUCCESS] Crawled introductory pages successfully."
-            ]
-        }
-    ],
+    "crawl_jobs": [],
     "book_pages": [
         {
             "_id": "page_math_1",

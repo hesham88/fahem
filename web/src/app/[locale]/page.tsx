@@ -357,7 +357,7 @@ export default function LandingPage() {
       {/* Glassmorphic Navbar */}
       <nav className="glass-nav" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, backdropFilter: "blur(20px)", borderBottom: "1px solid var(--card-border)", background: isDarkMode ? "rgba(17, 24, 39, 0.75)" : "rgba(248, 250, 252, 0.75)" }}>
         <div className="glass-nav-logo" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <FiCpu className="pulse-icon" style={{ fontSize: "1.6rem", color: "var(--secondary)" }} />
+          <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "2.2rem", width: "auto" }} />
           <span style={{ fontWeight: 800, letterSpacing: "0.5px", background: "linear-gradient(135deg, var(--primary), var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t("dashboard_title")}</span>
         </div>
         <ul className="glass-nav-links" style={{ display: "flex", alignItems: "center", gap: "1.75rem", listStyle: "none" }}>
@@ -957,47 +957,17 @@ export default function LandingPage() {
 
       {/* Styled Interactive Footer with Asdaa.co Attribution */}
       <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: isDarkMode ? "rgba(9, 13, 22, 0.9)" : "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-          <a href={`/${language}/terms`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
-            <FiBookOpen /> {t("nav_terms")}
-          </a>
-          <a href={`/${language}/privacy`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
-            <FiLock /> {t("nav_privacy")}
-          </a>
-          <a href={`/${language}/contact`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
-            <FiMail /> {language === "ar" ? "اتصل بنا" : "Contact Us"}
-          </a>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1.5rem", alignItems: "center" }}>
-          <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiTwitter />
-          </a>
-          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiInstagram />
-          </a>
-          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiFacebook />
-          </a>
-          <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.2rem", transition: "opacity 0.2s" }}>
-            <FiMail />
-          </a>
-          <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Asdaa" style={{ display: "flex", alignItems: "center", gap: "0.25rem", opacity: 0.8, textDecoration: "none", transition: "opacity 0.2s" }}>
-            <img src="/brand/asdaa.png" alt="Asdaa" height="18" style={{ objectFit: "contain" }} />
-          </a>
-        </div>
-
-        {/* Premium Partner & Infrastructure Logos Showcase */}
+        
+        {/* Upper Sub-Section: Partners & Infrastructure Marquee */}
         <div style={{ 
           display: "flex", 
           justifyContent: "center", 
           alignItems: "center", 
           gap: "2.5rem", 
           flexWrap: "wrap", 
-          margin: "2rem auto", 
+          margin: "0 auto 2.5rem auto", 
           maxWidth: "800px",
           padding: "1rem",
-          borderTop: "1px dashed rgba(16, 107, 163, 0.08)",
           borderBottom: "1px dashed rgba(16, 107, 163, 0.08)"
         }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>
@@ -1079,13 +1049,61 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <p style={{ fontSize: "0.9rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <span>{t("footer_landing")}</span>
-          </p>
-          <p style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 600, margin: 0, letterSpacing: "0.5px" }}>
-            Developed by <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa.co</a>
-          </p>
+        {/* Elegant exactly 3-line Footer Content */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
+          
+          {/* Line 1: Navigational Links (Terms • Privacy • Contact Us) */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "2rem", flexWrap: "wrap", alignItems: "center" }}>
+            <a href={`/${language}/terms`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
+              <FiBookOpen /> {t("nav_terms")}
+            </a>
+            <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>•</span>
+            <a href={`/${language}/privacy`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
+              <FiLock /> {t("nav_privacy")}
+            </a>
+            <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>•</span>
+            <a href={`/${language}/contact`} className="footer-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.9rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.8 }}>
+              <FiMail /> {language === "ar" ? "اتصل بنا" : "Contact Us"}
+            </a>
+          </div>
+
+          {/* Line 2: Premium Social Icons (X, Instagram, Facebook, Email) */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "1.75rem", alignItems: "center" }}>
+            <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" 
+               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
+               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--primary)"; }}
+               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
+              <FiTwitter />
+            </a>
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" 
+               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
+               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--secondary)"; }}
+               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
+              <FiInstagram />
+            </a>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" 
+               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
+               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#1877f2"; }}
+               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
+              <FiFacebook />
+            </a>
+            <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
+               style={{ color: "var(--foreground)", opacity: 0.7, fontSize: "1.25rem", transition: "all 0.2s" }}
+               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--primary)"; }}
+               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.color = "var(--foreground)"; }}>
+              <FiMail />
+            </a>
+          </div>
+
+          {/* Line 3: Unified copyright, Project console, and Developer attribution (Asdaa.co) */}
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span>{t("footer_landing")}</span>
+              <span style={{ color: "#94a3b8" }}>|</span>
+              <span>Project Console • Developed by <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa.co</a></span>
+            </p>
+          </div>
+
         </div>
       </footer>
     </div>

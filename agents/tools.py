@@ -59,56 +59,56 @@ def resolve_srv_to_mongodb_uri(uri: str) -> str:
         targets = []
         txt_options = {}
 
-        # 1. Attempt DNS-over-HTTPS (DoH) first (extremely reliable and safe from blocking/hanging in GCP Cloud Run sandbox)
+        # 1. Attempt standard DNS library resolution first (extremely fast in standard environments, e.g. 10x faster than DoH)
         try:
-            srv_answers = resolve_via_doh(f"_mongodb._tcp.{host}", "SRV")
-            for ans in srv_answers:
-                data = ans.get("data", "").strip()
-                # Format: "Priority Weight Port Target" e.g., "0 0 27017 cluster0.mongodb.net."
-                parts = data.split()
-                if len(parts) >= 4:
-                    port = parts[2]
-                    target = parts[3]
-                    if target.endswith("."):
-                        target = target[:-1]
-                    targets.append(f"{target}:{port}")
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.timeout = 1.0
+            resolver.lifetime = 1.0
+            srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+            for rec in srv_records:
+                target = str(rec.target)
+                if target.endswith("."):
+                    target = target[:-1]
+                targets.append(f"{target}:{rec.port}")
 
-            if targets:
-                # Also pull TXT options via DoH
-                txt_answers = resolve_via_doh(host, "TXT")
-                for ans in txt_answers:
-                    data = ans.get("data", "").strip().strip('"')
-                    for param in data.split("&"):
+            try:
+                txt_records = resolver.resolve(host, "TXT")
+                for txt in txt_records:
+                    rec_str = "".join([s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in txt.strings])
+                    for param in rec_str.split("&"):
                         if "=" in param:
                             k, v = param.split("=", 1)
                             txt_options[k.strip()] = v.strip()
+            except Exception:
+                pass
         except Exception:
             pass
 
-        # 2. Fallback to standard DNS library resolution if DoH did not find any targets (e.g. in offline local environment)
+        # 2. Fallback to DNS-over-HTTPS (DoH) if standard DNS did not resolve any targets (safe fallback for sandboxed/blocked environments)
         if not targets:
             try:
-                import dns.resolver
-                resolver = dns.resolver.Resolver()
-                resolver.timeout = 1.5
-                resolver.lifetime = 1.5
-                srv_records = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
-                for rec in srv_records:
-                    target = str(rec.target)
-                    if target.endswith("."):
-                        target = target[:-1]
-                    targets.append(f"{target}:{rec.port}")
+                srv_answers = resolve_via_doh(f"_mongodb._tcp.{host}", "SRV")
+                for ans in srv_answers:
+                    data = ans.get("data", "").strip()
+                    # Format: "Priority Weight Port Target" e.g., "0 0 27017 cluster0.mongodb.net."
+                    parts = data.split()
+                    if len(parts) >= 4:
+                        port = parts[2]
+                        target = parts[3]
+                        if target.endswith("."):
+                            target = target[:-1]
+                        targets.append(f"{target}:{port}")
 
-                try:
-                    txt_records = resolver.resolve(host, "TXT")
-                    for txt in txt_records:
-                        rec_str = "".join([s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in txt.strings])
-                        for param in rec_str.split("&"):
+                if targets:
+                    # Also pull TXT options via DoH
+                    txt_answers = resolve_via_doh(host, "TXT")
+                    for ans in txt_answers:
+                        data = ans.get("data", "").strip().strip('"')
+                        for param in data.split("&"):
                             if "=" in param:
                                 k, v = param.split("=", 1)
                                 txt_options[k.strip()] = v.strip()
-                except Exception:
-                    pass
             except Exception:
                 pass
 

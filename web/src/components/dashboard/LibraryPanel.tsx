@@ -2219,6 +2219,12 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   // New states for hierarchical menu, library selection, and Swarm SVG Mind Map
   const [activeSidebarTab, setActiveSidebarTab] = useState<"pages" | "toc">("toc");
   const [tocSearch, setTocSearch] = useState("");
+  const [jumpInput, setJumpInput] = useState("");
+
+  useEffect(() => {
+    setJumpInput(readerCurrentPage.toString());
+  }, [readerCurrentPage]);
+
   const [mcqEvaluations, setMcqEvaluations] = useState<Record<string, { isCorrect: boolean; feedback: string; explanation: string; loading?: boolean; xpGained?: number }>>({});
   const viewerPanelRef = useRef<HTMLDivElement>(null);
   const lastOpenedBookIdRef = useRef<string | null>(null);
@@ -2246,11 +2252,12 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
   const fetchCounts = (libs: any[]) => {
     const counts: Record<string, number> = {};
+    const curriculumBooks = (dynamicBooks || []).filter((b: any) => b.category !== "private" && b.library_id !== "private" && b.libraryId !== "private");
     for (const lib of libs) {
-      const libBooks = (dynamicBooks || []).filter((b: any) => isBookInLibrary(b, lib._id));
+      const libBooks = curriculumBooks.filter((b: any) => isBookInLibrary(b, lib._id));
       counts[lib._id] = libBooks.length;
     }
-    counts["all"] = (dynamicBooks || []).length;
+    counts["all"] = curriculumBooks.length;
     setLibraryCounts(counts);
   };
 
@@ -3057,7 +3064,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   gap: "1rem",
                   maxHeight: "650px",
                   overflowY: "auto",
-                  boxShadow: "0 10px 30px rgba(16, 107, 163, 0.02)"
+                  boxShadow: "0 10px 30px rgba(16, 107, 163, 0.02)",
+                  position: "sticky",
+                  top: "100px",
+                  zIndex: 20
                 }}>
                   {/* Tab Switcher */}
                   <div style={{
@@ -3134,7 +3144,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         }}
                       />
 
-                      {/* Pages List */}
+                      {/* Pages List rendered as compact icon-only thumbnails grid (OR-27) */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflowY: "auto", flex: 1, paddingRight: "4px" }}>
                         {(() => {
                           const search = sidebarPageSearch.toLowerCase();
@@ -3157,76 +3167,80 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           }
 
                           return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                            <div style={{ 
+                              display: "grid", 
+                              gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))", 
+                              gap: "8px",
+                              padding: "4px"
+                            }}>
                               {filteredPages.map((p) => {
                                 const isActive = p.pageNum === readerCurrentPage;
                                 const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                                const pAr = translationLanguage === "ar";
-                                const pContent = translationLanguage === "ar" ? (p.contentAr || p.contentEn || "") : (p.contentEn || p.contentAr || "");
-                                const pSnippet = pContent.replace(/\s+/g, " ").trim().slice(0, 55) + (pContent.length > 55 ? "..." : "");
-
+                                
                                 return (
                                   <button
                                     key={p.pageNum}
                                     onClick={() => setReaderCurrentPage(p.pageNum)}
+                                    title={`${pTitle} (${language === "ar" ? `صفحة ${p.pageNum}` : `Page ${p.pageNum}`})`}
                                     style={{
-                                      textAlign: pAr ? "right" : "left",
-                                      direction: pAr ? "rtl" : "ltr",
                                       display: "flex",
                                       flexDirection: "column",
-                                      gap: "0.25rem",
-                                      padding: "8px 12px",
-                                      borderRadius: "10px",
-                                      border: isActive ? "1px solid rgba(16, 107, 163, 0.3)" : "1px solid transparent",
-                                      background: isActive ? "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(212, 175, 55, 0.03))" : "rgba(255, 255, 255, 0.5)",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      aspectRatio: "3 / 4",
+                                      borderRadius: "6px",
+                                      border: isActive ? "2px solid var(--primary)" : "1px solid rgba(16, 107, 163, 0.15)",
+                                      background: isActive 
+                                        ? "linear-gradient(135deg, rgba(16, 107, 163, 0.12), rgba(212, 175, 55, 0.05))" 
+                                        : "#ffffff",
                                       cursor: "pointer",
                                       transition: "all 0.2s ease",
-                                      width: "100%",
-                                      boxSizing: "border-box"
+                                      boxSizing: "border-box",
+                                      padding: "4px",
+                                      position: "relative",
+                                      boxShadow: isActive ? "0 4px 12px rgba(16, 107, 163, 0.15)" : "0 2px 6px rgba(0, 0, 0, 0.02)",
+                                      transform: isActive ? "scale(1.05)" : "none"
                                     }}
-                                    onMouseOver={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(16, 107, 163, 0.04)"; }}
-                                    onMouseOut={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255, 255, 255, 0.5)"; }}
+                                    onMouseOver={(e) => { 
+                                      if (!isActive) {
+                                        e.currentTarget.style.transform = "scale(1.05)";
+                                        e.currentTarget.style.borderColor = "var(--primary)";
+                                        e.currentTarget.style.boxShadow = "0 4px 8px rgba(16, 107, 163, 0.1)";
+                                      }
+                                    }}
+                                    onMouseOut={(e) => { 
+                                      if (!isActive) {
+                                        e.currentTarget.style.transform = "none";
+                                        e.currentTarget.style.borderColor = "rgba(16, 107, 163, 0.15)";
+                                        e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.02)";
+                                      }
+                                    }}
                                   >
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "0.5rem" }}>
-                                      <span style={{
-                                        fontSize: "0.8rem",
-                                        fontWeight: isActive ? 800 : 700,
-                                        color: isActive ? "var(--primary)" : "var(--foreground)",
-                                        textOverflow: "ellipsis",
-                                        overflow: "hidden",
-                                        whiteSpace: "nowrap",
-                                        flex: 1,
-                                        textAlign: pAr ? "right" : "left"
-                                      }}>
-                                        {pTitle}
-                                      </span>
-                                      <span style={{
-                                        fontSize: "0.7rem",
-                                        fontWeight: 800,
-                                        color: isActive ? "var(--primary)" : "#6a7c88",
-                                        background: isActive ? "rgba(16, 107, 163, 0.12)" : "rgba(16, 107, 163, 0.05)",
-                                        padding: "2px 6px",
-                                        borderRadius: "6px",
-                                        whiteSpace: "nowrap"
-                                      }}>
-                                        {language === "ar" ? `ص ${p.pageNum}` : `p. ${p.pageNum}`}
-                                      </span>
+                                    <div style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "3px",
+                                      width: "100%",
+                                      opacity: 0.15,
+                                      position: "absolute",
+                                      top: "8px",
+                                      left: 0,
+                                      padding: "0 6px"
+                                    }}>
+                                      <div style={{ height: "2px", background: "var(--foreground)", width: "80%" }}></div>
+                                      <div style={{ height: "2px", background: "var(--foreground)", width: "60%" }}></div>
+                                      <div style={{ height: "2px", background: "var(--foreground)", width: "70%" }}></div>
                                     </div>
-                                    {pSnippet && (
-                                      <p style={{
-                                        margin: 0,
-                                        fontSize: "0.7rem",
-                                        color: "#6a7c88",
-                                        lineHeight: "1.3",
-                                        textAlign: pAr ? "right" : "left",
-                                        textOverflow: "ellipsis",
-                                        overflow: "hidden",
-                                        whiteSpace: "nowrap",
-                                        width: "100%"
-                                      }}>
-                                        {pSnippet}
-                                      </p>
-                                    )}
+
+                                    <span style={{
+                                      fontSize: "0.85rem",
+                                      fontWeight: 800,
+                                      color: isActive ? "var(--primary)" : "#6a7c88",
+                                      zIndex: 1,
+                                      marginTop: "8px"
+                                    }}>
+                                      {p.pageNum}
+                                    </span>
                                   </button>
                                 );
                               })}
@@ -3236,25 +3250,46 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       </div>
                     </>
                   ) : (
-                    /* Collapsible searchable TOC Accordion */
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1, position: "relative" }}>
-                      <input
-                        type="text"
-                        placeholder={language === "ar" ? "ابحث في جدول المحتويات..." : "Search Table of Contents..."}
-                        value={tocSearch}
-                        onChange={(e) => setTocSearch(e.target.value)}
-                        style={{
-                          padding: "0.45rem 0.75rem",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(16, 107, 163, 0.15)",
-                          fontSize: "0.8rem",
-                          outline: "none",
-                          background: "#ffffff",
-                          fontFamily: "var(--font-sans)",
-                          width: "100%",
-                          boxSizing: "border-box"
-                        }}
-                      />
+                      <div style={{ display: "flex", gap: "0.5rem", width: "100%" }}>
+                        <input
+                          type="text"
+                          placeholder={language === "ar" ? "ابحث في جدول المحتويات..." : "Search Table of Contents..."}
+                          value={tocSearch}
+                          onChange={(e) => setTocSearch(e.target.value)}
+                          style={{
+                            padding: "0.45rem 0.75rem",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(16, 107, 163, 0.15)",
+                            fontSize: "0.8rem",
+                            outline: "none",
+                            background: "#ffffff",
+                            fontFamily: "var(--font-sans)",
+                            flex: 1,
+                            boxSizing: "border-box"
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            setTocSearch("");
+                            setExpandedChapters({});
+                            setReaderCurrentPage(1);
+                          }}
+                          style={{
+                            padding: "0.45rem 0.75rem",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(16, 107, 163, 0.2)",
+                            background: "rgba(16, 107, 163, 0.05)",
+                            color: "var(--primary)",
+                            fontSize: "0.8rem",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          {language === "ar" ? "إعادة ضبط" : "Reset"}
+                        </button>
+                      </div>
 
                       <div style={{ 
                         display: "flex", 
@@ -3580,24 +3615,137 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       );
                     })()}
 
-                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                      <button
-                        disabled={readerCurrentPage <= 1}
-                        onClick={() => setReaderCurrentPage(Math.max(1, readerCurrentPage - 1))}
-                        className="btn btn-secondary"
-                        style={{ padding: "4px 10px", fontSize: "0.75rem" }}
-                      >
-                        {language === "ar" ? "السابق" : "Prev"}
-                      </button>
-                      <button
-                        disabled={readerCurrentPage >= totalPagesCount}
-                        onClick={() => setReaderCurrentPage(Math.min(totalPagesCount, readerCurrentPage + 1))}
-                        className={`btn btn-secondary ${isNextPageGlow ? "pulse-glow-next" : ""}`}
-                        style={{ padding: "4px 10px", fontSize: "0.75rem" }}
-                      >
-                        {language === "ar" ? "التالي" : "Next"}
-                      </button>
-                    </div>
+                    {/* Interactive Numeric Page Pagination (OR-10) */}
+                    {(() => {
+                      const getPageNumbers = () => {
+                        const pages = [];
+                        const maxVisible = 5;
+                        if (totalPagesCount <= maxVisible) {
+                          for (let i = 1; i <= totalPagesCount; i++) {
+                            pages.push(i);
+                          }
+                        } else {
+                          pages.push(1);
+                          let start = Math.max(2, readerCurrentPage - 1);
+                          let end = Math.min(totalPagesCount - 1, readerCurrentPage + 1);
+                          if (readerCurrentPage <= 3) {
+                            end = 4;
+                          }
+                          if (readerCurrentPage >= totalPagesCount - 2) {
+                            start = totalPagesCount - 3;
+                          }
+                          if (start > 2) {
+                            pages.push("...");
+                          }
+                          for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                          }
+                          if (end < totalPagesCount - 1) {
+                            pages.push("...");
+                          }
+                          pages.push(totalPagesCount);
+                        }
+                        return pages;
+                      };
+
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                          <button
+                            disabled={readerCurrentPage <= 1}
+                            onClick={() => setReaderCurrentPage(Math.max(1, readerCurrentPage - 1))}
+                            className="btn btn-secondary"
+                            style={{ padding: "6px 12px", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
+                          >
+                            {language === "ar" ? "◀ السابق" : "◀ Prev"}
+                          </button>
+
+                          <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+                            {getPageNumbers().map((pageNum, idx) => {
+                              if (pageNum === "...") {
+                                return (
+                                  <span key={`dots-${idx}`} style={{ padding: "0 4px", color: "#6a7c88", fontSize: "0.8rem", fontWeight: "bold" }}>
+                                    ...
+                                  </span>
+                                );
+                              }
+                              const isPageActive = pageNum === readerCurrentPage;
+                              return (
+                                <button
+                                  key={`page-${pageNum}`}
+                                  onClick={() => setReaderCurrentPage(pageNum as number)}
+                                  style={{
+                                    width: "28px",
+                                    height: "28px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    borderRadius: "6px",
+                                    border: isPageActive ? "1px solid var(--primary)" : "1px solid rgba(16, 107, 163, 0.12)",
+                                    background: isPageActive ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "#ffffff",
+                                    color: isPageActive ? "#ffffff" : "var(--foreground)",
+                                    fontWeight: "bold",
+                                    fontSize: "0.75rem",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease"
+                                  }}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <button
+                            disabled={readerCurrentPage >= totalPagesCount}
+                            onClick={() => setReaderCurrentPage(Math.min(totalPagesCount, readerCurrentPage + 1))}
+                            className={`btn btn-secondary ${isNextPageGlow ? "pulse-glow-next" : ""}`}
+                            style={{ padding: "6px 12px", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
+                          >
+                            {language === "ar" ? "التالي ▶" : "Next ▶"}
+                          </button>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: "bold" }}>
+                              {language === "ar" ? "اذهب إلى:" : "Go to:"}
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={totalPagesCount}
+                              value={jumpInput}
+                              onChange={(e) => setJumpInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const p = parseInt(jumpInput, 10);
+                                  if (!isNaN(p) && p >= 1 && p <= totalPagesCount) {
+                                    setReaderCurrentPage(p);
+                                  } else {
+                                    setJumpInput(readerCurrentPage.toString());
+                                  }
+                                }
+                              }}
+                              onBlur={() => {
+                                const p = parseInt(jumpInput, 10);
+                                if (!isNaN(p) && p >= 1 && p <= totalPagesCount) {
+                                  setReaderCurrentPage(p);
+                                } else {
+                                  setJumpInput(readerCurrentPage.toString());
+                                }
+                              }}
+                              style={{
+                                width: "48px",
+                                padding: "4px 6px",
+                                borderRadius: "6px",
+                                border: "1px solid rgba(16, 107, 163, 0.2)",
+                                fontSize: "0.75rem",
+                                textAlign: "center",
+                                outline: "none"
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {loadingBookPages ? (
@@ -4703,8 +4851,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         display: "flex", 
                         flexDirection: "column",
                         justifyContent: "space-between", 
-                        minHeight: "220px",
-                        height: "auto", 
+                        height: "270px", // fixed, coherent card height for stable grids
+                        boxSizing: "border-box",
                         position: "relative", 
                         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                         background: isBookSelected 
@@ -4805,7 +4953,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           )}
                         </div>
 
-                        <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                        <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start", overflow: "hidden" }}>
                           <BookCoverWithFallback
                             src={item.coverThumbUrl || item.coverUrl}
                             alt="book thumbnail"
@@ -4819,9 +4967,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               borderRadius: "10px",
                               boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
                               border: "1px solid rgba(16, 107, 163, 0.08)",
+                              flexShrink: 0
                             }}
                           />
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
                             <h3 style={{
                               fontSize: "0.95rem",
                               fontWeight: 700,
@@ -4845,7 +4994,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       </div>
 
                       {/* Direct hyperlink & primary action layout */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", borderTop: "1px solid rgba(16,107,163,0.06)", paddingTop: "0.75rem", marginTop: "0.5rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", borderTop: "1px solid rgba(16,107,163,0.06)", paddingTop: "0.75rem", marginTop: "auto" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           {item.source_url ? (
                             <a 

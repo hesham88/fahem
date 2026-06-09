@@ -12,6 +12,7 @@ export interface AuthCtx {
   role: Role;
   db_target?: string;
   sandbox_session_id?: string;
+  tier?: number;
 }
 
 // Initialize Firebase Admin SDK
@@ -98,7 +99,7 @@ const LOCAL_MOCK_TOKENS: Record<string, AuthCtx> = {
 
 const EVAL_SIGNING_KEY = process.env.EVAL_SIGNING_KEY || "fahem_default_eval_signing_key_secret_2026_xyz";
 
-export function signDemoToken(payload: { uid: string; email: string | null; role: Role; db_target: string; sandbox_session_id?: string; exp: number }): string {
+export function signDemoToken(payload: { uid: string; email: string | null; role: Role; db_target: string; sandbox_session_id?: string; tier?: number; exp: number }): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto.createHmac("sha256", EVAL_SIGNING_KEY).update(`${header}.${body}`).digest("base64url");
@@ -142,7 +143,9 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
     // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
     const config = await getDBConfig();
     if (config && config.evalSandboxEnabled === false) {
-      return null; // Reject live tokens!
+      if (payload.tier !== 0) {
+        return null; // Reject live verified Tier-1 tokens! But bypass/allow for public Tier-0 (payload.tier === 0).
+      }
     }
 
     return {
@@ -150,7 +153,8 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
       email: payload.email,
       role: payload.role as Role,
       db_target: payload.db_target || "fahem_sandbox",
-      sandbox_session_id: payload.sandbox_session_id
+      sandbox_session_id: payload.sandbox_session_id,
+      tier: payload.tier
     };
   } catch (err) {
     return null;

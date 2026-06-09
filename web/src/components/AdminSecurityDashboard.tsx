@@ -62,6 +62,16 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
 
+  // Search & Sort states for Reports
+  const [reportsSearchQuery, setReportsSearchQuery] = useState<string>("");
+  const [reportsSortBy, setReportsSortBy] = useState<string>("date-desc");
+
+  // Compose message/email response states for Reports (mapped by reportId)
+  const [composeMessageBody, setComposeMessageBody] = useState<{[reportId: string]: string}>({});
+  const [isSendingMessage, setIsSendingMessage] = useState<{[reportId: string]: boolean}>({});
+  const [messageSendSuccess, setMessageSendSuccess] = useState<{[reportId: string]: string | null}>({});
+  const [messageSendError, setMessageSendError] = useState<{[reportId: string]: string | null}>({});
+
   // User limits override state
   const [usersList, setUsersList] = useState<any[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
@@ -119,6 +129,42 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     } catch (err: any) {
       console.error("Failed to update report status:", err);
       alert(err.message || "Network error occurred.");
+    }
+  };
+
+  const handleSendReportResponse = async (reportId: string, userId: string, email: string) => {
+    const bodyText = composeMessageBody[reportId] || "";
+    if (!bodyText.trim()) return;
+
+    setIsSendingMessage(prev => ({ ...prev, [reportId]: true }));
+    setMessageSendError(prev => ({ ...prev, [reportId]: null }));
+    setMessageSendSuccess(prev => ({ ...prev, [reportId]: null }));
+
+    try {
+      const response = await authedFetch("/api/admin/reports/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportId,
+          userId,
+          message: bodyText,
+          email,
+          updateStatus: "resolved"
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setMessageSendSuccess(prev => ({ ...prev, [reportId]: data.message || "Response sent successfully!" }));
+        setComposeMessageBody(prev => ({ ...prev, [reportId]: "" }));
+        fetchReports();
+      } else {
+        setMessageSendError(prev => ({ ...prev, [reportId]: data.error || "Failed to send response." }));
+      }
+    } catch (err: any) {
+      setMessageSendError(prev => ({ ...prev, [reportId]: err.message || "An unexpected error occurred." }));
+    } finally {
+      setIsSendingMessage(prev => ({ ...prev, [reportId]: false }));
     }
   };
 
@@ -2087,42 +2133,40 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           </table>
         </div>
       </section>
-        </>
+      </>
       )}
 
-      {/* 6. Reports and Feedback Panel (activeSubTab === "reports") */}
       {activeSubTab === "reports" && (
         <section className="panel-card" style={{ width: "100%", marginTop: "1rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--card-border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
             <div>
               <h2 style={{ fontSize: "1.4rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
                 <FiMessageSquare style={{ color: "var(--primary)" }} />
-                <span>{language === "ar" ? "تقارير المستخدمين والملاحظات" : "User Reports & Feedback Triager"}</span>
+                <span>{language === "ar" ? "إدارة تقارير المستخدمين" : "User Reports & Support Surface"}</span>
               </h2>
               <p style={{ color: "#4f6371", fontSize: "0.9rem", margin: "0.25rem 0 0 0" }}>
                 {language === "ar"
-                  ? "مراجعة تقارير المشاكل العلمية أو التقنية المرسلة من قبل الطلاب وإدارتها باستخدام نظام الحالات الذكي."
-                  : "Review, triage, and resolve student-submitted academic or technical reports using our state machine."}
+                  ? "مراجعة وحل بلاغات المشاكل التقنية والاستفسارات من الطلاب والمحكمين مباشرة."
+                  : "Review, triage, and reply directly to user-submitted bug reports or system feedback."}
               </p>
             </div>
-            <button 
-              onClick={fetchReports}
-              disabled={isLoadingReports}
-              className="action-btn"
-              style={{ padding: "0.5rem 1rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem", background: "var(--primary)", border: "none", color: "#fff", borderRadius: "6px", cursor: "pointer" }}
-            >
-              {language === "ar" ? "تحديث التقارير" : "Refresh Reports"}
-            </button>
           </div>
 
-          {reportsError && (
-            <div style={{ padding: "0.75rem", background: "rgba(211, 47, 47, 0.1)", border: "1px solid rgba(211, 47, 47, 0.2)", borderRadius: "6px", color: "#f87171", fontSize: "0.85rem", marginBottom: "1rem" }}>
-              {reportsError}
-            </div>
-          )}
-
           {/* Filter Bar */}
-          <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", flex: "1 1 200px" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>
+                {language === "ar" ? "بحث عن تقرير" : "Search Reports"}
+              </label>
+              <input
+                type="text"
+                value={reportsSearchQuery}
+                onChange={(e) => setReportsSearchQuery(e.target.value)}
+                placeholder={language === "ar" ? "ابحث بالعنوان، النص، المعرف..." : "Search by title, body, UID, category..."}
+                style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#fff", color: "var(--foreground)", fontSize: "0.85rem" }}
+              />
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>
                 {language === "ar" ? "تصفية حسب الحالة" : "Filter by Status"}
@@ -2153,6 +2197,23 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                 <option value="footer">{language === "ar" ? "تذييل الصفحة" : "Footer"}</option>
               </select>
             </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)" }}>
+                {language === "ar" ? "ترتيب حسب" : "Sort by"}
+              </label>
+              <select
+                value={reportsSortBy}
+                onChange={(e) => setReportsSortBy(e.target.value)}
+                style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid var(--card-border)", background: "#fff", color: "var(--foreground)", fontSize: "0.85rem", minWidth: "150px" }}
+              >
+                <option value="date-desc">{language === "ar" ? "الأحدث أولاً" : "Newest First"}</option>
+                <option value="date-asc">{language === "ar" ? "الأقدم أولاً" : "Oldest First"}</option>
+                <option value="title">{language === "ar" ? "العنوان" : "Title"}</option>
+                <option value="status">{language === "ar" ? "الحالة" : "Status"}</option>
+                <option value="category">{language === "ar" ? "الفئة" : "Category"}</option>
+              </select>
+            </div>
           </div>
 
           {isLoadingReports ? (
@@ -2170,7 +2231,33 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                   .filter((rep) => {
                     const statusMatch = statusFilter === "all" || rep.status === statusFilter;
                     const sourceMatch = sourceFilter === "all" || rep.source === sourceFilter;
-                    return statusMatch && sourceMatch;
+                    
+                    const query = reportsSearchQuery.trim().toLowerCase();
+                    let queryMatch = true;
+                    if (query) {
+                      const titleMatch = (rep.title || "").toLowerCase().includes(query);
+                      const bodyMatch = (rep.body || "").toLowerCase().includes(query);
+                      const catMatch = (rep.category || "").toLowerCase().includes(query);
+                      const userMatch = (rep.userId || "").toLowerCase().includes(query);
+                      const emailMatch = (rep.email || "").toLowerCase().includes(query);
+                      queryMatch = titleMatch || bodyMatch || catMatch || userMatch || emailMatch;
+                    }
+                    
+                    return statusMatch && sourceMatch && queryMatch;
+                  })
+                  .sort((a, b) => {
+                    if (reportsSortBy === "date-desc") {
+                      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                    } else if (reportsSortBy === "date-asc") {
+                      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+                    } else if (reportsSortBy === "title") {
+                      return (a.title || "").localeCompare(b.title || "");
+                    } else if (reportsSortBy === "status") {
+                      return (a.status || "").localeCompare(b.status || "");
+                    } else if (reportsSortBy === "category") {
+                      return (a.category || "").localeCompare(b.category || "");
+                    }
+                    return 0;
                   })
                   .map((rep) => {
                     const isExpanded = expandedReportId === rep._id;
@@ -2289,6 +2376,86 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                                   </pre>
                                 </div>
                               )}
+
+                              {/* Compose Reply Form inside expanded card */}
+                              <div style={{ marginTop: "1.25rem", borderTop: "1px dashed var(--card-border)", paddingTop: "1rem" }}>
+                                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.5rem 0", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--primary)" }}>
+                                  <FiMessageSquare />
+                                  <span>{language === "ar" ? "إرسال رد رسمي وحل البلاغ:" : "Compose Support Reply:"}</span>
+                                </h4>
+                                <p style={{ color: "#64748b", fontSize: "0.8rem", margin: "0 0 0.75rem 0" }}>
+                                  {language === "ar"
+                                    ? "سيصل الرد كإشعار فوري في لوحة الطالب، وسيتم تدوين رسالة بريدية رسمية وسجل تتبع."
+                                    : "This will push a platform notification alert to the student, dispatch a virtual support email, and auto-resolve the issue."}
+                                </p>
+                                
+                                {messageSendSuccess[rep._id] && (
+                                  <div style={{ padding: "0.6rem 0.8rem", background: "rgba(40, 167, 69, 0.1)", border: "1px solid rgba(40, 167, 69, 0.2)", borderRadius: "6px", color: "var(--accent-green)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+                                    {messageSendSuccess[rep._id]}
+                                  </div>
+                                )}
+                                
+                                {messageSendError[rep._id] && (
+                                  <div style={{ padding: "0.6rem 0.8rem", background: "rgba(220, 53, 69, 0.1)", border: "1px solid rgba(220, 53, 69, 0.2)", borderRadius: "6px", color: "#dc3545", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+                                    {messageSendError[rep._id]}
+                                  </div>
+                                )}
+
+                                <textarea
+                                  value={composeMessageBody[rep._id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setComposeMessageBody(prev => ({ ...prev, [rep._id]: val }));
+                                  }}
+                                  placeholder={language === "ar" ? "اكتب رسالة الرد الرسمية هنا لمساعدة الطالب..." : "Type your official support response message here..."}
+                                  disabled={isSendingMessage[rep._id]}
+                                  style={{ 
+                                    width: "100%", 
+                                    height: "100px", 
+                                    padding: "0.6rem", 
+                                    borderRadius: "6px", 
+                                    border: "1px solid var(--card-border)", 
+                                    background: "#fff", 
+                                    color: "var(--foreground)", 
+                                    fontSize: "0.85rem", 
+                                    outline: "none", 
+                                    resize: "vertical" 
+                                  }}
+                                />
+
+                                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
+                                  <button
+                                    onClick={() => handleSendReportResponse(rep._id, rep.userId, rep.email || "")}
+                                    disabled={isSendingMessage[rep._id] || !(composeMessageBody[rep._id] || "").trim()}
+                                    style={{
+                                      padding: "0.5rem 1rem",
+                                      fontSize: "0.85rem",
+                                      fontWeight: 700,
+                                      background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+                                      border: "none",
+                                      color: "#fff",
+                                      borderRadius: "6px",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "0.4rem",
+                                      opacity: (isSendingMessage[rep._id] || !(composeMessageBody[rep._id] || "").trim()) ? 0.6 : 1
+                                    }}
+                                  >
+                                    {isSendingMessage[rep._id] ? (
+                                      <>
+                                        <FiRefreshCw className="spinning-icon" style={{ animation: "spin 1s linear infinite" }} />
+                                        <span>{language === "ar" ? "جاري إرسال الرد..." : "Sending..."}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <FiCheck />
+                                        <span>{language === "ar" ? "إرسال الرد وحل البلاغ" : "Send Response & Resolve"}</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}

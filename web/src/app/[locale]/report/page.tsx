@@ -167,8 +167,9 @@ export default function ReportPage() {
 
       {/* Glassmorphic Navbar */}
       <nav className="glass-nav">
-        <div className="glass-nav-logo" onClick={() => router.push(`/${language}`)}>
-          <span>🧠</span> {t("dashboard_title")}
+        <div className="glass-nav-logo" onClick={() => router.push(`/${language}`)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "2rem", width: "auto" }} />
+          <span>{t("dashboard_title")}</span>
         </div>
         <button className="btn btn-secondary" onClick={() => router.push(`/${language}`)}>
           <FiArrowLeft style={{ fontSize: "1.2rem", transform: language === "ar" ? "rotate(180deg)" : "none" }} />

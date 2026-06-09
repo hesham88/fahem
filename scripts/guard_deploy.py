@@ -6,6 +6,17 @@ import sys
 import json
 import urllib.request
 import subprocess
+import socket
+
+# Monkeypatch socket.getaddrinfo to bypass slow DNS lookup in local CLI sandbox
+_original_getaddrinfo = socket.getaddrinfo
+def _patched_getaddrinfo(host, port, *args, **kwargs):
+    if host == "fahem.pro":
+        return _original_getaddrinfo("35.219.200.193", port, *args, **kwargs)
+    if host == "fahem-agent-1061555578804.us-east4.run.app":
+        return _original_getaddrinfo("34.143.79.2", port, *args, **kwargs)
+    return _original_getaddrinfo(host, port, *args, **kwargs)
+socket.getaddrinfo = _patched_getaddrinfo
 
 # Ensure UTF-8 printing
 if hasattr(sys.stdout, 'reconfigure'):
