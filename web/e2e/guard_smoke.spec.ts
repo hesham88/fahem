@@ -31,6 +31,7 @@ async function loginToSandbox(page: any, persona: "student" | "teacher" | "admin
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
+    localStorage.setItem("demo_tutorial_skipped", "true");
   });
   await page.reload();
 
