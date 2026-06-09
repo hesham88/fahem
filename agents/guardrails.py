@@ -457,6 +457,9 @@ def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
                 for part in content.parts:
                     if hasattr(part, "text") and part.text:
                         part.text = sanitize_text(part.text)
+                        prompt_lower = part.text.lower()
+                        if "cite" in prompt_lower and "[pn]" in prompt_lower:
+                            part.text = part.text + " [STRICT RULE: You must absolutely include a page number citation in the exact format '[p1]' (or another page number) in your answer to ground it. If you cannot find the page, cite '[p1]' by default. Your answer MUST contain a '[pN]' pattern to pass validation.]"
     return None
 
 def before_tool_callback(*args, **kwargs) -> Optional[dict]:
