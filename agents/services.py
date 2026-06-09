@@ -2241,9 +2241,20 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"books": [], "error": str(err)}
 
     class PartitionCache:
-        def __init__(self, ttl=15):
+        def __init__(self, ttl=3600):
             self.ttl = ttl
             self.cache = {}  # db_name -> {collection_name -> (timestamp, data)}
+
+        def sanitize(self, obj):
+            from bson import ObjectId
+            if isinstance(obj, dict):
+                return {k: self.sanitize(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [self.sanitize(x) for x in obj]
+            elif type(obj).__name__ == "ObjectId" or isinstance(obj, ObjectId):
+                return str(obj)
+            else:
+                return obj
 
         def get_collection(self, db, collection_name):
             import time
@@ -2255,13 +2266,46 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 if now - ts < self.ttl:
                     return copy.deepcopy(data)
             # Fetch fresh from DB
-            data = list(db[collection_name].find({}))
+            raw_data = list(db[collection_name].find({}))
+            data = [self.sanitize(x) for x in raw_data]
             if db_name not in self.cache:
                 self.cache[db_name] = {}
             self.cache[db_name][collection_name] = (now, copy.deepcopy(data))
             return data
 
-    _knowledge_cache = PartitionCache(ttl=15)
+        def prefetch_collections(self, db, collection_names):
+            import time
+            import copy
+            from concurrent.futures import ThreadPoolExecutor
+
+            db_name = db.name
+            now = time.time()
+            needed = []
+            for col in collection_names:
+                cached = False
+                if db_name in self.cache and col in self.cache[db_name]:
+                    ts, _ = self.cache[db_name][col]
+                    if now - ts < self.ttl:
+                        cached = True
+                if not cached:
+                    needed.append(col)
+            
+            if not needed:
+                return
+
+            def fetch_one(col):
+                raw_data = list(db[col].find({}))
+                return col, [self.sanitize(x) for x in raw_data]
+
+            with ThreadPoolExecutor(max_workers=len(needed)) as executor:
+                results = list(executor.map(fetch_one, needed))
+
+            if db_name not in self.cache:
+                self.cache[db_name] = {}
+            for col, data in results:
+                self.cache[db_name][col] = (now, copy.deepcopy(data))
+
+    _knowledge_cache = PartitionCache(ttl=3600)
 
     @app.get("/user/knowledge")
     async def get_knowledge_endpoint(request: fastapi.Request):
@@ -2273,6 +2317,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             client = get_cached_mongodb_client()
             db = get_active_db(client)
+            _knowledge_cache.prefetch_collections(db, ["curricula", "books", "subjects"])
             
             # Extract query params
             params = dict(request.query_params)
@@ -2396,18 +2441,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 subjects = [s for s in subjects if s.get("_id") in active_subject_ids or str(s.get("_id")) in active_subject_ids]
                 
             # 4. Group books by subject
-            def sanitize(obj):
-                if isinstance(obj, dict):
-                    return {k: sanitize(v) for k, v in obj.items()}
-                elif isinstance(obj, list):
-                    return [sanitize(x) for x in obj]
-                elif type(obj).__name__ == "ObjectId":
-                    return str(obj)
-                else:
-                    return obj
-
-            # Sanitize filtered books once up front to eliminate recursive sanitization CPU overhead
-            sanitized_books = [sanitize(b) for b in books]
+            sanitized_books = books
 
             subjects_with_books = []
             for subject in subjects:
@@ -2418,7 +2452,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 core_books = [b for b in subject_books if b.get("role") == "core" or not b.get("role")]
                 supporting_books = [b for b in subject_books if b.get("role") == "supporting"]
                 
-                subject_copy = sanitize(subject)
+                subject_copy = dict(subject)
                 subject_copy["books"] = subject_books
                 subject_copy["core_books"] = core_books
                 subject_copy["supporting_books"] = supporting_books
@@ -2729,11 +2763,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
     @app.get("/auth/session-status")
     async def get_session_status_endpoint(sandbox_session_id: str):
         try:
-            from tools import get_mongodb_uri
-            from pymongo import MongoClient
+            from tools import get_cached_mongodb_client
             
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client = get_cached_mongodb_client()
             
             # Double-redundant check: check both fahem_sandbox and fahem databases, prioritizing killed/ended state
             session = None
@@ -2746,8 +2778,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             break
                 except Exception as e:
                     logger.warning(f"Error reading session status from {db_name}: {e}")
-            
-            client.close()
             
             status = "active"
             if session:
@@ -2762,11 +2792,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
     @app.get("/auth/resolve-role")
     async def resolve_role_endpoint(uid: str, email: str = None):
         try:
-            from tools import get_mongodb_uri
-            from pymongo import MongoClient
+            from tools import get_cached_mongodb_client
             
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client = get_cached_mongodb_client()
             db = get_active_db(client)
             
             normalized_email = email.lower().strip() if email else ""
@@ -2777,7 +2805,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 query["$or"].append({"email": normalized_email})
                 
             user = db["users"].find_one(query)
-            client.close()
             
             role = "user"
             if user and user.get("role"):
@@ -6000,7 +6027,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             }
                         }
                     }
-                }
+                },
+                "safetySettings": [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                ]
             }
             
             resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
