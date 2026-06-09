@@ -119,19 +119,19 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { url, maxDepth = 3, jobId, action } = body;
+    const { url, maxDepth = 3, jobId: jobIdParam, action } = body;
 
     const requesterEmail = ctx.email || "";
 
     // 1. Cooperative/force crawl job controls (pause/resume/stop/kill)
-    if (jobId && action) {
+    if (jobIdParam && action) {
       if (!isLocalEnv()) {
-        return await proxyRequest("/admin/crawl", "POST", { jobId, action, requesterEmail }, ctx);
+        return await proxyRequest("/admin/crawl", "POST", { jobId: jobIdParam, action, requesterEmail }, ctx);
       }
 
       const db = getLocalDb() as any;
       const crawlJobs = db.crawl_jobs || [];
-      const job = crawlJobs.find((j: any) => j._id === jobId);
+      const job = crawlJobs.find((j: any) => j._id === jobIdParam);
 
       if (!job) {
         return new Response(JSON.stringify({ error: "Crawl job not found" }), {
@@ -203,8 +203,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const requesterEmail = ctx.email || "";
-
     let targetUrl = url.trim();
     if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
       targetUrl = "https://" + targetUrl;
@@ -215,8 +213,8 @@ export async function POST(req: NextRequest) {
       return await proxyRequest("/admin/crawl", "POST", { url: targetUrl, maxDepth, requesterEmail }, ctx);
     }
 
-    // Generate a unique jobId
-    const jobId = `crawl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    // Generate a unique jobId (support optional client-provided jobIdParam or auto-generate)
+    const jobId = jobIdParam || `crawl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     // Prepare initial log window state
     const initialLogs = [

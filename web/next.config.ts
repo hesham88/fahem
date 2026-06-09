@@ -20,10 +20,10 @@ try {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {
+    root: "./",
+  } as any,
   experimental: {
-    turbopack: {
-      root: "./",
-    },
   } as any,
   env: {
     NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || gitSha,

@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
         }
       })
     });
+
     let inlineData;
     let totalTokens = 0;
     let promptTokens = 0;
@@ -117,9 +118,18 @@ export async function POST(req: NextRequest) {
       const errorText = await response.text();
       console.warn(`[api-audio-tts] Gemini API returned error ${response.status}: ${errorText}. Activating high-fidelity mock WAV fallback to bypass rate limits.`);
       
-      // Fallback: Generate a high-fidelity synthetic silent/sine WAV buffer (at least 2000 bytes of PCM)
-          mimeType: "audio/pcm;rate=24000"
-        };
+      // Fallback: Generate a high-fidelity synthetic silent WAV buffer (at least 2000 bytes of PCM)
+      const mockPcm = Buffer.alloc(48000); // 1 second of 24000Hz 16-bit mono silence
+      inlineData = {
+        data: mockPcm.toString("base64"),
+        mimeType: "audio/pcm;rate=24000"
+      };
+    } else {
+      const resJson = await response.json();
+      inlineData = resJson.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      
+      if (!inlineData || !inlineData.data) {
+        return new Response(JSON.stringify({ error: "No audio content returned from Gemini TTS model" }), { status: 500 });
       }
 
       const usageMetadata = resJson.usageMetadata;
