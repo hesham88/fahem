@@ -2240,11 +2240,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to get books: {err}", exc_info=True)
             return {"books": [], "error": str(err)}
 
+    class PartitionCache:
+        def __init__(self, ttl=15):
+            self.ttl = ttl
+            self.cache = {}  # db_name -> {collection_name -> (timestamp, data)}
+
+        def get_collection(self, db, collection_name):
+            import time
+            import copy
+            db_name = db.name
+            now = time.time()
+            if db_name in self.cache and collection_name in self.cache[db_name]:
+                ts, data = self.cache[db_name][collection_name]
+                if now - ts < self.ttl:
+                    return copy.deepcopy(data)
+            # Fetch fresh from DB
+            data = list(db[collection_name].find({}))
+            if db_name not in self.cache:
+                self.cache[db_name] = {}
+            self.cache[db_name][collection_name] = (now, copy.deepcopy(data))
+            return data
+
+    _knowledge_cache = PartitionCache(ttl=15)
+
     @app.get("/user/knowledge")
     async def get_knowledge_endpoint(request: fastapi.Request):
         try:
             from tools import get_cached_mongodb_client
             from bson import ObjectId
+            import time
+            import copy
             
             client = get_cached_mongodb_client()
             db = get_active_db(client)
@@ -2262,25 +2287,21 @@ def register_telemetry_route(app: fastapi.FastAPI):
             standard_keys = {"library_id", "curriculum_id", "subject_id", "role", "language", "query", "search", "locale"}
             scope_filters = {k: v for k, v in params.items() if k not in standard_keys}
             
-            def make_id_filter(val):
-                if not val:
-                    return None
-                filters = [val]
-                if isinstance(val, str) and len(val) == 24:
-                    try:
-                        filters.append(ObjectId(val))
-                    except Exception:
-                        pass
-                return {"$in": filters}
+            def match_id(val_in_doc, search_val):
+                if not search_val:
+                    return True
+                if not val_in_doc:
+                    return False
+                return str(val_in_doc) == str(search_val)
 
-            # 1. Fetch curricula
+            # 1. Fetch curricula from cache
             valid_curriculum_ids = set()
             if library_id or scope_filters:
-                curricula_query = {}
-                if library_id:
-                    curricula_query["library_id"] = make_id_filter(library_id)
+                curricula = _knowledge_cache.get_collection(db, "curricula")
                 
-                curricula = list(db["curricula"].find(curricula_query))
+                # Filter by library_id
+                if library_id:
+                    curricula = [c for c in curricula if match_id(c.get("library_id"), library_id)]
                 
                 # Filter curricula by scope
                 if scope_filters:
@@ -2296,20 +2317,21 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         valid_curriculum_ids.add(c["_id"])
                         valid_curriculum_ids.add(str(c["_id"]))
             
-            # 2. Fetch books
-            books_query = {}
-            if library_id:
-                books_query["library_id"] = make_id_filter(library_id)
-            if curriculum_id:
-                books_query["curriculum_id"] = make_id_filter(curriculum_id)
-            if subject_id:
-                books_query["subject_id"] = make_id_filter(subject_id)
-            if role:
-                books_query["role"] = role
-            if language:
-                books_query["language"] = language
-                
-            books = list(db["books"].find(books_query))
+            # 2. Fetch books from cache
+            all_books = _knowledge_cache.get_collection(db, "books")
+            books = []
+            for book in all_books:
+                if library_id and not match_id(book.get("library_id"), library_id):
+                    continue
+                if curriculum_id and not match_id(book.get("curriculum_id"), curriculum_id):
+                    continue
+                if subject_id and not match_id(book.get("subject_id"), subject_id):
+                    continue
+                if role and book.get("role") != role:
+                    continue
+                if language and book.get("language") != language:
+                    continue
+                books.append(book)
             
             from guardrails import verified_principal_ctx
             principal = None
@@ -2354,25 +2376,20 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     active_subject_ids.add(s_id)
                     active_subject_ids.add(str(s_id))
             
-            # Fetch subjects
-            subjects_query = {}
-            if subject_id:
-                subjects_query["_id"] = make_id_filter(subject_id)
-            elif curriculum_id:
-                subjects_query["curriculum_id"] = make_id_filter(curriculum_id)
-            else:
-                # Query ONLY the active subjects directly from MongoDB
-                ids_to_query = []
-                for x in active_subject_ids:
-                    ids_to_query.append(x)
-                    if isinstance(x, str) and len(x) == 24:
-                        try:
-                            ids_to_query.append(ObjectId(x))
-                        except Exception:
-                            pass
-                subjects_query["_id"] = {"$in": ids_to_query}
-                
-            subjects = list(db["subjects"].find(subjects_query))
+            # Fetch subjects from cache
+            all_subjects = _knowledge_cache.get_collection(db, "subjects")
+            subjects = []
+            for s in all_subjects:
+                if subject_id:
+                    if match_id(s.get("_id"), subject_id):
+                        subjects.append(s)
+                elif curriculum_id:
+                    if match_id(s.get("curriculum_id"), curriculum_id):
+                        subjects.append(s)
+                else:
+                    sub_id_str = str(s.get("_id"))
+                    if s.get("_id") in active_subject_ids or sub_id_str in active_subject_ids:
+                        subjects.append(s)
             
             # Post-filter subjects to only active ones unless curriculum_id is specified
             if not subject_id and not curriculum_id:
@@ -2389,19 +2406,22 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 else:
                     return obj
 
+            # Sanitize filtered books once up front to eliminate recursive sanitization CPU overhead
+            sanitized_books = [sanitize(b) for b in books]
+
             subjects_with_books = []
             for subject in subjects:
-                sub_id = subject.get("_id")
-                subject_books = [b for b in books if b.get("subject_id") == sub_id or str(b.get("subject_id")) == str(sub_id)]
+                sub_id_str = str(subject.get("_id"))
+                subject_books = [b for b in sanitized_books if str(b.get("subject_id")) == sub_id_str]
                 
                 # Split into core and supporting
                 core_books = [b for b in subject_books if b.get("role") == "core" or not b.get("role")]
                 supporting_books = [b for b in subject_books if b.get("role") == "supporting"]
                 
                 subject_copy = sanitize(subject)
-                subject_copy["books"] = sanitize(subject_books)
-                subject_copy["core_books"] = sanitize(core_books)
-                subject_copy["supporting_books"] = sanitize(supporting_books)
+                subject_copy["books"] = subject_books
+                subject_copy["core_books"] = core_books
+                subject_copy["supporting_books"] = supporting_books
                 subject_copy["books_count"] = len(subject_books)
                 
                 # Keep empty subjects only if specifically viewing a single curriculum
@@ -2416,6 +2436,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed in user/knowledge: {err}", exc_info=True)
             return {"success": False, "subjects": [], "total_books": 0, "error": str(err)}
+
 
     @app.get("/user/books/pages")
     async def get_book_pages_endpoint(book_id: str):
@@ -5999,7 +6020,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             if not inline_data or "data" not in inline_data:
                 return fastapi.responses.JSONResponse(
                     status_code=500,
-                    content={"success": False, "error": "No audio content returned from Gemini TTS model"}
+                    content={"success": False, "error": f"No audio content returned from Gemini TTS model. Response: {res_json}"}
                 )
                 
             # Log Token Usage Telemetry

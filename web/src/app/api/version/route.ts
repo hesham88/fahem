@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { GIT_SHA } from "./git_sha";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const response = NextResponse.json({
-    sha: process.env.NEXT_PUBLIC_BUILD_SHA || "unknown",
-    builtAt: process.env.NEXT_PUBLIC_BUILD_TIME || "unknown",
+    sha: GIT_SHA || "unknown",
+    builtAt: process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString(),
     system: "Fahem Educational Platform - Production",
     status: "healthy",
     guard_pass: true,
