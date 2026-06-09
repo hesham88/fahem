@@ -2,7 +2,7 @@
   "task": "P5-4",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P5-4-D10-language-lock.png": "a2976a304e1a65cd8898d9b58ed92c7209dfb47066c73fb046a2e83bc2c7f0d9"
   },
   "vision_verdict": "pass. The interface is displayed in English, with the language selection dropdown clearly set to English. The layout remains stable and consistent, with all dashboard elements, navigation menus, and the interactive welcome guide correctly rendered in the selected language. The visual hierarchy, from the \"Whitelisted Judge Sandbox Console\" down to the \"All Libraries\" portal, is properly aligned, indicating a clean and cohesive user experience that respects the chosen localization settings.",
-  "timestamp": 1781003002,
-  "run_signature": "a8b0bfb91d8db6123726a44a3e7abd0f1742181303f1f640950ce9ca41eef14b"
+  "timestamp": 1781006845,
+  "run_signature": "e68bbf9fd2d7b100ef6369d8699ff6e8e634c86c505ea72c26cbe64c8587b2ed"
 }

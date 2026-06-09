@@ -2,7 +2,7 @@
   "task": "P0-6",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P0-6-D0-version.png": "7f46be62549c725bb4e12febe1dea6b2c9aeade759cf1f436e68c8057ba72512"
   },
   "vision_verdict": "pass. The screenshot displays a clean and valid JSON response from the `/api/version` endpoint. The data includes a properly formatted 'sha' string, a 'builtAt' timestamp, a 'healthy' status, and the 'manifest_info' field confirming compliance with security standards. The 'padding' field contains a large, repetitive sequence of text, which is typical for specific internal formatting requirements. The interface shows a standard, raw JSON output consistent with a direct API call. There is no additional UI, administrative dashboard, or external integration component present, indicating that the view is restricted solely to the requested JSON data structure. The layout is intact and fully operational as a standard machine-readable response.",
-  "timestamp": 1781002432,
-  "run_signature": "97a889fb3fb3071d6c14cdf984acd2fa178700781fffb0b4e2e20f4001f879b8"
+  "timestamp": 1781006845,
+  "run_signature": "1ec704e3def25405fc8b7787a21501f2bca8c42efa669003fc3b80eeb5e0fa85"
 }

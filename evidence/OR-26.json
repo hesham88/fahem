@@ -2,7 +2,7 @@
   "task": "OR-26",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-26-D7-reader.png": "a7dfe5f91e50ca99de645648012109cc1b14556a0d04694967ffa86653d5fdba"
   },
   "vision_verdict": "pass. The screenshot displays a cleanly rendered interface for the \"Interactive Knowledge Library\" within the Fahem sandbox environment. The sidebar navigation is fully operational, showing structured academic resources, and the content area correctly identifies the \"All Libraries\" portal. The overlay provides a clear, helpful onboarding guide that is properly formatted within the view. The layout remains coherent, with all navigational elements, theme controls, and user profiles accurately positioned, confirming that the interface is functioning as intended with a logical, consistent design.",
-  "timestamp": 1781002091,
-  "run_signature": "37aea31df0fc09fb5fdfb68aa4ef18f332cc1b40f7aa839825adfb7d2dfc40eb"
+  "timestamp": 1781006845,
+  "run_signature": "20b8887a325b5d76579c59791717c0cab62c540200ba309daf9396190a788a40"
 }

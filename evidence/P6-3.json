@@ -2,7 +2,7 @@
   "task": "P6-3",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -23,6 +23,6 @@
     "evidence/shots/P6-3-D3-teacher-view.png": "eebb0a4228efe420ef95ad8d1cb9eefb80b47c3853219b1987b13b92f65d9647"
   },
   "vision_verdict": "pass. The screenshot displays a fully functional and populated sandbox environment. The interface shows an \"Admin (Studio & Overrides)\" active persona as indicated by the highlighted tab in the \"Whitelisted Judge Sandbox Console.\" The \"Interactive Knowledge Library\" is clearly defined with accessible categories such as \"Curriculum Libraries\" and \"Private Study Vault.\" The sidebar provides full navigation to academic features, confirming the system is prepared for user interaction. The inclusion of the \"Welcome to Fahem Sandbox!\" tour guide provides clear instructional context for the platform’s AI-driven capabilities, and the overall layout exhibits consistent UI elements, active tokens, and a clean, responsive design suitable for a production-grade demonstration.",
-  "timestamp": 1781003241,
-  "run_signature": "74311743dedf841b4714aa138b34972b79dd0c0f77afd7e98e56f06792333b47"
+  "timestamp": 1781006845,
+  "run_signature": "e1b3957fe421ef16dbddc68b0bbda396e2bfc36b2e7bf14c2d8b830fc5a2880a"
 }

@@ -3797,8 +3797,8 @@ export default function Home() {
             userType: savedPersona === "teacher" ? "teacher" : "student",
             role: savedPersona === "admin" ? "admin" : savedPersona,
             isWhitelisted: true,
-            grade: "Secondary 1",
-            school: "Suez High School",
+            grade: "Grade 10",
+            school: "El Nasr School",
             friends: [],
             groupsJoined: [],
             privacySettings: {

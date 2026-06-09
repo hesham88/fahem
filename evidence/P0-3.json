@@ -2,7 +2,7 @@
   "task": "P0-3",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P0-3-D0-version.png": "005df5b1a6eaca50fe895631685408f07d6002fb34583ca46b64299c08fcdda9"
   },
   "vision_verdict": "pass. The screenshot displays a clean and valid JSON object returned from the `/api/version` endpoint. The data is properly formatted, confirming that the `sha` field contains a valid hexadecimal identifier and the `builtAt` field shows a timestamp corresponding to June 9, 2026. The layout is presented as a structured text block with a consistent visual presentation, and the requested external infrastructure interface is entirely absent from this view. The output demonstrates a direct, raw response from the server, indicating the system is operating as intended.",
-  "timestamp": 1781002325,
-  "run_signature": "019d2e37653e5ee1a476acafc834157c30d9c40bf9823d47cc6c005dc0aa1801"
+  "timestamp": 1781006845,
+  "run_signature": "47bb129e86e62c980bcce013f89bda4ef2afe27d2df357a402c74c8a71e471ea"
 }

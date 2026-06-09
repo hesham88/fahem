@@ -2,7 +2,7 @@
   "task": "P3-1",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P3-1-D7-reader.png": "ff20bb9b6cf785da3c82f3560b4aa46e17d2349a2e9230e8ea17ea3e0a9cf04b"
   },
   "vision_verdict": "pass. The screenshot presents a clean, well-organized interface for the Fahem Sandbox, focusing on the Knowledge Library module. The layout is professional and logically structured, with the sidebar navigation, primary content area, and role-based sandbox console appearing properly aligned and responsive. The \"All Libraries\" section is clearly designated, and the onboarding walkthrough is positioned correctly in the foreground to guide the user. All UI elements, including the profile section, status indicators, and navigation tabs, render with appropriate padding and spacing, confirming that the interface is fully functional and consistent across its modules.",
-  "timestamp": 1781002551,
-  "run_signature": "591251973528aeecfbfd65b3e63bed08839d45ea5114f0188aad43a08de77344"
+  "timestamp": 1781006845,
+  "run_signature": "69c254ac710435378d3736f96d883ad4db9cc7948c4ee84606aada4066644e1c"
 }

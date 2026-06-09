@@ -2,7 +2,7 @@
   "task": "P5-1",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P5-1-D10-language-lock.png": "7003a504db18a15fb00d48f9b67e7f7893589beb1fdd0976a6bcaef050595491"
   },
   "vision_verdict": "pass. The interface is visually coherent and displays the English language setting consistently across the UI elements, including the sidebar, navigation headers, and the active welcome modal. The layout remains stable, with all components—such as the sandbox console toggles, the main content area, and the user profile section—properly aligned and responsive. The system maintains a unified linguistic consistency throughout the visible workspace, ensuring a clean and professional user experience.",
-  "timestamp": 1781002848,
-  "run_signature": "69a4b25c157e800d3f900f9f302ac330b642d8a01e438e01b42c6f53b3fe3149"
+  "timestamp": 1781006845,
+  "run_signature": "8bb1a9f3c37e5c8f3985aa15cb93a8ade3637bbb12a31c546b823bed605bfd8c"
 }

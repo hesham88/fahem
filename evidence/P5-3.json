@@ -2,7 +2,7 @@
   "task": "P5-3",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P5-3-D10-language-lock.png": "f98a9f93fbf640b1e5fdeb5601cc6f289efc620ae1fb9cb1eb808e235e3c8079"
   },
   "vision_verdict": "pass. The interface displays a consistent and orderly design, maintaining a professional visual hierarchy. The language selection dropdown is clearly visible and integrated into the sidebar, suggesting that the system maintains a unified linguistic environment. The layout components, including the sandbox navigation and the welcome guide, are rendered correctly with proper alignment and spacing, ensuring a stable user experience. The elements are uniformly presented in English, indicating a coherent application state where the UI elements remain aligned with the selected language settings throughout the user interface.",
-  "timestamp": 1781002953,
-  "run_signature": "fac3a1730ed55289dbe9b7153145f1aa69d9f7ca9691e109e78c541598b5e929"
+  "timestamp": 1781006845,
+  "run_signature": "ffacacd3098d766163da287b36cd98736a305926648c2df289cd09b5f4a60196"
 }

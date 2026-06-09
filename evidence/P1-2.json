@@ -2,7 +2,7 @@
   "task": "P1-2",
   "builder": "builder-1",
   "d_box": "D-CRUD",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P1-2-D-CRUD-studio.png": "69d70311ee2816ba3c68ee29e652a908f7c84f6265274f34efe9d83abcbec0a1"
   },
   "vision_verdict": "pass. This screenshot depicts a fully functional and well-structured administrative interface for the Fahem platform. The layout is clean and logically organized, featuring a comprehensive sidebar with categorized navigation options such as \"Academic Space\" and \"Community & Control.\" The main workspace displays a sophisticated \"Curriculum Studio\" header and a \"Curriculum Ingestion Studio\" section, indicating that the system is ready for data processing and library management. An interactive welcome guide is overlaid, suggesting a dynamic and responsive user experience. The color palette is consistent, typography is clear, and all UI components—including the persona selector, profile card, and navigation menu—are properly aligned, demonstrating that the page has rendered correctly and is prepared for user interaction.",
-  "timestamp": 1781002490,
-  "run_signature": "6ebd98173818719d2fc4f2853790ec0792712ea0b63a325068b7a413d0a892c3"
+  "timestamp": 1781006845,
+  "run_signature": "0f4243980c93bc68097e9503bd8087bb82de6c2ba0bd0a4d306dc89364171669"
 }

@@ -2,7 +2,7 @@
   "task": "R4",
   "builder": "builder-1",
   "d_box": "D0",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/R4-D0-version.png": "12b3de2ba2e075b3c991afcbdcc0ac0d84d4bfbef55eeb5b37feaded04150c48"
   },
   "vision_verdict": "pass. The screenshot displays a clean and structured JSON response from the `/api/version` endpoint. The output includes a valid `sha` identifier (34443c0fc350976905064918c00910b75c519ada) and a precise `builtAt` timestamp (2026-06-09T10:25:31.654Z), confirming the system status is healthy. The layout is perfectly intact, rendering a standard developer-friendly view without any extra interface elements or overlays. The content is presented clearly, demonstrating full system readiness and proper API delivery.",
-  "timestamp": 1781000853,
-  "run_signature": "51cf00f1650c164b13271f2f37444c8cb0bba0e971bd24bd0441b3b94dabd323"
+  "timestamp": 1781006845,
+  "run_signature": "777d37b787e7f58469b1c9f978f3fc643ca62b3dab8c42c11ffa7b305b349611"
 }

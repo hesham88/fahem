@@ -2,7 +2,7 @@
   "task": "OR-15",
   "builder": "builder-1",
   "d_box": "D-CRUD",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/OR-15-D-CRUD-studio.png": "56d3c09824773e55a1685e8089b3c3048ee7ee95fbe8cb6e67d07a619152c823"
   },
   "vision_verdict": "pass. The page displays a fully functional interface for the \"Fahem\" learning platform. The layout is intact and professional, featuring a sidebar with navigation links such as \"Knowledge Library,\" \"Course Subjects,\" and \"Study Planner.\" The main content area shows a \"Curriculum Studio\" header and a \"Curriculum Ingestion Studio\" section, confirming a structured software environment. A modal is present, providing a guided welcome walkthrough for the sandbox, and the user profile area is correctly rendered with a status indicator and daily token count. All UI components, including buttons, icons, and text, are properly aligned and responsive, indicating that the application is operating as intended.",
-  "timestamp": 1781001948,
-  "run_signature": "3d5f46975d99399e68f3fb37f4620c82b018c781c7ad9de341d0992b8d5ccda1"
+  "timestamp": 1781006845,
+  "run_signature": "a2717d31b9c0f33bcb4ffcbeeea080c731435cd60cc1dc8be7aff52e6a5c8112"
 }

@@ -2,7 +2,7 @@
   "task": "P4-2",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P4-2-D10-language-lock.png": "84ec9b0c083752d560e2711156a4381afb9065861a2add8ccc253452e4f0d9e6"
   },
   "vision_verdict": "pass. The interface displays a consistent linguistic application, as the primary navigation menus, instructional tooltips, and dashboard headers are presented in English throughout the screenshot. The layout remains fully intact, with well-aligned containers and clear hierarchical organization. Each element, from the sidebar navigation to the contextual guide, maintains a uniform visual structure that successfully supports the intended user workflow.",
-  "timestamp": 1781002713,
-  "run_signature": "e02791087efbea4461f9b23d24783fe84ae7c765854a0d02700c9d8d0d480c33"
+  "timestamp": 1781006845,
+  "run_signature": "efe8a1e7ec0f49b54ce59bc00c3a91511ce111a2c8cad9ce91efd4c3ad5b7321"
 }

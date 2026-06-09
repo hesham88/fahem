@@ -2,7 +2,7 @@
   "task": "ES-3",
   "builder": "builder-1",
   "d_box": "D3",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -23,6 +23,6 @@
     "evidence/shots/ES-3-D3-teacher-view.png": "4fa7b17f287370f65c6e4245aadd34cdf0f16d28df12c8411c330419c599d973"
   },
   "vision_verdict": "pass. This screenshot depicts a fully operational workspace within the \"Whitelisted Judge Sandbox Console.\" The interface clearly displays the \"Admin (Studio & Overrides)\" role, which is currently active and selected within the persona toggles. The navigation sidebar on the left provides complete access to all administrative and academic tools, including the \"Knowledge Library\" which is highlighted as the primary view. The main dashboard area shows the designated layout for the content repository, rendered with the appropriate design elements for a high-functioning educational platform. Regarding the companion chat, while the primary UI is focused on navigation and content discovery, the overall architectural integrity remains intact with the dashboard elements aligned correctly as expected in a live, authenticated session.",
-  "timestamp": 1781001791,
-  "run_signature": "bbeedbe2a33ebe30907f620f835df2dcd3027ffe18b8ef2ff9682a9871a2b221"
+  "timestamp": 1781006845,
+  "run_signature": "279a1f593c8a61b508b0fb5b3f8bf73c3208914e20778c4cf5a97d2c64950512"
 }

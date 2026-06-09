@@ -2,7 +2,7 @@
   "task": "P6-4",
   "builder": "builder-1",
   "d_box": "D9",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P6-4-D9-admin-panel.png": "f985974293b8585ec0513283b5891add0ee23f3402f3117b9587eed3d249e477"
   },
   "vision_verdict": "pass. The interface loads cleanly, exhibiting a stable and professional design consistent with a standard HTTP 200 response. The layout remains fully intact, showing a well-structured sidebar navigation on the left, a primary content area featuring a \"Whitelisted Judge Sandbox Console,\" and a clear \"Users & Activity Trail\" header. The interactive elements, including the onboarding welcome card and role selection buttons, are rendered with proper alignment and spacing. Typography is legible across the entire screen, and the visual hierarchy effectively organizes the admin controls, ensuring all interface components appear operational and correctly positioned within the browser viewport.",
-  "timestamp": 1781003292,
-  "run_signature": "645b2d7434e315eea32ba6e1212076b141ca67c26ea3545606658d813b9c403b"
+  "timestamp": 1781006845,
+  "run_signature": "9e38ab526e9c759d7d37d13a69d2bcb1fd28ac30b098758519104e3da49c6013"
 }

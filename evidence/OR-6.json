@@ -2,7 +2,7 @@
   "task": "OR-6",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -21,6 +21,6 @@
     "evidence/shots/OR-6-D1-landing.png": "6e7ba38f9948a6a2c654207f30874165bc8005a905f0126744719e83df1c4c40"
   },
   "vision_verdict": "pass. The interface displays a fully functional and accessible sandbox environment. The top navigation bar confirms that an identity with elevated privileges is currently active, allowing for seamless switching between administrative, student, and pedagogical persona views. The dashboard renders completely with a functional \"Welcome\" tour overlay, a populated \"Interactive Knowledge Library\" section, and active user metrics, indicating that the system is fully operational and authenticated for the current session. The layout remains clean, responsive, and intact, confirming that the platform provides unrestricted navigation throughout its core modules.",
-  "timestamp": 1781002244,
-  "run_signature": "ea20ea1851c1c98cbd33e628efa259b79f10c0a586fc12e041f13cf1cbb1c861"
+  "timestamp": 1781006845,
+  "run_signature": "fef33b2395cf59ed9990eb080239e0822c0b83a2b8ec25245c09e00c20d77108"
 }

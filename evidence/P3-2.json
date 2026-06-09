@@ -2,7 +2,7 @@
   "task": "P3-2",
   "builder": "builder-1",
   "d_box": "D7",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "fahem-agent-00157-q96",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/P3-2-D7-reader.png": "34d07c9bd713ad2b0d33385ce94f6d10a49c62c0d233ebd1d43d61fb3a5ced84"
   },
   "vision_verdict": "pass. The screenshot displays a functional interface for the \"Fahem\" academic platform, specifically showing the \"Interactive Knowledge Library\" dashboard. The layout is well-structured with a clear navigation sidebar, a role-selection console, and a \"Curriculum Libraries\" section. The interface remains consistent, with all elements rendered correctly in the \"Student (Gamification)\" persona. The welcome message and navigation components are clearly legible, indicating a successful load of the user environment, with the catalog structure appearing ready for academic resource retrieval.",
-  "timestamp": 1781002582,
-  "run_signature": "2a2487a937699c93345082b8b81928be16ac72afa77eba4c97635f87d3d9991b"
+  "timestamp": 1781006845,
+  "run_signature": "7fbd24fa71babba323395cd4d2ac8d6b79477a477edc059a5a8a1c2205adf706"
 }

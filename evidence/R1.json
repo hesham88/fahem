@@ -2,7 +2,7 @@
   "task": "R1",
   "builder": "builder-1",
   "d_box": "D10",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T01:17:58.129Z",
   "backend_revision": "fahem-agent-00156-44m",
   "smoke": {
@@ -19,6 +19,6 @@
     "evidence/shots/R1-D10-language-lock.png": "e3f0406367051cc6cb91f6bc32417a6867fa92200d5dc4d53be4f4ca313e9a64"
   },
   "vision_verdict": "pass. The interface displays a clean, professional dashboard for the Fahem Sandbox, showing a language selector set to English. The layout remains fully aligned and responsive, with clear typography and organized modules like the \"Interactive Knowledge Library\" and the \"Whitelisted Judge Sandbox Console.\" The welcome modal appears centered and distinct, maintaining structural integrity across the entire viewport. The consistent use of English throughout the labels, navigation menus, and instructional text indicates the platform is correctly persisting the chosen language setting, ensuring a cohesive user experience within the application environment.",
-  "timestamp": 1781000766,
-  "run_signature": "b53a446924debbc86663c18734379e6870c86ee85ddfaccc3a7543fd368f1b31"
+  "timestamp": 1781006845,
+  "run_signature": "8ca4d270f4a402fc5182904040980f516417fc5a1316a79b14883f4c7f3c3874"
 }

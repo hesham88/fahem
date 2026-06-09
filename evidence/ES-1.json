@@ -2,7 +2,7 @@
   "task": "ES-1",
   "builder": "builder-1",
   "d_box": "D1",
-  "sha": "34443c0fc350976905064918c00910b75c519ada",
+  "sha": "43b076124228fb3d8589e7d9f574edd0004e6ab7",
   "frontend_revision": "2026-06-09T10:25:31.654Z",
   "backend_revision": "Cloud Run",
   "smoke": {
@@ -21,6 +21,6 @@
     "evidence/shots/ES-1-D1-landing.png": "3af3a31eac15bc9a1b456f0cd6dc7d6fd6ca6746b10e317105bdd62d3ac8bc0c"
   },
   "vision_verdict": "pass\n\nThe interface displays a fully functional and unrestricted environment. The presence of the \"Whitelisted Judge Sandbox Console\" and the active onboarding overlay indicate that a user has successfully initialized the session. The layout is completely intact, featuring a clear navigation sidebar, an interactive main content area, and a functional progress indicator within the welcome guide. All UI components, including the \"Knowledge Library\" header and the \"Curriculum Libraries\" button, appear correctly rendered and responsive, confirming that the platform is operating within its intended parameters with full access to the sandbox features.",
-  "timestamp": 1781001220,
-  "run_signature": "50e21ce32d13be7350060ed750e395f936b19a1d605ba2059ed69a08f2578d11"
+  "timestamp": 1781006845,
+  "run_signature": "3d6f86d08ff12d17388ad76171194b6293bba6539f58c18edce2cf2dee682106"
 }
