@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { authedFetch } from "../../lib/authedFetch";
+import { Dropdown } from "../ui/Dropdown";
 
 interface Subject {
   _id: string;
@@ -108,16 +110,50 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
   t,
 }) => {
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [curricula, setCurricula] = useState<any[]>([]);
+  const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>("");
 
-  // Auto-select first subject if selectedSubjectId is invalid or not in dynamicSubjects
   useEffect(() => {
-    if (dynamicSubjects && dynamicSubjects.length > 0) {
-      const exists = dynamicSubjects.some((s: any) => s._id === selectedSubjectId);
+    const fetchCurricula = async () => {
+      try {
+        const res = await authedFetch("/api/curricula");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.curricula) {
+            setCurricula(data.curricula);
+            const openstax = data.curricula.find((c: any) =>
+              c.library_id === "lib_openstax" ||
+              c._id === "openstax_all" ||
+              (c.title && c.title.toLowerCase().includes("openstax"))
+            );
+            if (openstax) {
+              setSelectedCurriculumId(openstax._id);
+            } else if (data.curricula.length > 0) {
+              setSelectedCurriculumId(data.curricula[0]._id);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching curricula:", err);
+      }
+    };
+    fetchCurricula();
+  }, []);
+
+  const filteredSubjects = dynamicSubjects ? dynamicSubjects.filter((subj: any) => {
+    if (!selectedCurriculumId) return true;
+    return subj.curriculum_id === selectedCurriculumId;
+  }) : [];
+
+  // Auto-select first subject if selectedSubjectId is invalid or not in filteredSubjects
+  useEffect(() => {
+    if (filteredSubjects && filteredSubjects.length > 0) {
+      const exists = filteredSubjects.some((s: any) => s._id === selectedSubjectId);
       if (!exists) {
-        setSelectedSubjectId(dynamicSubjects[0]._id);
+        setSelectedSubjectId(filteredSubjects[0]._id);
       }
     }
-  }, [dynamicSubjects, selectedSubjectId, setSelectedSubjectId]);
+  }, [filteredSubjects, selectedSubjectId, setSelectedSubjectId]);
 
   if (!dynamicSubjects || dynamicSubjects.length === 0) {
     return (
@@ -151,7 +187,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
     );
   }
 
-  const mappedSubjects = dynamicSubjects.map((subj: any) => {
+  const mappedSubjects = filteredSubjects.map((subj: any) => {
     const subjectColor = subj.color || "#ef6c00";
     const subjectIcon = subj.emoji || subj.icon_emoji || "📚";
     return {
@@ -168,7 +204,53 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem" }} className="grid-cols-1">
+      {/* Curriculum Switcher Dropdown */}
+      {curricula.length > 0 && (
+        <div style={{ maxWidth: "400px", alignSelf: "flex-start", width: "100%" }}>
+          <Dropdown
+            label={language === "ar" ? "المنهج الدراسي" : "Select Curriculum"}
+            value={selectedCurriculumId}
+            onChange={(val) => setSelectedCurriculumId(val)}
+            options={curricula.map((c) => ({
+              value: c._id,
+              label: c.title || c.grade || c._id,
+              labelAr: c.title_ar || c.grade_ar || c.title || c._id,
+            }))}
+            language={language}
+          />
+        </div>
+      )}
+
+      {mappedSubjects.length === 0 ? (
+        <div
+          className="panel-card"
+          style={{
+            padding: "3rem 1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            gap: "1.25rem",
+            border: "1px dashed var(--card-border)",
+            background: "rgba(255, 255, 255, 0.4)",
+            borderRadius: "var(--border-radius-lg)",
+          }}
+        >
+          <span style={{ fontSize: "3.5rem" }}>📚</span>
+          <div>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: "0 0 0.5rem 0", color: "var(--foreground)" }}>
+              {language === "ar" ? "لا توجد مواد دراسية مخصصة لهذا المنهج" : "No Subjects for Selected Curriculum"}
+            </h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--foreground-muted)", maxWidth: "400px", margin: "0 auto", lineHeight: 1.5 }}>
+              {language === "ar"
+                ? "لم يتم تعيين أي مواد دراسية لهذا المنهج بعد."
+                : "No subjects have been assigned to this curriculum yet."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem" }} className="grid-cols-1">
         
         {/* Core subjects list cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -464,7 +546,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
             })()}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

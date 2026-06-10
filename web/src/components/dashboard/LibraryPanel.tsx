@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 import { authedFetch } from "../../lib/authedFetch";
+import { Dropdown } from "../ui/Dropdown";
+
 
 interface Book {
   _id?: string;
@@ -4524,53 +4526,21 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 }}>
                   🏫 {language === "ar" ? "المكتبة النشطة" : "Active Library"}
                 </label>
-                <div style={{ position: "relative", width: "100%" }}>
-                  <select
+                <div style={{ width: "100%" }}>
+                  <Dropdown
                     value={selectedLibraryId}
-                    onChange={(e) => setSelectedLibraryId(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      paddingRight: language === "ar" ? "16px" : "36px",
-                      paddingLeft: language === "ar" ? "36px" : "16px",
-                      borderRadius: "12px",
-                      background: "rgba(255, 255, 255, 0.8)",
-                      border: "1px solid rgba(16, 107, 163, 0.15)",
-                      color: "var(--foreground)",
-                      fontSize: "0.85rem",
-                      fontWeight: 700,
-                      fontFamily: "Cairo, var(--font-sans), sans-serif",
-                      cursor: "pointer",
-                      appearance: "none",
-                      outline: "none",
-                      transition: "all 0.2s ease",
-                      boxShadow: "0 4px 12px rgba(16, 107, 163, 0.02)"
-                    }}
-                  >
-                    {consolidatedLibraries.map((lib) => {
+                    onChange={(val) => setSelectedLibraryId(val)}
+                    options={consolidatedLibraries.map((lib) => {
                       const count = libraryCounts[lib._id] || 0;
-                      const libName = language === "ar" ? lib.name_ar : lib.name;
-                      return (
-                        <option key={lib._id} value={lib._id} style={{ color: "#1e293b", fontWeight: 600 }}>
-                          {libName} ({count} {language === "ar" ? "كتب" : "Books"})
-                        </option>
-                      );
+                      const countText = language === "ar" ? "كتب" : "Books";
+                      return {
+                        value: lib._id,
+                        label: `${lib.name} (${count} ${countText})`,
+                        labelAr: `${lib.name_ar || lib.name} (${count} ${language === "ar" ? "كتب" : "Books"})`,
+                      };
                     })}
-                  </select>
-                  <div style={{
-                    position: "absolute",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    right: language === "ar" ? "auto" : "12px",
-                    left: language === "ar" ? "12px" : "auto",
-                    pointerEvents: "none",
-                    color: "var(--primary)",
-                    fontSize: "0.8rem",
-                    display: "flex",
-                    alignItems: "center"
-                  }}>
-                    ▼
-                  </div>
+                    language={language}
+                  />
                 </div>
               </div>
             )}
@@ -4622,30 +4592,21 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           {label}
                         </label>
                         {field.type === "enum" ? (
-                          <select
+                          <Dropdown
                             value={currentValue}
-                            onChange={(e) => {
-                              const val = e.target.value;
+                            onChange={(val) => {
                               setScopeValues(prev => ({ ...prev, [field.key]: val }));
                             }}
-                            style={{
-                              padding: "0.6rem 1rem",
-                              borderRadius: "12px",
-                              border: "1px solid rgba(16, 107, 163, 0.12)",
-                              backgroundColor: "#ffffff",
-                              fontSize: "0.82rem",
-                              color: "var(--foreground)",
-                              outline: "none",
-                              fontFamily: "Cairo, var(--font-sans), sans-serif",
-                              cursor: "pointer",
-                              transition: "all 0.2s"
-                            }}
-                          >
-                            <option value="">{language === "ar" ? "الكل" : "All"}</option>
-                            {(field.options || []).map((opt: string) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
+                            options={[
+                              { value: "", label: "All", labelAr: "الكل" },
+                              ...(field.options || []).map((opt: string) => ({
+                                value: opt,
+                                label: opt,
+                                labelAr: opt,
+                              }))
+                            ]}
+                            language={language}
+                          />
                         ) : (
                           <input
                             type="text"

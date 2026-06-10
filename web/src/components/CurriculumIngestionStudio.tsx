@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { authedFetch } from "../lib/authedFetch";
+import { Dropdown } from "./ui/Dropdown";
 import {
   FiBookOpen,
   FiPlus,
@@ -2308,29 +2309,38 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
               <div className="gateway-filters-row">
                 <div className="filter-item">
                   <label>{t("tab_libraries")}</label>
-                  <select value={selectedLibId} onChange={e => setSelectedLibId(e.target.value)} className="styled-select">
-                    {libraries.map(lib => (
-                      <option key={lib._id} value={lib._id}>{isAr ? lib.name_ar : lib.name}</option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={selectedLibId}
+                    onChange={(val) => setSelectedLibId(val)}
+                    options={libraries}
+                    language={isAr ? "ar" : "en"}
+                  />
                 </div>
                 <div className="filter-item">
                   <label>{t("tab_curricula")}</label>
-                  <select value={selectedCurriculumId} onChange={e => setSelectedCurriculumId(e.target.value)} className="styled-select">
-                    <option value="">-- Choose Curriculum --</option>
-                    {curricula.map(cur => (
-                      <option key={cur._id} value={cur._id}>{isAr ? cur.title_ar : cur.title}</option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={selectedCurriculumId}
+                    onChange={(val) => setSelectedCurriculumId(val)}
+                    placeholder={isAr ? "-- اختر المنهج --" : "-- Choose Curriculum --"}
+                    options={[
+                      { value: "", label: "-- Choose Curriculum --", labelAr: "-- اختر المنهج --" },
+                      ...curricula
+                    ]}
+                    language={isAr ? "ar" : "en"}
+                  />
                 </div>
                 <div className="filter-item">
                   <label>Target Subject</label>
-                  <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} className="styled-select">
-                    <option value="">-- Choose Subject --</option>
-                    {subjects.map(subj => (
-                      <option key={subj._id} value={subj._id}>{isAr ? subj.name_ar : subj.name}</option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={selectedSubjectId}
+                    onChange={(val) => setSelectedSubjectId(val)}
+                    placeholder={isAr ? "-- اختر المادة --" : "-- Choose Subject --"}
+                    options={[
+                      { value: "", label: "-- Choose Subject --", labelAr: "-- اختر المادة --" },
+                      ...subjects
+                    ]}
+                    language={isAr ? "ar" : "en"}
+                  />
                 </div>
               </div>
             </div>

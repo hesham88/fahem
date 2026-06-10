@@ -4,6 +4,8 @@ import React from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 import { authedFetch } from "../../lib/authedFetch";
+import { Dropdown } from "../ui/Dropdown";
+
 import {
   FiSettings,
   FiCheckCircle,
@@ -549,25 +551,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--foreground)" }}>
               {language === "ar" ? "ظهور الملف الشخصي" : "Profile Visibility"}
             </label>
-            <select
+            <Dropdown
               value={privacyVisibility}
-              onChange={(e: any) => setPrivacyVisibility(e.target.value)}
-              style={{
-                padding: "0.85rem 1.1rem",
-                borderRadius: "var(--border-radius-md)",
-                border: "1px solid var(--card-border)",
-                outline: "none",
-                fontFamily: "var(--font-sans)",
-                background: "#ffffff",
-                fontSize: "0.95rem",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
-                transition: "border-color 0.2s ease",
-              }}
-            >
-              <option value="public">{language === "ar" ? "عام (الجميع يمكنه رؤية ملفك)" : "Public (Visible to everyone)"}</option>
-              <option value="friends">{language === "ar" ? "الأصدقاء فقط" : "Friends Only"}</option>
-              <option value="private">{language === "ar" ? "خاص (مخفي من الدليل)" : "Private (Hidden from directory)"}</option>
-            </select>
+              onChange={(val) => setPrivacyVisibility(val)}
+              options={[
+                { value: "public", label: "Public (Visible to everyone)", labelAr: "عام (الجميع يمكنه رؤية ملفك)" },
+                { value: "friends", label: "Friends Only", labelAr: "الأصدقاء فقط" },
+                { value: "private", label: "Private (Hidden from directory)", labelAr: "خاص (مخفي من الدليل)" }
+              ]}
+              language={language}
+            />
           </div>
         </div>
 

@@ -23,6 +23,8 @@ import { SettingsPanel } from "../../../components/dashboard/SettingsPanel";
 import { InsightsPanel } from "../../../components/dashboard/InsightsPanel";
 import { DemoTourGuide } from "../../../components/DemoTourGuide";
 import ScreenLock from "../../../components/ScreenLock";
+import { Dropdown } from "../../../components/ui/Dropdown";
+
 
 
 import { 
@@ -5041,37 +5043,16 @@ export default function Home() {
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                background: "rgba(16, 107, 163, 0.06)",
-                border: "1px solid rgba(16, 107, 163, 0.15)",
-                padding: "6px 14px",
-                borderRadius: "20px",
-                color: "var(--primary)",
-                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.02)",
-                transition: "all 0.2s"
-              }}>
-                <FiGlobe style={{ fontSize: "0.95rem" }} />
-                <select
+              <div style={{ width: "130px" }}>
+                <Dropdown
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--primary)",
-                    fontSize: "0.82rem",
-                    fontWeight: 700,
-                    outline: "none",
-                    cursor: "pointer",
-                    paddingRight: language === "ar" ? "0" : "4px",
-                    paddingLeft: language === "ar" ? "4px" : "0",
-                  }}
-                >
-                  <option value="en" style={{ color: "#111827", background: "#ffffff" }}>English</option>
-                  <option value="ar" style={{ color: "#111827", background: "#ffffff" }}>العربية</option>
-                </select>
+                  onChange={(val) => setLanguage(val as any)}
+                  options={[
+                    { value: "en", label: "English", labelAr: "English", icon: "🇺🇸" },
+                    { value: "ar", label: "العربية", labelAr: "العربية", icon: "🇪🇬" }
+                  ]}
+                  language={language}
+                />
               </div>
 
               <button
@@ -6170,15 +6151,15 @@ export default function Home() {
               <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
                 <FiGlobe /> <span>{language === "ar" ? "اللغة" : "Language"}</span>
               </label>
-              <select
+              <Dropdown
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
-                className="sidebar-language-select"
-                style={{ width: "100%", padding: "6px 10px", fontSize: "0.8rem", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--foreground)" }}
-              >
-                <option value="en">English</option>
-                <option value="ar">العربية</option>
-              </select>
+                onChange={(val) => setLanguage(val as any)}
+                options={[
+                  { value: "en", label: "English", labelAr: "English", icon: "🇺🇸" },
+                  { value: "ar", label: "العربية", labelAr: "العربية", icon: "🇪🇬" }
+                ]}
+                language={language}
+              />
             </div>
 
             {/* Premium Theme Switcher */}
