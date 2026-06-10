@@ -1008,7 +1008,7 @@ body[dir="rtl"] .glass-nav-links {
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: #6a7c88;
-  margin: 0.75rem 0.75rem 0.3rem 0.75rem;
+  margin: 0.3rem 0.75rem 0.15rem 0.75rem;
   opacity: 0.8;
 }
 
@@ -1023,7 +1023,7 @@ body[dir="rtl"] .glass-nav-links {
   background: transparent;
   color: #5c6f7c;
   font-family: var(--font-sans);
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   font-weight: 550;
   cursor: pointer;
   text-align: left;
@@ -1558,7 +1558,7 @@ body[dir="rtl"] .glass-nav-links {
   .sidebar-nav-btn {
     width: 100% !important;
     padding: 0.6rem 0.9rem !important;
-    font-size: 0.7rem !important;
+    font-size: 0.85rem !important;
     border-radius: var(--border-radius-md) !important;
     display: flex !important;
     align-items: center !important;
