@@ -40,7 +40,7 @@ export default function AgentsPage() {
           <div className="glass-card" style={{ textAlign: "center", marginBottom: "3rem", padding: "3rem 2rem", position: "relative", overflow: "hidden" }}>
             <div className="glow-effect" style={{ position: "absolute", top: "-50%", left: "-50%", right: "-50%", bottom: "-50%", background: "radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 60%)", pointerEvents: "none" }}></div>
             
-            <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, #a855f7, #ec4899)", margin: "0 auto 1.5rem auto", display: "flex", alignItems: "center", justifymContent: "center", width: "64px", height: "64px", borderRadius: "16px", boxShadow: "0 8px 20px rgba(168,85,247,0.2)" }}>
+            <div className="glass-card-icon" style={{ background: "linear-gradient(135deg, #a855f7, #ec4899)", margin: "0 auto 1.5rem auto", display: "flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px", borderRadius: "16px", boxShadow: "0 8px 20px rgba(168,85,247,0.2)" }}>
               <FiUsers style={{ fontSize: "2rem", color: "#ffffff" }} />
             </div>
 
