@@ -102,7 +102,7 @@ const translations: Record<string, Record<string, string>> = {
     create_library: "Create Library",
     edit_library: "Edit Library",
     lib_id: "Library ID",
-    lib_id_placeholder: "e.g. lib_moe",
+    lib_id_placeholder: "e.g. lib_openstax",
     lib_name_en: "Library Name (EN)",
     lib_name_ar: "Library Name (AR)",
     lib_source: "Source Provider Type",
@@ -179,7 +179,7 @@ const translations: Record<string, Record<string, string>> = {
     create_library: "إنشاء مكتبة جديدة",
     edit_library: "تعديل المكتبة",
     lib_id: "رمز المكتبة الفريد",
-    lib_id_placeholder: "مثال: lib_moe",
+    lib_id_placeholder: "مثال: lib_openstax",
     lib_name_en: "اسم المكتبة (إنجليزي)",
     lib_name_ar: "اسم المكتبة (عربي)",
     lib_source: "مزود المحتوى",
@@ -522,6 +522,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<"library" | "curriculum" | "subject" | "assign_book" | null>(null);
+  const [booksSearchQuery, setBooksSearchQuery] = useState("");
 
   // Core collections
   const [libraries, setLibraries] = useState<Library[]>([]);
@@ -672,9 +674,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   // Tree Explorer, Emoji Picker, Delete Confirm & Pending states
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    "lib_lib_moe": true // Expand first library by default if desired
-  });
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [crawlExpandedNodes, setCrawlExpandedNodes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -967,7 +967,20 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Library
   const handleSaveLibrary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!libForm._id || !libForm.name || !libForm.name_ar || !libForm.source) {
+    let finalId = libForm._id;
+    if (!isEditingLib) {
+      finalId = "lib_" + (libForm.name || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      if (finalId === "lib_" || finalId.length < 5) {
+        finalId = "lib_" + Math.random().toString(36).substring(2, 7);
+      }
+    }
+
+    const finalLibForm = {
+      ...libForm,
+      _id: finalId
+    };
+
+    if (!finalLibForm._id || !finalLibForm.name || !finalLibForm.name_ar || !finalLibForm.source) {
       triggerToast("Missing library primary fields", true);
       return;
     }
@@ -976,7 +989,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       const res = await authedFetch("/api/libraries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(libForm)
+        body: JSON.stringify(finalLibForm)
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -1028,8 +1041,18 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     }
     setLoading(true);
     try {
+      let finalId = curForm._id;
+      if (!isEditingCur) {
+        finalId = "cur_" + (curForm.title || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        if (finalId === "cur_" || finalId.length < 5) {
+          finalId = "cur_" + Math.random().toString(36).substring(2, 7);
+        }
+      }
+
       const payload = {
         ...curForm,
+        _id: finalId,
+        id: finalId,
         library_id: selectedLibId,
         visibility: "public"
       };
@@ -1506,89 +1529,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
           .studio-header {
             flex-direction: column;
             align-items: flex-start !important;
-            gap: 1rem;
-          }
-          .studio-tabs {
-            width: 100%;
-            overflow-x: auto;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-          }
-          .tab-btn {
-            flex: 1;
-            text-align: center;
-          }
-          .tab-grid.grid-2 {
-            grid-template-columns: 1fr !important;
-          }
-          .form-card, .list-card, .column-container, .crawler-card, .manual-ingest-card {
-            padding: 1.25rem !important;
-          }
-        }
-        
-        /* Ingestion Dashboard Custom Animations & Style overrides */
-        @keyframes shimmer-slide {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-        @keyframes pulse-active-step {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
-          }
-          50% {
-            box-shadow: 0 0 16px 6px rgba(37, 99, 235, 0.7);
-          }
-        }
-        @keyframes pulse-soft {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-        /* HSL Custom Terminal Scrollbar */
-        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.2);
-        }
-        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 4px;
-        }
-        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
-        }
-        .subjects-checkbox-grid::-webkit-scrollbar {
-          width: 6px;
-        }
-        .subjects-checkbox-grid::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.05);
-        }
-        .subjects-checkbox-grid::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.15);
-          border-radius: 4px;
-        }
-        .subjects-checkbox-grid::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.25);
-        }
-        .subject-checkbox-item:hover {
-          background: rgba(37, 99, 235, 0.05) !important;
-          border-color: rgba(37, 99, 235, 0.15) !important;
-        }
-      `}</style>
-      {/* Toast feedback notifications */}
-      {successMsg && <div className="toast success-toast"><FiCheckCircle /> {successMsg}</div>}
-      {errorMsg && <div className="toast error-toast"><FiAlertCircle /> {errorMsg}</div>}
-
-      <header className="studio-header">
+<header className="studio-header">
         <div className="header-meta">
           <FiCpu className="header-icon pulse-animation" />
           <div>
@@ -1601,109 +1542,1079 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
         </div>
       </header>
 
-      {/* Tabs */}
-      <nav className="studio-tabs">
-        <button
-          onClick={() => setActiveTab("libraries")}
-          className={`tab-btn ${activeTab === "libraries" ? "active-tab" : ""}`}
-        >
-          {t("tab_libraries")}
-        </button>
-        <button
-          onClick={() => setActiveTab("curricula_builder")}
-          className={`tab-btn ${activeTab === "curricula_builder" ? "active-tab" : ""}`}
-        >
-          {t("tab_curricula")}
-        </button>
-        <button
-          onClick={() => setActiveTab("ingest_console")}
-          className={`tab-btn ${activeTab === "ingest_console" ? "active-tab" : ""}`}
-        >
-          {t("tab_ingest")}
-        </button>
-      </nav>
-
-      {/* Tab Contents */}
-      <main className="tab-contents">
+      {/* Unified 2-Column Studio Dashboard */}
+      <div className="studio-unified-layout">
         
-        {/* TAB 1: Library Manager */}
-        {activeTab === "libraries" && (
-          <div className="tab-grid grid-2">
-            <section className="form-card">
-              <h2>{isEditingLib ? t("edit_library") : t("create_library")}</h2>
-              <form onSubmit={handleSaveLibrary} className="standard-form">
-                <div className="form-group">
-                  <label>{t("lib_id")}</label>
+        {/* Left Column: Master Curriculum Tree Explorer */}
+        <aside className="tree-explorer-card">
+          <div className="sidebar-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: "750", display: "flex", alignItems: "center", gap: "8px" }}>
+                🌳 {isAr ? "مستكشف المناهج" : "Curriculum Explorer"}
+              </h3>
+              <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b" }}>
+                {isAr ? "الهيكل الهرمي للمكتبات والمناهج والكتب" : "Hierarchical libraries, curricula & books"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="icon-btn-text"
+              onClick={() => {
+                setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
+                setIsEditingLib(false);
+                setActiveModal("library");
+              }}
+              title={isAr ? "إضافة مكتبة جديدة" : "Add New Library"}
+              style={{
+                background: "rgba(59, 130, 246, 0.1)",
+                color: "var(--primary)",
+                border: "1px solid rgba(59, 130, 246, 0.15)",
+                padding: "6px 10px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <FiPlus /> {isAr ? "مكتبة" : "Library"}
+            </button>
+          </div>
+
+          <div className="tree-scroller-capped">
+            {libraries.map(lib => {
+              const libExpanded = !!expandedNodes[`lib_${lib._id}`];
+              const libCurricula = curricula.filter(c => c.library_id === lib._id);
+              return (
+                <div key={lib._id} className="tree-branch" style={{ marginBottom: "6px" }}>
+                  <div 
+                    className={`tree-row ${selectedLibId === lib._id && !selectedCurriculumId && !selectedSubjectId ? "active-row" : ""}`}
+                    onClick={() => {
+                      setSelectedLibId(lib._id);
+                      setSelectedCurriculumId("");
+                      setSelectedSubjectId("");
+                      setIsEditingLib(true);
+                      setLibForm(lib);
+                    }}
+                    style={{ cursor: "pointer", borderRadius: "8px", padding: "6px 8px" }}
+                  >
+                    <span 
+                      className="expand-toggle" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedNodes(prev => ({ ...prev, [`lib_${lib._id}`]: !prev[`lib_${lib._id}`] }));
+                      }}
+                      style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      {libCurricula.length > 0 ? (libExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: isAr ? "rotate(90deg)" : "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                    </span>
+                    <img src={lib.logo || "/libs/logo.svg"} className="tree-lib-logo" alt="" onError={e => { (e.target as any).src = "/libs/logo.svg" }} style={{ width: "20px", height: "20px", objectFit: "contain", margin: "0 4px" }} />
+                    <span className="tree-node-text" style={{ fontWeight: 700, fontSize: "0.9rem" }}>{isAr ? lib.name_ar : lib.name}</span>
+                    
+                    <div className="tree-node-actions" style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                      <button 
+                        type="button" 
+                        className="tree-row-action" 
+                        title={isAr ? "إضافة منهج" : "Add Curriculum"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLibId(lib._id);
+                          setSelectedCurriculumId("");
+                          setSelectedSubjectId("");
+                          setIsCreatingCurUnderLib(lib._id);
+                          setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
+                          setIsEditingCur(false);
+                          setActiveModal("curriculum");
+                        }}
+                      >
+                        <FiPlus />
+                      </button>
+                      <button 
+                        type="button" 
+                        className="tree-row-action" 
+                        title={isAr ? "تعديل المكتبة" : "Edit Library"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLibId(lib._id);
+                          setSelectedCurriculumId("");
+                          setSelectedSubjectId("");
+                          setIsEditingLib(true);
+                          setLibForm(lib);
+                          setActiveModal("library");
+                        }}
+                      >
+                        <FiEdit />
+                      </button>
+                    </div>
+                  </div>
+
+                  {libExpanded && (
+                    <div className="tree-children" style={{ paddingLeft: isAr ? 0 : "16px", paddingRight: isAr ? "16px" : 0 }}>
+                      {libCurricula.map(cur => {
+                        const curExpanded = !!expandedNodes[`cur_${cur._id}`];
+                        const curSubjects = subjects.filter(s => s.curriculum_id === cur._id);
+                        return (
+                          <div key={cur._id} className="tree-branch" style={{ marginTop: "4px" }}>
+                            <div 
+                              className={`tree-row ${selectedCurriculumId === cur._id && !selectedSubjectId ? "active-row" : ""}`}
+                              onClick={() => {
+                                setSelectedLibId(lib._id);
+                                setSelectedCurriculumId(cur._id);
+                                setSelectedSubjectId("");
+                                setIsEditingCur(true);
+                                setCurForm({ _id: cur._id, title: cur.title, title_ar: cur.title_ar, scope: cur.scope || {} });
+                              }}
+                              style={{ cursor: "pointer", borderRadius: "6px", padding: "4px 8px" }}
+                            >
+                              <span 
+                                className="expand-toggle" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedNodes(prev => ({ ...prev, [`cur_${cur._id}`]: !prev[`cur_${cur._id}`] }));
+                                }}
+                              >
+                                {curSubjects.length > 0 ? (curExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: isAr ? "rotate(90deg)" : "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                              </span>
+                              <FiLayers className="tree-node-icon" style={{ color: "#6366f1" }} />
+                              <span className="tree-node-text" style={{ fontSize: "0.85rem" }}>{isAr ? cur.title_ar : cur.title}</span>
+                              
+                              <div className="tree-node-actions" style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                                <button 
+                                  type="button" 
+                                  className="tree-row-action" 
+                                  title={isAr ? "إضافة مادة" : "Add Subject"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedLibId(lib._id);
+                                    setSelectedCurriculumId(cur._id);
+                                    setSelectedSubjectId("");
+                                    setIsCreatingSubjUnderCur(cur._id);
+                                    setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
+                                    setEditingSubjectId(null);
+                                    setActiveModal("subject");
+                                  }}
+                                >
+                                  <FiPlus />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  className="tree-row-action" 
+                                  title={isAr ? "تعديل المنهج" : "Edit Curriculum"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedLibId(lib._id);
+                                    setSelectedCurriculumId(cur._id);
+                                    setSelectedSubjectId("");
+                                    setIsEditingCur(true);
+                                    setCurForm({ _id: cur._id, title: cur.title, title_ar: cur.title_ar, scope: cur.scope || {} });
+                                    setActiveModal("curriculum");
+                                  }}
+                                >
+                                  <FiEdit />
+                                </button>
+                              </div>
+                            </div>
+
+                            {curExpanded && (
+                              <div className="tree-children" style={{ paddingLeft: isAr ? 0 : "16px", paddingRight: isAr ? "16px" : 0 }}>
+                                {curSubjects.map(subj => {
+                                  const subjExpanded = !!expandedNodes[`subj_${subj._id}`];
+                                  const subjBooks = books.filter(b => b.subject_id === subj._id);
+                                  return (
+                                    <div key={subj._id} className="tree-branch" style={{ marginTop: "2px" }}>
+                                      <div 
+                                        className={`tree-row ${selectedSubjectId === subj._id ? "active-row" : ""}`}
+                                        style={{ borderInlineStart: `3px solid ${subj.color}`, padding: "4px 8px" }}
+                                        onClick={() => {
+                                          setSelectedLibId(lib._id);
+                                          setSelectedCurriculumId(cur._id);
+                                          setSelectedSubjectId(subj._id);
+                                          setSelectedSubjectIds({ [subj._id]: true });
+                                          setSubjForm(subj);
+                                          setEditingSubjectId(subj._id);
+                                        }}
+                                      >
+                                        <span 
+                                          className="expand-toggle" 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedNodes(prev => ({ ...prev, [`subj_${subj._id}`]: !prev[`subj_${subj._id}`] }));
+                                          }}
+                                        >
+                                          {subjBooks.length > 0 ? (subjExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: isAr ? "rotate(90deg)" : "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
+                                        </span>
+                                        <span className="tree-node-emoji">{subj.emoji || "📚"}</span>
+                                        <span className="tree-node-text" style={{ fontSize: "0.82rem" }}>{isAr ? subj.name_ar : subj.name}</span>
+                                        
+                                        <div className="tree-node-actions" style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                                          <button 
+                                            type="button" 
+                                            className="tree-row-action" 
+                                            title={isAr ? "ربط كتاب" : "Assign Book"}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedLibId(lib._id);
+                                              setSelectedCurriculumId(cur._id);
+                                              setSelectedSubjectId(subj._id);
+                                              setAssignBookId("");
+                                              setAssignSubjectId(subj._id);
+                                              setAssignRole("core");
+                                              setActiveModal("assign_book");
+                                            }}
+                                          >
+                                            <FiPlus />
+                                          </button>
+                                          <button 
+                                            type="button" 
+                                            className="tree-row-action" 
+                                            title={isAr ? "تعديل المادة" : "Edit Subject"}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedLibId(lib._id);
+                                              setSelectedCurriculumId(cur._id);
+                                              setSelectedSubjectId(subj._id);
+                                              setSubjForm(subj);
+                                              setEditingSubjectId(subj._id);
+                                              setActiveModal("subject");
+                                            }}
+                                          >
+                                            <FiEdit />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {subjExpanded && (
+                                        <div className="tree-children" style={{ paddingLeft: isAr ? 0 : "12px", paddingRight: isAr ? "12px" : 0 }}>
+                                          {subjBooks.map(book => (
+                                            <div key={book._id} className="tree-row tree-row-book" style={{ padding: "4px 8px" }}>
+                                              <FiBookOpen className="tree-node-icon" style={{ color: "#10b981", flexShrink: 0 }} />
+                                              <div className="tree-node-book-meta" style={{ flexGrow: 1, minWidth: 0 }}>
+                                                <span className="tree-node-text-bold" style={{ fontSize: "0.8rem", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                  {isAr ? book.title_ar : book.title}
+                                                </span>
+                                                <span className="tree-node-subtext" style={{ fontSize: "0.72rem", color: "#64748b" }}>
+                                                  ({book.language}) - {book.role === "core" ? (isAr ? "أساسي" : "Core") : (isAr ? "داعم" : "Supporting")}
+                                                </span>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                className="tree-row-action decouple-action"
+                                                title={isAr ? "فصل الكتاب" : "Decouple Book"}
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
+                                                  if (confirm(isAr ? `هل أنت متأكد من فصل "${book.title}"؟` : `Are you sure you want to decouple "${book.title}"?`)) {
+                                                    setLoading(true);
+                                                    try {
+                                                      const res = await authedFetch(`/api/books/${book._id}/assign`, {
+                                                        method: "PATCH",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ action: "decouple" })
+                                                      });
+                                                      if (res.ok) {
+                                                        triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
+                                                        fetchBooks();
+                                                        fetchSubjects(cur._id);
+                                                      } else {
+                                                        triggerToast("Failed to decouple book", true);
+                                                      }
+                                                    } catch (err: any) {
+                                                      triggerToast(err.message, true);
+                                                    } finally {
+                                                      setLoading(false);
+                                                    }
+                                                  }
+                                                }}
+                                              >
+                                                <FiTrash2 />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Right Column: Operations Console & Assets Repository */}
+        <div className="operations-column" style={{ display: "flex", flexDirection: "column" }}>
+          
+          {/* Active Workspace HUD Selection Card */}
+          <div className="workspace-hud-card">
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", color: "#64748b" }}>
+                <span>🎯 {isAr ? "الموقع النشط المستهدف:" : "Target Workspace Location:"}</span>
+              </div>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {selectedLibId ? (
+                  <span className="badge-pill" style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "rgba(59, 130, 246, 0.12)", color: "var(--primary)", fontWeight: "600", fontSize: "0.8rem", padding: "4px 10px", borderRadius: "20px" }}>
+                    🏛️ {isAr ? (activeLibrary?.name_ar || selectedLibId) : (activeLibrary?.name || selectedLibId)}
+                  </span>
+                ) : (
+                  <span className="badge-pill" style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", fontSize: "0.8rem", padding: "4px 10px", borderRadius: "20px" }}>
+                    {isAr ? "لم يتم تحديد مكتبة" : "No Library Target"}
+                  </span>
+                )}
+                {selectedCurriculumId && (
+                  <span className="badge-pill" style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "rgba(99, 102, 241, 0.12)", color: "#6366f1", fontWeight: "600", fontSize: "0.8rem", padding: "4px 10px", borderRadius: "20px" }}>
+                    📐 {isAr ? (translations[language]?.title_ar || "المنهج") : "Curriculum"}
+                  </span>
+                )}
+                {Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length > 0 && (
+                  <span className="badge-pill" style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "rgba(16, 185, 129, 0.12)", color: "#10b981", fontWeight: "600", fontSize: "0.8rem", padding: "4px 10px", borderRadius: "20px" }}>
+                    🎨 {Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length} {isAr ? "مواد محددة" : "Subjects selected"}
+                  </span>
+                )}
+              </div>
+            </div>
+            {(selectedLibId || selectedCurriculumId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLibId("");
+                  setSelectedCurriculumId("");
+                  setSelectedSubjectId("");
+                  setSelectedSubjectIds({});
+                }}
+                className="discard-btn"
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  backgroundColor: "rgba(220, 38, 38, 0.08)",
+                  color: "#dc2626",
+                  border: "1px solid rgba(220, 38, 38, 0.15)",
+                  margin: 0
+                }}
+              >
+                <FiSlash size={12} /> {isAr ? "تصفير الاختيار" : "Clear Target"}
+              </button>
+            )}
+          </div>
+
+          {/* Validation context alert if selections are incomplete */}
+          {(!selectedLibId || !selectedCurriculumId || Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0) && (
+            <div className="ingestion-validation-warning-banner" style={{
+              marginBottom: "1.5rem",
+              padding: "1rem 1.25rem",
+              borderRadius: "10px",
+              backgroundColor: "rgba(245, 158, 11, 0.12)",
+              border: "1.5px solid rgb(245, 158, 11)",
+              color: "rgb(251, 191, 36)",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              boxShadow: "0 4px 15px rgba(245, 158, 11, 0.12)",
+              animation: "pulse-soft 2.5s infinite"
+            }}>
+              <FiAlertCircle style={{ fontSize: "1.6rem", flexShrink: 0, textShadow: "0 0 8px rgba(245, 158, 11, 0.5)" }} />
+              <div style={{ fontSize: "0.85rem", lineHeight: 1.45 }}>
+                <strong style={{ display: "block", marginBottom: "3px", textShadow: "0 0 4px rgba(245, 158, 11, 0.2)" }}>
+                  {isAr ? "⚠️ متطلبات التوجيه والمسار معلقة" : "⚠️ Routing Context Incomplete"}
+                </strong>
+                <span>
+                  {isAr 
+                    ? `لوحة الاستيراد بانتظار تحديد المسار: يرجى اختيار مادة دراسية واحدة على الأقل في الأعلى لتتمكن من تشغيل قنوات استيراد الكتب.`
+                    : `The Ingestion console is waiting for router context: Please select or click on a Curriculum or Subject on the tree sidebar to automatically activate targets.`
+                  }
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Ops Control Cards Grid */}
+          <div className="ops-panels-grid">
+            
+            {/* CARD A: Autonomous Web Crawler */}
+            <section className="ops-console-card crawler-card">
+              <h3 style={{ margin: 0, fontSize: "1.02rem", fontWeight: "750", display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "8px" }}>
+                📡 {t("web_crawler")}
+              </h3>
+              
+              <div className="standard-form" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: "0.8rem", fontWeight: "600" }}>{t("crawl_url_label")}</label>
+                  <input
+                    type="url"
+                    value={crawlUrl}
+                    onChange={e => setCrawlUrl(e.target.value)}
+                    className="styled-input url-input"
+                    style={{ fontSize: "0.85rem", padding: "8px 10px" }}
+                  />
+                </div>
+                
+                <div className="form-group-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", margin: 0, alignItems: "end" }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: "0.8rem", fontWeight: "600" }}>{t("crawl_depth")}</label>
+                    <select
+                      value={crawlMaxDepth}
+                      onChange={e => setCrawlMaxDepth(Number(e.target.value))}
+                      className="styled-select"
+                      style={{ fontSize: "0.85rem", padding: "6px 8px", height: "38px" }}
+                      disabled={isCrawling || crawlStatus === "paused"}
+                    >
+                      <option value={1}>1 - Shallow Target Link Only</option>
+                      <option value={2}>2 - Standard Folder Depth</option>
+                      <option value={3}>3 - Complete Portal Crawl</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    {!isCrawling && crawlStatus !== "paused" ? (
+                      <button
+                        type="button"
+                        onClick={handleStartCrawling}
+                        className="primary-submit-btn crawl-start-btn"
+                        style={{ height: "38px", display: "flex", alignItems: "center", gap: "4px", fontSize: "0.82rem", margin: 0, padding: "0 14px" }}
+                      >
+                        <FiSearch /> {t("start_crawl")}
+                      </button>
+                    ) : (
+                      <>
+                        {crawlStatus === "paused" ? (
+                          <button
+                            type="button"
+                            onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "resume")}
+                            className="control-btn resume-btn"
+                            style={{
+                              height: "38px",
+                              padding: "0 10px",
+                              borderRadius: "8px",
+                              backgroundColor: "rgba(16, 185, 129, 0.15)",
+                              border: "1.5px solid rgb(16, 185, 129)",
+                              color: "rgb(52, 211, 153)",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                              fontSize: "0.8rem"
+                            }}
+                          >
+                            <FiPlay />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "pause")}
+                            className="control-btn pause-btn"
+                            style={{
+                              height: "38px",
+                              padding: "0 10px",
+                              borderRadius: "8px",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              border: "1.5px solid rgb(245, 158, 11)",
+                              color: "rgb(251, 191, 36)",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                              fontSize: "0.8rem"
+                            }}
+                          >
+                            <FiPause />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "stop")}
+                          className="control-btn stop-btn"
+                          style={{
+                            height: "38px",
+                            padding: "0 10px",
+                            borderRadius: "8px",
+                            backgroundColor: "rgba(239, 68, 68, 0.12)",
+                            border: "1.5px solid rgb(239, 68, 68)",
+                            color: "rgb(248, 113, 113)",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "0.8rem"
+                          }}
+                        >
+                          <FiSquare />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {(isCrawling || crawlProgress > 0) && (
+                  <div style={{ marginTop: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "4px" }}>
+                      <span style={{ color: "var(--primary)", fontWeight: "600" }}>
+                        {isCrawling ? t("crawler_running") : (isAr ? "اكتمال المسح" : "Crawl Completed")}
+                      </span>
+                      <span>{crawlProgress}%</span>
+                    </div>
+                    <div style={{ height: "6px", width: "100%", backgroundColor: "rgba(0,0,0,0.06)", borderRadius: "10px", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${crawlProgress}%`, backgroundColor: "var(--primary)", borderRadius: "10px", transition: "width 0.4s ease" }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Past Crawls History Select */}
+                {pastCrawls.length > 0 && (
+                  <div className="form-group" style={{ margin: "4px 0 0 0" }}>
+                    <label style={{ fontSize: "0.78rem", fontWeight: "600", color: "#64748b" }}>
+                      📂 {isAr ? "تاريخ عمليات الزحف السابقة" : "Historical Exploration History"}
+                    </label>
+                    <select
+                      value={selectedCrawlId || ""}
+                      onChange={e => {
+                        const job = pastCrawls.find(j => j._id === e.target.value);
+                        if (job) handleSelectPastCrawl(job);
+                      }}
+                      className="styled-select compact"
+                      style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                    >
+                      <option value="">-- {isAr ? "اختر عملية سابقة" : "Review Historical Jobs"} --</option>
+                      {pastCrawls.map(c => (
+                        <option key={c._id} value={c._id}>
+                          {c.url} ({new Date(c.createdAt).toLocaleDateString()}) - {c.status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Crawler Discovered Resources Result Table */}
+              <div style={{ borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: "10px", marginTop: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.85rem", fontWeight: "700" }}>
+                    📦 {t("crawled_results")} ({discoveredBooks.length})
+                  </h4>
+                  {discoveredBooks.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBulkIngestion}
+                      disabled={loading || Object.keys(selectedDiscovered).filter(k => selectedDiscovered[k]).length === 0}
+                      className="primary-submit-btn"
+                      style={{
+                        margin: 0,
+                        padding: "4px 10px",
+                        fontSize: "0.75rem",
+                        height: "28px",
+                        borderRadius: "6px"
+                      }}
+                    >
+                      {t("bulk_ingest_btn", { count: Object.keys(selectedDiscovered).filter(k => selectedDiscovered[k]).length })}
+                    </button>
+                  )}
+                </div>
+
+                <div style={{
+                  maxHeight: "220px",
+                  overflowY: "auto",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  padding: "4px"
+                }}>
+                  {discoveredBooks.length === 0 ? (
+                    <p style={{ margin: 0, padding: "2rem", textAlign: "center", fontSize: "0.8rem", color: "#64748b" }}>
+                      {isAr ? "لم يتم العثور على كتب أو مصادر مكتشفة حالياً." : "No crawled resources discovered yet. Execute a crawl to harvest digital library files."}
+                    </p>
+                  ) : (
+                    buildDirectoryTree(discoveredBooks).map(node => (
+                      <DirectoryNode
+                        key={node.key}
+                        node={node}
+                        selectedDiscovered={selectedDiscovered}
+                        crawlExpandedNodes={crawlExpandedNodes}
+                        onToggleNode={(n, checked) => {
+                          const ids = getAllBookIds(n);
+                          setSelectedDiscovered(prev => {
+                            const updated = { ...prev };
+                            ids.forEach(id => {
+                              if (checked) updated[id] = true;
+                              else delete updated[id];
+                            });
+                            return updated;
+                          });
+                        }}
+                        onToggleExpand={(key) => {
+                          setCrawlExpandedNodes(prev => ({ ...prev, [key]: !prev[key] }));
+                        }}
+                        isAr={isAr}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* CARD B: Direct Ingestion & Telemetry Pipeline */}
+            <section className="ops-console-card manual-ingest-card">
+              <h3 style={{ margin: 0, fontSize: "1.02rem", fontWeight: "750", display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "8px" }}>
+                🚀 {t("manual_ingest")}
+              </h3>
+              
+              <form onSubmit={handleManualIngestion} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "end" }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: "0.8rem", fontWeight: "600" }}>{t("file_upload_or_url")}</label>
+                    <input
+                      type="text"
+                      placeholder={isAr ? "أدخل رابط الـ PDF المباشر..." : "Direct PDF URL link to download..."}
+                      value={manualIngestForm.source_url}
+                      onChange={e => setManualIngestForm({ ...manualIngestForm, source_url: e.target.value })}
+                      className="styled-input"
+                      style={{ fontSize: "0.85rem", padding: "8px 10px" }}
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="primary-submit-btn"
+                    style={{ height: "38px", margin: 0, fontSize: "0.8rem", padding: "0 14px", display: "flex", alignItems: "center", gap: "4px" }}
+                  >
+                    <FiPlus /> {isAr ? "استيراد" : "Ingest"}
+                  </button>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: "0.78rem" }}>{isAr ? "عنوان الكتاب (EN)" : "Book Title (EN)"}</label>
+                    <input
+                      type="text"
+                      value={manualIngestForm.title}
+                      onChange={e => setManualIngestForm({ ...manualIngestForm, title: e.target.value })}
+                      className="styled-input"
+                      style={{ fontSize: "0.8rem", padding: "6px" }}
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: "0.78rem" }}>{isAr ? "عنوان الكتاب (AR)" : "Book Title (AR)"}</label>
+                    <input
+                      type="text"
+                      value={manualIngestForm.title_ar}
+                      onChange={e => setManualIngestForm({ ...manualIngestForm, title_ar: e.target.value })}
+                      className="styled-input"
+                      style={{ fontSize: "0.8rem", padding: "6px" }}
+                      required
+                    />
+                  </div>
+                </div>
+              </form>
+
+              {/* ACTIVE INGESTION PIPELINE PROGRESS */}
+              <div style={{ borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: "10px", marginTop: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.85rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FiActivity className={queue.length > 0 ? "spin-animation" : ""} />
+                    <span>{t("telemetry_console")}</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={fetchQueueJobs}
+                    className="icon-btn-text"
+                    style={{ fontSize: "0.72rem", display: "flex", alignItems: "center", gap: "4px" }}
+                  >
+                    <FiRefreshCw /> {t("refresh_jobs")}
+                  </button>
+                </div>
+
+                <div style={{
+                  maxHeight: "180px",
+                  overflowY: "auto",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  padding: "6px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px"
+                }}>
+                  {queue.length === 0 ? (
+                    <p style={{ margin: 0, padding: "1.5rem", textAlign: "center", fontSize: "0.8rem", color: "#64748b" }}>
+                      ✨ {t("queue_empty")}
+                    </p>
+                  ) : (
+                    queue.map(job => {
+                      const maxProgress = maxProgressByJob[job.id] || 0;
+                      const displayProgress = Math.max(maxProgress, job.progress || 0);
+                      const isFailed = job.status === "failed";
+                      const isComplete = job.status === "completed";
+                      return (
+                        <div key={job.id} style={{
+                          padding: "8px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--card-border)",
+                          background: isFailed ? "rgba(220, 38, 38, 0.05)" : (isComplete ? "rgba(16, 185, 129, 0.05)" : "rgba(255, 255, 255, 0.4)")
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "8px", marginBottom: "4px" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <h5 style={{ margin: 0, fontSize: "0.8rem", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {isAr ? job.bookTitleAr : job.bookTitle}
+                              </h5>
+                              <small style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                                {job.fileName} ({job.processedPages}/{job.totalPages} pgs)
+                              </small>
+                            </div>
+                            <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                              <span style={{
+                                fontSize: "0.68rem",
+                                padding: "2px 6px",
+                                borderRadius: "10px",
+                                fontWeight: "bold",
+                                backgroundColor: isFailed ? "rgba(220, 38, 38, 0.12)" : (isComplete ? "rgba(16, 185, 129, 0.12)" : "rgba(59, 130, 246, 0.12)"),
+                                color: isFailed ? "#ef4444" : (isComplete ? "#10b981" : "#3b82f6")
+                              }}>
+                                {job.status.toUpperCase()}
+                              </span>
+                              {!isComplete && !isFailed && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelJob(job.id)}
+                                  style={{
+                                    border: "none",
+                                    background: "none",
+                                    color: "#ef4444",
+                                    cursor: "pointer",
+                                    padding: "2px",
+                                    display: "flex",
+                                    alignItems: "center"
+                                  }}
+                                  title={t("term_job_btn")}
+                                >
+                                  <FiTrash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ height: "4px", width: "100%", backgroundColor: "rgba(0,0,0,0.04)", borderRadius: "4px", overflow: "hidden" }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${displayProgress}%`,
+                              backgroundColor: isFailed ? "#ef4444" : (isComplete ? "#10b981" : "#3b82f6"),
+                              borderRadius: "4px",
+                              transition: "width 0.4s ease"
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* TERMINAL MONOSPACE LIVE LOGS */}
+              <div style={{ borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: "10px", marginTop: "4px" }}>
+                <h4 style={{ margin: "0 0 6px 0", fontSize: "0.85rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <FiTerminal />
+                  <span>{isAr ? "مراقب السجلات الحية للمكتبة" : "System Logs & Tracing Terminal"}</span>
+                </h4>
+                <div className="terminal-logs-window" style={{
+                  height: "110px",
+                  background: "#0f172a",
+                  borderRadius: "8px",
+                  padding: "8px",
+                  overflowY: "auto",
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                  color: "#38bdf8",
+                  boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)"
+                }}>
+                  {terminalLogs.concat(crawlLogs).slice(-15).map((log, idx) => (
+                    <div key={idx} className="terminal-line" style={{ marginBottom: "2px", color: log.includes("[CRAWLER]") ? "#34d399" : (log.includes("[ERROR]") ? "#f87171" : "#38bdf8") }}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* CARD C: Global Textbook Asset Pool (Beautiful Table) */}
+          <section className="global-books-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <FiBookOpen size={20} style={{ color: "var(--primary)" }} />
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "750" }}>
+                  {isAr ? "مستودع الكتب العام والمصادر" : "Global Textbook Assets & Files"}
+                </h3>
+                <span className="badge-pill" style={{ fontSize: "0.75rem", fontWeight: "600", padding: "2px 8px", backgroundColor: "rgba(59, 130, 246, 0.12)", color: "var(--primary)", borderRadius: "12px" }}>
+                  {books.length} {isAr ? "كتب مفهرسة" : "Indexed Textbooks"}
+                </span>
+              </div>
+              
+              {/* Dynamic search and filters */}
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flex: 1, justifyContent: "flex-end", maxWidth: "400px" }}>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <FiSearch style={{ position: "absolute", left: isAr ? "auto" : "10px", right: isAr ? "10px" : "auto", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
                   <input
                     type="text"
-                    disabled={isEditingLib}
-                    value={libForm._id || ""}
-                    onChange={e => setLibForm({ ...libForm, _id: e.target.value })}
-                    placeholder={t("lib_id_placeholder")}
+                    placeholder={isAr ? "ابحث عن كتاب بالاسم أو اللغة..." : "Search textbooks by title or language..."}
+                    value={booksSearchQuery}
+                    onChange={e => setBooksSearchQuery(e.target.value)}
+                    className="styled-input"
+                    style={{
+                      fontSize: "0.8rem",
+                      padding: "6px 10px",
+                      paddingLeft: isAr ? "10px" : "32px",
+                      paddingRight: isAr ? "32px" : "10px",
+                      borderRadius: "8px",
+                      margin: 0,
+                      width: "100%"
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="global-books-table-wrapper">
+              {books.length === 0 ? (
+                <div style={{ padding: "3rem", textShadow: "none", textAlign: "center", color: "#64748b", fontSize: "0.9rem" }}>
+                  {isAr ? "لا توجد كتب مسجلة في قاعدة البيانات حالياً." : "No textbook assets indexed in the local database. Start a crawl or upload files!"}
+                </div>
+              ) : (
+                <table className="global-books-table">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: isAr ? "right" : "left" }}>{isAr ? "اسم المرجع / الكتاب" : "Textbook Title"}</th>
+                      <th style={{ width: "100px" }}>{isAr ? "اللغة" : "Language"}</th>
+                      <th style={{ width: "120px" }}>{isAr ? "عدد الصفحات" : "Page Count"}</th>
+                      <th>{isAr ? "التصنيف التابع" : "Mapped Location"}</th>
+                      <th style={{ width: "100px", textAlign: "center" }}>{isAr ? "الإجراءات" : "Actions"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {books
+                      .filter(b => {
+                        if (!booksSearchQuery) return true;
+                        const query = booksSearchQuery.toLowerCase();
+                        return (
+                          b.title.toLowerCase().includes(query) ||
+                          b.title_ar.toLowerCase().includes(query) ||
+                          b.language.toLowerCase().includes(query)
+                        );
+                      })
+                      .map(book => {
+                        const actualPages = book.totalPages || book.total_pages || "--";
+                        const sub = subjects.find(s => s._id === book.subject_id);
+                        const cur = curricula.find(c => c._id === book.curriculum_id);
+                        return (
+                          <tr key={book._id}>
+                            <td style={{ fontWeight: "600", fontSize: "0.85rem" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <FiBookOpen style={{ color: sub?.color || "#64748b", flexShrink: 0 }} />
+                                <div style={{ minWidth: 0 }}>
+                                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {isAr ? book.title_ar : book.title}
+                                  </span>
+                                  {book.source_url && (
+                                    <a href={book.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.72rem", color: "var(--primary)", wordBreak: "break-all" }}>
+                                      {book.source_url}
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ textTransform: "uppercase", fontSize: "0.78rem" }}>
+                              <span className="badge-pill" style={{ padding: "2px 6px", fontSize: "0.72rem" }}>
+                                {book.language}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: "0.8rem", fontWeight: "bold", color: "var(--foreground)" }}>
+                                {actualPages !== "--" ? `${actualPages} pgs` : "--"}
+                              </span>
+                            </td>
+                            <td>
+                              {sub ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                  <span style={{ fontSize: "0.75rem", fontWeight: "600", color: sub.color || "var(--primary)" }}>
+                                    {sub.emoji} {isAr ? sub.name_ar : sub.name}
+                                  </span>
+                                  {cur && (
+                                    <span style={{ fontSize: "0.68rem", color: "#64748b" }}>
+                                      {isAr ? cur.title_ar : cur.title}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: "0.75rem", color: "#ef4444" }}>
+                                  ⚠️ {isAr ? "كتاب غير مخصص بمادة" : "Unmapped Resource File"}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", justifyContent: "center", gap: "6px" }}>
+                                {book.subject_id && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (confirm(isAr ? `هل أنت متأكد من فصل "${book.title}"؟` : `Are you sure you want to decouple "${book.title}"?`)) {
+                                        setLoading(true);
+                                        try {
+                                          const res = await authedFetch(`/api/books/${book._id}/assign`, {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ action: "decouple" })
+                                          });
+                                          if (res.ok) {
+                                            triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
+                                            fetchBooks();
+                                            if (book.curriculum_id) fetchSubjects(book.curriculum_id);
+                                          } else {
+                                            triggerToast("Failed to decouple book", true);
+                                          }
+                                        } catch (err: any) {
+                                          triggerToast(err.message, true);
+                                        } finally {
+                                          setLoading(false);
+                                        }
+                                      }
+                                    }}
+                                    className="edit-circle-btn"
+                                    style={{ width: "28px", height: "28px", borderRadius: "6px", backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "none" }}
+                                    title={isAr ? "فصل الكتاب من المادة" : "Decouple from Subject"}
+                                  >
+                                    <FiSlash size={12} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(isAr ? `هل أنت متأكد من حذف هذا الكتاب تماماً من النظام وقاعدة البيانات؟` : `Are you sure you want to completely delete this book from the system database?`)) {
+                                      setLoading(true);
+                                      try {
+                                        const res = await authedFetch(`/api/books/${book._id}`, {
+                                          method: "DELETE"
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok && data.success) {
+                                          triggerToast(isAr ? "🗑️ تم حذف الكتاب بالكامل!" : "🗑️ Textbook completely deleted!");
+                                          fetchBooks();
+                                          if (book.curriculum_id) fetchSubjects(book.curriculum_id);
+                                        } else {
+                                          triggerToast(data.error || "Failed to delete book", true);
+                                        }
+                                      } catch (err: any) {
+                                        triggerToast(err.message, true);
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }
+                                  }}
+                                  className="edit-circle-btn"
+                                  style={{ width: "28px", height: "28px", borderRadius: "6px", backgroundColor: "rgba(220, 38, 38, 0.15)", color: "#dc2626", border: "none" }}
+                                  title={isAr ? "حذف الكتاب نهائياً" : "Delete Textbook completely"}
+                                >
+                                  <FiTrash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+
+        </div> {/* End of operations column */}
+      </div> {/* End of studio-unified-layout */}
+
+      {/* MODAL OVERLAYS (GLASSMORPHIC DIALOG FLOATING FORMS) */}
+
+      {/* MODAL 1: Library configuration Form */}
+      {activeModal === "library" && (
+        <div className="studio-modal-overlay">
+          <div className="studio-modal-box">
+            <div className="studio-modal-header">
+              <div className="studio-modal-title">
+                <FiBookOpen style={{ color: "var(--primary)" }} />
+                <span>{isEditingLib ? t("edit_library") : t("create_library")}</span>
+              </div>
+              <button type="button" onClick={() => { setActiveModal(null); setIsEditingLib(false); }} className="studio-modal-close">×</button>
+            </div>
+
+            <form onSubmit={async (e) => { e.preventDefault(); await handleSaveLibrary(e); setActiveModal(null); }} className="standard-form">
+              <div className="form-group-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group">
+                  <label>{t("lib_name_en")}</label>
+                  <input
+                    type="text"
+                    value={libForm.name || ""}
+                    onChange={e => setLibForm({ ...libForm, name: e.target.value })}
+                    className="styled-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>{t("lib_name_ar")}</label>
+                  <input
+                    type="text"
+                    value={libForm.name_ar || ""}
+                    onChange={e => setLibForm({ ...libForm, name_ar: e.target.value })}
+                    className="styled-input"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-group-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group">
+                  <label>{t("lib_source")}</label>
+                  <select
+                    value={libForm.source || "openstax"}
+                    onChange={e => setLibForm({ ...libForm, source: e.target.value })}
+                    className="styled-select"
+                  >
+                    <option value="openstax">OpenStax</option>
+                    <option value="private">Private Vault</option>
+                    <option value="custom">Custom Provider</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>{t("lib_logo")}</label>
+                  <input
+                    type="text"
+                    value={libForm.logo || ""}
+                    onChange={e => setLibForm({ ...libForm, logo: e.target.value })}
+                    placeholder="/libs/logo.svg"
                     className="styled-input"
                   />
                 </div>
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>{t("lib_name_en")}</label>
-                    <input
-                      type="text"
-                      value={libForm.name || ""}
-                      onChange={e => setLibForm({ ...libForm, name: e.target.value })}
-                      className="styled-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>{t("lib_name_ar")}</label>
-                    <input
-                      type="text"
-                      value={libForm.name_ar || ""}
-                      onChange={e => setLibForm({ ...libForm, name_ar: e.target.value })}
-                      className="styled-input"
-                    />
-                  </div>
-                </div>
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>{t("lib_source")}</label>
-                    <select
-                      value={libForm.source || "openstax"}
-                      onChange={e => setLibForm({ ...libForm, source: e.target.value })}
-                      className="styled-select"
-                    >
-                      <option value="openstax">OpenStax</option>
-                      <option value="private">Private Vault</option>
-                      <option value="custom">Custom Provider</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>{t("lib_logo")}</label>
-                    <input
-                      type="text"
-                      value={libForm.logo || ""}
-                      onChange={e => setLibForm({ ...libForm, logo: e.target.value })}
-                      placeholder="/libs/logo.svg"
-                      className="styled-input"
-                    />
-                  </div>
-                </div>
+              </div>
 
-                <div className="scope-schema-section">
-                  <div className="section-header">
-                    <h3>{t("scope_schema")}</h3>
-                    <button type="button" onClick={handleAddScopeDimension} className="icon-btn-text">
-                      <FiPlus /> {t("add_dimension")}
-                    </button>
-                  </div>
-                  
+              <div className="scope-schema-section" style={{ borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: "12px", marginTop: "12px" }}>
+                <div className="section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.85rem" }}>{t("scope_schema")}</h4>
+                  <button type="button" onClick={handleAddScopeDimension} className="icon-btn-text" style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "2px" }}>
+                    <FiPlus /> {t("add_dimension")}
+                  </button>
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "180px", overflowY: "auto", padding: "4px" }}>
                   {(libForm.scopeSchema || []).map((dim, idx) => (
-                    <div key={idx} className="dimension-row">
+                    <div key={idx} className="dimension-row" style={{ display: "flex", gap: "6px", flexWrap: "wrap", border: "1px solid var(--card-border)", padding: "6px", borderRadius: "8px" }}>
                       <input
                         type="text"
                         placeholder={t("dim_key")}
                         value={dim.key}
                         onChange={e => handleUpdateDimension(idx, "key", e.target.value)}
                         className="styled-input compact"
+                        style={{ flex: 1, minWidth: "80px", fontSize: "0.78rem" }}
+                        required
                       />
                       <input
                         type="text"
@@ -1711,6 +2622,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                         value={dim.label}
                         onChange={e => handleUpdateDimension(idx, "label", e.target.value)}
                         className="styled-input compact"
+                        style={{ flex: 1, minWidth: "100px", fontSize: "0.78rem" }}
+                        required
                       />
                       <input
                         type="text"
@@ -1718,11 +2631,14 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                         value={dim.label_ar}
                         onChange={e => handleUpdateDimension(idx, "label_ar", e.target.value)}
                         className="styled-input compact"
+                        style={{ flex: 1, minWidth: "100px", fontSize: "0.78rem" }}
+                        required
                       />
                       <select
                         value={dim.type}
                         onChange={e => handleUpdateDimension(idx, "type", e.target.value)}
                         className="styled-select compact"
+                        style={{ width: "120px", fontSize: "0.78rem" }}
                       >
                         <option value="enum">Enum Dropdown</option>
                         <option value="string">Text Input</option>
@@ -1733,767 +2649,300 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                           placeholder="Options (Val1, Val2)"
                           value={dim.options?.join(",") || ""}
                           onChange={e => handleUpdateDimension(idx, "options", e.target.value.split(",").map(o => o.trim()))}
-                          className="styled-input compact full-width-span"
+                          className="styled-input compact"
+                          style={{ width: "100%", fontSize: "0.78rem", marginTop: "4px" }}
+                          required
                         />
                       )}
-                      <button type="button" onClick={() => handleRemoveScopeDimension(idx)} className="delete-btn">
+                      <button type="button" onClick={() => handleRemoveScopeDimension(idx)} className="delete-btn" style={{ marginLeft: "auto" }}>
                         <FiTrash2 />
                       </button>
                     </div>
                   ))}
                 </div>
+              </div>
 
-                <div className="form-actions-row">
-                  <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
-                    <FiSave /> {t("save_library")}
+              <div className="modal-actions" style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: "12px", marginTop: "12px" }}>
+                {isEditingLib && (
+                  <button
+                    type="button"
+                    className="discard-btn"
+                    style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
+                    onClick={() => { handleDeleteLibrary(); setActiveModal(null); }}
+                  >
+                    <FiTrash2 /> {isAr ? "حذف المكتبة" : "Delete Library"}
                   </button>
-                  {isEditingLib && (
-                    <button
-                      type="button"
-                      className="discard-btn"
-                      style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
-                      onClick={handleDeleteLibrary}
-                    >
-                      <FiTrash2 /> {isAr ? "حذف المكتبة" : "Delete Library"}
-                    </button>
-                  )}
+                )}
+                <div style={{ display: "flex", gap: "8px", marginLeft: isEditingLib ? "auto" : "0" }}>
                   <button 
                     type="button" 
                     className="discard-btn"
+                    onClick={() => { setActiveModal(null); setIsEditingLib(false); }}
                     style={{ margin: 0 }}
-                    onClick={() => {
-                      setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
-                      setIsEditingLib(false);
-                    }}
                   >
-                    {isAr ? "إلغاء التغييرات" : "Discard"}
+                    {isAr ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
+                    <FiSave /> {t("save_library")}
                   </button>
                 </div>
-              </form>
-            </section>
-
-            <section className="list-card">
-              <h2>{t("library_list")}</h2>
-              <div className="card-scroller">
-                {libraries.length === 0 ? (
-                  <p className="empty-state-text">{t("no_libraries")}</p>
-                ) : (
-                  libraries.map(lib => (
-                    <div key={lib._id} className="item-row-card">
-                      <div className="item-meta">
-                        <img
-                          src={lib.logo}
-                          alt={lib.name}
-                          className="lib-logo-thumbnail"
-                          onError={e => {
-                            const img = e.target as HTMLImageElement;
-                            img.onerror = null;
-                            img.src = "/libs/logo.svg";
-                          }}
-                        />
-                        <div>
-                          <h4>{isAr ? lib.name_ar : lib.name} <span className="badge-pill">{lib.source}</span></h4>
-                          <small className="monospace-id">{lib._id}</small>
-                          <div className="dimensions-summary-pills">
-                            {lib.scopeSchema?.map(s => (
-                              <span key={s.key} className="dim-pill">{isAr ? s.label_ar : s.label} ({s.key})</span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setLibForm(lib);
-                          setIsEditingLib(true);
-                        }}
-                        className="edit-circle-btn"
-                      >
-                        <FiEdit />
-                      </button>
-                    </div>
-                  ))
-                )}
               </div>
-            </section>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* TAB 2: Curriculum Builder */}
-        {activeTab === "curricula_builder" && (
-          <div className="curriculum-builder-layout">
-            <div className="tree-dual-pane-layout">
-              
-              {/* TREE EXPLORER SIDEBAR */}
-              <aside className="tree-explorer-sidebar">
-                <div className="sidebar-header">
-                  <h3>🌳 {isAr ? "مستكشف المناهج" : "Curriculum Explorer"}</h3>
-                  <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b" }}>
-                    {isAr ? "الهيكل الهرمي للمكتبات والمناهج والكتب" : "Hierarchical structure of libraries & textbooks"}
-                  </p>
-                </div>
-
-                <div className="library-picker-panel" style={{ padding: "0.5rem", border: "none", background: "none" }}>
-                  <select
-                    value={selectedLibId}
-                    onChange={e => {
-                      setSelectedLibId(e.target.value);
-                      setSelectedCurriculumId("");
-                      setSelectedSubjectId("");
-                      setIsCreatingCurUnderLib(null);
-                      setIsCreatingSubjUnderCur(null);
-                    }}
-                    className="styled-select-large"
-                    style={{ width: "100%" }}
-                  >
-                    <option value="">-- {isAr ? "اختر المكتبة" : "Select Library Domain"} --</option>
-                    {libraries.map(lib => (
-                      <option key={lib._id} value={lib._id}>{isAr ? lib.name_ar : lib.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <button 
-                  type="button" 
-                  className="create-library-btn"
-                  onClick={() => {
-                    setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
-                    setIsEditingLib(false);
-                    setActiveTab("libraries");
-                  }}
-                >
-                  <FiPlus /> {isAr ? "إضافة مكتبة جديدة" : "Add New Library"}
-                </button>
-
-                <div className="tree-scroller">
-                  {libraries
-                    .filter(lib => !selectedLibId || lib._id === selectedLibId)
-                    .map(lib => {
-                      const libExpanded = !!expandedNodes[`lib_${lib._id}`];
-                      const libCurricula = curricula.filter(c => c.library_id === lib._id);
-                      return (
-                        <div key={lib._id} className="tree-branch">
-                          <div 
-                            className={`tree-row ${selectedLibId === lib._id && !selectedCurriculumId && !selectedSubjectId ? "active-row" : ""}`}
-                            onClick={() => {
-                              setSelectedLibId(lib._id);
-                              setSelectedCurriculumId("");
-                              setSelectedSubjectId("");
-                              setIsEditingLib(true);
-                              setLibForm(lib);
-                              setIsCreatingCurUnderLib(null);
-                              setIsCreatingSubjUnderCur(null);
-                            }}
-                          >
-                            <span 
-                              className="expand-toggle" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedNodes(prev => ({ ...prev, [`lib_${lib._id}`]: !prev[`lib_${lib._id}`] }));
-                              }}
-                            >
-                              {libCurricula.length > 0 ? (libExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
-                            </span>
-                            <img src={lib.logo || "/libs/logo.svg"} className="tree-lib-logo" alt="" onError={e => { (e.target as any).src = "/libs/logo.svg" }} />
-                            <span className="tree-node-text" style={{ fontWeight: 700 }}>{isAr ? lib.name_ar : lib.name}</span>
-                            <button 
-                              type="button" 
-                              className="tree-row-action" 
-                              title={isAr ? "إضافة منهج" : "Add Curriculum"}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedLibId(lib._id);
-                                setSelectedCurriculumId("");
-                                setSelectedSubjectId("");
-                                setIsCreatingCurUnderLib(lib._id);
-                                setIsCreatingSubjUnderCur(null);
-                                setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
-                              }}
-                            >
-                              <FiPlus />
-                            </button>
-                          </div>
-
-                          {libExpanded && (
-                            <div className="tree-children">
-                              {isCreatingCurUnderLib === lib._id && (
-                                <div className="tree-row pending-creation">
-                                  <FiPlus className="pending-icon spin-animation" />
-                                  <span className="tree-node-text italic" style={{ opacity: 0.6 }}>{isAr ? "منهج جديد..." : "New Curriculum..."}</span>
-                                </div>
-                              )}
-                              {libCurricula.map(cur => {
-                                const curExpanded = !!expandedNodes[`cur_${cur._id}`];
-                                const curSubjects = subjects.filter(s => s.curriculum_id === cur._id);
-                                return (
-                                  <div key={cur._id} className="tree-branch">
-                                    <div 
-                                      className={`tree-row ${selectedCurriculumId === cur._id && !selectedSubjectId ? "active-row" : ""}`}
-                                      onClick={() => {
-                                        setSelectedLibId(lib._id);
-                                        setSelectedCurriculumId(cur._id);
-                                        setSelectedSubjectId("");
-                                        setIsEditingCur(true);
-                                        setCurForm({ _id: cur._id, title: cur.title, title_ar: cur.title_ar, scope: cur.scope || {} });
-                                        setIsCreatingCurUnderLib(null);
-                                        setIsCreatingSubjUnderCur(null);
-                                      }}
-                                    >
-                                      <span 
-                                        className="expand-toggle" 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setExpandedNodes(prev => ({ ...prev, [`cur_${cur._id}`]: !prev[`cur_${cur._id}`] }));
-                                        }}
-                                      >
-                                        {curSubjects.length > 0 ? (curExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
-                                      </span>
-                                      <FiLayers className="tree-node-icon" style={{ color: "#6366f1" }} />
-                                      <span className="tree-node-text">{isAr ? cur.title_ar : cur.title}</span>
-                                      <button 
-                                        type="button" 
-                                        className="tree-row-action" 
-                                        title={isAr ? "إضافة مادة" : "Add Subject"}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedLibId(lib._id);
-                                          setSelectedCurriculumId(cur._id);
-                                          setSelectedSubjectId("");
-                                          setIsCreatingSubjUnderCur(cur._id);
-                                          setIsCreatingCurUnderLib(null);
-                                          setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
-                                          setEditingSubjectId(null);
-                                        }}
-                                      >
-                                        <FiPlus />
-                                      </button>
-                                    </div>
-
-                                    {curExpanded && (
-                                      <div className="tree-children">
-                                        {isCreatingSubjUnderCur === cur._id && (
-                                          <div className="tree-row pending-creation">
-                                            <FiPlus className="pending-icon spin-animation" />
-                                            <span className="tree-node-text italic" style={{ opacity: 0.6 }}>{isAr ? "مادة جديدة..." : "New Subject..."}</span>
-                                          </div>
-                                        )}
-                                        {curSubjects.map(subj => {
-                                          const subjExpanded = !!expandedNodes[`subj_${subj._id}`];
-                                          const subjBooks = books.filter(b => b.subject_id === subj._id);
-                                          return (
-                                            <div key={subj._id} className="tree-branch">
-                                              <div 
-                                                className={`tree-row ${selectedSubjectId === subj._id ? "active-row" : ""}`}
-                                                style={{ borderInlineStart: `3px solid ${subj.color}` }}
-                                                onClick={() => {
-                                                  setSelectedLibId(lib._id);
-                                                  setSelectedCurriculumId(cur._id);
-                                                  setSelectedSubjectId(subj._id);
-                                                  setSubjForm(subj);
-                                                  setEditingSubjectId(subj._id);
-                                                  setIsCreatingCurUnderLib(null);
-                                                  setIsCreatingSubjUnderCur(null);
-                                                }}
-                                              >
-                                                <span 
-                                                  className="expand-toggle" 
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setExpandedNodes(prev => ({ ...prev, [`subj_${subj._id}`]: !prev[`subj_${subj._id}`] }));
-                                                  }}
-                                                >
-                                                  {subjBooks.length > 0 ? (subjExpanded ? <FiChevronDown /> : <FiChevronDown style={{ transform: "rotate(-90deg)" }} />) : <span className="empty-spacer" />}
-                                                </span>
-                                                <span className="tree-node-emoji">{subj.emoji}</span>
-                                                <span className="tree-node-text">{isAr ? subj.name_ar : subj.name}</span>
-                                              </div>
-
-                                              {subjExpanded && (
-                                                <div className="tree-children">
-                                                  {subjBooks.map(book => (
-                                                    <div key={book._id} className="tree-row tree-row-book">
-                                                      <FiBookOpen className="tree-node-icon" style={{ color: "#10b981", flexShrink: 0 }} />
-                                                      <div className="tree-node-book-meta" style={{ flexGrow: 1, minWidth: 0 }}>
-                                                        <span className="tree-node-text-bold" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                          {isAr ? book.title_ar : book.title}
-                                                        </span>
-                                                        <span className="tree-node-subtext">
-                                                          ({book.language}) - {book.role === "core" ? (isAr ? "أساسي" : "Core") : (isAr ? "داعم" : "Supporting")}
-                                                        </span>
-                                                      </div>
-                                                      <button
-                                                        type="button"
-                                                        className="tree-row-action decouple-action"
-                                                        title={isAr ? "فصل الكتاب" : "Decouple Book"}
-                                                        onClick={async (e) => {
-                                                          e.stopPropagation();
-                                                          if (confirm(isAr ? `هل أنت متأكد من فصل "${book.title}"؟` : `Are you sure you want to decouple "${book.title}"?`)) {
-                                                            setLoading(true);
-                                                            try {
-                                                              const res = await authedFetch(`/api/books/${book._id}/assign`, {
-                                                                method: "PATCH",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ action: "decouple" })
-                                                              });
-                                                              if (res.ok) {
-                                                                triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
-                                                                fetchBooks();
-                                                                fetchSubjects(cur._id);
-                                                              } else {
-                                                                triggerToast("Failed to decouple book", true);
-                                                              }
-                                                            } catch (err: any) {
-                                                              triggerToast(err.message, true);
-                                                            } finally {
-                                                                setLoading(false);
-                                                            }
-                                                          }
-                                                        }}
-                                                      >
-                                                        <FiTrash2 style={{ color: "#ef4444" }} />
-                                                      </button>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </aside>
-
-              {/* FOCUSED WORKSPACE EDITOR PANEL */}
-              <main className="workspace-editor-panel">
-                
-                {/* 1. Subject Form / Create / Edit View */}
-                {(selectedSubjectId || isCreatingSubjUnderCur) ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                    <section className="form-card" style={{ margin: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                        <h2>
-                          {editingSubjId ? `🎨 ${isAr ? "تعديل المادة" : "Edit Subject"}` : `🎨 ${isAr ? "مادة جديدة" : "Create Subject"}`}
-                        </h2>
-                        {editingSubjId && (
-                          <button
-                            type="button"
-                            onClick={() => setShowDeleteSubjectConfirm(true)}
-                            className="discard-btn"
-                            style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)" }}
-                          >
-                            <FiTrash2 /> {isAr ? "حذف المادة" : "Delete Subject"}
-                          </button>
-                        )}
-                      </div>
-                      
-                      <form onSubmit={handleSaveSubject} className="standard-form">
-                        <div className="form-group-row">
-                          <div className="form-group">
-                            <label>{t("subject_name_en")}</label>
-                            <input
-                              type="text"
-                              value={subjForm.name || ""}
-                              onChange={e => setSubjForm({ ...subjForm, name: e.target.value })}
-                              className="styled-input"
-                              required
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label>{t("subject_name_ar")}</label>
-                            <input
-                              type="text"
-                              value={subjForm.name_ar || ""}
-                              onChange={e => setSubjForm({ ...subjForm, name_ar: e.target.value })}
-                              className="styled-input"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="form-group-row">
-                          <div className="form-group color-picker-group">
-                            <label>{t("subject_color")}</label>
-                            <div className="color-picker-input-wrapper">
-                              <input
-                                type="color"
-                                value={subjForm.color || "#4F46E5"}
-                                onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
-                                className="styled-color-picker"
-                              />
-                              <input
-                                type="text"
-                                value={subjForm.color || ""}
-                                onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
-                                className="styled-input hex-code-input"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Curated academic emoji picker popover (OR-14) */}
-                          <div className="form-group" style={{ position: "relative" }} ref={emojiPickerRef}>
-                            <label>{t("subject_emoji")}</label>
-                            <div style={{ display: "flex", gap: "0.5rem" }}>
-                              <input
-                                type="text"
-                                value={subjForm.emoji || "📚"}
-                                onChange={e => setSubjForm({ ...subjForm, emoji: e.target.value })}
-                                className="styled-input emoji-input"
-                                style={{ width: "3.5rem", textAlign: "center", fontSize: "1.25rem", cursor: "pointer" }}
-                                readOnly
-                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                              />
-                              <button
-                                type="button"
-                                className="styled-input"
-                                style={{ padding: "0.5rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}
-                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                              >
-                                😀
-                              </button>
-                            </div>
-
-                            {showEmojiPicker && (
-                              <div 
-                                className="academic-emoji-grid"
-                                style={{
-                                  position: "absolute",
-                                  top: "100%",
-                                  left: 0,
-                                  zIndex: 100,
-                                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                                  border: "1.5px solid var(--card-border)",
-                                  borderRadius: "8px",
-                                  padding: "0.5rem",
-                                  display: "grid",
-                                  gridTemplateColumns: "repeat(6, 1fr)",
-                                  gap: "0.25rem",
-                                  width: "220px",
-                                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-                                  backdropFilter: "blur(12px)"
-                                }}
-                              >
-                                {["📚", "📖", "🎓", "🔬", "🧪", "🧮", "🎨", "💻", "🧠", "📐", "📏", "🧭", "🌍", "🪐", "🧬", "🦕", "🏛️", "🖋️", "📝", "📊", "📈", "🛹", "🎭", "🎼"].map(emo => (
-                                  <div
-                                    key={emo}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault(); // Bypass focus blur events entirely!
-                                      setSubjForm({ ...subjForm, emoji: emo });
-                                      setShowEmojiPicker(false);
-                                    }}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      padding: "0.4rem",
-                                      borderRadius: "4px",
-                                      fontSize: "1.25rem",
-                                      cursor: "pointer",
-                                      transition: "background-color 0.2s"
-                                    }}
-                                    className="emoji-grid-item"
-                                  >
-                                    {emo}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="form-group">
-                          <label>{t("subject_category")}</label>
-                          <select
-                            value={subjForm.category || "Science"}
-                            onChange={e => setSubjForm({ ...subjForm, category: e.target.value })}
-                            className="styled-select"
-                          >
-                            <option value="Science">Science</option>
-                            <option value="Mathematics">Mathematics</option>
-                            <option value="Languages">Languages</option>
-                            <option value="Social Studies">Social Studies</option>
-                            <option value="Computer Science">Computer Science</option>
-                            <option value="Business">Business</option>
-                          </select>
-                        </div>
-
-                        {/* Universal side-by-side Save and Discard (OR-13) */}
-                        <div className="form-actions-row">
-                          <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
-                            <FiSave /> {t("save_subject")}
-                          </button>
-                          <button 
-                            type="button" 
-                            className="discard-btn"
-                            onClick={() => {
-                              setSubjForm({ name: "", name_ar: "", color: "#4F46E5", emoji: "📚", category: "Science" });
-                              setEditingSubjectId(null);
-                              setIsCreatingSubjUnderCur(null);
-                              setSelectedSubjectId("");
-                            }}
-                          >
-                            {isAr ? "إلغاء التغييرات" : "Discard"}
-                          </button>
-                        </div>
-                      </form>
-                    </section>
-
-                    {/* Book Assignments in Subject workspace (OR-11) */}
-                    {selectedSubjectId && (
-                      <div className="tab-grid grid-2" style={{ gap: "1.5rem" }}>
-                        <section className="form-card" style={{ margin: 0, padding: "1.5rem" }}>
-                          <h3>🔗 {t("assign_book")}</h3>
-                          <form onSubmit={handleAssignBook} className="standard-form" style={{ marginTop: "1rem" }}>
-                            <div className="form-group">
-                              <label>{t("select_book")}</label>
-                              <select
-                                value={assignBookId}
-                                onChange={e => setAssignBookId(e.target.value)}
-                                className="styled-select"
-                                required
-                              >
-                                <option value="">-- Choose Book from Pool --</option>
-                                {books
-                                  .filter(b => b.subject_id !== selectedSubjectId)
-                                  .map(b => (
-                                    <option key={b._id} value={b._id}>
-                                      {isAr ? b.title_ar : b.title} ({b.language})
-                                    </option>
-                                  ))}
-                              </select>
-                            </div>
-
-                            <div className="form-group">
-                              <label>{t("book_role")}</label>
-                              <select
-                                value={assignRole}
-                                onChange={e => setAssignRole(e.target.value as "core" | "supporting")}
-                                className="styled-select"
-                              >
-                                <option value="core">{t("role_core")}</option>
-                                <option value="supporting">{t("role_supporting")}</option>
-                              </select>
-                            </div>
-
-                            <button type="submit" disabled={loading} className="primary-submit-btn highlight-gold" style={{ margin: 0, width: "100%" }}>
-                              <FiLink /> {t("assign_btn")}
-                            </button>
-                          </form>
-                        </section>
-
-                        <section className="list-card" style={{ margin: 0, padding: "1.5rem" }}>
-                          <h3>📚 {t("assigned_books")}</h3>
-                          <div className="list-scroller-compact" style={{ maxHeight: "250px", marginTop: "1rem" }}>
-                            {books.filter(b => b.subject_id === selectedSubjectId).length === 0 ? (
-                              <p className="empty-state-text" style={{ fontSize: "0.85rem" }}>No books assigned to this subject yet.</p>
-                            ) : (
-                              books
-                                .filter(b => b.subject_id === selectedSubjectId)
-                                .map(b => (
-                                  <div key={b._id} className="item-row-card" style={{ padding: "0.5rem 0.75rem", marginBottom: "0.5rem" }}>
-                                    <div className="item-meta">
-                                      <FiBookOpen style={{ color: subjForm.color || "#4F46E5", flexShrink: 0 }} />
-                                      <div style={{ minWidth: 0 }}>
-                                        <h5 style={{ margin: 0, fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          {isAr ? b.title_ar : b.title}
-                                        </h5>
-                                        <small className="badge-role" style={{ fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}>
-                                          {b.role === "core" ? t("role_core") : t("role_supporting")}
-                                        </small>
-                                      </div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="edit-circle-btn compact"
-                                      style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "none" }}
-                                      onClick={async () => {
-                                        if (confirm(isAr ? `هل أنت متأكد من فصل "${b.title}"؟` : `Are you sure you want to decouple "${b.title}"?`)) {
-                                          setLoading(true);
-                                          try {
-                                            const res = await authedFetch(`/api/books/${b._id}/assign`, {
-                                              method: "PATCH",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ action: "decouple" })
-                                            });
-                                            if (res.ok) {
-                                              triggerToast(isAr ? "🔓 تم فصل الكتاب بنجاح!" : "🔓 Book decoupled successfully!");
-                                              fetchBooks();
-                                              fetchSubjects(selectedCurriculumId);
-                                            } else {
-                                              triggerToast("Failed to decouple book", true);
-                                            }
-                                          } catch (err: any) {
-                                            triggerToast(err.message, true);
-                                          } finally {
-                                            setLoading(false);
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <FiTrash2 />
-                                    </button>
-                                  </div>
-                                ))
-                            )}
-                          </div>
-                        </section>
-                      </div>
-                    )}
-                  </div>
-                ) : (selectedCurriculumId || isCreatingCurUnderLib) ? (
-                  /* 2. Curriculum Form / Create / Edit View */
-                  <section className="form-card" style={{ margin: 0 }}>
-                    <h2>
-                      {selectedCurriculumId ? `📐 ${isAr ? "تعديل المنهج الدراسي" : "Edit Curriculum Unit"}` : `📐 ${isAr ? "منهج دراسي جديد" : "Create Curriculum Unit"}`}
-                    </h2>
-                    <form onSubmit={handleSaveCurriculum} className="standard-form">
-                      <div className="form-group">
-                        <label>{t("cur_id_opt")}</label>
-                        <input
-                          type="text"
-                          disabled={!!selectedCurriculumId}
-                          value={curForm._id}
-                          onChange={e => setCurForm({ ...curForm, _id: e.target.value })}
-                          placeholder="e.g. cur_moe_g12"
-                          className="styled-input"
-                        />
-                      </div>
-                      <div className="form-group-row">
-                        <div className="form-group">
-                          <label>{t("cur_title_en")}</label>
-                          <input
-                            type="text"
-                            value={curForm.title}
-                            onChange={e => setCurForm({ ...curForm, title: e.target.value })}
-                            className="styled-input"
-                            required
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>{t("cur_title_ar")}</label>
-                          <input
-                            type="text"
-                            value={curForm.title_ar}
-                            onChange={e => setCurForm({ ...curForm, title_ar: e.target.value })}
-                            className="styled-input"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      {/* Scope Dimensions mapping */}
-                      {activeLibrary && activeLibrary.scopeSchema?.length > 0 && (
-                        <div className="dynamic-scope-fields" style={{ marginTop: "1rem" }}>
-                          <h4 style={{ marginBottom: "0.75rem", fontSize: "0.95rem" }}>🧭 {t("scope_details")}</h4>
-                          {activeLibrary.scopeSchema.map(dim => (
-                            <div key={dim.key} className="form-group">
-                              <label>{isAr ? dim.label_ar : dim.label} ({dim.key})</label>
-                              {dim.type === "enum" ? (
-                                <select
-                                  value={curForm.scope[dim.key] || ""}
-                                  onChange={e => setCurForm({
-                                    ...curForm,
-                                    scope: { ...curForm.scope, [dim.key]: e.target.value }
-                                  })}
-                                  className="styled-select"
-                                >
-                                  <option value="">-- Select Option --</option>
-                                  {dim.options?.map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={curForm.scope[dim.key] || ""}
-                                  onChange={e => setCurForm({
-                                    ...curForm,
-                                    scope: { ...curForm.scope, [dim.key]: e.target.value }
-                                  })}
-                                  className="styled-input"
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Universal Save / Discard Controls */}
-                      <div className="form-actions-row">
-                        <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
-                          <FiSave /> {t("save_curriculum")}
-                        </button>
-                        {selectedCurriculumId && (
-                          <button
-                            type="button"
-                            className="discard-btn"
-                            style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
-                            onClick={handleDeleteCurriculum}
-                          >
-                            <FiTrash2 /> {isAr ? "حذف المنهج" : "Delete Curriculum"}
-                          </button>
-                        )}
-                        <button 
-                          type="button" 
-                          className="discard-btn"
-                          style={{ margin: 0 }}
-                          onClick={() => {
-                            setCurForm({ _id: "", title: "", title_ar: "", scope: {} });
-                            setIsEditingCur(false);
-                            setIsCreatingCurUnderLib(null);
-                            setSelectedCurriculumId("");
-                          }}
-                        >
-                          {isAr ? "إلغاء التغييرات" : "Discard"}
-                        </button>
-                      </div>
-                    </form>
-                  </section>
-                ) : (
-                  /* 3. Empty State Welcome Card */
-                  <div className="empty-workspace-state">
-                    <FiLayers className="large-empty-iconpulse-animation" style={{ fontSize: "4rem", color: "var(--primary)", opacity: 0.25 }} />
-                    <h3>{isAr ? "استوديو بناء وتعديل المناهج" : "Curriculum Workspace"}</h3>
-                    <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.8, color: "#64748b" }}>
-                      {isAr ? "اختر مادة أو منهجاً من المخطط الشجري للمستكشف على اليمين للبدء بالتعديل أو بناء هياكل تعليمية جديدة." : "Select a Library, Curriculum or Subject from the Tree Explorer sidebar to view details, assign textbooks, or configure structures."}
-                    </p>
-                  </div>
-                )}
-              </main>
-              
+      {/* MODAL 2: Curriculum configuration Form */}
+      {activeModal === "curriculum" && (
+        <div className="studio-modal-overlay">
+          <div className="studio-modal-box">
+            <div className="studio-modal-header">
+              <div className="studio-modal-title">
+                <FiLayers style={{ color: "#6366f1" }} />
+                <span>{isEditingCur ? t("edit_curriculum") : t("create_curriculum")}</span>
+              </div>
+              <button type="button" onClick={() => { setActiveModal(null); setIsEditingCur(false); setIsCreatingCurUnderLib(null); }} className="studio-modal-close">×</button>
             </div>
 
-            {/* DELETE SUBJECT CONFIRMATION MODAL OVERLAY (OR-12) */}
-            {showDeleteSubjectConfirm && (
-              <div className="delete-confirm-overlay">
-                <div className="delete-confirm-modal">
-                  <div className="modal-title-row">
-                    <FiAlertCircle style={{ fontSize: "1.5rem" }} />
-                    <span>{isAr ? "تأكيد حذف المادة" : "Confirm Deletion"}</span>
+            <form onSubmit={async (e) => { e.preventDefault(); await handleSaveCurriculum(e); setActiveModal(null); }} className="standard-form">
+              <div className="form-group">
+                <label>{t("cur_title_en")}</label>
+                <input
+                  type="text"
+                  value={curForm.title || ""}
+                  onChange={e => setCurForm({ ...curForm, title: e.target.value })}
+                  className="styled-input"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>{t("cur_title_ar")}</label>
+                <input
+                  type="text"
+                  value={curForm.title_ar || ""}
+                  onChange={e => setCurForm({ ...curForm, title_ar: e.target.value })}
+                  className="styled-input"
+                  required
+                />
+              </div>
+
+              {/* Dynamic scope dimension configurations */}
+              {activeLibrary && activeLibrary.scopeSchema?.length > 0 && (
+                <div style={{ borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: "12px", marginTop: "12px" }}>
+                  <h4 style={{ margin: "0 0 8px 0", fontSize: "0.85rem" }}>{t("scope_details")}</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {activeLibrary.scopeSchema.map(dim => (
+                      <div key={dim.key} className="form-group" style={{ margin: 0 }}>
+                        <label>{isAr ? dim.label_ar : dim.label} ({dim.key})</label>
+                        {dim.type === "enum" ? (
+                          <select
+                            value={curForm.scope?.[dim.key] || ""}
+                            onChange={e => setCurForm({
+                              ...curForm,
+                              scope: { ...(curForm.scope || {}), [dim.key]: e.target.value }
+                            })}
+                            className="styled-select"
+                            required
+                          >
+                            <option value="">-- Choose Option --</option>
+                            {dim.options?.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={curForm.scope?.[dim.key] || ""}
+                            onChange={e => setCurForm({
+                              ...curForm,
+                              scope: { ...(curForm.scope || {}), [dim.key]: e.target.value }
+                            })}
+                            className="styled-input"
+                            required
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.5, color: "#475569" }}>
-                    {isAr 
-                      ? "هل أنت متأكد من حذف هذه المادة؟ سيتم فك ارتباط جميع الكتب والكتب المنهجية التابعة لها (Decouple) ولكن لن يتم حذف ملفاتها من قاعدة البيانات."
-                      : "Are you sure you want to delete this subject? All associated books and curricula roles will be decoupled (unassigned) gracefully, but their textbook source files will NOT be deleted."}
-                  </p>
-                  <div className="modal-actions">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowDeleteSubjectConfirm(false)}
-                      className="discard-btn"
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: "12px", marginTop: "12px" }}>
+                {isEditingCur && (
+                  <button
+                    type="button"
+                    className="discard-btn"
+                    style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
+                    onClick={() => { handleDeleteCurriculum(); setActiveModal(null); }}
+                  >
+                    <FiTrash2 /> {isAr ? "حذف المنهج" : "Delete Curriculum"}
+                  </button>
+                )}
+                <div style={{ display: "flex", gap: "8px", marginLeft: isEditingCur ? "auto" : "0" }}>
+                  <button 
+                    type="button" 
+                    className="discard-btn"
+                    onClick={() => { setActiveModal(null); setIsEditingCur(false); setIsCreatingCurUnderLib(null); }}
+                    style={{ margin: 0 }}
+                  >
+                    {isAr ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button type="submit" disabled={loading} className="primary-submit-btn" style={{ margin: 0 }}>
+                    <FiSave /> {t("save_curriculum")}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Subject configuration Form */}
+      {activeModal === "subject" && (
+        <div className="studio-modal-overlay">
+          <div className="studio-modal-box">
+            <div className="studio-modal-header">
+              <div className="studio-modal-title">
+                <span style={{ color: subjForm.color }}>{subjForm.emoji || "🎨"}</span>
+                <span>{editingSubjId ? (isAr ? "تعديل المادة" : "Edit Subject") : (isAr ? "إضافة مادة جديدة" : "Create Subject")}</span>
+              </div>
+              <button type="button" onClick={() => { setActiveModal(null); setEditingSubjectId(null); setIsCreatingSubjUnderCur(null); }} className="studio-modal-close">×</button>
+            </div>
+
+            <form onSubmit={async (e) => { e.preventDefault(); await handleSaveSubject(e); setActiveModal(null); }} className="standard-form">
+              <div className="form-group-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group">
+                  <label>{t("subject_name_en")}</label>
+                  <input
+                    type="text"
+                    value={subjForm.name || ""}
+                    onChange={e => setSubjForm({ ...subjForm, name: e.target.value })}
+                    className="styled-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>{t("subject_name_ar")}</label>
+                  <input
+                    type="text"
+                    value={subjForm.name_ar || ""}
+                    onChange={e => setSubjForm({ ...subjForm, name_ar: e.target.value })}
+                    className="styled-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "12px", alignItems: "end" }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>{t("subject_color")}</label>
+                  <input
+                    type="color"
+                    value={subjForm.color || "#4F46E5"}
+                    onChange={e => setSubjForm({ ...subjForm, color: e.target.value })}
+                    className="styled-input"
+                    style={{ padding: "2px 6px", height: "38px", cursor: "pointer" }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                  <label>{t("subject_emoji")}</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="styled-input"
+                    style={{
+                      height: "38px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0 12px",
+                      cursor: "pointer",
+                      fontSize: "1.15rem",
+                      width: "100%",
+                      textAlign: "center"
+                    }}
+                  >
+                    <span>{subjForm.emoji || "📚"}</span>
+                    <FiChevronDown size={14} style={{ opacity: 0.5 }} />
+                  </button>
+
+                  {showEmojiPicker && (
+                    <div
+                      ref={emojiPickerRef}
+                      className="emoji-picker-container"
+                      style={{
+                        position: "absolute",
+                        bottom: "100%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        marginBottom: "6px",
+                        zIndex: 1100,
+                        backgroundColor: "rgba(255, 255, 255, 0.95)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid var(--card-border)",
+                        borderRadius: "10px",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+                        padding: "10px",
+                        width: "200px"
+                      }}
                     >
-                      {isAr ? "إلغاء" : "Cancel"}
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={async () => {
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
+                        {["📚", "📐", "🔬", "🧪", "🧬", "💻", "🧠", "🪐", "🌍", "🗺️", "🏛️", "🎨", "🎭", "🎵", "✍️", "📖", "🔢", "➕", "🗣️", "⏳"].map(emoji => (
+                          <span
+                            key={emoji}
+                            onClick={() => {
+                              setSubjForm({ ...subjForm, emoji });
+                              setShowEmojiPicker(false);
+                            }}
+                            className="emoji-grid-item"
+                            style={{
+                              fontSize: "1.25rem",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "4px"
+                            }}
+                          >
+                            {emoji}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>{t("subject_category")}</label>
+                  <select
+                    value={subjForm.category || "Science"}
+                    onChange={e => setSubjForm({ ...subjForm, category: e.target.value })}
+                    className="styled-select"
+                    style={{ height: "38px" }}
+                  >
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Science">Science</option>
+                    <option value="Languages">Languages</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Arts & Humanities">Arts & Humanities</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: "12px", marginTop: "12px" }}>
+                {editingSubjId && (
+                  <button
+                    type="button"
+                    className="discard-btn"
+                    style={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", margin: 0 }}
+                    onClick={async () => {
+                      if (confirm(isAr 
+                        ? "هل أنت متأكد من حذف هذه المادة؟ سيتم فك ارتباط الكتب المرتبطة بها."
+                        : "Are you sure you want to delete this subject? Associated books will be decoupled gracefully."
+                      )) {
                         setLoading(true);
                         try {
                           const res = await authedFetch(`/api/subjects?id=${selectedSubjectId}`, {
@@ -2501,7 +2950,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                           });
                           const data = await res.json();
                           if (res.ok && data.success) {
-                            triggerToast(isAr ? "🗑️ تم حذف المادة وفصل الكتب بنجاح!" : "🗑️ Subject deleted and books decoupled!");
+                            triggerToast(isAr ? "🗑️ تم حذف المادة بنجاح!" : "🗑️ Subject deleted!");
                             fetchSubjects(selectedCurriculumId);
                             fetchBooks();
                             setSelectedSubjectId("");
@@ -2514,307 +2963,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                           triggerToast(err.message, true);
                         } finally {
                           setLoading(false);
-                          setShowDeleteSubjectConfirm(false);
+                          setActiveModal(null);
                         }
-                      }}
-                      className="confirm-delete-btn"
-                    >
-                      {isAr ? "نعم، احذف المادة" : "Confirm Deletion"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: Ingestion & Crawl Console */}
-        {activeTab === "ingest_console" && (
-          <div className="ingestion-console-layout">
-            
-            {/* DESTINATION SELECTION GATEWAY */}
-            <div className="curriculum-assignment-gateway" style={{
-              background: "rgba(255, 255, 255, 0.4)",
-              backdropFilter: "blur(8px)",
-              border: "1.5px solid var(--card-border)",
-              borderRadius: "12px",
-              padding: "1.5rem",
-              marginBottom: "1.5rem"
-            }}>
-              <h3 style={{ margin: "0 0 1.25rem 0", fontSize: "1.15rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                🎯 {t("target_destination")}
-              </h3>
-              <div className="gateway-filters-row" style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "1.25rem"
-              }}>
-                <div className="filter-item" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--foreground)" }}>{t("tab_libraries")}</label>
-                  <Dropdown
-                    value={selectedLibId}
-                    onChange={(val) => setSelectedLibId(val)}
-                    options={libraries.map(lib => ({
-                      value: lib._id,
-                      label: lib.name,
-                      labelAr: lib.name_ar
-                    }))}
-                    language={isAr ? "ar" : "en"}
-                  />
-                </div>
-                <div className="filter-item" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--foreground)" }}>{t("tab_curricula")}</label>
-                  <Dropdown
-                    value={selectedCurriculumId}
-                    onChange={(val) => setSelectedCurriculumId(val)}
-                    placeholder={isAr ? "-- اختر المنهج --" : "-- Choose Curriculum --"}
-                    options={[
-                      { value: "", label: "-- Choose Curriculum --", labelAr: "-- اختر المنهج --" },
-                      ...curricula.map(c => ({
-                        value: c._id,
-                        label: c.title,
-                        labelAr: c.title_ar
-                      }))
-                    ]}
-                    language={isAr ? "ar" : "en"}
-                  />
-                </div>
-              </div>
-
-              {/* Multi-Subject Checkboxes Selection Grid */}
-              <div className="filter-item full-width" style={{ marginTop: "1.25rem", borderTop: "1px dashed rgba(0, 0, 0, 0.08)", paddingTop: "1.25rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                  <label style={{ fontWeight: "700", fontSize: "0.9rem", color: "var(--foreground)", display: "flex", alignItems: "center", gap: "6px" }}>
-                    📚 {isAr ? "المواد المستهدفة للاستيراد (تحديد متعدد)" : "Target Subjects (Multi-Selection)"}
-                  </label>
-                  {subjects.length > 0 && (
-                    <div style={{ display: "flex", gap: "12px" }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated: Record<string, boolean> = {};
-                          subjects.forEach(s => {
-                            updated[s._id] = true;
-                          });
-                          setSelectedSubjectIds(updated);
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--primary)",
-                          fontSize: "0.78rem",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "color 0.15s ease"
-                        }}
-                      >
-                        {isAr ? "✓ تحديد الكل" : "✓ Select All"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubjectIds({});
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#64748b",
-                          fontSize: "0.78rem",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "color 0.15s ease"
-                        }}
-                      >
-                        {isAr ? "✗ إلغاء تحديد الكل" : "✗ Deselect All"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {subjects.length === 0 ? (
-                  <div className="no-subjects-placeholder" style={{
-                    padding: "1.25rem",
-                    borderRadius: "8px",
-                    border: "1.5px dashed var(--card-border)",
-                    background: "rgba(0, 0, 0, 0.03)",
-                    textAlign: "center",
-                    fontSize: "0.85rem",
-                    color: "#64748b"
-                  }}>
-                    {isAr ? "ℹ️ يرجى اختيار منهج دراسي أولاً لرؤية المواد المعرفة به." : "ℹ️ Please select a Curriculum to display its available subjects."}
-                  </div>
-                ) : (
-                  <div className="subjects-checkbox-grid" style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                    gap: "10px",
-                    maxHeight: "180px",
-                    overflowY: "auto",
-                    padding: "0.75rem",
-                    borderRadius: "8px",
-                    border: "1.5px solid var(--card-border)",
-                    background: "rgba(255, 255, 255, 0.35)",
-                    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
-                  }}>
-                    {subjects.map(s => {
-                      const isChecked = !!selectedSubjectIds[s._id];
-                      return (
-                        <label
-                          key={s._id}
-                          className="subject-checkbox-item"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            padding: "8px 12px",
-                            borderRadius: "6px",
-                            background: isChecked ? "rgba(37, 99, 235, 0.08)" : "transparent",
-                            border: isChecked ? "1px solid rgba(37, 99, 235, 0.25)" : "1px solid transparent",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                            userSelect: "none"
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={e => {
-                              setSelectedSubjectIds(prev => ({
-                                ...prev,
-                                [s._id]: e.target.checked
-                              }));
-                            }}
-                            className="styled-checkbox"
-                            style={{ cursor: "pointer" }}
-                          />
-                          <span style={{ fontSize: "0.85rem", fontWeight: isChecked ? "600" : "500", color: "#1e293b", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.1))", fontSize: "1rem" }}>{s.emoji || "📚"}</span>
-                            <span>{isAr ? s.name_ar : s.name}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Non-Blocking Validation Warning Banner */}
-            {(!selectedLibId || !selectedCurriculumId || Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0) && (
-              <div className="ingestion-validation-warning-banner" style={{
-                marginBottom: "1.5rem",
-                padding: "1rem 1.25rem",
-                borderRadius: "10px",
-                backgroundColor: "rgba(245, 158, 11, 0.12)",
-                border: "1.5px solid rgb(245, 158, 11)",
-                color: "rgb(251, 191, 36)",
-                display: "flex",
-                alignItems: "center",
-                gap: "14px",
-                boxShadow: "0 4px 15px rgba(245, 158, 11, 0.12)",
-                animation: "pulse-soft 2.5s infinite"
-              }}>
-                <FiAlertCircle style={{ fontSize: "1.6rem", flexShrink: 0, textShadow: "0 0 8px rgba(245, 158, 11, 0.5)" }} />
-                <div style={{ fontSize: "0.85rem", lineHeight: 1.45 }}>
-                  <strong style={{ display: "block", marginBottom: "3px", textShadow: "0 0 4px rgba(245, 158, 11, 0.2)" }}>
-                    {isAr ? "⚠️ متطلبات التوجيه والمسار معلقة" : "⚠️ Routing Context Incomplete"}
-                  </strong>
-                  <span>
-                    {isAr 
-                      ? `لوحة الاستيراد بانتظار تحديد المسار: يرجى اختيار ${!selectedLibId ? "المكتبة" : ""} ${!selectedLibId && !selectedCurriculumId ? "ثم" : ""} ${!selectedCurriculumId ? "المنهج الدراسي" : ""} ${(!selectedLibId || !selectedCurriculumId) && Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "ثم" : ""} ${Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "مادة دراسية واحدة على الأقل" : ""} في الأعلى لتتمكن من تشغيل قنوات استيراد الكتب.`
-                      : `The Ingestion console is waiting for router context: Please select a ${!selectedLibId ? "Library" : ""} ${!selectedLibId && !selectedCurriculumId ? "-> " : ""}${!selectedCurriculumId ? "Curriculum" : ""} ${(!selectedLibId || !selectedCurriculumId) && Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "-> " : ""}${Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "at least one target Subject" : ""} in the gateway above.`
-                    }
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="tab-grid grid-2">
-              
-              {/* CRAWLER SECTION */}
-              <section className="crawler-card">
-                <h2>{t("web_crawler")}</h2>
-                <div className="standard-form">
-                  <div className="form-group">
-                    <label>{t("crawl_url_label")}</label>
-                    <input
-                      type="url"
-                      value={crawlUrl}
-                      onChange={e => setCrawlUrl(e.target.value)}
-                      className="styled-input url-input"
-                    />
-                  </div>
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>{t("crawl_depth")}</label>
-                      <select
-                        value={crawlMaxDepth}
-                        onChange={e => setCrawlMaxDepth(Number(e.target.value))}
-                        className="styled-select"
-                        disabled={isCrawling || crawlStatus === "paused"}
-                      >
-                        <option value={1}>1 - Shallow Target Link Only</option>
-                        <option value={2}>2 - Standard Folder Depth</option>
-                        <option value={3}>3 - Complete Portal Crawl</option>
-                      </select>
-                    </div>
-
-                    <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap" }}>
-                      {!isCrawling && crawlStatus !== "paused" ? (
-                        <button
-                          type="button"
-                          onClick={handleStartCrawling}
-                          className="primary-submit-btn crawl-start-btn"
-                          style={{ height: "42px", display: "flex", alignItems: "center", gap: "6px" }}
-                        >
-                          <FiSearch /> {t("start_crawl")}
-                        </button>
-                      ) : (
-                        <>
-                          {crawlStatus === "paused" ? (
-                            <button
-                              type="button"
-                              onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "resume")}
-                              className="control-btn resume-btn"
-                              style={{
-                                height: "42px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                padding: "0 1.25rem",
-                                borderRadius: "8px",
-                                backgroundColor: "rgba(16, 185, 129, 0.15)",
-                                border: "1.5px solid rgb(16, 185, 129)",
-                                color: "rgb(52, 211, 153)",
-                                cursor: "pointer",
-                                fontWeight: "600",
-                                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                                textShadow: "0 0 8px rgba(16, 185, 129, 0.5)",
-                                boxShadow: "0 0 12px rgba(16, 185, 129, 0.1)"
-                              }}
-                            >
-                              <FiPlay /> {isAr ? "استئناف" : "Resume"}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => selectedCrawlId && handleControlCrawlJob(selectedCrawlId, "pause")}
-                              className="control-btn pause-btn"
-                              style={{
-                                height: "42px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                padding: "0 1.25rem",
-                                borderRadius: "8px",
-                                backgroundColor: "rgba(245, 158, 11, 0.15)",
-                                border: "1.5px solid rgb(245, 158, 11)",
-                                color: "rgb(251, 191, 36)",
-                                cursor: "pointer",
-                                fontWeight: "600",
-                                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                                textShadow: "0 0 8px rgba(245, 158, 11, 0.5)",
                                 boxShadow: "0 0 12px rgba(245, 158, 11, 0.1)"
                               }}
                             >
