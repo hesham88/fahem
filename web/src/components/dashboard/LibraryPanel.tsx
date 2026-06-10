@@ -213,7 +213,7 @@ const BookCoverWithFallback: React.FC<{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "center",
           padding: "8px",
           color: "#ffffff",
           fontFamily: "var(--font-sans)",
@@ -246,29 +246,9 @@ const BookCoverWithFallback: React.FC<{
           borderRight: "1px solid rgba(255,255,255,0.2)"
         }} />
 
-        <div style={{ fontSize: typeof width === 'number' && width < 50 ? "1.2rem" : "1.8rem", zIndex: 1, marginTop: "4px" }}>
+        <div style={{ fontSize: typeof width === 'number' && width < 50 ? "1.2rem" : "1.8rem", zIndex: 1 }}>
           {emoji}
         </div>
-        
-        {title && (typeof width === 'number' && width > 50 || parseInt(String(width)) > 50) && (
-          <div style={{
-            fontSize: "0.65rem",
-            fontWeight: 800,
-            textAlign: "center",
-            lineHeight: "1.2",
-            display: "-webkit-box",
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            wordBreak: "break-word",
-            padding: "0 2px",
-            zIndex: 1,
-            marginBottom: "4px"
-          }}>
-            {title}
-          </div>
-        )}
       </div>
     );
   }
@@ -4487,8 +4467,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {/* Top-level Category Tabs */}
             <div style={{
               display: "flex", gap: "0.75rem", padding: "6px", borderRadius: "16px",
-              background: "rgba(255, 255, 255, 0.45)", backdropFilter: "blur(12px)",
-              border: "1px solid rgba(16, 107, 163, 0.08)", width: "fit-content",
+              background: "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.45))", backdropFilter: "blur(12px)",
+              border: "1px solid var(--card-border-glass, rgba(16, 107, 163, 0.08))", width: "fit-content",
               boxShadow: "0 8px 32px rgba(16, 107, 163, 0.02)"
             }}>
               {[
@@ -4504,7 +4484,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       padding: "10px 20px", borderRadius: "12px", fontSize: "0.85rem", fontWeight: 700,
                       cursor: "pointer", border: "none",
                       background: isActive ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
-                      color: isActive ? "#ffffff" : "#475569",
+                      color: isActive ? "#ffffff" : "var(--foreground, #475569)",
                       transition: "all 0.25s ease",
                       boxShadow: isActive ? "0 4px 12px rgba(16, 107, 163, 0.2)" : "none",
                       fontFamily: "var(--font-sans)"
@@ -4522,11 +4502,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.5rem",
-                background: "rgba(255, 255, 255, 0.35)",
+                background: "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.35))",
                 backdropFilter: "blur(16px)",
                 padding: "1rem 1.25rem",
                 borderRadius: "20px",
-                border: "1px solid rgba(16, 107, 163, 0.12)",
+                border: "1px solid var(--card-border-glass, rgba(16, 107, 163, 0.12))",
                 boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)",
                 width: "100%",
                 maxWidth: "380px",
@@ -4728,8 +4708,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         style={{
                           padding: "6px 14px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 700,
                           cursor: "pointer", border: librarySubject === subject.id ? "none" : "1px solid var(--card-border)",
-                          background: librarySubject === subject.id ? theme.gradient : "#ffffff",
-                          color: librarySubject === subject.id ? "#ffffff" : "#475569",
+                          background: librarySubject === subject.id ? theme.gradient : "var(--card-bg, #ffffff)",
+                          color: librarySubject === subject.id ? "#ffffff" : "var(--foreground, #475569)",
                           boxShadow: librarySubject === subject.id ? `0 4px 12px ${theme.glowColor}` : "none",
                           transition: "all 0.2s"
                         }}

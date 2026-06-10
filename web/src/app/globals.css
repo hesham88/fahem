@@ -11,6 +11,9 @@
   --card-bg: #ffffff;         /* Pure white glass card backgrounds */
   --card-border: rgba(226, 232, 240, 0.8); /* Ultra-soft modern gray border */
   --card-border-active: #2563eb;
+  --card-border-glass: rgba(16, 107, 163, 0.1);
+  --card-bg-glass-card: rgba(255, 255, 255, 0.45);
+  --card-bg-glass-dense: rgba(255, 255, 255, 0.85);
   --code-bg: #0f172a;         /* High-contrast deep slate logs terminal */
   --code-fg: #f8fafc;
   --shadow-sm: 0 2px 8px rgba(37, 99, 235, 0.02);
@@ -39,6 +42,9 @@ html.dark, :root.dark {
   --card-bg: #111827;         /* Deep slate-900 background */
   --card-border: rgba(51, 65, 85, 0.45); /* Soft slate border */
   --card-border-active: #3b82f6;
+  --card-border-glass: rgba(255, 255, 255, 0.08);
+  --card-bg-glass-card: rgba(17, 24, 39, 0.45);
+  --card-bg-glass-dense: rgba(17, 24, 39, 0.85);
   --code-bg: #030712;         /* Deep logs terminal pitch black */
   --code-fg: #f3f4f6;
 }
@@ -3648,6 +3654,75 @@ html.dark, :root.dark {
 .tree-row-folder:hover {
   background: rgba(15, 23, 42, 0.04);
 }
+
+/* ==========================================================================
+   PREMIUM DARK THEME OVERRIDES FOR SIGNED-IN DASHBOARD (BUILDER 4)
+   ========================================================================== */
+
+/* Sidebar Background & Borders in Dark Mode */
+html.dark .sidebar, :root.dark .sidebar {
+  background: rgba(9, 13, 22, 0.85) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Sidebar Navigation Header text */
+html.dark .sidebar-nav-header, :root.dark .sidebar-nav-header {
+  color: rgba(148, 163, 184, 0.55) !important;
+}
+
+/* Sidebar Navigation Button text colors in Dark Mode */
+html.dark .sidebar-nav-btn, :root.dark .sidebar-nav-btn {
+  color: #94a3b8 !important;
+}
+
+html.dark .sidebar-nav-btn:hover, :root.dark .sidebar-nav-btn:hover {
+  color: #ffffff !important;
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+html.dark .sidebar-nav-btn.active, :root.dark .sidebar-nav-btn.active {
+  color: #ffffff !important;
+  background: rgba(59, 130, 246, 0.18) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Sidebar User Profile Card in Dark Mode */
+html.dark .sidebar-user-card, :root.dark .sidebar-user-card {
+  background: rgba(17, 24, 39, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Sidebar Language Select option rendering */
+html.dark .sidebar-language-select, :root.dark .sidebar-language-select {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Dashboard Main Content Header section (page-title-section) */
+html.dark .page-title-section, :root.dark .page-title-section {
+  background: rgba(17, 24, 39, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Page Title Subtitle description visibility */
+html.dark .page-title-section p, :root.dark .page-title-section p {
+  color: #94a3b8 !important;
+}
+
+/* Mobile Sticky Header in Dark Mode */
+html.dark .mobile-header, :root.dark .mobile-header {
+  background: rgba(9, 13, 22, 0.9) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
 
 
 

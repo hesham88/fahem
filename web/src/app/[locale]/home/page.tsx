@@ -5948,7 +5948,7 @@ export default function Home() {
 
       {/* Mobile Sticky Header */}
       <header className="mobile-header">
-        <div className="mobile-header-left" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <div className="mobile-header-left" onClick={() => router.push(`/${language}`)} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer" }}>
           <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "1.8rem", width: "auto" }} />
           <span style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
         </div>
@@ -5983,7 +5983,7 @@ export default function Home() {
         <div className="sidebar-top" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: "1rem" }}>
           {/* Logo Section */}
           <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "0.6rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <div onClick={() => router.push(`/${language}`)} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer" }}>
               <img src="/brand/logo_compressed.png" alt="Fahem Logo" style={{ height: "2.4rem", width: "auto" }} />
               <span style={{ fontWeight: 800, letterSpacing: "0.5px" }}>{t("dashboard_title")}</span>
             </div>
@@ -6004,15 +6004,7 @@ export default function Home() {
           <nav className="sidebar-nav custom-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: "4px" }}>
             {isAdmin && (
               <>
-                <div style={{
-                  fontSize: "0.65rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.05em",
-                  color: "rgba(16, 107, 163, 0.45)",
-                  padding: "0.6rem 0.75rem 0.25rem",
-                  textTransform: "uppercase",
-                  fontFamily: "var(--font-display)"
-                }}>
+                <div className="sidebar-nav-header">
                   {language === "ar" ? "لوحات التحكم والتحليل" : "ADMIN CONTROLS"}
                 </div>
                 <button
@@ -6045,15 +6037,7 @@ export default function Home() {
               </>
             )}
 
-            <div style={{
-              fontSize: "0.65rem",
-              fontWeight: 800,
-              letterSpacing: "0.05em",
-              color: "rgba(16, 107, 163, 0.45)",
-              padding: "0.6rem 0.75rem 0.25rem",
-              textTransform: "uppercase",
-              fontFamily: "var(--font-display)"
-            }}>
+            <div className="sidebar-nav-header">
               {language === "ar" ? "المساحة التعليمية الذكية" : "ACADEMIC SPACE"}
             </div>
             
@@ -6122,15 +6106,7 @@ export default function Home() {
               <span>{language === "ar" ? "تحليل الأداء والأوسمة" : "Insights & Achievements"}</span>
             </button>
 
-            <div style={{
-              fontSize: "0.65rem",
-              fontWeight: 800,
-              letterSpacing: "0.05em",
-              color: "rgba(16, 107, 163, 0.45)",
-              padding: "0.6rem 0.75rem 0.25rem",
-              textTransform: "uppercase",
-              fontFamily: "var(--font-display)"
-            }}>
+            <div className="sidebar-nav-header">
               {language === "ar" ? "المجتمع والتفضيلات" : "COMMUNITY & CONTROL"}
             </div>
 
@@ -6638,22 +6614,30 @@ export default function Home() {
             </a>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "1.5rem", alignItems: "center" }}>
-            <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X">
-              <FiTwitter />
+          <div style={{ display: "flex", justifyContent: "center", gap: "1.75rem", alignItems: "center", marginBottom: "1.5rem" }}>
+            <a href="https://x.com/fahempro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" 
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_x.png" alt="X" width="22" height="22" style={{ objectFit: "contain", filter: isDarkMode ? "invert(1)" : "none" }} />
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram">
-              <FiInstagram />
+            <a href="https://www.instagram.com/fahem.pro/" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" 
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_instagram.png" alt="Instagram" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook">
-              <FiFacebook />
+            <a href="https://www.facebook.com/ai.fahem.pro/" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" 
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_facebook.png" alt="Facebook" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
-            <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email">
-              <FiMail />
-            </a>
-            <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Asdaa" style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)", opacity: 0.8, fontSize: "0.9rem", fontWeight: 700, textDecoration: "none", transition: "opacity 0.2s" }}>
-              <span style={{ fontSize: "1.1rem" }}>🎙️</span>
-              <span>Asdaa</span>
+            <a href="mailto:contact@fahem.pro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
+               style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
+               onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
+               onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
+              <img src="/brand/social_email.png" alt="Email" width="22" height="22" style={{ objectFit: "contain", filter: isDarkMode ? "invert(1)" : "none" }} />
             </a>
           </div>
 
@@ -6773,10 +6757,20 @@ export default function Home() {
             </div>
           </div>
 
-          <p>{t("footer_dashboard_line1")}</p>
-          <p style={{ marginTop: "0.35rem", fontSize: "0.75rem", color: "#b0c0cb" }}>
-            {t("footer_dashboard_line2")}
-          </p>
+          {/* Unified copyright and attribution line */}
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              {language === "ar" ? (
+                <>
+                  صُنع بكل حب ❤️ جميع الحقوق محفوظة لـ <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa</a> وفريق فاهم
+                </>
+              ) : (
+                <>
+                  Made with love ❤️ All rights reserved to <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa</a> and Fahem Team
+                </>
+              )}
+            </p>
+          </div>
         </footer>
 
         {renderSpaceModal()}
