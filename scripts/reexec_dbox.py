@@ -339,8 +339,13 @@ def verify_d8():
         return False, f"TTS response carries no audio mime type: {body[:140]}"
     m = re.search(r'"([A-Za-z0-9+/=]{500,})"', body)
     if not m:
-        return False, "TTS response contains no real audio payload (empty/too small)"
-    return True, f"TTS returned real audio (audio/wav, {len(m.group(1))} base64 chars)"
+        return False, "TTS response contains no audio payload (empty)"
+    n = len(m.group(1))
+    # Real Gemini TTS of a sentence is ~300k base64 chars; the silent-PCM "fallback" is ~64k.
+    # Reject small payloads so a success-faking silent fallback can't pass D8.
+    if n < 150000:
+        return False, f"TTS audio is only {n} base64 chars — this is the SILENT fallback, not real Gemini speech (audio regressed/masked; R18)"
+    return True, f"TTS returned REAL speech audio (audio/wav, {n} base64 chars)"
 
 
 def verify_perf():

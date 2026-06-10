@@ -135,7 +135,9 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
     // Delay first measurement slightly to allow Next.js tab transition and slide rendering
     const timer = setTimeout(updateRect, 300);
 
-    const interval = setInterval(updateRect, 150);
+    const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+    const intervalMs = isMobile ? 1000 : 150; // Throttle on mobile to eliminate continuous getBoundingClientRect layout thrashing/jank
+    const interval = setInterval(updateRect, intervalMs);
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
 

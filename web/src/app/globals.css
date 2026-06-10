@@ -213,6 +213,19 @@ a:hover {
               inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
 }
 
+html.dark .panel-card, :root.dark .panel-card {
+  background: rgba(17, 24, 39, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), 
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.dark .panel-card:hover, :root.dark .panel-card:hover {
+  border-color: rgba(218, 165, 32, 0.4) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45), 
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.08) !important;
+}
+
 .panel-card h2 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
@@ -447,7 +460,11 @@ a:hover {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.04) 0%, rgba(249, 115, 22, 0.02) 90.1%), #f8fafc;
+  background: radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.04) 0%, rgba(249, 115, 22, 0.02) 90.1%), var(--background);
+}
+
+html.dark .glass-container, :root.dark .glass-container {
+  background: radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, rgba(249, 115, 22, 0.04) 90.1%), var(--background) !important;
 }
 
 /* Floating background spheres for maximum glass blur visibility */
@@ -466,6 +483,15 @@ a:hover {
   border-radius: 50%;
   filter: blur(80px);
   opacity: 0.45;
+}
+
+@keyframes float-logo {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-6px);
+  }
 }
 
 /* Premium hardware-accelerated floating keyframe animations for the ambient spheres */
