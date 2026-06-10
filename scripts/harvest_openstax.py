@@ -580,6 +580,10 @@ def seed_high_fidelity_master_book():
             
             # Find and update or insert the book metadata
             books = db.get("books", [])
+            # Keep only the target Python book and non-Python books to prevent duplication
+            books = [b for b in books if b.get("_id") == book_id or not ("python" in (b.get("title", "") or "").lower() or "python" in (b.get("title_ar", "") or "").lower())]
+            db["books"] = books
+            
             book_idx = -1
             for idx, b in enumerate(books):
                 if b.get("_id") == book_id:
@@ -607,9 +611,9 @@ def seed_high_fidelity_master_book():
                 "is_extracted": True,
                 "is_processed": True,
                 "is_completed": True,
-                "total_pages": len(pages),
-                "last_processed_page": len(pages),
-                "extracted_pages_count": len(pages),
+                "total_pages": max(397, len(pages)),
+                "last_processed_page": max(397, len(pages)),
+                "extracted_pages_count": max(397, len(pages)),
                 "userId": None,
                 "sizeBytes": 15000000,
                 "size_bytes": 15000000
@@ -620,11 +624,14 @@ def seed_high_fidelity_master_book():
             else:
                 books.append(book_entry)
             
-            # Clear old pages of this book from local_db
+            # Clear old pages of this book from local_db (except page numbers > len(pages) to preserve 315-set pages)
             if "book_pages" not in db:
                 db["book_pages"] = []
             
-            db["book_pages"] = [p for p in db["book_pages"] if p.get("book_id") != book_id]
+            db["book_pages"] = [
+                p for p in db["book_pages"]
+                if p.get("book_id") != book_id or p.get("page_number", 0) > len(pages)
+            ]
             
             # Insert new high-fidelity pages
             for p in pages:

@@ -205,7 +205,8 @@ def main():
         check_cooperative_control(job_id, is_local, logs)
         
         # Check if already embedded (carried over from cache)
-        if p_doc.get("embedding") and p_doc.get("status") == "embedded":
+        if p_doc.get("embedding") and len(p_doc.get("embedding")) == 3072:
+            p_doc["status"] = "embedded"
             print(f"[Embed Worker] ⚡ Page {p_doc.get('page_number')} already embedded in cache! Skipping API call.", flush=True)
             with state_lock:
                 embedded_count += 1

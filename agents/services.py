@@ -558,6 +558,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from pymongo import MongoClient
             import time
             
+            pb_book = None
+            pb_pages = []
+            
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = client["fahem_sandbox"]
@@ -654,7 +657,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "title": "OpenStax College Essentials (2026)",
                     "title_ar": "سلسلة الكليات أوبن ستاكس (2026)",
                     "scope": {"discipline": "Mathematics", "level": "College"},
-                    "subject_ids": ["subj_cur_openstax_college_2026_calculus", "subj_cur_openstax_college_2026_physics"],
+                    "subject_ids": ["subj_cur_openstax_college_2026_calculus", "subj_cur_openstax_college_2026_physics", "sub_computer_science_1780535716963"],
                     "status": "published",
                     "visibility": "public",
                     "owner_uid": None,
@@ -751,6 +754,20 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "core_book_ids": ["book_openstax_phys_core"],
                     "supporting_book_ids": ["book_openstax_phys_sup"],
                     "books_count": 2
+                },
+                {
+                    "_id": "sub_computer_science_1780535716963",
+                    "curriculum_id": "cur_openstax_college_2026",
+                    "slug": "computer-science",
+                    "name": "Computer Science",
+                    "name_ar": "علوم الحاسب",
+                    "emoji": "💻",
+                    "color": "#6366F1",
+                    "category": "Computer Science",
+                    "grade_level": "College",
+                    "core_book_ids": ["book_introduction_to_python_programming_1780535737559"],
+                    "supporting_book_ids": [],
+                    "books_count": 1
                 }
             ]
             for subj in subjects_data:
@@ -1226,6 +1243,35 @@ def register_telemetry_route(app: fastapi.FastAPI):
             for pg in book_pages_data:
                 db["book_pages"].replace_one({"_id": pg["_id"]}, pg, upsert=True)
 
+            # --- 5b. SEED PYTHON BOOK & PAGES FROM JSON SEED ---
+            import os
+            import json
+            seed_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "python_book_seed.json")
+            if os.path.exists(seed_path):
+                logger.info(f"[SEED] Found Python book seed at: {seed_path}. Seeding Python book & pages...")
+                try:
+                    with open(seed_path, "r", encoding="utf-8") as f:
+                        seed_data = json.load(f)
+                    
+                    pb_book = seed_data.get("book")
+                    if pb_book:
+                        # Ensure standard library and curriculum fields
+                        pb_book["library_id"] = "lib_openstax"
+                        pb_book["curriculum_id"] = "cur_openstax_college_2026"
+                        pb_book["book_type"] = "core"
+                        db["books"].replace_one({"_id": pb_book["_id"]}, pb_book, upsert=True)
+                        logger.info(f"[SEED] Successfully seeded Python book: {pb_book['_id']}")
+                    
+                    pb_pages = seed_data.get("pages", [])
+                    if pb_pages:
+                        db["book_pages"].delete_many({"book_id": pb_book["_id"]})
+                        db["book_pages"].insert_many(pb_pages)
+                        logger.info(f"[SEED] Successfully seeded {len(pb_pages)} Python book pages via bulk insert.")
+                except Exception as ex:
+                    logger.error(f"[SEED] Error seeding Python book / pages: {ex}", exc_info=True)
+            else:
+                logger.warning(f"[SEED] Python book seed NOT found at: {seed_path}")
+
             # --- 6. SEED USERS (3: Student, Teacher, Admin) ---
             users_data = [
                 {
@@ -1607,8 +1653,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "libraries": len(libraries_data),
                     "curricula": len(curricula_data),
                     "subjects": len(subjects_data),
-                    "books": len(books_data),
-                    "book_pages": len(book_pages_data),
+                    "books": len(books_data) + (1 if pb_book else 0),
+                    "book_pages": len(book_pages_data) + (len(pb_pages) if pb_pages else 0),
                     "users": len(users_data),
                     "social_groups": len(social_groups_data),
                     "social_threads": len(social_threads_data),
