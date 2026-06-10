@@ -252,6 +252,8 @@ export interface TreeNode {
   children?: TreeNode[];
   bookId?: string;
   url?: string;
+  totalPages?: number;
+  subjectId?: string;
 }
 
 export function getAllBookIds(node: TreeNode): string[] {
@@ -267,69 +269,55 @@ export function getAllBookIds(node: TreeNode): string[] {
   return ids;
 }
 
+export function countPagesRecursive(node: TreeNode): number {
+  if (node.type === "file") {
+    return node.totalPages || 0;
+  }
+  let sum = 0;
+  if (node.children) {
+    node.children.forEach(child => {
+      sum += countPagesRecursive(child);
+    });
+  }
+  return sum;
+}
+
 export function buildDirectoryTree(books: any[]): TreeNode[] {
-  const rootNodes: TreeNode[] = [];
+  // Group books by subject (using book.subject as directory name, with subjectId if available)
+  const subjectGroups: Record<string, { name: string; id: string; books: any[] }> = {};
 
   books.forEach(book => {
-    let urlStr = book.url || "";
-    let hostname = "";
-    let paths: string[] = [];
-
-    try {
-      if (urlStr) {
-        if (!/^https?:\/\//i.test(urlStr)) {
-          urlStr = "https://" + urlStr;
-        }
-        const parsedUrl = new URL(urlStr);
-        hostname = parsedUrl.hostname;
-        paths = parsedUrl.pathname.split("/").filter(Boolean);
-      }
-    } catch (e) {
-      hostname = "unknown-source";
-      paths = [urlStr.replace(/[^a-zA-Z0-9]/g, "_")].filter(Boolean);
-    }
-
-    if (!hostname) {
-      hostname = "unknown-source";
-    }
-
-    let currentChildren = rootNodes;
-    let currentPathKey = "dir:" + hostname;
-
-    let hostnameNode = currentChildren.find(n => n.name === hostname && n.type === "directory");
-    if (!hostnameNode) {
-      hostnameNode = {
-        key: currentPathKey,
-        name: hostname,
-        type: "directory",
-        children: []
+    const subjName = book.subject || "Discovered Resources";
+    const subjId = book.subjectId || "unassigned_subject";
+    
+    if (!subjectGroups[subjId]) {
+      subjectGroups[subjId] = {
+        name: subjName,
+        id: subjId,
+        books: []
       };
-      currentChildren.push(hostnameNode);
     }
-    currentChildren = hostnameNode.children!;
+    subjectGroups[subjId].books.push(book);
+  });
 
-    for (let i = 0; i < paths.length; i++) {
-      const part = paths[i];
-      currentPathKey += "/" + part;
-      let node = currentChildren.find(n => n.name === part && n.type === "directory");
-      if (!node) {
-        node = {
-          key: currentPathKey,
-          name: part,
-          type: "directory",
-          children: []
-        };
-        currentChildren.push(node);
-      }
-      currentChildren = node.children!;
-    }
+  const rootNodes: TreeNode[] = [];
 
-    currentChildren.push({
-      key: book.id,
-      name: book.title,
-      type: "file",
-      bookId: book.id,
-      url: book.url
+  Object.values(subjectGroups).forEach(group => {
+    const children: TreeNode[] = group.books.map(book => ({
+      key: book.id || book._id || book.url,
+      name: book.title || book.bookTitle || "Untitled Book",
+      type: "file" as const,
+      bookId: book.id || book._id || book.url, // Fallback to url to guarantee a selectable identifier
+      url: book.url,
+      totalPages: book.totalPages || book.total_pages || 0
+    }));
+
+    rootNodes.push({
+      key: "subject_node_" + group.id,
+      name: group.name,
+      type: "directory" as const,
+      children: children,
+      subjectId: group.id
     });
   });
 
@@ -364,6 +352,14 @@ export function DirectoryNode({
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onToggleNode(node, e.target.checked);
   };
+
+  // Calculate total pages for folder display recursively
+  let totalDirPages = 0;
+  if (isDir && node.children) {
+    node.children.forEach(c => {
+      if (typeof c.totalPages === "number") totalDirPages += c.totalPages;
+    });
+  }
 
   return (
     <div className="directory-branch" style={{ paddingInlineStart: "4px" }}>
@@ -433,6 +429,42 @@ export function DirectoryNode({
           >
             {node.name}
           </span>
+
+          {isDir && totalDirPages > 0 && (
+            <span 
+              className="page-count-badge dir-pages" 
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.1rem 0.4rem",
+                borderRadius: "12px",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                color: "#3b82f6",
+                fontWeight: "600",
+                marginLeft: "8px",
+                marginRight: "8px"
+              }}
+            >
+              {totalDirPages} pgs
+            </span>
+          )}
+
+          {!isDir && typeof node.totalPages === "number" && node.totalPages > 0 && (
+            <span 
+              className="page-count-badge file-pages" 
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.1rem 0.4rem",
+                borderRadius: "12px",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                color: "#10b981",
+                fontWeight: "600",
+                marginLeft: "8px",
+                marginRight: "8px"
+              }}
+            >
+              {node.totalPages} pgs
+            </span>
+          )}
         </div>
 
         {!isDir && node.url && (
@@ -499,13 +531,78 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   const [selectedLibId, setSelectedLibId] = useState<string>("");
   const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>("");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<Record<string, boolean>>({});
+
+  // Monotonic Ingestion Progress Hook
+  const [maxProgressByJob, setMaxProgressByJob] = useState<Record<string, number>>({});
+
+  const isRoutingComplete = !!(selectedLibId && selectedCurriculumId && Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length > 0);
+
+  const renderRoutingChecklist = () => {
+    const hasLib = !!selectedLibId;
+    const hasCur = !!selectedCurriculumId;
+    const hasSub = Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length > 0;
+
+    return (
+      <div className="glass-routing-checklist" style={{
+        background: "rgba(239, 68, 68, 0.08)",
+        backdropFilter: "blur(12px)",
+        border: "1.5px solid rgba(239, 68, 68, 0.25)",
+        borderRadius: "10px",
+        padding: "1rem 1.25rem",
+        marginTop: "1rem",
+        color: "#f8fafc",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+        boxShadow: "0 8px 32px 0 rgba(239, 68, 68, 0.05)",
+        width: "100%"
+      }}>
+        <div style={{ fontWeight: "700", fontSize: "0.85rem", color: "#f87171", display: "flex", alignItems: "center", gap: "6px" }}>
+          <FiAlertCircle />
+          {isAr ? "متطلبات التوجيه والربط ناقصة" : "Routing Requirements Incomplete"}
+        </div>
+        <p style={{ margin: 0, fontSize: "0.78rem", opacity: 0.8, color: "#cbd5e1" }}>
+          {isAr 
+            ? "يرجى استكمال تحديد معطيات التوجيه في الأعلى لتمكين الاستيراد:" 
+            : "Please complete the routing configuration above to enable ingestion:"}
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "0.8rem", marginTop: "4px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: hasLib ? "#10b981" : "#f87171", fontWeight: "bold" }}>
+              {hasLib ? "✓" : "✗"}
+            </span>
+            <span style={{ opacity: hasLib ? 0.6 : 1, textDecoration: hasLib ? "line-through" : "none" }}>
+              {isAr ? "اختيار المكتبة التعليمية" : "Select Library Domain"}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: hasCur ? "#10b981" : "#f87171", fontWeight: "bold" }}>
+              {hasCur ? "✓" : "✗"}
+            </span>
+            <span style={{ opacity: hasCur ? 0.6 : 1, textDecoration: hasCur ? "line-through" : "none" }}>
+              {isAr ? "اختيار المنهج الدراسي المستهدف" : "Select target Curriculum Unit"}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: hasSub ? "#10b981" : "#f87171", fontWeight: "bold" }}>
+              {hasSub ? "✓" : "✗"}
+            </span>
+            <span style={{ opacity: hasSub ? 0.6 : 1, textDecoration: hasSub ? "line-through" : "none" }}>
+              {isAr ? "تحديد مادة دراسية واحدة على الأقل" : "Select at least one target Subject"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Form states - Library
   const [libForm, setLibForm] = useState<Partial<Library>>({
     _id: "",
     name: "",
     name_ar: "",
-    source: "moe",
+    source: "openstax",
     logo: "",
     scopeSchema: []
   });
@@ -612,15 +709,29 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   const [isCreatingCurUnderLib, setIsCreatingCurUnderLib] = useState<string | null>(null);
   const [isCreatingSubjUnderCur, setIsCreatingSubjUnderCur] = useState<string | null>(null);
 
+  // Dynamic poller setup (2s when active jobs exist, 10s otherwise)
+  const [pollInterval, setPollInterval] = useState(10000);
+
+  useEffect(() => {
+    const hasActiveJob = queue.some(job => ["processing", "downloading", "queued"].includes(job.status));
+    const targetInterval = hasActiveJob ? 2000 : 10000;
+    if (pollInterval !== targetInterval) {
+      setPollInterval(targetInterval);
+    }
+  }, [queue, pollInterval]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchQueueJobs, pollInterval);
+    return () => clearInterval(interval);
+  }, [pollInterval]);
+
   // Onboarding loads
   useEffect(() => {
     fetchLibraries();
     fetchBooks();
     fetchQueueJobs();
     fetchPastCrawls();
-    const interval = setInterval(fetchQueueJobs, 10000);
     return () => {
-      clearInterval(interval);
       if (crawlIntervalRef.current) {
         clearInterval(crawlIntervalRef.current);
       }
@@ -728,14 +839,17 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       // Reset curriculum selection
       setSelectedCurriculumId("");
       setSubjects([]);
+      setSelectedSubjectIds({});
     }
   }, [selectedLibId]);
 
   useEffect(() => {
     if (selectedCurriculumId) {
       fetchSubjects(selectedCurriculumId);
+      setSelectedSubjectIds({});
     } else {
       setSubjects([]);
+      setSelectedSubjectIds({});
     }
   }, [selectedCurriculumId]);
 
@@ -796,7 +910,36 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       const res = await authedFetch("/api/books/jobs");
       const data = await res.json();
       if (data.jobs) {
-        setQueue(data.jobs);
+        const normalized = data.jobs.map((job: any) => {
+          const jobId = job.id || job._id || "";
+          const jobProgress = typeof job.progress === "number" ? job.progress : (job.pct || 0);
+          return {
+            id: jobId,
+            fileName: job.fileName || job.file_name || "",
+            bookTitle: job.bookTitle || job.book_title || job.title || "",
+            bookTitleAr: job.bookTitleAr || job.book_title_ar || job.title_ar || "",
+            subjectName: job.subjectName || job.subject_name || "",
+            status: job.status || "idle",
+            progress: jobProgress,
+            totalPages: typeof job.totalPages === "number" ? job.totalPages : (job.total_pages || 0),
+            processedPages: typeof job.processedPages === "number" ? job.processedPages : (job.processed_pages || 0),
+            current_step: job.current_step || job.stage || "fetch",
+            logs: job.logs || []
+          };
+        });
+
+        setMaxProgressByJob(prev => {
+          const updated = { ...prev };
+          normalized.forEach((job: any) => {
+            const prevProgress = prev[job.id] || 0;
+            if (job.progress > prevProgress) {
+              updated[job.id] = job.progress;
+            }
+          });
+          return updated;
+        });
+
+        setQueue(normalized);
       }
     } catch (err) {
       console.error("Failed to fetch queue jobs", err);
@@ -837,7 +980,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       if (res.ok && data.success) {
         triggerToast(isAr ? "🏛️ تم حفظ المكتبة وتحديث البنية!" : "🏛️ Library saved and structure synced!");
         fetchLibraries();
-        setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+        setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
         setIsEditingLib(false);
       } else {
         triggerToast(data.error || "Failed to save library", true);
@@ -931,7 +1074,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       if (res.ok && data.success) {
         triggerToast(isAr ? "🗑️ تم حذف المكتبة وفصل الكتب بنجاح!" : "🗑️ Library deleted and books decoupled gracefully!");
         fetchLibraries();
-        setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+        setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
         setIsEditingLib(false);
         setSelectedLibId("");
         setSelectedCurriculumId("");
@@ -1144,34 +1287,99 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   const handleBulkIngest = async () => {
     const selectedList = discoveredBooks.filter(b => selectedDiscovered[b.id]);
+    const targetSubjectIds = Object.keys(selectedSubjectIds).filter(sid => !!selectedSubjectIds[sid]);
+
     if (selectedList.length === 0) {
-      triggerToast("No discovered books selected", true);
+      triggerToast(isAr ? "⚠️ يرجى تحديد كتاب واحد على الأقل للاستيراد." : "⚠️ No discovered books selected for ingestion.", true);
       return;
     }
-    if (!selectedCurriculumId || !selectedSubjectId) {
-      triggerToast("Please pick a target Curriculum and Subject in the header above", true);
+    if (!selectedLibId || !selectedCurriculumId || targetSubjectIds.length === 0) {
+      let missingMsg = "";
+      if (!selectedLibId) missingMsg = isAr ? "يجب اختيار مكتبة أولاً" : "Please select a Library domain first";
+      else if (!selectedCurriculumId) missingMsg = isAr ? "يجب اختيار المنهج الدراسي المستهدف" : "Please select a target Curriculum unit first";
+      else missingMsg = isAr ? "يجب تحديد مادة دراسية واحدة على الأقل من القائمة" : "Please select at least one target Subject checkbox";
+      
+      triggerToast(`⚠️ ${missingMsg}`, true);
       return;
     }
 
-    addTerminalLog(`[CRAWLER] Initiating bulk ingestion for ${selectedList.length} assets...`);
+    addTerminalLog(`[CRAWLER] Initiating bulk ingestion for ${selectedList.length} assets into ${targetSubjectIds.length} subjects...`);
     setLoading(true);
 
     let successCount = 0;
+    let totalAttempts = selectedList.length * targetSubjectIds.length;
+
     for (const item of selectedList) {
+      for (const subId of targetSubjectIds) {
+        try {
+          const res = await authedFetch("/api/books", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              subject_id: subId,
+              curriculum_id: selectedCurriculumId,
+              library_id: selectedLibId,
+              role: "core",
+              title: item.title,
+              title_ar: item.titleAr || item.title,
+              source_url: item.url,
+              language: item.language || "en",
+              book_type: "core"
+            })
+          });
+          if (res.ok) successCount++;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
+
+    triggerToast(isAr
+      ? `📥 تم بنجاح استيراد وبدء معالجة ${successCount} كتاب لـ ${targetSubjectIds.length} مواد!`
+      : `📥 Successfully queued ingestion for ${successCount}/${totalAttempts} book-subject assignments!`);
+    
+    fetchBooks();
+    fetchQueueJobs();
+    setLoading(false);
+  };
+
+  const handleDirectIngest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetSubjectIds = Object.keys(selectedSubjectIds).filter(sid => !!selectedSubjectIds[sid]);
+
+    if (!manualIngestForm.title || !manualIngestForm.source_url) {
+      triggerToast(isAr ? "⚠️ يرجى إدخال عنوان الكتاب ورابط ملف PDF" : "⚠️ Please enter a Title and PDF source URL", true);
+      return;
+    }
+    if (!selectedLibId || !selectedCurriculumId || targetSubjectIds.length === 0) {
+      let missingMsg = "";
+      if (!selectedLibId) missingMsg = isAr ? "يجب اختيار مكتبة أولاً" : "Please select a Library domain first";
+      else if (!selectedCurriculumId) missingMsg = isAr ? "يجب اختيار المنهج الدراسي المستهدف" : "Please select a target Curriculum unit first";
+      else missingMsg = isAr ? "يجب تحديد مادة دراسية واحدة على الأقل من القائمة" : "Please select at least one target Subject checkbox";
+      
+      triggerToast(`⚠️ ${missingMsg}`, true);
+      return;
+    }
+
+    setLoading(true);
+    addTerminalLog(`[MANUAL INGEST] Ingesting "${manualIngestForm.title}" into ${targetSubjectIds.length} subjects...`);
+
+    let successCount = 0;
+    for (const subId of targetSubjectIds) {
       try {
         const res = await authedFetch("/api/books", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            subject_id: selectedSubjectId,
+            subject_id: subId,
             curriculum_id: selectedCurriculumId,
             library_id: selectedLibId,
-            role: "core",
-            title: item.title,
-            title_ar: item.titleAr || item.title,
-            source_url: item.url,
-            language: item.language || "en",
-            book_type: "core"
+            role: manualIngestForm.role,
+            title: manualIngestForm.title,
+            title_ar: manualIngestForm.title_ar || manualIngestForm.title,
+            source_url: manualIngestForm.source_url,
+            language: manualIngestForm.language,
+            book_type: manualIngestForm.role
           })
         });
         if (res.ok) successCount++;
@@ -1180,57 +1388,17 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
       }
     }
 
-    triggerToast(t("import_bulk_success", { importedCount: successCount, skippedCount: selectedList.length - successCount }));
-    fetchBooks();
-    fetchQueueJobs();
+    if (successCount > 0) {
+      triggerToast(isAr
+        ? `📚 تم بدء استيراد ومعالجة الكتاب لـ ${successCount} مادة بنجاح!`
+        : `📚 Textbook ingestion queued successfully for ${successCount} subjects!`);
+      setManualIngestForm({ title: "", title_ar: "", source_url: "", language: "ar", role: "core" });
+      fetchBooks();
+      fetchQueueJobs();
+    } else {
+      triggerToast(isAr ? "⚠️ فشل بدء الاستيراد لجميع المواد المعينة" : "⚠️ Ingestion failed to start", true);
+    }
     setLoading(false);
-  };
-
-  const handleDirectIngest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualIngestForm.title || !manualIngestForm.source_url) {
-      triggerToast("Please enter a Title and PDF source URL", true);
-      return;
-    }
-    if (!selectedCurriculumId || !selectedSubjectId) {
-      triggerToast("Please pick a target Curriculum and Subject destination", true);
-      return;
-    }
-
-    setLoading(true);
-    addTerminalLog(`[MANUAL INGEST] Launching single textbook parsing for: "${manualIngestForm.title}"`);
-
-    try {
-      const res = await authedFetch("/api/books", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject_id: selectedSubjectId,
-          curriculum_id: selectedCurriculumId,
-          library_id: selectedLibId,
-          role: manualIngestForm.role,
-          title: manualIngestForm.title,
-          title_ar: manualIngestForm.title_ar || manualIngestForm.title,
-          source_url: manualIngestForm.source_url,
-          language: manualIngestForm.language,
-          book_type: manualIngestForm.role
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        triggerToast(isAr ? "📚 تم بدء استيراد ومعالجة الكتاب بنجاح!" : "📚 Textbook manual ingestion queued successfully!");
-        setManualIngestForm({ title: "", title_ar: "", source_url: "", language: "ar", role: "core" });
-        fetchBooks();
-        fetchQueueJobs();
-      } else {
-        triggerToast(data.error || "Ingestion failed to start", true);
-      }
-    } catch (err: any) {
-      triggerToast(err.message, true);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleTerminateJob = async (id: string) => {
@@ -1247,7 +1415,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     }
   };
 
-  const handleControlJob = async (bookId: string, jobId: string, action: "pause" | "resume" | "kill") => {
+  const handleControlJob = async (bookId: string, jobId: string, action: "pause" | "resume" | "stop" | "kill") => {
     try {
       const res = await authedFetch('/api/books/control', {
         method: 'POST',
@@ -1263,6 +1431,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
           msg = isAr ? "⏸️ تم إيقاف المهمة مؤقتاً!" : "⏸️ Ingestion job paused cooperatively!";
         } else if (action === "resume") {
           msg = isAr ? "▶️ تم استئناف المهمة بنجاح!" : "▶️ Ingestion job resumed successfully!";
+        } else if (action === "stop") {
+          msg = isAr ? "⏹️ تم إيقاف المهمة!" : "⏹️ Ingestion job stopped cooperatively!";
         } else {
           msg = isAr ? "🛑 تم إنهاء المهمة بنجاح!" : "🛑 Ingestion job force terminated!";
         }
@@ -1353,6 +1523,64 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
             padding: 1.25rem !important;
           }
         }
+        
+        /* Ingestion Dashboard Custom Animations & Style overrides */
+        @keyframes shimmer-slide {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        @keyframes pulse-active-step {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 16px 6px rgba(37, 99, 235, 0.7);
+          }
+        }
+        @keyframes pulse-soft {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.8;
+          }
+        }
+        /* HSL Custom Terminal Scrollbar */
+        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.2);
+        }
+        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 4px;
+        }
+        .big-ingestion-dashboard .terminal-logs-window::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        .subjects-checkbox-grid::-webkit-scrollbar {
+          width: 6px;
+        }
+        .subjects-checkbox-grid::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.05);
+        }
+        .subjects-checkbox-grid::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 4px;
+        }
+        .subjects-checkbox-grid::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.25);
+        }
+        .subject-checkbox-item:hover {
+          background: rgba(37, 99, 235, 0.05) !important;
+          border-color: rgba(37, 99, 235, 0.15) !important;
+        }
       `}</style>
       {/* Toast feedback notifications */}
       {successMsg && <div className="toast success-toast"><FiCheckCircle /> {successMsg}</div>}
@@ -1437,11 +1665,10 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   <div className="form-group">
                     <label>{t("lib_source")}</label>
                     <select
-                      value={libForm.source || "moe"}
+                      value={libForm.source || "openstax"}
                       onChange={e => setLibForm({ ...libForm, source: e.target.value })}
                       className="styled-select"
                     >
-                      <option value="moe">Ministry of Education (moe)</option>
                       <option value="openstax">OpenStax</option>
                       <option value="private">Private Vault</option>
                       <option value="custom">Custom Provider</option>
@@ -1533,7 +1760,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     className="discard-btn"
                     style={{ margin: 0 }}
                     onClick={() => {
-                      setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+                      setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
                       setIsEditingLib(false);
                     }}
                   >
@@ -1627,7 +1854,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   type="button" 
                   className="create-library-btn"
                   onClick={() => {
-                    setLibForm({ _id: "", name: "", name_ar: "", source: "moe", logo: "", scopeSchema: [] });
+                    setLibForm({ _id: "", name: "", name_ar: "", source: "openstax", logo: "", scopeSchema: [] });
                     setIsEditingLib(false);
                     setActiveTab("libraries");
                   }}
@@ -2304,11 +2531,24 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
           <div className="ingestion-console-layout">
             
             {/* DESTINATION SELECTION GATEWAY */}
-            <div className="curriculum-assignment-gateway">
-              <h3>🎯 {t("target_destination")}</h3>
-              <div className="gateway-filters-row">
-                <div className="filter-item">
-                  <label>{t("tab_libraries")}</label>
+            <div className="curriculum-assignment-gateway" style={{
+              background: "rgba(255, 255, 255, 0.4)",
+              backdropFilter: "blur(8px)",
+              border: "1.5px solid var(--card-border)",
+              borderRadius: "12px",
+              padding: "1.5rem",
+              marginBottom: "1.5rem"
+            }}>
+              <h3 style={{ margin: "0 0 1.25rem 0", fontSize: "1.15rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                🎯 {t("target_destination")}
+              </h3>
+              <div className="gateway-filters-row" style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1.25rem"
+              }}>
+                <div className="filter-item" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--foreground)" }}>{t("tab_libraries")}</label>
                   <Dropdown
                     value={selectedLibId}
                     onChange={(val) => setSelectedLibId(val)}
@@ -2316,8 +2556,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     language={isAr ? "ar" : "en"}
                   />
                 </div>
-                <div className="filter-item">
-                  <label>{t("tab_curricula")}</label>
+                <div className="filter-item" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--foreground)" }}>{t("tab_curricula")}</label>
                   <Dropdown
                     value={selectedCurriculumId}
                     onChange={(val) => setSelectedCurriculumId(val)}
@@ -2329,21 +2569,156 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     language={isAr ? "ar" : "en"}
                   />
                 </div>
-                <div className="filter-item">
-                  <label>Target Subject</label>
-                  <Dropdown
-                    value={selectedSubjectId}
-                    onChange={(val) => setSelectedSubjectId(val)}
-                    placeholder={isAr ? "-- اختر المادة --" : "-- Choose Subject --"}
-                    options={[
-                      { value: "", label: "-- Choose Subject --", labelAr: "-- اختر المادة --" },
-                      ...subjects
-                    ]}
-                    language={isAr ? "ar" : "en"}
-                  />
+              </div>
+
+              {/* Multi-Subject Checkboxes Selection Grid */}
+              <div className="filter-item full-width" style={{ marginTop: "1.25rem", borderTop: "1px dashed rgba(0, 0, 0, 0.08)", paddingTop: "1.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                  <label style={{ fontWeight: "700", fontSize: "0.9rem", color: "var(--foreground)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    📚 {isAr ? "المواد المستهدفة للاستيراد (تحديد متعدد)" : "Target Subjects (Multi-Selection)"}
+                  </label>
+                  {subjects.length > 0 && (
+                    <div style={{ display: "flex", gap: "12px" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated: Record<string, boolean> = {};
+                          subjects.forEach(s => {
+                            updated[s._id] = true;
+                          });
+                          setSelectedSubjectIds(updated);
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--primary)",
+                          fontSize: "0.78rem",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "color 0.15s ease"
+                        }}
+                      >
+                        {isAr ? "✓ تحديد الكل" : "✓ Select All"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubjectIds({});
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#64748b",
+                          fontSize: "0.78rem",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "color 0.15s ease"
+                        }}
+                      >
+                        {isAr ? "✗ إلغاء تحديد الكل" : "✗ Deselect All"}
+                      </button>
+                    </div>
+                  )}
                 </div>
+                {subjects.length === 0 ? (
+                  <div className="no-subjects-placeholder" style={{
+                    padding: "1.25rem",
+                    borderRadius: "8px",
+                    border: "1.5px dashed var(--card-border)",
+                    background: "rgba(0, 0, 0, 0.03)",
+                    textAlign: "center",
+                    fontSize: "0.85rem",
+                    color: "#64748b"
+                  }}>
+                    {isAr ? "ℹ️ يرجى اختيار منهج دراسي أولاً لرؤية المواد المعرفة به." : "ℹ️ Please select a Curriculum to display its available subjects."}
+                  </div>
+                ) : (
+                  <div className="subjects-checkbox-grid" style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: "10px",
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                    padding: "0.75rem",
+                    borderRadius: "8px",
+                    border: "1.5px solid var(--card-border)",
+                    background: "rgba(255, 255, 255, 0.35)",
+                    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)"
+                  }}>
+                    {subjects.map(s => {
+                      const isChecked = !!selectedSubjectIds[s._id];
+                      return (
+                        <label
+                          key={s._id}
+                          className="subject-checkbox-item"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            padding: "8px 12px",
+                            borderRadius: "6px",
+                            background: isChecked ? "rgba(37, 99, 235, 0.08)" : "transparent",
+                            border: isChecked ? "1px solid rgba(37, 99, 235, 0.25)" : "1px solid transparent",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            userSelect: "none"
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              setSelectedSubjectIds(prev => ({
+                                ...prev,
+                                [s._id]: e.target.checked
+                              }));
+                            }}
+                            className="styled-checkbox"
+                            style={{ cursor: "pointer" }}
+                          />
+                          <span style={{ fontSize: "0.85rem", fontWeight: isChecked ? "600" : "500", color: "#1e293b", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.1))", fontSize: "1rem" }}>{s.emoji || "📚"}</span>
+                            <span>{isAr ? s.name_ar : s.name}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Non-Blocking Validation Warning Banner */}
+            {(!selectedLibId || !selectedCurriculumId || Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0) && (
+              <div className="ingestion-validation-warning-banner" style={{
+                marginBottom: "1.5rem",
+                padding: "1rem 1.25rem",
+                borderRadius: "10px",
+                backgroundColor: "rgba(245, 158, 11, 0.12)",
+                border: "1.5px solid rgb(245, 158, 11)",
+                color: "rgb(251, 191, 36)",
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                boxShadow: "0 4px 15px rgba(245, 158, 11, 0.12)",
+                animation: "pulse-soft 2.5s infinite"
+              }}>
+                <FiAlertCircle style={{ fontSize: "1.6rem", flexShrink: 0, textShadow: "0 0 8px rgba(245, 158, 11, 0.5)" }} />
+                <div style={{ fontSize: "0.85rem", lineHeight: 1.45 }}>
+                  <strong style={{ display: "block", marginBottom: "3px", textShadow: "0 0 4px rgba(245, 158, 11, 0.2)" }}>
+                    {isAr ? "⚠️ متطلبات التوجيه والمسار معلقة" : "⚠️ Routing Context Incomplete"}
+                  </strong>
+                  <span>
+                    {isAr 
+                      ? `لوحة الاستيراد بانتظار تحديد المسار: يرجى اختيار ${!selectedLibId ? "المكتبة" : ""} ${!selectedLibId && !selectedCurriculumId ? "ثم" : ""} ${!selectedCurriculumId ? "المنهج الدراسي" : ""} ${(!selectedLibId || !selectedCurriculumId) && Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "ثم" : ""} ${Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "مادة دراسية واحدة على الأقل" : ""} في الأعلى لتتمكن من تشغيل قنوات استيراد الكتب.`
+                      : `The Ingestion console is waiting for router context: Please select a ${!selectedLibId ? "Library" : ""} ${!selectedLibId && !selectedCurriculumId ? "-> " : ""}${!selectedCurriculumId ? "Curriculum" : ""} ${(!selectedLibId || !selectedCurriculumId) && Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "-> " : ""}${Object.keys(selectedSubjectIds).filter(k => selectedSubjectIds[k]).length === 0 ? "at least one target Subject" : ""} in the gateway above.`
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="tab-grid grid-2">
               
@@ -2544,15 +2919,19 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                 {/* Crawled Results */}
                 {discoveredBooks.length > 0 && (
                   <div className="discovered-catalog-wrapper">
-                    <div className="catalog-header-checkbox">
+                    <div className="catalog-header-checkbox" style={{ display: "flex", flexDirection: isRoutingComplete ? "row" : "column", alignItems: isRoutingComplete ? "center" : "stretch", gap: "10px" }}>
                       <h3>{t("crawled_results")}</h3>
-                      <button
-                        onClick={handleBulkIngest}
-                        disabled={loading || !selectedCurriculumId || !selectedSubjectId}
-                        className="bulk-ingest-button"
-                      >
-                        {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
-                      </button>
+                      {isRoutingComplete ? (
+                        <button
+                          onClick={handleBulkIngest}
+                          disabled={loading}
+                          className="bulk-ingest-button"
+                        >
+                          {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
+                        </button>
+                      ) : (
+                        renderRoutingChecklist()
+                      )}
                     </div>
                     <div className="discovered-list">
                       {buildDirectoryTree(discoveredBooks).map(node => (
@@ -2635,116 +3014,508 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || !selectedCurriculumId || !selectedSubjectId}
-                    className="primary-submit-btn"
-                  >
-                    <FiLayers /> {t("direct_ingest_btn")}
-                  </button>
+                  {isRoutingComplete ? (
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="primary-submit-btn"
+                    >
+                      <FiLayers /> {t("direct_ingest_btn")}
+                    </button>
+                  ) : (
+                    renderRoutingChecklist()
+                  )}
                 </form>
-
-                {/* Telemetry Queue Dashboard */}
-                <div className="telemetry-dashboard-wrapper">
-                  <div className="dashboard-header">
-                    <h3>{t("telemetry_console")}</h3>
-                    <button onClick={fetchQueueJobs} className="icon-btn-text"><FiRefreshCw /> {t("refresh_jobs")}</button>
-                  </div>
-                  
-                  <div className="queue-jobs-scroller">
-                    {queue.length === 0 ? (
-                      <p className="empty-state-text">{t("queue_empty")}</p>
-                    ) : (
-                      queue.map(job => (
-                        <div key={job.id} className={`telemetry-job-row ${job.status === "processing" ? "active-border" : ""}`}>
-                          <div className="job-meta-header">
-                            <div>
-                              <strong>{job.bookTitle}</strong>
-                              <small>{job.id}</small>
-                            </div>
-                            <span className={`status-pill ${job.status}`}>{job.status}</span>
-                          </div>
-                          {job.status === "processing" && (
-                            <div className="job-progressbar-outer">
-                              <div className="job-progressbar-inner" style={{ width: `${job.progress}%` }} />
-                              <span className="progress-percent">{job.progress}% ({job.processedPages}/{job.totalPages} pgs)</span>
-                            </div>
-                          )}
-                          <div className="job-control-actions" style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-                            {["processing", "queued", "downloading"].includes(job.status) && (
-                              <button
-                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "pause")}
-                                className="control-btn"
-                                style={{
-                                  background: "rgba(245, 158, 11, 0.15)",
-                                  color: "#f59e0b",
-                                  border: "1px solid rgba(245, 158, 11, 0.3)",
-                                  borderRadius: "4px",
-                                  padding: "6px 12px",
-                                  fontSize: "12px",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                ⏸️ {isAr ? "إيقاف مؤقت" : "Pause"}
-                              </button>
-                            )}
-                            {job.status === "paused" && (
-                              <button
-                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "resume")}
-                                className="control-btn"
-                                style={{
-                                  background: "rgba(16, 185, 129, 0.15)",
-                                  color: "#10b981",
-                                  border: "1px solid rgba(16, 185, 129, 0.3)",
-                                  borderRadius: "4px",
-                                  padding: "6px 12px",
-                                  fontSize: "12px",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                ▶️ {isAr ? "استئناف" : "Resume"}
-                              </button>
-                            )}
-                            {["processing", "paused", "queued", "downloading"].includes(job.status) && (
-                              <button
-                                onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "kill")}
-                                className="control-btn"
-                                style={{
-                                  background: "rgba(239, 68, 68, 0.15)",
-                                  color: "#ef4444",
-                                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                                  borderRadius: "4px",
-                                  padding: "6px 12px",
-                                  fontSize: "12px",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                🛑 {isAr ? "إنهاء فوراً" : "Force Kill"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
               </section>
             </div>
+
+            {/* BIG INGESTION DASHBOARD (FULL-WIDTH) */}
+            <section className="big-ingestion-dashboard" style={{
+              marginTop: "2rem",
+              padding: "1.5rem",
+              borderRadius: "12px",
+              background: "rgba(17, 24, 39, 0.75)",
+              border: "1.5px solid var(--card-border)",
+              boxShadow: "0 12px 30px rgba(0, 0, 0, 0.3)",
+              backdropFilter: "blur(12px)",
+              color: "#f8fafc"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: "1rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <FiCpu className="pulse-animation" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "700", tracking: "-0.025em" }}>
+                      {isAr ? "⚡ مركز مراقبة المعالجة والاستيراد" : "⚡ Live Ingestion Telemetry Hub"}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: "0.78rem", opacity: 0.7 }}>
+                      {isAr ? "مراقبة مباشرة لتدفقات الاستيراد، المعالجة، والترميز الموجه لشبكة فاحم المعرفية." : "Real-time tracking of active pipeline stages, neural translation, page-by-page ingestion, and vector embeddings."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchQueueJobs}
+                  className="icon-btn-text"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: "rgba(37, 99, 235, 0.15)",
+                    border: "1px solid rgba(37, 99, 235, 0.3)",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    color: "var(--primary)",
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    fontWeight: "600"
+                  }}
+                >
+                  <FiRefreshCw className={loading ? "spin-animation" : ""} /> {t("refresh_jobs")}
+                </button>
+              </div>
+
+              {queue.length === 0 ? (
+                <div style={{ padding: "3rem 1.5rem", textAlign: "center", color: "#64748b" }}>
+                  <FiActivity style={{ fontSize: "3rem", opacity: 0.15, marginBottom: "1rem" }} />
+                  <p style={{ margin: 0, fontSize: "0.9rem", fontWeight: "500" }}>{t("queue_empty")}</p>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "0.8rem", opacity: 0.7 }}>
+                    {isAr ? "ابدأ استيراداً جماعياً أو فردياً لتنشيط لوحة المراقبة." : "Trigger manual or crawled ingestion assignments to wake up telemetry streams."}
+                  </p>
+                </div>
+              ) : (
+                <div className="active-pipeline-monitor" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  {queue.map(job => {
+                    const isProcessing = job.status === "processing" || job.status === "downloading" || job.status === "queued";
+                    const isCompleted = job.status === "completed";
+                    const isFailed = job.status === "failed";
+                    const isPaused = job.status === "paused";
+
+                    const displayProgress = maxProgressByJob[job.id] ?? job.progress;
+
+                    const telemetryMapping: Record<string, { stage: string; agent: string; tool: string }> = {
+                      fetch: { stage: "Source Retrieval", agent: "Download Crawler Agent", tool: "file_crawler" },
+                      struct: { stage: "Document Structuring", agent: "Layout Parser Agent", tool: "pdf_layout_extractor" },
+                      translate: { stage: "Neural Translation", agent: "Bi-directional Translator", tool: "llm_translator" },
+                      assemble: { stage: "Content Assembly", agent: "Metadata Aggregator", tool: "meta_stitcher" },
+                      embed: { stage: "Vector Embedding", agent: "Neural Indexer", tool: "pinecone_vectorizer" }
+                    };
+
+                    const telemetryMappingAr: Record<string, { stage: string; agent: string; tool: string }> = {
+                      fetch: { stage: "جلب المصدر", agent: "وكيل الزحف والتحميل", tool: "file_crawler" },
+                      struct: { stage: "هيكلة المستند", agent: "وكيل تحليل الهيكل والصفحات", tool: "pdf_layout_extractor" },
+                      translate: { stage: "الترجمة العصبية", agent: "وكيل الترجمة الذكي", tool: "llm_translator" },
+                      assemble: { stage: "تجميع البيانات", agent: "وكيل تجميع البيانات التعريفية", tool: "meta_stitcher" },
+                      embed: { stage: "الترميز المتجهي", agent: "وكيل الفهرسة العصبية", tool: "pinecone_vectorizer" }
+                    };
+
+                    // Dynamic ETA Calculation
+                    let etaText = isAr ? "غير محدد" : "Calculating...";
+                    if (isProcessing && job.totalPages > 0 && job.processedPages > 0) {
+                      const remainingPages = job.totalPages - job.processedPages;
+                      if (remainingPages > 0) {
+                        const estimatedSeconds = remainingPages * 2.5; // Average 2.5s per page (neural parsing + vectoring)
+                        const mins = Math.floor(estimatedSeconds / 60);
+                        const secs = Math.floor(estimatedSeconds % 60);
+                        etaText = mins > 0 
+                          ? `${mins}m ${secs}s` 
+                          : `${secs}s`;
+                      } else {
+                        etaText = isAr ? "جاري الإنهاء..." : "Wrapping up...";
+                      }
+                    } else if (isCompleted) {
+                      etaText = "0s";
+                    }
+
+                    // Stepper configuration based on stages
+                    const stepKeys = ["fetch", "struct", "translate", "assemble", "embed"];
+                    const stepLabels: Record<string, { en: string; ar: string; desc: string }> = {
+                      fetch: { en: "Fetch Source", ar: "جلب المصدر", desc: "Downloading & isolating file" },
+                      struct: { en: "Structure", ar: "هيكلة الفصول", desc: "Chunking & parsing layout" },
+                      translate: { en: "Translate", ar: "الترجمة العصبية", desc: "Translating EN/FR content" },
+                      assemble: { en: "Assemble", ar: "تجميع البيانات", desc: "Stitching structured metadata" },
+                      embed: { en: "Embed Vector", ar: "الترميز المتجهي", desc: "Indexing into Pinecone database" }
+                    };
+
+                    const currentStepIndex = stepKeys.indexOf(job.current_step || "fetch");
+
+                    return (
+                      <div key={job.id} className={`pipeline-job-card ${job.status}`} style={{
+                        padding: "1.25rem",
+                        borderRadius: "10px",
+                        background: "rgba(15, 23, 42, 0.4)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)"
+                      }}>
+                        {/* Job Meta Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "1rem" }}>
+                          <div>
+                            <span style={{
+                              fontSize: "0.7rem",
+                              fontWeight: "700",
+                              letterSpacing: "0.05em",
+                              textTransform: "uppercase",
+                              color: "var(--primary)",
+                              background: "rgba(37, 99, 235, 0.15)",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              marginRight: "8px",
+                              display: "inline-block"
+                            }} className="monospace-id">
+                              {job.id}
+                            </span>
+                            <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: "500" }}>
+                              {job.subjectName ? `🎯 ${job.subjectName}` : ""}
+                            </span>
+                            <h4 style={{ margin: "4px 0 0 0", fontSize: "1.05rem", fontWeight: "600", color: "#f8fafc" }}>
+                              {isAr ? (job.bookTitleAr || job.bookTitle) : job.bookTitle}
+                            </h4>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ textAlign: "right" }}>
+                              <span style={{ fontSize: "0.7rem", opacity: 0.6, textTransform: "uppercase", display: "block" }}>
+                                {isAr ? "الوقت المتبقي المقدر (ETA)" : "Estimated ETA"}
+                              </span>
+                              <strong style={{ fontSize: "0.95rem", color: isProcessing ? "var(--primary)" : "#64748b", textShadow: isProcessing ? "0 0 8px rgba(37,99,235,0.4)" : "none" }}>
+                                {etaText}
+                              </strong>
+                            </div>
+                            <span className={`status-pill ${job.status}`} style={{
+                              fontSize: "0.75rem",
+                              padding: "4px 10px",
+                              borderRadius: "12px",
+                              fontWeight: "700",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em"
+                            }}>
+                              {job.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Stage Stepper Progress */}
+                        <div className="horizontal-stepper" style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          position: "relative",
+                          margin: "1.5rem 0",
+                          padding: "0 10px"
+                        }}>
+                          {/* Background Connector Bar */}
+                          <div style={{
+                            position: "absolute",
+                            top: "16px",
+                            left: "5%",
+                            right: "5%",
+                            height: "3px",
+                            background: "rgba(255,255,255,0.1)",
+                            zIndex: 1
+                          }} />
+                          
+                          {/* Active Connector Progress */}
+                          {currentStepIndex >= 0 && (
+                            <div style={{
+                              position: "absolute",
+                              top: "16px",
+                              left: "5%",
+                              width: `${(currentStepIndex / (stepKeys.length - 1)) * 90}%`,
+                              height: "3px",
+                              background: "linear-gradient(90deg, var(--primary) 0%, #10b981 100%)",
+                              boxShadow: "0 0 8px rgba(16, 185, 129, 0.5)",
+                              zIndex: 1,
+                              transition: "width 0.4s ease"
+                            }} />
+                          )}
+
+                          {stepKeys.map((stepKey, idx) => {
+                            const isStepCompleted = idx < currentStepIndex || isCompleted;
+                            const isStepActive = idx === currentStepIndex && isProcessing;
+                            const isStepPending = idx > currentStepIndex && !isCompleted;
+                            
+                            let bubbleColor = "rgba(255,255,255,0.1)";
+                            let borderStyle = "1.5px solid rgba(255,255,255,0.2)";
+                            let textColor = "#64748b";
+
+                            if (isStepCompleted) {
+                              bubbleColor = "#10b981";
+                              borderStyle = "1.5px solid #10b981";
+                              textColor = "#10b981";
+                            } else if (isStepActive) {
+                              bubbleColor = "var(--primary)";
+                              borderStyle = "1.5px solid var(--primary)";
+                              textColor = "var(--primary)";
+                            }
+
+                            return (
+                              <div key={stepKey} style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                width: "16%",
+                                zIndex: 2,
+                                textAlign: "center"
+                              }}>
+                                <div style={{
+                                  width: "32px",
+                                  height: "32px",
+                                  borderRadius: "50%",
+                                  backgroundColor: isStepCompleted ? "#10b981" : (isStepActive ? "var(--primary)" : "rgba(30, 41, 59, 0.8)"),
+                                  border: borderStyle,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "0.85rem",
+                                  fontWeight: "700",
+                                  color: isStepCompleted || isStepActive ? "#ffffff" : "#64748b",
+                                  boxShadow: isStepActive ? "0 0 12px var(--primary)" : (isStepCompleted ? "0 0 8px rgba(16, 185, 129, 0.4)" : "none"),
+                                  animation: isStepActive ? "pulse-active-step 1.5s infinite" : "none"
+                                }}>
+                                  {isStepCompleted ? <FiCheckCircle size={14} /> : (idx + 1)}
+                                </div>
+                                <span style={{
+                                  fontSize: "0.8rem",
+                                  fontWeight: isStepActive || isStepCompleted ? "600" : "500",
+                                  color: textColor,
+                                  marginTop: "6px"
+                                }}>
+                                  {isAr ? stepLabels[stepKey].ar : stepLabels[stepKey].en}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Monotonic Progress Bar with Shimmer */}
+                        <div style={{ marginTop: "1rem" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", color: "#94a3b8", marginBottom: "4px" }}>
+                            <span>
+                              {isAr ? "معالجة الصفحات بالتتابع" : "Monotonic Progress"}
+                            </span>
+                            <span style={{ fontWeight: "700" }}>
+                              {job.processedPages} / {job.totalPages} {isAr ? "صفحة" : "pages"} ({displayProgress}%)
+                            </span>
+                          </div>
+                          <div className="job-progressbar-outer" style={{
+                            height: "10px",
+                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                            borderRadius: "6px",
+                            overflow: "hidden",
+                            position: "relative"
+                          }}>
+                            <div className="job-progressbar-inner" style={{
+                              width: `${displayProgress}%`,
+                              height: "100%",
+                              borderRadius: "6px",
+                              background: "linear-gradient(90deg, var(--primary) 0%, #3b82f6 50%, #10b981 100%)",
+                              position: "relative",
+                              transition: "width 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                            }}>
+                              <div className="scanning-shimmer" style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)",
+                                transform: "translateX(-100%)",
+                                animation: "shimmer-slide 1.8s infinite"
+                              }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* High-Fidelity Telemetry Trace Breadcrumb */}
+                        {(() => {
+                          const currentStep = job.current_step || "fetch";
+                          const map = isAr ? telemetryMappingAr[currentStep] || telemetryMappingAr.fetch : telemetryMapping[currentStep] || telemetryMapping.fetch;
+                          const arrow = isAr ? " ← " : " → ";
+                          return (
+                            <div className="telemetry-trace-breadcrumb" style={{
+                              display: "flex",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "8px",
+                              marginTop: "1.25rem",
+                              padding: "10px 14px",
+                              background: "rgba(255, 255, 255, 0.03)",
+                              borderRadius: "8px",
+                              border: "1px solid rgba(255, 255, 255, 0.05)",
+                              fontSize: "0.78rem"
+                            }}>
+                              <span style={{ color: "#94a3b8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                {isAr ? "مسار التتبع الحي:" : "Telemetry Trace:"}
+                              </span>
+                              <span style={{ color: "var(--primary)", fontWeight: "600", background: "rgba(37, 99, 235, 0.12)", padding: "3px 8px", borderRadius: "4px" }}>
+                                {map.stage}
+                              </span>
+                              <span style={{ color: "#475569" }}>{arrow}</span>
+                              <span style={{ color: "#10b981", fontWeight: "600", background: "rgba(16, 185, 129, 0.12)", padding: "3px 8px", borderRadius: "4px" }}>
+                                🤖 {map.agent}
+                              </span>
+                              <span style={{ color: "#475569" }}>{arrow}</span>
+                              <span style={{ color: "#a78bfa", fontWeight: "600", background: "rgba(139, 92, 246, 0.12)", padding: "3px 8px", borderRadius: "4px" }}>
+                                🛠️ {map.tool}
+                              </span>
+                              <span style={{ color: "#475569" }}>{arrow}</span>
+                              <span style={{ color: "#cbd5e1", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={isAr ? (job.bookTitleAr || job.bookTitle) : job.bookTitle}>
+                                📖 {isAr ? (job.bookTitleAr || job.bookTitle) : job.bookTitle}
+                              </span>
+                              <span style={{ color: "#475569" }}>{arrow}</span>
+                              <span style={{ color: "#f43f5e", fontWeight: "700", background: "rgba(244, 63, 94, 0.12)", padding: "3px 8px", borderRadius: "4px" }}>
+                                📄 {job.processedPages} / {job.totalPages} pgs
+                              </span>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Control Triggers Row */}
+                        <div style={{ display: "flex", gap: "10px", marginTop: "1.25rem", borderTop: "1px dashed rgba(255,255,255,0.08)", paddingTop: "0.75rem" }}>
+                          {isProcessing && (
+                            <button
+                              type="button"
+                              onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "pause")}
+                              className="control-btn"
+                              style={{
+                                background: "rgba(245, 158, 11, 0.12)",
+                                color: "#fbbf24",
+                                border: "1px solid rgba(245, 158, 11, 0.25)",
+                                borderRadius: "6px",
+                                padding: "6px 14px",
+                                fontSize: "0.8rem",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              <FiPause /> {isAr ? "إيقاف مؤقت" : "Pause"}
+                            </button>
+                          )}
+                          {isPaused && (
+                            <button
+                              type="button"
+                              onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "resume")}
+                              className="control-btn"
+                              style={{
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#34d399",
+                                border: "1px solid rgba(16, 185, 129, 0.25)",
+                                borderRadius: "6px",
+                                padding: "6px 14px",
+                                fontSize: "0.8rem",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              <FiPlay /> {isAr ? "استئناف" : "Resume"}
+                            </button>
+                          )}
+                          {isProcessing && (
+                            <button
+                              type="button"
+                              onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "stop")}
+                              className="control-btn"
+                              style={{
+                                background: "rgba(239, 68, 68, 0.12)",
+                                color: "#f87171",
+                                border: "1px solid rgba(239, 68, 68, 0.25)",
+                                borderRadius: "6px",
+                                padding: "6px 14px",
+                                fontSize: "0.8rem",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              <FiSquare /> {isAr ? "إيقاف" : "Stop"}
+                            </button>
+                          )}
+                          {(isProcessing || isPaused || isFailed) && (
+                            <button
+                              type="button"
+                              onClick={() => handleControlJob(job.id.replace("job_", ""), job.id, "kill")}
+                              className="control-btn"
+                              style={{
+                                background: "rgba(185, 28, 28, 0.18)",
+                                color: "#fca5a5",
+                                border: "1px solid rgba(220, 38, 38, 0.3)",
+                                borderRadius: "6px",
+                                padding: "6px 14px",
+                                fontSize: "0.8rem",
+                                fontWeight: "700",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              <FiSlash /> {isAr ? "إنهاء فوراً (Kill)" : "Kill Job"}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Live Step-by-Step logs nested in job */}
+                        {job.logs && job.logs.length > 0 && (
+                          <div style={{ marginTop: "1rem" }}>
+                            <label style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", textTransform: "uppercase", marginBottom: "6px" }}>
+                              <FiTerminal /> {isAr ? "سجل التتبع الخاص بالمهمة" : "Active Ingestion Trace Logs"}
+                            </label>
+                            <div className="terminal-logs-window" style={{
+                              maxHeight: "150px",
+                              overflowY: "auto",
+                              background: "rgba(0, 0, 0, 0.35)",
+                              border: "1px solid rgba(255, 255, 255, 0.05)",
+                              borderRadius: "6px",
+                              padding: "0.75rem",
+                              fontSize: "0.75rem",
+                              fontFamily: "var(--font-mono, monospace)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "4px"
+                            }}>
+                              {job.logs.map((logLine, lIdx) => {
+                                // Colorize logs based on keywords
+                                let lineStyle: React.CSSProperties = { color: "#e2e8f0" };
+                                const lowerLine = logLine.toLowerCase();
+                                if (lowerLine.includes("error") || lowerLine.includes("fail") || lowerLine.includes("exception")) {
+                                  lineStyle = { color: "#f87171", fontWeight: "600", borderLeft: "3px solid #ef4444", paddingLeft: "6px" };
+                                } else if (lowerLine.includes("success") || lowerLine.includes("completed") || lowerLine.includes("done")) {
+                                  lineStyle = { color: "#34d399", fontWeight: "600", borderLeft: "3px solid #10b981", paddingLeft: "6px" };
+                                } else if (lowerLine.includes("fetch") || lowerLine.includes("download")) {
+                                  lineStyle = { color: "var(--primary)", borderLeft: "3px solid #3b82f6", paddingLeft: "6px" };
+                                } else if (lowerLine.includes("translate")) {
+                                  lineStyle = { color: "#fbbf24", borderLeft: "3px solid #f59e0b", paddingLeft: "6px" };
+                                } else if (lowerLine.includes("embed") || lowerLine.includes("vector")) {
+                                  lineStyle = { color: "#a78bfa", borderLeft: "3px solid #8b5cf6", paddingLeft: "6px" };
+                                }
+                                return (
+                                  <div key={lIdx} style={{
+                                    ...lineStyle,
+                                    lineHeight: 1.4,
+                                    whiteSpace: "pre-wrap",
+                                    wordBreak: "break-all"
+                                  }}>
+                                    {logLine}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </main>
