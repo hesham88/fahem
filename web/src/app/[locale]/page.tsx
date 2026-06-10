@@ -39,6 +39,11 @@ import {
 } from "react-icons/fi";
 
 export default function LandingPage() {
+  const cleanBullet = (txt: string) => {
+    if (!txt) return "";
+    return txt.replace(/^[🚀💬🎯🔒✨⭐💡🔥📍👤✔️⚡️\s]+/u, "").trim();
+  };
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -456,7 +461,8 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1rem 1.5rem", maxWidth: "1200px", margin: "0 auto", widt        <div 
+      <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1.5rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
+        <div 
           className="glass-card" 
           style={{ 
             background: isDarkMode ? "rgba(11, 17, 32, 0.65)" : "rgba(255, 255, 255, 0.65)", 
@@ -496,25 +502,48 @@ export default function LandingPage() {
                 {t("hero_subtitle")}
               </p>
 
-              {/* Organized bullet points with perfect alignment */}
-              <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "0.85rem", width: "100%", padding: "1.25rem 0", margin: "0.25rem 0", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)" }}>
-                <div className="feature-bullet-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", fontSize: "0.95rem", color: "var(--foreground)", fontWeight: 500, lineHeight: "1.5" }}>
-                  <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--primary)", marginTop: "0.15rem" }}>
+              {/* Organized bullet points with perfect alignment as beautiful glass list-panels */}
+              <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", padding: "1.5rem 0", margin: "0.25rem 0", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)" }}>
+                <div className="premium-hero-bullet-item">
+                  <span className="feature-bullet-icon" style={{ 
+                    display: "flex", 
+                    color: "var(--primary)", 
+                    background: "rgba(37, 99, 235, 0.1)", 
+                    padding: "0.55rem", 
+                    borderRadius: "10px",
+                    flexShrink: 0 
+                  }}>
                     <FiLayers style={{ fontSize: "1.1rem" }} />
                   </span>
-                  <span>{t("bullet_1")}</span>
+                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_1"))}</span>
                 </div>
-                <div className="feature-bullet-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", fontSize: "0.95rem", color: "var(--foreground)", fontWeight: 500, lineHeight: "1.5" }}>
-                  <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--secondary)", marginTop: "0.15rem" }}>
+
+                <div className="premium-hero-bullet-item">
+                  <span className="feature-bullet-icon" style={{ 
+                    display: "flex", 
+                    color: "var(--secondary)", 
+                    background: "rgba(249, 115, 22, 0.1)", 
+                    padding: "0.55rem", 
+                    borderRadius: "10px",
+                    flexShrink: 0 
+                  }}>
                     <FiActivity style={{ fontSize: "1.1rem" }} />
                   </span>
-                  <span>{t("bullet_2")}</span>
+                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_2"))}</span>
                 </div>
-                <div className="feature-bullet-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", fontSize: "0.95rem", color: "var(--foreground)", fontWeight: 500, lineHeight: "1.5" }}>
-                  <span className="feature-bullet-icon" style={{ display: "flex", color: "var(--accent-green)", marginTop: "0.15rem" }}>
+
+                <div className="premium-hero-bullet-item">
+                  <span className="feature-bullet-icon" style={{ 
+                    display: "flex", 
+                    color: "var(--accent-green)", 
+                    background: "rgba(13, 148, 136, 0.1)", 
+                    padding: "0.55rem", 
+                    borderRadius: "10px",
+                    flexShrink: 0 
+                  }}>
                     <FiShield style={{ fontSize: "1.1rem" }} />
                   </span>
-                  <span>{t("bullet_3")}</span>
+                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_3"))}</span>
                 </div>
               </div>
 
@@ -532,27 +561,9 @@ export default function LandingPage() {
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={signingIn || bypassActive}
-                  className="google-btn"
+                  className="premium-google-btn"
                   id="google-signin-button"
                   type="button"
-                  style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    gap: "0.75rem", 
-                    background: "var(--card-bg)", 
-                    border: "1px solid var(--card-border)", 
-                    borderRadius: "30px", 
-                    padding: "0.75rem 1.75rem", 
-                    fontSize: "0.95rem", 
-                    fontWeight: 600, 
-                    cursor: "pointer", 
-                    boxShadow: "var(--shadow-sm)", 
-                    transition: "all 0.2s ease", 
-                    width: "100%", 
-                    maxWidth: "340px",
-                    opacity: (signingIn || bypassActive) ? 0.6 : 1 
-                  }}
                 >
                   <svg className="google-icon-svg" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -560,7 +571,7 @@ export default function LandingPage() {
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
-                  <span style={{ color: "var(--foreground)" }}>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
+                  <span>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
                 </button>
               </div>
             </div>
@@ -772,226 +783,413 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-      </main>zm0 9.9H6V6.31l6-2.25v7.84z" fill="#4285F4" />
-                  <path d="M12 11.9h6V6.31l-6-2.25v7.84z" fill="#EA4335" opacity="0.9" />
-                </svg>
-                <span className="tech-logo-text">Cloud Armor</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
 
-      {/* Swarm Intelligence Section */}
-      <section id="swarm" style={{ zIndex: 1, padding: "4rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%", scrollMarginTop: "100px" }}>
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
-            {t("section_swarm_title")}
-          </h2>
-          <p style={{ fontSize: "1.05rem", color: "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
-            {t("section_swarm_desc")}
-          </p>
-        </div>
+      {/* Shared section wrapper styles mapping DonationCard's layout for full-width dark backdrop matching */}
+      {(() => {
+        const sectionStyle = {
+          zIndex: 1,
+          padding: "5rem 1.5rem",
+          background: isDarkMode ? "var(--card-bg)" : "rgba(255, 255, 255, 0.35)",
+          backdropFilter: "blur(16px)",
+          borderTop: "1px solid var(--card-border)",
+          borderBottom: "1px solid var(--card-border)",
+          position: "relative" as const,
+          overflow: "hidden" as const,
+          width: "100%",
+          scrollMarginTop: "100px"
+        };
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.5rem" }}>
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
-              <div style={{ background: "rgba(37,99,235,0.1)", color: "var(--primary)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
-                <FiCpu style={{ fontSize: "1.4rem" }} />
+        return (
+          <>
+            {/* Swarm Intelligence Section */}
+            <section id="swarm" style={sectionStyle}>
+              {/* Decorative Blur Spheres */}
+              <div style={{ position: "absolute", top: "10%", left: "-10%", width: "300px", height: "300px", background: "rgba(37, 99, 235, 0.05)", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "250px", height: "250px", background: "rgba(249, 115, 22, 0.03)", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none" }} />
+
+              <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 2 }}>
+                <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+                  <h2 style={{ fontSize: "2.25rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
+                    {t("section_swarm_title")}
+                  </h2>
+                  <p style={{ fontSize: "1.05rem", color: isDarkMode ? "#cbd5e1" : "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
+                    {t("section_swarm_desc")}
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.5rem" }}>
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
+                      <div style={{ background: "rgba(37,99,235,0.1)", color: "var(--primary)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
+                        <FiCpu style={{ fontSize: "1.4rem" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("swarm_agent_coordinator")}</h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("swarm_agent_coordinator_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
+                      <div style={{ background: "rgba(249,115,22,0.1)", color: "var(--secondary)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
+                        <FiActivity style={{ fontSize: "1.4rem" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("swarm_agent_companion")}</h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("swarm_agent_companion_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
+                      <div style={{ background: "rgba(13,148,136,0.1)", color: "var(--accent-green)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
+                        <FiBookOpen style={{ fontSize: "1.4rem" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("swarm_agent_quiz")}</h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("swarm_agent_quiz_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
+                      <div style={{ background: "rgba(251,191,36,0.1)", color: "var(--accent-yellow)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
+                        <FiShield style={{ fontSize: "1.4rem" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("swarm_agent_admin")}</h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("swarm_agent_admin_desc")}</p>
+                  </div>
+                </div>
               </div>
-              <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("swarm_agent_coordinator")}</h3>
-            </div>
-            <p style={{ fontSize: "0.92rem", color: "#475569", lineHeight: 1.5 }}>{t("swarm_agent_coordinator_desc")}</p>
-          </div>
+            </section>
 
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
-              <div style={{ background: "rgba(249,115,22,0.1)", color: "var(--secondary)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
-                <FiActivity style={{ fontSize: "1.4rem" }} />
+            {/* Non-intrusive AdSense Placeholder container to prevent CLS */}
+            <AdSensePlaceholder type="leaderboard" />
+
+            {/* System Features Section */}
+            <section id="features" style={sectionStyle}>
+              {/* Decorative Blur Spheres */}
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "400px", height: "400px", background: "rgba(13, 148, 136, 0.04)", borderRadius: "50%", filter: "blur(100px)", pointerEvents: "none" }} />
+
+              <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 2 }}>
+                <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+                  <h2 style={{ fontSize: "2.25rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
+                    {t("section_features_title")}
+                  </h2>
+                  <p style={{ fontSize: "1.05rem", color: isDarkMode ? "#cbd5e1" : "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
+                    {t("section_features_desc")}
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "2rem" }}>
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(37,99,235,0.08)", color: "var(--primary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiBookOpen style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_library")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_library_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(249,115,22,0.08)", color: "var(--secondary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiLayers style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_subjects")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_subjects_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(13,148,136,0.08)", color: "var(--accent-green)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiActivity style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_practice")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_practice_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(251,191,36,0.08)", color: "var(--accent-yellow)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiCpu style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_plan")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_plan_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(37,99,235,0.08)", color: "var(--primary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiExternalLink style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_timetable")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_timetable_desc")}</p>
+                    </div>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
+                    <div style={{ background: "rgba(249,115,22,0.08)", color: "var(--secondary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FiShield style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("feature_zatona")}</h4>
+                      <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_zatona_desc")}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("swarm_agent_companion")}</h3>
-            </div>
-            <p style={{ fontSize: "0.92rem", color: "#475569", lineHeight: 1.5 }}>{t("swarm_agent_companion_desc")}</p>
-          </div>
+            </section>
 
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
-              <div style={{ background: "rgba(13,148,136,0.1)", color: "var(--accent-green)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
-                <FiBookOpen style={{ fontSize: "1.4rem" }} />
+            {/* Why Choose Fahem Section */}
+            <section id="why-fahem" style={sectionStyle}>
+              {/* Decorative Blur Spheres */}
+              <div style={{ position: "absolute", top: "-10%", right: "-10%", width: "300px", height: "300px", background: "rgba(37, 99, 235, 0.04)", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", bottom: "10%", left: "-10%", width: "250px", height: "250px", background: "rgba(249, 115, 22, 0.03)", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none" }} />
+
+              <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 2 }}>
+                <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+                  <h2 style={{ fontSize: "2.25rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
+                    {t("section_why_fahem_title")}
+                  </h2>
+                  <p style={{ fontSize: "1.05rem", color: isDarkMode ? "#cbd5e1" : "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
+                    {t("section_why_fahem_desc")}
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.5rem" }}>
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
+                      <FiGlobe style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_personalized_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_personalized_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--secondary), var(--accent-orange))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(249,115,22,0.15)" }}>
+                      <FiLayers style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_bilingual_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_bilingual_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--primary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(13,148,136,0.15)" }}>
+                      <FiShield style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_secure_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_secure_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--primary), var(--accent-green))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
+                      <FiCpu style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_intelligent_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_intelligent_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--accent-orange), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(249,115,22,0.15)" }}>
+                      <FiActivity style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_clt_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_clt_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--accent-orange))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(13,148,136,0.15)" }}>
+                      <FiBookOpen style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_heutagogy_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_heutagogy_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(16,107,163,0.15)" }}>
+                      <FiShield style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_security_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_security_desc")}</p>
+                  </div>
+
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ background: "linear-gradient(135deg, var(--accent-orange), var(--primary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
+                      <FiCpu style={{ fontSize: "1.3rem" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>{t("why_dag_title")}</h4>
+                    <p style={{ fontSize: "0.9rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_dag_desc")}</p>
+                  </div>
+                </div>
               </div>
-              <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("swarm_agent_quiz")}</h3>
-            </div>
-            <p style={{ fontSize: "0.92rem", color: "#475569", lineHeight: 1.5 }}>{t("swarm_agent_quiz_desc")}</p>
-          </div>
+            </section>
 
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1rem", borderRadius: "var(--border-radius-md)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.5rem" }}>
-              <div style={{ background: "rgba(251,191,36,0.1)", color: "var(--accent-yellow)", padding: "0.5rem", borderRadius: "10px", display: "flex" }}>
-                <FiShield style={{ fontSize: "1.4rem" }} />
+            {/* Leading Tech Integrations & Stack Section */}
+            <section id="tech-stack" style={sectionStyle}>
+              {/* Decorative Blur Spheres */}
+              <div style={{ position: "absolute", top: "20%", left: "-10%", width: "350px", height: "350px", background: "rgba(59, 130, 246, 0.05)", borderRadius: "50%", filter: "blur(90px)", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "300px", height: "300px", background: "rgba(249, 115, 22, 0.04)", borderRadius: "50%", filter: "blur(90px)", pointerEvents: "none" }} />
+
+              <div style={{ maxWidth: "1200px", margin: "0 auto", position: "relative", zIndex: 2 }}>
+                <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+                  <h2 style={{ fontSize: "2.25rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
+                    {language === "ar" ? "تكامل التقنيات والشركاء الرائدين" : "Leading Tech Integrations & Stack"}
+                  </h2>
+                  <p style={{ fontSize: "1.05rem", color: isDarkMode ? "#cbd5e1" : "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
+                    {language === "ar" 
+                      ? "بُنيت منصة فاهم بالاعتماد على بنية تحتية سحابية قوية ومؤمنة بالكامل بالتعاون مع أفضل مزودي التقنية سحابياً."
+                      : "Fahem is built on top of a highly resilient, enterprise-grade cloud architecture integrated with world-leading technology partners."}
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
+                  
+                  {/* Google Gemini Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "تحليل متقدم للمناهج الدراسية مع فهم سياقي فائق للصور والنصوص والكتب التفاعلية."
+                        : "Advanced natural language reasoning and contextual multi-modal textbook analysis."}
+                    </p>
+                  </div>
+
+                  {/* Google ADK 2.0 Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(249, 115, 22, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <img src="/brand/adk.png" alt="Google ADK" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "جوجل ADK 2.0" : "Google ADK 2.0"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "توليف صوتي فائق الدقة ومزامنة فورية للحديث الصوتي الطبيعي للمعلمين لتفادي استخدام الردود الصامتة."
+                        : "Advanced audio speech synthesis and local hardware coordination for natural voice tutoring."}
+                    </p>
+                  </div>
+
+                  {/* Antigravity Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(13, 148, 136, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <img src="/brand/antigravity.png" alt="Antigravity" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "أنتي-جرافيتي CLI" : "Antigravity CLI"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "عميل التطوير الذاتي للأكواد البرمجية البرمجية، تشغيل لوحة التحكم، وتأمين بيئة الـ runtime البرمجية."
+                        : "Autonomous developer execution agent, dashboard control console, and secure prompt runtime environments."}
+                    </p>
+                  </div>
+
+                  {/* Firebase Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <img src="/brand/firebase.png" alt="Firebase" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "جوجل فيربيز" : "Google Firebase"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "إدارة التحقق من الهوية الشخصية للمستخدمين وتأمين الجلسات واستضافة التطبيق على خوادم فائقة السرعة."
+                        : "Secure global database synchronization, cloud hosting, and robust user session authentication."}
+                    </p>
+                  </div>
+
+                  {/* Next.js Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(15, 23, 42, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <span style={{ fontSize: "1.1rem", fontWeight: 900, fontFamily: "var(--font-display)", color: "var(--foreground)" }}>N</span>
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "نيكست جي إس" : "Next.js 14"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "بناء واجهات مستخدم مذهلة، معالجة فورية للملفات على الخادم، وتهيئة مثالية لمحركات البحث."
+                        : "High-performance server-side rendering, seamless client-side routing, and absolute SEO indexing optimization."}
+                    </p>
+                  </div>
+
+                  {/* Google Maps Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <span style={{ color: "#10b981", display: "flex" }}><FiGlobe style={{ fontSize: "1.2rem" }} /></span>
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "خرائط جوجل" : "Google Maps"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "توفير خدمات التوجيه الجغرافي وتحديد مواقع المدارس القريبة ومراكز المساعدة وتوفير سياق إقليمي ممتاز."
+                        : "Geospatial routing and localized visual school directories for easy regional discovery."}
+                    </p>
+                  </div>
+
+                  {/* MongoDB Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <img src="/brand/mongodb.png" alt="MongoDB Atlas" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "مونجو دي بي أطلس" : "MongoDB Atlas"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "قاعدة بيانات سحابية موزعة للبحث الدلالي الفوري بالمؤشرات المتجهة (Vector Indexes) واسترجاع الدروس ذكياً."
+                        : "Distributed cloud database, vectors index search, and semantic lesson retrieval via custom MCP servers."}
+                    </p>
+                  </div>
+
+                  {/* Cloud Armor Card */}
+                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                      <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                        <span style={{ color: "#3b82f6", display: "flex" }}><FiShield style={{ fontSize: "1.2rem" }} /></span>
+                      </div>
+                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                        {language === "ar" ? "جوجل كلاود آرمور" : "Google Cloud Armor"}
+                      </h3>
+                    </div>
+                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                      {language === "ar" 
+                        ? "حماية متقدمة للمنصة ضد هجمات حجب الخدمة ومراقبة الطلبات الضارة لضمان أمان تام للطلاب والمدرسين."
+                        : "Enterprise DDOS protection, secure API shields, and intelligent threat defense to preserve platform integrity."}
+                    </p>
+                  </div>
+
+                </div>
               </div>
-              <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("swarm_agent_admin")}</h3>
-            </div>
-            <p style={{ fontSize: "0.92rem", color: "#475569", lineHeight: 1.5 }}>{t("swarm_agent_admin_desc")}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Non-intrusive AdSense Placeholder container to prevent CLS */}
-      <AdSensePlaceholder type="leaderboard" />
-
-      {/* System Features Section */}
-      <section id="features" style={{ zIndex: 1, padding: "4rem 1.5rem", background: isDarkMode ? "rgba(17, 24, 39, 0.3)" : "rgba(255, 255, 255, 0.3)", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)", width: "100%", scrollMarginTop: "100px" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-            <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
-              {t("section_features_title")}
-            </h2>
-            <p style={{ fontSize: "1.05rem", color: "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
-              {t("section_features_desc")}
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "2rem" }}>
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(37,99,235,0.08)", color: "var(--primary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiBookOpen style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_library")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_library_desc")}</p>
-              </div>
-            </div>
-
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(249,115,22,0.08)", color: "var(--secondary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiLayers style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_subjects")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_subjects_desc")}</p>
-              </div>
-            </div>
-
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(13,148,136,0.08)", color: "var(--accent-green)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiActivity style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_practice")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_practice_desc")}</p>
-              </div>
-            </div>
-
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(251,191,36,0.08)", color: "var(--accent-yellow)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiCpu style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_plan")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_plan_desc")}</p>
-              </div>
-            </div>
-
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(37,99,235,0.08)", color: "var(--primary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiExternalLink style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_timetable")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_timetable_desc")}</p>
-              </div>
-            </div>
-
-            <div className="panel-card" style={{ display: "flex", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "1.5rem" }}>
-              <div style={{ background: "rgba(249,115,22,0.08)", color: "var(--secondary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FiShield style={{ fontSize: "1.3rem" }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{t("feature_zatona")}</h4>
-                <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("feature_zatona_desc")}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Choose Fahem Section */}
-      <section id="why-fahem" style={{ zIndex: 1, padding: "4rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%", scrollMarginTop: "100px" }}>
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.75rem" }}>
-            {t("section_why_fahem_title")}
-          </h2>
-          <p style={{ fontSize: "1.05rem", color: "#475569", maxWidth: "700px", margin: "0 auto", lineHeight: 1.6 }}>
-            {t("section_why_fahem_desc")}
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.5rem" }}>
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
-              <FiGlobe style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_personalized_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_personalized_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--secondary), var(--accent-orange))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(249,115,22,0.15)" }}>
-              <FiLayers style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_bilingual_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_bilingual_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--primary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(13,148,136,0.15)" }}>
-              <FiShield style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_secure_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_secure_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--accent-green))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
-              <FiCpu style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_intelligent_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_intelligent_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--accent-orange), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(249,115,22,0.15)" }}>
-              <FiActivity style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_clt_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_clt_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--accent-orange))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(13,148,136,0.15)" }}>
-              <FiBookOpen style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_heutagogy_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_heutagogy_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--accent-green), var(--secondary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(16,107,163,0.15)" }}>
-              <FiShield style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_security_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_security_desc")}</p>
-          </div>
-
-          <div className="panel-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "1rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-            <div style={{ background: "linear-gradient(135deg, var(--accent-orange), var(--primary))", width: "50px", height: "50px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 4px 15px rgba(37,99,235,0.15)" }}>
-              <FiCpu style={{ fontSize: "1.3rem" }} />
-            </div>
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{t("why_dag_title")}</h4>
-            <p style={{ fontSize: "0.9rem", color: "#475569", lineHeight: 1.5, margin: 0 }}>{t("why_dag_desc")}</p>
-          </div>
-        </div>
-      </section>
+            </section>
+          </>
+        );
+      })()}
 
       {/* Dedicated Last Landing Section - Warm and informative Support Fahem section */}
       <DonationCard variant="section" />

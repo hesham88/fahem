@@ -3526,6 +3526,125 @@ html[dir="rtl"] .directory-children {
   user-select: none;
 }
 
+/* ==========================================================================
+   Builder 4: High-Premium Hero Section & Interactive Card Restyling
+   ========================================================================== */
+:root {
+  --hero-bullet-bg: rgba(255, 255, 255, 0.55);
+  --hero-bullet-border: rgba(226, 232, 240, 0.95);
+  --hero-bullet-hover-bg: rgba(37, 99, 235, 0.05);
+  --hero-bullet-hover-border: rgba(37, 99, 235, 0.35);
+  --hero-bullet-shadow: 0 4px 15px rgba(37, 99, 235, 0.02);
+  --hero-google-bg: #ffffff;
+  --hero-google-border: #cbd5e1;
+  --hero-google-color: #334155;
+}
+
+html.dark, :root.dark {
+  --hero-bullet-bg: rgba(30, 41, 59, 0.35);
+  --hero-bullet-border: rgba(255, 255, 255, 0.08);
+  --hero-bullet-hover-bg: rgba(59, 130, 246, 0.08);
+  --hero-bullet-hover-border: rgba(59, 130, 246, 0.4);
+  --hero-bullet-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --hero-google-bg: rgba(30, 41, 59, 0.5);
+  --hero-google-border: rgba(255, 255, 255, 0.12);
+  --hero-google-color: #f8fafc;
+}
+
+/* Beautiful modern, responsive bullet item cards with smooth active transitions */
+.premium-hero-bullet-item {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  font-size: 0.96rem;
+  color: var(--foreground);
+  background: var(--hero-bullet-bg);
+  border: 1px solid var(--hero-bullet-border);
+  padding: 0.95rem 1.35rem;
+  border-radius: 16px;
+  box-shadow: var(--hero-bullet-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  text-align: start;
+}
+
+.premium-hero-bullet-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.premium-hero-bullet-item:hover {
+  transform: translateY(-2px) scale(1.008);
+  background: var(--hero-bullet-hover-bg);
+  border-color: var(--hero-bullet-hover-border);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08), var(--hero-bullet-shadow);
+}
+
+.premium-hero-bullet-item:hover::before {
+  opacity: 1;
+}
+
+/* Smooth micro-animations for the icons inside the bullets */
+.premium-hero-bullet-item:hover .feature-bullet-icon {
+  transform: scale(1.12) rotate(4deg);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+}
+
+.feature-bullet-icon {
+  display: flex;
+  padding: 0.6rem;
+  border-radius: 12px;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Premium styled interactive Google Button */
+.premium-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  background: var(--hero-google-bg) !important;
+  border: 1px solid var(--hero-google-border) !important;
+  color: var(--hero-google-color) !important;
+  border-radius: 30px !important;
+  padding: 0.85rem 2rem !important;
+  font-size: 0.98rem !important;
+  font-weight: 650 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), var(--shadow-sm) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  width: 100% !important;
+  max-width: 340px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.premium-google-btn:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.premium-google-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.premium-google-btn:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+
 .tree-row-folder:hover {
   background: rgba(15, 23, 42, 0.04);
 }
