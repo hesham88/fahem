@@ -135,7 +135,7 @@ test.describe("Fahem - Agentic Companion Actions Verification", () => {
 
     // Wait for Social panel to mount
     console.log("[AGENTIC] Waiting for Social Panel to mount...");
-    const socialHeader = page.locator("h3:has-text('Academic Clubs')");
+    const socialHeader = page.locator("h1:has-text('Social Network & Interactive Chat')");
     await expect(socialHeader).toBeVisible({ timeout: 10000 });
 
     // Wait a brief moment to ensure React has fully mounted the component and registered the custom event listener
