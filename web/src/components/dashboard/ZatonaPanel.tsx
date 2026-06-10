@@ -92,6 +92,29 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
     fetchZatonaHistory();
   }, [user]);
 
+  // Listen for custom launch Zatona event from companion agent
+  useEffect(() => {
+    const handleLaunchZatona = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.data) {
+        const { report, concept } = customEvent.detail.data;
+        if (report) {
+          setZatonaResult(report);
+        }
+        if (concept) {
+          setZatonaPrompt(concept);
+        }
+        // Force text scope so it matches what we pasted/created
+        setScopeType("text");
+        // Re-fetch the history so the new run appears in the list
+        fetchZatonaHistory();
+      }
+    };
+
+    window.addEventListener("fahemLaunchZatona", handleLaunchZatona);
+    return () => window.removeEventListener("fahemLaunchZatona", handleLaunchZatona);
+  }, [setZatonaResult, setZatonaPrompt]);
+
   /**
    * Triggers the server endpoint to digest and summarize the user-provided textbook topic or textbook scope.
    */

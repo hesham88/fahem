@@ -140,7 +140,14 @@ export async function GET(req: NextRequest) {
       if (subjectId) {
         filteredBooks = filteredBooks.filter((b: any) => b.subject_id === subjectId);
       }
-      return new Response(JSON.stringify({ success: true, books: filteredBooks }), {
+
+      // Project out heavy fields like ingestion_logs, pages, chunks, content to reduce latency and payload size
+      const projectedBooks = filteredBooks.map((b: any) => {
+        const { ingestion_logs, pages, chunks, content, extracted_text, ...rest } = b;
+        return rest;
+      });
+
+      return new Response(JSON.stringify({ success: true, books: projectedBooks }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });

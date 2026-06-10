@@ -20,6 +20,7 @@ try {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  optimizeFonts: false,
   turbopack: {
     root: "./",
   } as any,

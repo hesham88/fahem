@@ -29,7 +29,11 @@ export async function GET(req: NextRequest) {
 
     if (isLocalEnv()) {
       const db = getLocalDb();
-      let books = db.books || [];
+      // Project out heavy fields like ingestion_logs, pages, chunks, content to reduce latency and payload size
+      let books = (db.books || []).map((b: any) => {
+        const { ingestion_logs, pages, chunks, content, extracted_text, ...rest } = b;
+        return rest;
+      });
       let curricula = db.curricula || [];
       let subjects = db.subjects || [];
 

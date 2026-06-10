@@ -17,8 +17,9 @@ from utils import (
     ROOT_DIR, LOCAL_DB_PATH, is_mongodb_enabled, get_mongodb_uri
 )
 
-TEST_BOOK_ID = "book_v2_test"
-TEST_SUBJECT_ID = "subj_algebra_stats"
+TEST_BOOK_ID = "openstax_python_programming"
+TEST_SUBJECT_ID = "subj_computer_science"
+
 
 def clear_test_data(is_local):
     """
@@ -180,12 +181,12 @@ def main():
     payload = {
         "book_id": TEST_BOOK_ID,
         "subject_id": TEST_SUBJECT_ID,
-        "title": "V2 Algebra Textbook",
-        "title_ar": "كتاب الجبر النسخة الثانية",
-        "source_url": "offline_mock_test_mode",
+        "title": "Introduction to Python Programming",
+        "title_ar": "مقدمة في البرمجة بلغة بايثون",
+        "source_url": "https://assets.openstax.org/oscms-prodcms/media/documents/Introduction_to_Python_Programming-WEB.pdf",
         "storage_path": None,
-        "grade": "Grade 11",
-        "term": "Term 2",
+        "grade": "General",
+        "term": "Full Year",
         "year": "2026",
         "language": "en",
         "book_type": "core",
@@ -217,7 +218,7 @@ def main():
     proc.wait()
 
     # Dynamic status polling with a timeout
-    max_wait = 450
+    max_wait = 1200
     poll_start = time.time()
     job_id = f"job_{TEST_BOOK_ID}"
     finished = False

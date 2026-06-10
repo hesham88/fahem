@@ -172,6 +172,9 @@ def get_books(token):
         books = _flatten_books(data)
         if books:
             return books
+        # If the response is structurally valid and successful, don't do redundant fallback requests
+        if isinstance(data, dict) and (data.get("success") is True or "books" in data or "subjects" in data):
+            return []
     return []
 
 

@@ -199,6 +199,32 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
     }
   }, [selectedGroupId, activeSubTab]);
 
+  // Listen for custom launch assignment event from companion agent
+  useEffect(() => {
+    const handleLaunchAssignment = (e: Event) => {
+      // Switch the sub-tab to assignments so the user is directly landed there
+      setActiveSubTab("assignments");
+      
+      const customEvent = e as CustomEvent;
+      const groupId = customEvent.detail?.groupId || selectedGroupId || "default";
+      
+      // If we don't have a selected group ID yet, or if it differs, update it
+      if (groupId && groupId !== selectedGroupId) {
+        setSelectedGroupId(groupId);
+      }
+      
+      // Force immediate re-hydration of assignments list
+      if (groupId) {
+        fetchAssignments(groupId);
+      } else {
+        fetchGroups();
+      }
+    };
+    
+    window.addEventListener("fahemLaunchAssignment", handleLaunchAssignment);
+    return () => window.removeEventListener("fahemLaunchAssignment", handleLaunchAssignment);
+  }, [selectedGroupId]);
+
   const fetchThreads = async (groupId: string) => {
     setLoadingThreads(true);
     try {

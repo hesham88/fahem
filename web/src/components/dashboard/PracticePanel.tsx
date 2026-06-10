@@ -299,6 +299,49 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [selectedVoice]);
 
+  // Listen for custom launch practice event from companion agent
+  useEffect(() => {
+    const handleLaunchPractice = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.data) {
+        const questionData = customEvent.detail.data;
+        
+        // Reset feedback and states
+        setPracticeFeedback(null);
+        setPracticeHasAnswered(false);
+        setPracticeAnswer("");
+        setPracticeSelectedOptionStr("");
+        setPracticeShowHint(false);
+
+        // Reset session stats
+        setPracticeSessionXpGained(0);
+        setPracticeSessionCorrectAnswers(0);
+        setPracticeSessionTotalQuestions(1);
+        setPracticeQuizTimeLeft(practiceQuizDurationLimit);
+
+        // Set subject and mode if provided, else keep defaults
+        if (questionData.subject) {
+          setPracticeSubject(questionData.subject);
+        }
+        if (questionData.mode) {
+          setPracticeMode(questionData.mode);
+        }
+
+        // Set the newly generated question and activate game state!
+        setPracticeCurrentQuestion(questionData);
+        setPracticeGameState("active");
+        
+        addSpaceHistory(
+          `Launched agent-generated ${(questionData.mode || "MCQ").toUpperCase()} practice session`,
+          `تم إطلاق ممارسة مولدة تلقائياً (${(questionData.mode || "MCQ").toUpperCase()}) بواسطة العميل الذكي`
+        );
+      }
+    };
+
+    window.addEventListener("fahemLaunchPractice", handleLaunchPractice);
+    return () => window.removeEventListener("fahemLaunchPractice", handleLaunchPractice);
+  }, [practiceQuizDurationLimit, addSpaceHistory]);
+
   const speakPracticeText = async (text: string, type: string) => {
     if (speakingType === type) {
       if ((window as any)._activeAudioPractice) {

@@ -949,6 +949,15 @@ export default function StickyChat() {
               if (data.success) {
                 setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنشاء ممارسة جديدة بنجاح! جاري الانتقال..." : "Practice session created successfully! Navigating..." }));
                 setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("fahemLaunchPractice", {
+                    detail: {
+                      data: {
+                        ...data,
+                        mode: target?.mode || "mcq",
+                        subject: target?.subject || "General"
+                      }
+                    }
+                  }));
                   window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "practice" } }));
                 }, 1500);
               } else {
@@ -972,6 +981,14 @@ export default function StickyChat() {
               if (data.success && data.report) {
                 setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنتاج ملخص الزتونة بنجاح! جاري الانتقال..." : "Zatona summary created successfully! Navigating..." }));
                 setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("fahemLaunchZatona", {
+                    detail: {
+                      data: {
+                        report: data.report,
+                        concept: target?.concept || "AI generated focus area"
+                      }
+                    }
+                  }));
                   window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "zatona" } }));
                 }, 1500);
               } else {
@@ -998,6 +1015,11 @@ export default function StickyChat() {
             if (res.ok) {
               setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم نشر الواجب بنجاح! جاري الانتقال..." : "Assignment published successfully! Navigating..." }));
               setTimeout(() => {
+                window.dispatchEvent(new CustomEvent("fahemLaunchAssignment", {
+                  detail: {
+                    groupId: target?.group_id || target?.groupId || "default"
+                  }
+                }));
                 window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "social" } }));
               }, 1500);
             } else {
@@ -3147,7 +3169,7 @@ User Question: ${queryText}`;
                       justifyContent: "space-between",
                       padding: "0.65rem 0.85rem",
                       borderRadius: "var(--border-radius-md)",
-                      background: isActive ? "rgba(16, 107, 163, 0.08)" : "rgba(255, 255, 255, 0.6)",
+                      background: isActive ? "rgba(16, 107, 163, 0.08)" : "var(--card-bg-glass-card, rgba(255, 255, 255, 0.45))",
                       border: `1px solid ${isActive ? "rgba(16, 107, 163, 0.25)" : "rgba(235, 220, 185, 0.25)"}`,
                       cursor: "pointer",
                       transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -3370,7 +3392,7 @@ User Question: ${queryText}`;
                       ? "rgba(46, 204, 113, 0.07)"
                       : likedMessages[msg.id] === "dislike"
                         ? "rgba(231, 76, 60, 0.07)"
-                        : "rgba(255, 255, 255, 0.85)",
+                        : "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.85))",
                   color: msg.role === "user" ? "#ffffff" : "var(--foreground)",
                   border: msg.role === "user" 
                     ? "none" 
@@ -3457,7 +3479,7 @@ User Question: ${queryText}`;
                                     padding: "0.6rem 0.8rem",
                                     borderRadius: "10px",
                                     border: "1px solid var(--card-border)",
-                                    background: "rgba(255, 255, 255, 0.6)",
+                                    background: "var(--card-bg-glass-card, rgba(255, 255, 255, 0.45))",
                                     color: "var(--foreground)",
                                     fontSize: "0.8rem",
                                     textAlign: "start",
@@ -3892,7 +3914,7 @@ User Question: ${queryText}`;
               left: "1rem",
               right: "1rem",
               zIndex: 10000,
-              background: "rgba(255, 255, 255, 0.95)",
+              background: "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.85))",
               backdropFilter: "blur(24px)",
               border: "1px solid rgba(16, 107, 163, 0.15)",
               borderRadius: "16px",
@@ -4169,7 +4191,7 @@ User Question: ${queryText}`;
           inset-inline-end: 0.5rem;
           opacity: 0;
           pointer-events: none;
-          background: rgba(255, 255, 255, 0.85) !important;
+          background: var(--card-bg-glass-dense, rgba(255, 255, 255, 0.85)) !important;
           backdrop-filter: blur(12px);
           border: 1px solid rgba(16, 107, 163, 0.15) !important;
           border-radius: 8px !important;

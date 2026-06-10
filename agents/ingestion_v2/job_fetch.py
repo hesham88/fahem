@@ -104,17 +104,21 @@ def main():
     try:
         # 1. Fetch source
         if source_url and source_url.startswith("http"):
-            try:
-                download_file_progressive(source_url, temp_pdf_path, job_id, is_local, logs, metadata)
-            except Exception as dl_err:
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] ⚠️ Progressive download failed: {dl_err}. Trying fallback...")
-                update_job_status(job_id, "processing", "fetch", 18, logs, 0, 0, False, is_local, **metadata)
-                
-                res = requests.get(source_url, timeout=35)
-                res.raise_for_status()
-                with open(temp_pdf_path, "wb") as f:
-                    f.write(res.content)
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] Fallback download completed.")
+            if os.path.exists(temp_pdf_path) and os.path.getsize(temp_pdf_path) >= 9000000:
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] ⚡ Cache HIT: Found complete local PDF ({os.path.getsize(temp_pdf_path) / (1024*1024):.2f}MB). Skipping download.")
+                update_job_status(job_id, "processing", "fetch", 20, logs, 0, 0, False, is_local, **metadata)
+            else:
+                try:
+                    download_file_progressive(source_url, temp_pdf_path, job_id, is_local, logs, metadata)
+                except Exception as dl_err:
+                    logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] ⚠️ Progressive download failed: {dl_err}. Trying fallback...")
+                    update_job_status(job_id, "processing", "fetch", 18, logs, 0, 0, False, is_local, **metadata)
+                    
+                    res = requests.get(source_url, timeout=35)
+                    res.raise_for_status()
+                    with open(temp_pdf_path, "wb") as f:
+                        f.write(res.content)
+                    logs.append(f"[{time.strftime('%H:%M:%S')}] [DOWNLOAD] Fallback download completed.")
         else:
             if storage_path and os.path.exists(os.path.join(ROOT_DIR, "ignore", os.path.basename(storage_path))):
                 local_uploaded_path = os.path.join(ROOT_DIR, "ignore", os.path.basename(storage_path))
