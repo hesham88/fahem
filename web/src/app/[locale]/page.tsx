@@ -1120,11 +1120,11 @@ export default function LandingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
                   
                   {/* Google Gemini Card */}
-                  <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                          <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}
@@ -1139,11 +1139,11 @@ export default function LandingPage() {
                   </a>
 
                   {/* Google ADK 2.0 Card */}
-                  <a href="https://github.com/google" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://adk.dev/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(249, 115, 22, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                          <img src="/brand/adk.png" alt="Google ADK" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/adk.png" alt="Google ADK" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "جوجل ADK 2.0" : "Google ADK 2.0"}
@@ -1158,11 +1158,11 @@ export default function LandingPage() {
                   </a>
 
                   {/* Antigravity Card */}
-                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://antigravity.google/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(13, 148, 136, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                          <img src="/brand/antigravity.png" alt="Antigravity" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/antigravity.png" alt="Antigravity" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "أنتي-جرافيتي CLI" : "Antigravity CLI"}
@@ -1177,11 +1177,11 @@ export default function LandingPage() {
                   </a>
 
                   {/* Firebase Card */}
-                  <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                          <img src="/brand/firebase.png" alt="Firebase" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/firebase.png" alt="Firebase" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "جوجل فيربيز" : "Google Firebase"}
@@ -1196,7 +1196,7 @@ export default function LandingPage() {
                   </a>
 
                   {/* Next.js Card */}
-                  <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://nextjs.org/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: isDarkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 42, 0.08)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
@@ -1215,7 +1215,7 @@ export default function LandingPage() {
                   </a>
 
                   {/* Google Maps Card */}
-                  <a href="https://mapsplatform.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://mapsplatform.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: isDarkMode ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(16, 185, 129, 0.1)" }}>
@@ -1234,11 +1234,11 @@ export default function LandingPage() {
                   </a>
 
                   {/* MongoDB Card */}
-                  <a href="https://www.mongodb.com/cloud/atlas" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://www.mongodb.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                          <img src="/brand/mongodb.png" alt="MongoDB Atlas" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/mongodb.png" alt="MongoDB Atlas" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "مونجو دي بي أطلس" : "MongoDB Atlas"}
@@ -1253,7 +1253,7 @@ export default function LandingPage() {
                   </a>
 
                   {/* Google Cloud Card */}
-                  <a href="https://cloud.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <a href="https://cloud.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: isDarkMode ? "rgba(59, 130, 246, 0.18)" : "rgba(37, 99, 235, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(37, 99, 235, 0.1)" }}>
