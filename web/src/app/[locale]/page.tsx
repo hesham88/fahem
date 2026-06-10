@@ -6,7 +6,7 @@ import { signInWithPopup, onAuthStateChanged, User, signInWithPhoneNumber, Recap
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
 import DonationCard from "../../components/DonationCard";
-import { Dropdown } from "../../components/ui/Dropdown";
+
 import { 
   FiGithub,
   FiGlobe,
@@ -36,7 +36,11 @@ import {
   FiDatabase,
   FiSun,
   FiMoon,
-  FiHeart
+  FiHeart,
+  FiChevronDown,
+  FiCloud,
+  FiUsers,
+  FiSliders
 } from "react-icons/fi";
 
 export default function LandingPage() {
@@ -65,15 +69,6 @@ export default function LandingPage() {
   const { language, setLanguage, t } = useTranslation();
   const pathname = usePathname();
 
-  const publicPagesOptions = [
-    { value: `/${language}`, label: "Welcome / Landing", labelAr: "الصفحة الرئيسية", icon: "✨" },
-    { value: `/${language}/home`, label: "Study Dashboard", labelAr: "لوحة الدراسة الذكية", icon: "📚" },
-    { value: `/${language}/contact`, label: "Contact Us", labelAr: "اتصل بنا", icon: "✉️" },
-    { value: `/${language}/privacy`, label: "Privacy Policy", labelAr: "سياسة الخصوصية", icon: "🔒" },
-    { value: `/${language}/terms`, label: "Terms of Service", labelAr: "شروط الخدمة", icon: "📜" },
-    { value: `/${language}/report`, label: "Report Issues", labelAr: "الإبلاغ عن المشكلات", icon: "⚠️" },
-    { value: `/${language}/profile/demouser`, label: "Public Profile", labelAr: "الملف الشخصي العام", icon: "👤" }
-  ];
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -403,14 +398,66 @@ export default function LandingPage() {
               <FiCpu /> {language === "ar" ? "البنية التقنية" : "Tech Stack"}
             </a>
           </li>
+          <li className="glass-nav-dropdown-wrapper">
+            <div className="glass-nav-link glass-nav-dropdown-trigger" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
+              <FiLayers /> {language === "ar" ? "النواة" : "Core"} <FiChevronDown style={{ fontSize: "0.8rem", transition: "transform 0.2s" }} className="chevron-icon" />
+            </div>
+            <ul className="glass-nav-dropdown-menu">
+              <li>
+                <a href={`/${language}/gcp-infrastructure`}>
+                  <FiCloud className="menu-item-icon" style={{ color: "#2563eb" }} />
+                  <div className="menu-item-text">
+                    <span className="menu-item-title">{language === "ar" ? "البنية التحتية لـ GCP" : "GCP Infrastructure"}</span>
+                    <span className="menu-item-desc">{language === "ar" ? "بنية سحابية وحماية متقدمة" : "Cloud compute & secure armor"}</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href={`/${language}/agents`}>
+                  <FiUsers className="menu-item-icon" style={{ color: "#a855f7" }} />
+                  <div className="menu-item-text">
+                    <span className="menu-item-title">{language === "ar" ? "الوكلاء الذكيون" : "Agents"}</span>
+                    <span className="menu-item-desc">{language === "ar" ? "ترابط وتحليل البيانات الفوري" : "Topology & relationship mapping"}</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href={`/${language}/mongodb-mcp`}>
+                  <FiDatabase className="menu-item-icon" style={{ color: "#10b981" }} />
+                  <div className="menu-item-text">
+                    <span className="menu-item-title">{language === "ar" ? "خادم MongoDB MCP" : "MongoDB MCP"}</span>
+                    <span className="menu-item-desc">{language === "ar" ? "البحث الدلالي وأنابيب التجميع" : "Semantic search & aggregations"}</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href={`/${language}/features-depth`}>
+                  <FiSliders className="menu-item-icon" style={{ color: "#f43f5e" }} />
+                  <div className="menu-item-text">
+                    <span className="menu-item-title">{language === "ar" ? "الميزات بالتفصيل" : "Features"}</span>
+                    <span className="menu-item-desc">{language === "ar" ? "الاختبار التلقائي والصوت الفوري" : "Automated testing, voice & memory"}</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href={`/${language}/educational-approach`}>
+                  <FiBookOpen className="menu-item-icon" style={{ color: "#d97706" }} />
+                  <div className="menu-item-text">
+                    <span className="menu-item-title">{language === "ar" ? "المنهج التعليمي" : "Educational Approach"}</span>
+                    <span className="menu-item-desc">{language === "ar" ? "التعلم الذاتي والعبء المعرفي" : "Heutagogy, OEPA & CCRII paths"}</span>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </li>
           <li>
             <a href="#donation-section" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
-              <FiHeart style={{ color: "#ef4444" }} /> {language === "ar" ? "ادعم مسيرتنا" : "Support Us"}
+              <FiHeart style={{ color: "#ef4444" }} /> <span className="nav-text-responsive">{language === "ar" ? "ادعم مسيرتنا" : "Support Us"}</span>
             </a>
           </li>
           <li>
             <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
-              <FiGithub /> {t("nav_github")}
+              <FiGithub /> <span className="nav-text-responsive">{t("nav_github")}</span>
             </a>
           </li>
           <li>
@@ -436,30 +483,28 @@ export default function LandingPage() {
               {isDarkMode ? <FiSun style={{ color: "var(--accent-yellow)" }} /> : <FiMoon style={{ color: "var(--primary)" }} />}
             </button>
           </li>
-          <li style={{ width: "170px" }}>
-            <Dropdown
-              value={pathname ?? `/${language}`}
-              onChange={(val) => router.push(val)}
-              options={publicPagesOptions}
-              language={language}
-              triggerOnHover={true}
-              placeholder={language === "ar" ? "استكشف الصفحات" : "Explore Pages"}
-              style={{ width: "170px" }}
-            />
-          </li>
           <li>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)" }}>
-              <FiGlobe />
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
-                className="language-select"
-                style={{ marginLeft: "0.25rem", background: "transparent", border: "none", color: "var(--foreground)", fontSize: "0.9rem", fontWeight: 500, outline: "none", cursor: "pointer" }}
-              >
-                <option value="en">English</option>
-                <option value="ar">العربية</option>
-              </select>
-            </div>
+            <button
+              onClick={() => setLanguage(language === "en" ? "ar" : "en")}
+              className="glass-nav-link language-toggle-btn"
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--foreground)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                opacity: 0.85,
+                transition: "all 0.2s ease"
+              }}
+              title={language === "en" ? "تبديل إلى العربية" : "Switch to English"}
+            >
+              <FiGlobe style={{ color: "var(--primary)" }} />
+              <span>{language === "en" ? "EN" : "ع"}</span>
+            </button>
           </li>
           <li>
             {(user || isDemo) ? (
