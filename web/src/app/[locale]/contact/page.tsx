@@ -19,6 +19,7 @@ export default function ContactPage() {
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [honeypot, setHoneypot] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -87,7 +88,7 @@ export default function ContactPage() {
       - description: "${message}"
       - timestamp: "${new Date().toISOString()}"
 
-      We have already dispatched a direct write to /api/feedback. Please verify or ensure alignment in MongoDB and then respond in "${language}" with a short, extremely polite professional confirmation.
+      We have already dispatched a direct write to /api/contact. Please verify or ensure alignment in MongoDB and then respond in "${language}" with a short, extremely polite professional confirmation.
     `;
 
     try {
@@ -95,7 +96,7 @@ export default function ContactPage() {
       const token = await executeRecaptcha();
       
       setLogs((prev) => [...prev, isAr ? "جاري حفظ استفسارك بشكل آمن..." : "Saving your inquiry securely..."]);
-      const feedbackResponse = await authedFetch("/api/feedback", {
+      const feedbackResponse = await fetch("/api/contact", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,10 +104,10 @@ export default function ContactPage() {
         body: JSON.stringify({
           name: name || "Anonymous",
           email: email,
-          title: "Contact Us: " + (subject || "General Inquiry"),
-          body: message,
-          category: "Inquiry",
-          source: "contact_us"
+          subject: subject || "General Inquiry",
+          message: message,
+          recaptchaToken: token || undefined,
+          honeypot: honeypot
         })
       });
 
@@ -115,58 +116,65 @@ export default function ContactPage() {
         throw new Error(errText || "Database write failed");
       }
 
-      setLogs((prev) => [...prev, isAr ? "تم استلام استفسارك بنجاح. جاري بدء اتصال مع وكيل الذكاء الاصطناعي للرد..." : "Inquiry saved successfully. Initiating secure stream to MongoDB agent..."]);
+      const hasUser = !!currentUser;
+      if (hasUser) {
+        setLogs((prev) => [...prev, isAr ? "تم استلام استفسارك بنجاح. جاري بدء اتصال مع وكيل الذكاء الاصطناعي للرد..." : "Inquiry saved successfully. Initiating secure stream to MongoDB agent..."]);
 
-      const response = await authedFetch("/api/agent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          language,
-          userEmail: currentUser?.email || email || "",
-          userId: currentUser?.uid || "",
-          recaptchaToken: token || undefined
-        }),
-      });
+        const response = await authedFetch("/api/agent", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt,
+            language,
+            userEmail: currentUser?.email || email || "",
+            userId: currentUser?.uid || "",
+            recaptchaToken: token || undefined
+          }),
+        });
 
-      if (!response.body) {
-        throw new Error("ReadableStream not supported by browser.");
-      }
+        if (!response.body) {
+          throw new Error("ReadableStream not supported by browser.");
+        }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let accumulatedResult = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        let accumulatedResult = "";
 
-      while (!done) {
-        const { value, done: isDone } = await reader.read();
-        done = isDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-          lines.forEach((line) => {
-            if (line.trim()) {
-              setLogs((prev) => [...prev, line]);
-              if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
-                if (line !== "=== Agent Final Output ===" && line !== "==========================") {
-                  accumulatedResult += line + "\n";
+        while (!done) {
+          const { value, done: isDone } = await reader.read();
+          done = isDone;
+          if (value) {
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
+            lines.forEach((line) => {
+              if (line.trim()) {
+                setLogs((prev) => [...prev, line]);
+                if (!line.includes("[STDERR]") && !line.includes("[CLOSE]") && !line.includes("[Unknown]") && !line.includes("[Fahem Agent]") && !line.startsWith("[Sub-Agent:") && !line.startsWith("Loading local configuration") && !line.startsWith("Prompt:") && !line.startsWith("Starting Fahem") && !line.startsWith("Invoking agent")) {
+                  if (line !== "=== Agent Final Output ===" && line !== "==========================") {
+                    accumulatedResult += line + "\n";
+                  }
                 }
               }
-            }
-          });
+            });
+          }
         }
+
+        const cleanResult = accumulatedResult
+           .replace(/=== Agent Final Output ===/g, "")
+           .replace(/==========================/g, "")
+           .trim();
+
+        setAgentResponse(cleanResult || (isAr ? "تم إرسال رسالتك بنجاح!" : "Message Sent Successfully!"));
+        setSubmitted(true);
+      } else {
+        setLogs((prev) => [...prev, isAr ? "تم استلام استفسارك بنجاح!" : "Inquiry saved successfully!"]);
+        setAgentResponse(isAr ? "شكرًا لتواصلك معنا. تم تسجيل رسالتك وسيتواصل معك أحد أعضاء الفريق قريبًا." : "Thank you for contacting us. Your message has been received and our team will get back to you shortly.");
+        setSubmitted(true);
+        setMessage("");
       }
-
-      const cleanResult = accumulatedResult
-         .replace(/=== Agent Final Output ===/g, "")
-         .replace(/==========================/g, "")
-         .trim();
-
-      setAgentResponse(cleanResult || (isAr ? "تم إرسال رسالتك بنجاح!" : "Message Sent Successfully!"));
-      setSubmitted(true);
-      setMessage(""); // Clear message field
     } catch (error: any) {
       setLogs((prev) => [...prev, (isAr ? "فشل الاتصال: " : "Stream failure: ") + error.message]);
     } finally {
@@ -270,6 +278,18 @@ export default function ContactPage() {
             ) : (
               <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 
+                {/* Honey-pot dummy field for bot prevention */}
+                <div style={{ display: "none" }}>
+                  <label htmlFor="confirm-email-verification">Do not fill this field</label>
+                  <input
+                    id="confirm-email-verification"
+                    type="text"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                    autoComplete="off"
+                  />
+                </div>
+
                 {/* Name */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   <label htmlFor="contact-name" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>

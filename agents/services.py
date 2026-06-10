@@ -129,12 +129,19 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
                     request.state.verified_email = email
                     
-                    if not principal:
-                        principal = {
-                            "uid": id_info.get("sub", "unknown_gcp_uid"),
-                            "email": email,
-                            "role": "super-admin" if email == "hesham1988@gmail.com" else "user"
-                        }
+                    # Reject X-Verified-Principal spoofing on GCP Run:
+                    # Identity is strictly derived from the verified token
+                    verified_role = "super-admin" if email == "hesham1988@gmail.com" else "user"
+                    # Only the real owner can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
+                    passed_db_target = principal.get("db_target") if (principal and isinstance(principal, dict)) else None
+                    db_target = passed_db_target if (email == "hesham1988@gmail.com" and passed_db_target) else "fahem_sandbox"
+                    
+                    principal = {
+                        "uid": id_info.get("sub", "unknown_gcp_uid"),
+                        "email": email,
+                        "role": verified_role,
+                        "db_target": db_target
+                    }
                 except Exception as err:
                     logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
                     if is_gcp:
@@ -1629,6 +1636,15 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
             
+            # FC.A5 Guard: refuse sync on GCP or if active DB is production (fahem)
+            is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+            if is_gcp or db.name == "fahem":
+                client.close()
+                raise fastapi.HTTPException(
+                    status_code=403,
+                    detail="Database synchronization is permanently disabled on production (fahem) and Google Cloud Platform."
+                )
+            
             # Guard Block: refuse sync if payload book count is less than current DB book count unless forced
             if "books" in payload:
                 incoming_books = payload.get("books")
@@ -2814,6 +2830,85 @@ def register_telemetry_route(app: fastapi.FastAPI):
         except Exception as err:
             logger.error(f"[services.py] Failed to resolve role: {err}", exc_info=True)
             return {"success": False, "role": "user", "error": str(err)}
+
+
+    @app.post("/public/contact")
+    async def post_public_contact_endpoint(payload: dict, request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            import random
+            import datetime
+
+            name = payload.get("name")
+            email = payload.get("email")
+            body = payload.get("body") or payload.get("message")
+            subject = payload.get("subject") or "General Inquiry"
+
+            if not email or not body:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Email and message body are required"},
+                    status_code=400
+                )
+
+            # Enforce anti-abuse rate limit by client IP: max 5/day (fail-closed)
+            client_ip = request.client.host if request.client else "127.0.0.1"
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+
+            now_dt = datetime.datetime.now(datetime.timezone.utc)
+            start_of_day = datetime.datetime(now_dt.year, now_dt.month, now_dt.day, tzinfo=datetime.timezone.utc)
+            start_of_day_ms = int(start_of_day.timestamp() * 1000)
+
+            count = db["reports"].count_documents({
+                "source": "contact",
+                "context.ip": client_ip,
+                "createdAt": {"$gte": start_of_day_ms}
+            })
+
+            if count >= 5:
+                client.close()
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Rate limit exceeded. Please try again tomorrow."},
+                    status_code=429
+                )
+
+            report_id = "rep_contact_" + str(int(time.time() * 1000)) + "_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=5))
+            
+            new_report = {
+                "_id": report_id,
+                "userId": None,
+                "source": "contact",
+                "category": "Contact Form",
+                "title": f"Contact Submission: {subject}",
+                "body": body,
+                "contact": {
+                    "name": name or "Anonymous",
+                    "email": email
+                },
+                "context": {
+                    "name": name or "Anonymous",
+                    "email": email,
+                    "ip": client_ip,
+                    "subject": subject
+                },
+                "status": "new",
+                "createdAt": int(time.time() * 1000)
+            }
+
+            db["reports"].insert_one(new_report)
+            client.close()
+
+            return {"success": True, "message": "Contact message submitted successfully.", "report": new_report}
+        except Exception as err:
+            logger.error(f"[services.py] Public contact submit failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
 
 
     @app.post("/user/reports")

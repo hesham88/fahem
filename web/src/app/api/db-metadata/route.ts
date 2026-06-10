@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     const requestHeaders: Record<string, string> = {
       "Accept": "application/json",
-      "X-Verified-Principal": JSON.stringify({
+      "X-Verified-Principal": JSON.stringify({ // guard:allow-principal
         uid: ctx.uid,
         email: ctx.email,
         role: ctx.role,

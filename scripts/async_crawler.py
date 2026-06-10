@@ -42,7 +42,6 @@ USER_AGENT = (
     "FahemCrawlerExplorer/2.0 (+educational research; non-aggressive, contact: hesham1988@gmail.com)"
 )
 OPENSTAX_LISTING = "https://openstax.org/apps/cms/api/books/?format=json"
-MOE_BASE = "https://ellibrary.moe.gov.eg/"
 
 # Emit callback signature: emit(kind: str, payload: dict). kinds: "log" | "progress"
 Emit = Callable[[str, dict], None]
@@ -275,7 +274,7 @@ def classify_subject_by_text(title, file_name, url, subjects_list=None):
 
 
 # --------------------------------------------------------------------------- #
-# Data models and OpenStax, MOE, and Generic adapters
+# Data models and OpenStax and Generic adapters
 # --------------------------------------------------------------------------- #
 @dataclass
 class BookRef:
@@ -305,15 +304,7 @@ class BookRef:
             self.language = "ar" if _has_arabic(self.title) else "en"
 
 
-def _moe_lang(file_name: str) -> str:
-    fn = (file_name or "").lower()
-    if re.search(r"(?:^|[_\-])fr(?:[_\-]|\d)", fn) or "french" in fn:
-        return "fr"
-    if re.search(r"(?:^|[_\-])(?:e|en)(?:[_\-]|\d)", fn) or "english" in fn:
-        return "en"
-    if re.search(r"(?:^|[_\-])ar(?:[_\-]|\d)", fn):
-        return "ar"
-    return "ar"
+
 
 
 def _ox_subject(node: dict) -> str:
@@ -371,6 +362,40 @@ async def _ox_list_nodes(client: httpx.AsyncClient, listing_url: str, emit: Emit
     return items, (total or len(items))
 
 
+async def probe_pdf_page_count(client, url, cap_bytes=28_000_000, timeout=10):
+    """Best-effort REAL page count for the discovery tree: stream the PDF (size/time capped)
+    and count pages via PyMuPDF. Returns an int, or None when it can't be determined cheaply
+    (then the authoritative count is set at the fetch stage). Replaces the fabricated 380."""
+    if not url:
+        return None
+    try:
+        import fitz  # PyMuPDF
+    except Exception:
+        return None
+    try:
+        buf = bytearray()
+        async with client.stream("GET", url, timeout=timeout) as resp:
+            if resp.status_code != 200:
+                return None
+            async for chunk in resp.aiter_bytes():
+                buf.extend(chunk)
+                if len(buf) > cap_bytes:
+                    break
+
+        def _count(data):
+            try:
+                d = fitz.open(stream=bytes(data), filetype="pdf")
+                n = d.page_count
+                d.close()
+                return n if n and n > 0 else None
+            except Exception:
+                return None
+
+        return await asyncio.to_thread(_count, buf)
+    except Exception:
+        return None
+
+
 async def discover_openstax(
     client: httpx.AsyncClient, listing_url: str, emit: Emit, discovered: list[dict]
 ) -> list[BookRef]:
@@ -420,17 +445,19 @@ async def discover_openstax(
             books.append(b_ref)
             
             subject_name, subject_id = classify_subject_by_text(b_ref.title, b_ref.file_name, b_ref.url, [b_ref.subject])
+            real_pages = await probe_pdf_page_count(client, b_ref.url)
             book_item = {
                 "id": "disc_" + hashlib.sha1(b_ref.url.encode()).hexdigest()[:8],
                 "title": b_ref.title,
                 "titleAr": b_ref.title,
                 "url": b_ref.url,
                 "fileName": b_ref.file_name,
-                "totalPages": 380,
+                "totalPages": real_pages,                 # REAL probed count (None => resolved at fetch). No more fabricated 380.
+                "pagesResolved": real_pages is not None,
                 "bookType": "core",
-                "grade": "Grade 11",
-                "term": "Full Year",
-                "year": "2026",
+                "grade": (meta.get("grade") if isinstance(meta, dict) else None),  # OpenStax has no grade/term/year — honest null, not fabricated
+                "term": None,
+                "year": None,
                 "language": b_ref.language or "en",
                 "subject": subject_name,
                 "subjectId": subject_id
@@ -449,114 +476,7 @@ async def discover_openstax(
     return books
 
 
-async def discover_moe(
-    client: httpx.AsyncClient, base_url: str, emit: Emit, discovered: list[dict]
-) -> list[BookRef]:
-    emit("log", {"text": f"MOE e-library catalogs under {base_url}", "level": "info"})
-    catalog_paths = [
-        "books.json",
-        "books/books.json",
-        "sec3guideforms/books.json",
-        "cha/books.json",
-        "ExamSpecifications/books.json",
-    ]
-    rows: list[tuple[dict, str]] = []
-    errors = []
-    
-    for path in catalog_paths:
-        full_url = urljoin(base_url, path)
-        try:
-            emit("log", {"text": f"Fetching MOE catalog path: {path} ...", "level": "info"})
-            r = await client.get(full_url, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
-            
-            status = r.status_code
-            content_type = r.headers.get("content-type", "unknown")
-            content_len = len(r.content)
-            
-            diagnostic_msg = f"{path} -> HTTP {status} | Content-Type: {content_type} | Length: {content_len} bytes"
-            emit("log", {"text": diagnostic_msg, "level": "info"})
-            
-            if status != 200:
-                errors.append(f"Failed to fetch {path}: HTTP {status}")
-                continue
-                
-            data = r.json()
-            src_dir = path.rsplit("/", 1)[0] if "/" in path else "root"
-            
-            # Support both top-level list and dict-wrapped formats (like {"books": [...]}, {"items": [...]})
-            items_list = None
-            if isinstance(data, list):
-                items_list = data
-            elif isinstance(data, dict):
-                items_list = data.get("books") or data.get("items") or data.get("data")
-                
-            if items_list and isinstance(items_list, list):
-                rows.extend((it, src_dir) for it in items_list if isinstance(it, dict))
-                emit("log", {"text": f"✓ {path} loaded successfully: +{len(items_list)} items found.", "level": "ok"})
-            else:
-                warn_msg = f"Catalog {path} was not a list and did not contain 'books'/'items' arrays."
-                emit("log", {"text": warn_msg, "level": "warning"})
-                errors.append(f"{path}: Invalid JSON catalog payload format.")
-                
-        except Exception as err:
-            err_msg = f"Error fetching or parsing catalog {path}: {err}"
-            emit("log", {"text": err_msg, "level": "error"})
-            errors.append(f"{path}: Exception: {err}")
 
-    # If all catalog paths failed, raise a loud exception instead of returning empty results silently!
-    if not rows and errors:
-        raise RuntimeError(f"All MOE e-library catalog path fetches failed! Crawl aborted. Diagnostics: {'; '.join(errors)}")
-
-    books: list[BookRef] = []
-    seen: set[str] = set()
-    for it, src_dir in rows:
-        link = (it.get("link") or "").strip().replace(" ", "")
-        if not link:
-            continue
-        link = urljoin(base_url, link)
-        if link.lower().endswith(".pdf.pdf"):
-            link = link[:-4]
-        if link in seen:
-            continue
-        seen.add(link)
-        subject = (it.get("subject") or "").replace("\U0001f393", "").strip()
-        file_name = os.path.basename(urlparse(link).path)
-        
-        b_ref = BookRef(
-            source="moe", title=subject or file_name,
-            url=link, subject=subject, category=src_dir,
-            stage=(it.get("stage") or "").strip(),
-            grade=(it.get("grade") or "").strip(), term=(it.get("term") or "").strip(),
-            type=(it.get("type") or "").strip(), language=_moe_lang(file_name),
-        )
-        books.append(b_ref)
-        
-        subject_name, subject_id = classify_subject_by_text(b_ref.title, b_ref.file_name, b_ref.url, [b_ref.subject])
-        
-        fn_clean = b_ref.file_name.replace(".pdf", "").replace("_", " ").replace("-", " ").title()
-        title_en = fn_clean if not _has_arabic(fn_clean) else b_ref.title
-        
-        book_item = {
-            "id": "disc_" + hashlib.sha1(b_ref.url.encode()).hexdigest()[:8],
-            "title": title_en,
-            "titleAr": b_ref.title,
-            "url": b_ref.url,
-            "fileName": b_ref.file_name,
-            "totalPages": 220,
-            "bookType": "core",
-            "grade": normalize_grade(b_ref.grade),
-            "term": normalize_term(b_ref.term),
-            "year": "2026",
-            "language": b_ref.language or "ar",
-            "subject": subject_name,
-            "subjectId": subject_id
-        }
-        discovered.append(book_item)
-        emit("log", {"text": f"✓ {b_ref.title}  → {b_ref.file_name}", "level": "ok"})
-        
-    emit("progress", {"pct": 70})
-    emit("log", {"text": f"MOE: {len(books)} unique books discovered dynamically from official catalogs.", "level": "ok"})
-    return books
 
 
 _HREF_RE = re.compile(r'<a\s+(?:[^>]*?\s+)?href=["\']([^"\']+)["\']', re.IGNORECASE)
@@ -600,13 +520,15 @@ async def discover_generic(
                     books.append(b_ref)
                     
                     subject_name, subject_id = classify_subject_by_text(b_ref.title, b_ref.file_name, b_ref.url)
+                    real_pages = await probe_pdf_page_count(client, b_ref.url)
                     book_item = {
                         "id": "disc_" + hashlib.sha1(b_ref.url.encode()).hexdigest()[:8],
                         "title": b_ref.title,
                         "titleAr": b_ref.title,
                         "url": b_ref.url,
                         "fileName": b_ref.file_name,
-                        "totalPages": 150,
+                        "totalPages": real_pages if real_pages is not None else "unknown/pending",
+                        "pagesResolved": real_pages is not None,
                         "bookType": "core",
                         "grade": "Grade 11",
                         "term": "Term 1",
@@ -676,11 +598,8 @@ async def crawl_and_explore(job_id: str, target_url: str, requester_email: str) 
             progress_pct = payload["pct"]
             update_job_db(job_id, target_url, "harvesting", progress_pct, logs, discovered)
 
-    target_url = target_url.strip()
     if "openstax.org" in target_url:
         source = "openstax"
-    elif "ellibrary.moe.gov.eg" in target_url or "moe.gov.eg" in target_url:
-        source = "moe"
     else:
         source = "generic"
 
@@ -688,8 +607,6 @@ async def crawl_and_explore(job_id: str, target_url: str, requester_email: str) 
     async with httpx.AsyncClient(timeout=timeout) as client:
         if source == "openstax":
             books = await discover_openstax(client, OPENSTAX_LISTING, emit, discovered)
-        elif source == "moe":
-            books = await discover_moe(client, MOE_BASE, emit, discovered)
         else:
             books = await discover_generic(client, target_url, max_depth=3, max_pages=80, emit=emit, discovered=discovered)
 

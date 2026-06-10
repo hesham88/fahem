@@ -102,7 +102,7 @@ const translations: Record<string, Record<string, string>> = {
     create_library: "Create Library",
     edit_library: "Edit Library",
     lib_id: "Library ID",
-    lib_id_placeholder: "e.g. lib_moe",
+    lib_id_placeholder: "e.g. lib_openstax",
     lib_name_en: "Library Name (EN)",
     lib_name_ar: "Library Name (AR)",
     lib_source: "Source Provider Type",
@@ -179,7 +179,7 @@ const translations: Record<string, Record<string, string>> = {
     create_library: "إنشاء مكتبة جديدة",
     edit_library: "تعديل المكتبة",
     lib_id: "رمز المكتبة الفريد",
-    lib_id_placeholder: "مثال: lib_moe",
+    lib_id_placeholder: "مثال: lib_openstax",
     lib_name_en: "اسم المكتبة (إنجليزي)",
     lib_name_ar: "اسم المكتبة (عربي)",
     lib_source: "مزود المحتوى",
@@ -673,7 +673,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   // Tree Explorer, Emoji Picker, Delete Confirm & Pending states
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    "lib_lib_moe": true // Expand first library by default if desired
+    "lib_lib_openstax": true // Expand first library by default if desired
   });
   const [crawlExpandedNodes, setCrawlExpandedNodes] = useState<Record<string, boolean>>({});
 

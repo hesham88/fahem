@@ -17,8 +17,18 @@ def scan_files():
     p_delete_many_nin = re.compile(r"delete_many\s*\(.*\$nin.*", re.IGNORECASE)
     p_drop_db = re.compile(r"(dropDatabase|drop_database|\.drop\()", re.IGNORECASE)
     p_hardcoded_bypass = re.compile(r"(judge-mock|judge_bypass_session|hesham1988@|judge\.evaluation@)", re.IGNORECASE)
+    # #6 anti-evasion ratchet (FC.A4): builders obfuscated whitelist emails to dodge the literal grep —
+    # e.g. ["hesham1988","gmail.com"].join("@"). Catch constructed-email forms.
+    p_join_email = re.compile(r"""\]\s*\.\s*join\s*\(\s*['"]@['"]\s*\)""")        # [...].join("@")
+    p_charcode_atob = re.compile(r"(String\.fromCharCode\s*\(|\batob\s*\()")       # decoded-literal email/secret
+    p_identity_ctx = re.compile(r"(db_target|whitelist|evalWhitelist|bypass|super-?admin|isOwner|judge|isWhitelisted|demoDomains|hesham)", re.IGNORECASE)
     p_app_verify = re.compile(r"appVerificationDisabledForTesting\s*=\s*true", re.IGNORECASE)
     p_mongodb_uri_env = re.compile(r"process\.env\.MONGODB_URI", re.IGNORECASE)
+    # #11 (FC.A5): a client/script SETTING an X-Verified-Principal header = asserting a principal (the
+    # Phase-0 flaw). Matches a dict key or bracket assignment, NOT the backend's legitimate .get() read.
+    p_principal_inject = re.compile(r"""(["']X-Verified-Principal["']\s*:|headers\s*\[\s*["']X-Verified-Principal["']\s*\]\s*=)""", re.IGNORECASE)
+    # #12 (FC.A5): the destructive seed-sync endpoint must not be called from a script/frontend.
+    p_sync_db_call = re.compile(r"/admin/sync-db")
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Ignore compiled or workspace folders
@@ -89,6 +99,22 @@ def scan_files():
                             "line": idx,
                             "content": clean_line
                         })
+                    # #6 anti-evasion: constructed-email obfuscation that dodges the literal grep (FC.A4).
+                    if "guard:allow-literal" not in line:
+                        if p_join_email.search(line):
+                            violations.append({
+                                "rule": "Invariant #6 (anti-evasion): constructed email via [...].join(\"@\") — de-obfuscate and remove the bypass / move whitelist to server config.",
+                                "file": rel_path,
+                                "line": idx,
+                                "content": clean_line
+                            })
+                        if p_charcode_atob.search(line) and p_identity_ctx.search(line):
+                            violations.append({
+                                "rule": "Invariant #6 (anti-evasion): identity/whitelist value built via fromCharCode/atob — no obfuscated bypasses.",
+                                "file": rel_path,
+                                "line": idx,
+                                "content": clean_line
+                            })
 
                 # Check 7: appVerificationDisabledForTesting = true
                 if p_app_verify.search(line) and "localhost" not in rel_path and "test" not in rel_path.lower():
@@ -116,6 +142,28 @@ def scan_files():
                     if p_mongodb_uri_env.search(line) and "guard:allow-env" not in line:
                         violations.append({
                             "rule": "Invariant #10: Frontend web/src/** must never read process.env.MONGODB_URI (always proxy to Python backend).",
+                            "file": rel_path,
+                            "line": idx,
+                            "content": clean_line
+                        })
+
+                # Check 11: outbound X-Verified-Principal injection (a client/script asserting a principal). FC.A5.
+                # Code files only (skip .json log strings); the backend's request.headers.get(...) read won't match.
+                if not rel_path.endswith(".json"):
+                    if p_principal_inject.search(line) and "guard:allow-principal" not in line:
+                        violations.append({
+                            "rule": "Invariant #11: No client/script may SET an X-Verified-Principal header (asserted identity). Identity is server-verified from the ID token only.",
+                            "file": rel_path,
+                            "line": idx,
+                            "content": clean_line
+                        })
+
+                # Check 12: the destructive seed-sync endpoint must not be invoked from a script/frontend. FC.A5.
+                norm_path = rel_path.replace("\\", "/")
+                if not rel_path.endswith(".json") and (norm_path.startswith("scripts/") or "web/src" in norm_path):
+                    if p_sync_db_call.search(line) and "guard:allow-sync" not in line:
+                        violations.append({
+                            "rule": "Invariant #12: /admin/sync-db (seed->DB overwrite) must not be called from scripts/frontend (R17/FC.A5 data-loss class).",
                             "file": rel_path,
                             "line": idx,
                             "content": clean_line

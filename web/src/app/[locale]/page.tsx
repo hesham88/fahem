@@ -1192,7 +1192,7 @@ export default function LandingPage() {
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                           <img src="/logos/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}

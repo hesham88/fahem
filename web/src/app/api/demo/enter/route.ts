@@ -27,13 +27,12 @@ export async function POST(req: NextRequest) {
       email = authCtx.email;
       uid = authCtx.uid;
       
-      const isOwner = email === ["hesham1988", "gmail.com"].join("@");
       const domain = email ? email.split("@")[1] : null;
       const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
 
-      if (isOwner || isJudgeDomain) {
-        tier = 1; // Tier-1 (verified domain or owner)
-        role = isOwner ? "super-admin" : "judge";
+      if (isJudgeDomain) {
+        tier = 1; // Tier-1 (verified domain)
+        role = "judge";
       } else {
         // Logged-in standard user gets Tier-0 but with their verified email
         tier = 0;
@@ -74,7 +73,7 @@ export async function POST(req: NextRequest) {
       uid: uid,
       email: email,
       role: role,
-      db_target: email === ["hesham1988", "gmail.com"].join("@") ? "fahem" : "fahem_sandbox",
+      db_target: "fahem_sandbox",
       sandbox_session_id: sandboxSessionId,
       tier: tier,
       exp: exp

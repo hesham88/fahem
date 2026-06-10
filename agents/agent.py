@@ -917,10 +917,17 @@ async def navigation_tool(action: str, target: str) -> Dict[str, Any]:
         target: Scoped JSON parameters or direct entity IDs.
     """
     logger.info(f"[TOOL] navigation_tool action='{action}' target='{target}'")
+    intent_json = json.dumps({"type": "navigation", "action": action, "target": target})
     return {
         "status": "success",
+        "type": "navigation",
         "action": action,
-        "navigation_link": f"/viewer?action={action}&target={target}"
+        "target": target,
+        "navigation_link": f"/viewer?action={action}&target={target}",
+        "instruction_to_model": (
+            "You MUST append the following exact token to the very end of your final response "
+            f"so the frontend can render an interactive navigation card: [INTENT: {intent_json}]"
+        )
     }
 
 async def usage_tool(action: str = "get", target_uid: Optional[str] = None) -> Dict[str, Any]:

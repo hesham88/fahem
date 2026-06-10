@@ -19,7 +19,6 @@ interface Book {
   size?: string;
   format?: string;
   downloads?: string;
-  isMoeIngested?: boolean;
   isUserUpload?: boolean;
   chapters?: any[];
   language?: string;
@@ -311,9 +310,6 @@ const getLibraryDescription = (id: string, name: string, name_ar: string, langua
   const isAr = language === "ar";
   if (id === "all") {
     return isAr ? "البوابة الرقمية الموحدة للمناهج والمرفوعات" : "Consolidated digital library portal";
-  }
-  if (id === "moe") {
-    return isAr ? "المناهج المصرية الرسمية المعتمدة" : "Official Egyptian education library";
   }
   if (id === "openstax") {
     return isAr ? "كتب جامعية وأكاديمية مفتوحة المصدر" : "Peer-reviewed open textbooks";
@@ -1110,7 +1106,6 @@ interface LibraryPanelProps {
   bubbleCoords: { x: number; y: number } | null;
   setBubbleCoords: (coords: { x: number; y: number } | null) => void;
   getAllPages: (book: Book, pages: any[]) => any[];
-  moeIngestedBooks: any[];
   dynamicBooks: any[];
   librarySearch: string;
   setLibrarySearch: (val: string) => void;
@@ -1141,7 +1136,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   bubbleCoords,
   setBubbleCoords,
   getAllPages,
-  moeIngestedBooks,
   dynamicBooks,
   librarySearch,
   setLibrarySearch,
@@ -2227,7 +2221,6 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     const lib = libraries.find(l => l._id === libId);
     if (!lib) return false;
     if (lib.subject_id && (b.subject_id === lib.subject_id || b.subjectId === lib.subject_id)) return true;
-    if (libId === "lib_moe" && (b.isMoeIngested || (b.subject_id && b.subject_id.includes("moe")) || (b.curriculum_id && b.curriculum_id.includes("moe")))) return true;
     if (libId === "lib_openstax" && ((b.titleEn && b.titleEn.toLowerCase().includes("openstax")) || (b.title && b.title.toLowerCase().includes("openstax")) || (b.sourceUrl && b.sourceUrl.includes("openstax")) || b.library_id === "lib_openstax")) return true;
     return false;
   };
@@ -2255,13 +2248,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         const res = await authedFetch("/api/libraries");
         if (!res.ok) throw new Error("Failed to fetch libraries");
         const data = await res.json();
-        if (isMounted && data.success) {
-          const filteredLibs = (data.libraries || []).filter((lib: any) => {
-            const isMoe = lib._id === "lib_moe" || lib.source === "moe" || lib._id.toLowerCase().includes("moe");
-            return !isMoe;
-          });
-          setLibraries(filteredLibs);
-        }
+          setLibraries(data.libraries || []);
       } catch (err) {
         console.error("Error loading libraries:", err);
       } finally {
@@ -2479,15 +2466,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const getBookLibraryId = (item: any): string => {
     const url = (item.source_url || item.sourceUrl || "").toLowerCase();
     const path = (item.storagePath || item.storage_path || "").toLowerCase();
-    const isMoe = item.isMoeIngested || path.includes("ellibrary_moe_gov_eg") || path.includes("moe library") || url.includes("ellibrary.moe.gov.eg");
     const isOpenStax = url.includes("openstax.org") || path.includes("assets_openstax_org") || (item.titleEn || "").toLowerCase().includes("openstax") || (item.title || "").toLowerCase().includes("openstax");
     
-    if (isMoe) return "moe";
     if (isOpenStax) return "openstax";
-    
-    const isAdmin = item.category === "admin" || path.startsWith("admin_uploads") || item.is_admin_upload || item.isAdminUpload;
-    if (isAdmin) return "general";
-    
     return "general";
   };
 
@@ -2720,6 +2701,51 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
     touchStartX.current = null;
   };
+
+  const checkTextSelection = () => {
+    try {
+      if (viewerPanelRef.current) {
+        const selection = window.getSelection();
+        if (!selection) return;
+        const text = selection.toString().trim();
+        if (text.length > 5) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          const containerRect = viewerPanelRef.current.getBoundingClientRect();
+          
+          const relativeLeft = rect.left - containerRect.left;
+          const relativeTop = rect.top - containerRect.top;
+          
+          const halfPopoverWidth = 90;
+          const clampedX = Math.max(halfPopoverWidth, Math.min(containerRect.width - halfPopoverWidth, relativeLeft + rect.width / 2));
+          
+          const popoverHeight = 40;
+          const margin = 8;
+          const clampedY = (relativeTop > popoverHeight + margin)
+            ? (relativeTop - popoverHeight - margin)
+            : (relativeTop + rect.height + margin);
+
+          setBubbleCoords({
+            x: clampedX,
+            y: clampedY
+          });
+          setSelectedText(text);
+
+          logActivityEvent("explain_requested", {
+            book_id: selectedBookReader ? (selectedBookReader._id || selectedBookReader.id) : "",
+            page_number: readerCurrentPage,
+            text_selection: text.slice(0, 100)
+          });
+        } else {
+          setBubbleCoords(null);
+          setSelectedText("");
+        }
+      }
+    } catch (err) {
+      console.error("Selection error:", err);
+    }
+  };
+
 
   const runVerifierAgent = async (file: File, storagePath: string, downloadURL: string) => {
     setIsVerifying(true);
@@ -3362,7 +3388,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       }));
                                     }
                                     if (ch.topics && ch.topics.length > 0) {
-                                      setReaderCurrentPage(ch.topics[0].pageNum);
+                                      setReaderCurrentPage(hasCover ? ch.topics[0].pageNum + 1 : ch.topics[0].pageNum);
                                     }
                                   }}
                                   style={{
@@ -3491,46 +3517,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 className="panel-card" 
                 ref={viewerPanelRef}
                 onTouchStart={handleTouchStart}
-                onTouchEnd={(e) => handleTouchEnd(e, totalPagesCount)}
-                onMouseUp={() => {
-                  if (viewerPanelRef.current) {
-                    const selection = window.getSelection();
-                    if (!selection) return;
-                    const text = selection.toString().trim();
-                    if (text.length > 5) {
-                      const range = selection.getRangeAt(0);
-                      const rect = range.getBoundingClientRect();
-                      const containerRect = viewerPanelRef.current.getBoundingClientRect();
-                      
-                      const relativeLeft = rect.left - containerRect.left;
-                      const relativeTop = rect.top - containerRect.top;
-                      
-                      const halfPopoverWidth = 90;
-                      const clampedX = Math.max(halfPopoverWidth, Math.min(containerRect.width - halfPopoverWidth, relativeLeft + rect.width / 2));
-                      
-                      const popoverHeight = 40;
-                      const margin = 8;
-                      const clampedY = (relativeTop > popoverHeight + margin)
-                        ? (relativeTop - popoverHeight - margin)
-                        : (relativeTop + rect.height + margin);
-
-                      setBubbleCoords({
-                        x: clampedX,
-                        y: clampedY
-                      });
-                      setSelectedText(text);
-
-                      logActivityEvent("explain_requested", {
-                        book_id: selectedBookReader._id || selectedBookReader.id,
-                        page_number: readerCurrentPage,
-                        text_selection: text.slice(0, 100)
-                      });
-                    } else {
-                      setBubbleCoords(null);
-                      setSelectedText("");
-                    }
-                  }
+                onTouchEnd={(e) => {
+                  handleTouchEnd(e, totalPagesCount);
+                  setTimeout(() => {
+                    checkTextSelection();
+                  }, 120);
                 }}
+                onMouseUp={checkTextSelection}
                 style={{
                   padding: "1.75rem", display: "flex", flexDirection: "column",
                   justifyContent: "space-between", minHeight: "550px", position: "relative",
@@ -3838,9 +3831,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             fontWeight: 800, fontSize: "0.8rem",
                             border: "1px solid rgba(16, 107, 163, 0.1)"
                           }}>
-                            🏫 {selectedBookReader.isMoeIngested 
-                              ? (language === "ar" ? "وزارة التربية والتعليم" : "MOE curriculum")
-                              : (language === "ar" ? "المكتبة الأكاديمية" : "Academic Library")}
+                            🏫 {language === "ar" ? "المكتبة الأكاديمية" : "Academic Library"}
                           </span>
                         </div>
 
@@ -3868,7 +3859,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         }}>
                           <div>
                             <strong>{language === "ar" ? "المرحلة الدراسية:" : "Education Stage:"}</strong>{" "}
-                            <span>{(selectedBookReader as any).stage || (selectedBookReader.isMoeIngested ? (language === "ar" ? "المرحلة الثانوية" : "Secondary Stage") : (language === "ar" ? "المرحلة الأكاديمية" : "Academic Stage"))}</span>
+                            <span>{(selectedBookReader as any).stage || (language === "ar" ? "المرحلة الأكاديمية" : "Academic Stage")}</span>
                           </div>
                           <div style={{ height: "1.2rem", width: "1px", background: "rgba(16, 107, 163, 0.15)" }}></div>
                           <div>
@@ -4911,8 +4902,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               const libId = getBookLibraryId(item);
                               return (
                                 <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "rgba(46, 125, 50, 0.12)", color: "var(--accent-green)", padding: "2px 6px", borderRadius: "8px", display: "inline-block" }}>
-                                  🏛️ {libId === "moe" ? (language === "ar" ? "وزارة التعليم" : "MOE Official") :
-                                      libId === "openstax" ? (language === "ar" ? "أوبن ستاكس" : "OpenStax") :
+                                  🏛️ {libId === "openstax" ? (language === "ar" ? "أوبن ستاكس" : "OpenStax") :
                                       (language === "ar" ? "المكتبة العامة" : "General Library")}
                                 </span>
                               );

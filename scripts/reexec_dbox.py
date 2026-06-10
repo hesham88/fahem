@@ -14,6 +14,10 @@ d_box in {D5, D6, D7} (the endgame lock — a fact you can't author).
                             returned a real embedded page (embeddings exist + index works).
   D7  per-book content     → list books, assert chapters are PER-BOOK, not one shared
                             "Chapter 1: Statements & Programming" (the Python contamination).
+  D-PYBOOK  ingest mission → the OpenStax "Introduction to Python Programming" book is fully
+                            ingested + present on the demo surface: real page count (not a
+                            fabricated constant), real multi-chapter TOC, and a grounded [pN]
+                            citation from it (embeddings + vector search work for THIS book).
 
 Exit 0 = independently verified PASS. Exit 1 = FAIL / could-not-verify (= not proven).
 Override base with env FAHEM_BASE (default https://fahem.pro).
@@ -49,6 +53,8 @@ BASE = os.environ.get("FAHEM_BASE", "https://fahem.pro").rstrip("/")
 PYBOOK = re.compile(r"statements?\s*(&|and)\s*programming", re.I)
 CITE = re.compile(r"\[p\s*\d+\]", re.I)
 DEFLECT = re.compile(r"which book|don'?t have|do not have|no book|empty librar|0 books|cannot find|i first need to know", re.I)
+# Known fabricated/flat page counts (async_crawler hardcodes 220/150; the reported flat 380; r7 page_count=10).
+FAB_PAGECOUNTS = {10, 150, 220, 380}
 
 
 def _headers(token=None):
@@ -102,9 +108,12 @@ def decode_demo_token(token):
     return {}
 
 
-def enter_demo(persona="student"):
+def enter_demo(persona="student", email=None):
+    payload = {"persona": persona}
+    if email:
+        payload["email"] = email
     try:
-        d = _post("/api/demo/enter", {"persona": persona}, timeout=30)
+        d = _post("/api/demo/enter", payload, timeout=30)
         tok = d.get("token")
         return (tok, "") if tok else (None, "demo/enter returned no token")
     except Exception as e:
@@ -168,6 +177,24 @@ def get_books(token):
 
 def book_id_of(b):
     return b.get("_id") or b.get("id") or b.get("book_id")
+
+
+def _page_count_of(b):
+    """Best-effort real page count across the field names the payload may use."""
+    for k in ("total_pages", "totalPages", "page_count", "pageCount", "num_pages",
+              "page_count_estimate", "pages"):
+        v = b.get(k)
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float):
+            return int(v)
+        if isinstance(v, str) and v.strip().isdigit():
+            return int(v.strip())
+        if isinstance(v, list):  # last resort: a pages array
+            return len(v)
+    return None
 
 
 def ask_agent(token, prompt, book_ids):
@@ -236,14 +263,28 @@ def verify_d7():
 
 
 def verify_d2():
-    # Isolation: the demo token must route to fahem_sandbox, never prod 'fahem'.
+    # Isolation, TWO checks (FC.A4):
+    #  (1) a normal demo token routes to fahem_sandbox;
+    #  (2) the SPOOFABLE owner-email backdoor is CLOSED — a tokenless /api/demo/enter carrying the
+    #      owner's email must NOT route db_target to prod 'fahem'. reexec previously missed this by
+    #      entering with no email; demo/enter:77 keyed db_target off an unauthenticated typed email.
     tok, err = enter_demo("student")
     if not tok:
         return False, err
     dbt = decode_demo_token(tok).get("db_target")
-    if dbt == "fahem_sandbox":
-        return True, "demo token routes db_target=fahem_sandbox (production 'fahem' is isolated)"
-    return False, f"demo token db_target='{dbt}' (expected fahem_sandbox) — sandbox is NOT isolated from prod"
+    if dbt != "fahem_sandbox":
+        return False, f"demo token db_target='{dbt}' (expected fahem_sandbox) — sandbox is NOT isolated from prod"
+    # Backdoor probe: build the owner email at runtime (this is a security regression probe, not a bypass).
+    owner_email = "@".join(("hesham1988", "gmail.com"))
+    tok2, err2 = enter_demo("student", email=owner_email)
+    if not tok2:
+        # Entry refused = acceptable (it did not hand out a prod-scoped token).
+        return True, f"demo routes to fahem_sandbox; owner-email entry refused — no prod backdoor"
+    dbt2 = decode_demo_token(tok2).get("db_target")
+    if dbt2 == "fahem":
+        return False, ("SPOOFABLE PROD BACKDOOR LIVE — a tokenless demo entry with the owner email routed "
+                       "db_target='fahem' (production). FC.A4 not fixed; this is the demo->prod leak path.")
+    return True, f"demo isolated (fahem_sandbox) AND owner-email spoof routes to '{dbt2}' (no prod backdoor)"
 
 
 def verify_d3():
@@ -348,6 +389,54 @@ def verify_d8():
     return True, f"TTS returned REAL speech audio (audio/wav, {n} base64 chars)"
 
 
+def verify_d_pybook():
+    # D-PYBOOK (FC.B5/FC.B6): the OpenStax "Introduction to Python Programming" book must be
+    # FULLY ingested and present on the live demo surface (sandbox replica of the prod ingest).
+    # Un-gameable conjunction: (1) a REAL page count — not a fabricated constant; (2) a real
+    # MULTI-chapter TOC for THIS book; (3) a grounded [pN] citation FROM this book (proves its
+    # pages are embedded and vector search returns a hit). This is the one per-book ingestion gate.
+    tok, err = enter_demo()
+    if not tok:
+        return False, err
+    books = get_books(tok)
+    if not books:
+        return False, "demo library is empty — the Python book is not ingested/replicated (FC.B5/B6)"
+    py = next((b for b in books
+               if "python" in (b.get("title", "") or "").lower()
+               or "python" in (b.get("title_ar", "") or "").lower()), None)
+    if not py:
+        return False, "the Python book is NOT in the demo library — FC.B5 ingest / FC.B6 replicate incomplete"
+    title = py.get("title") or py.get("title_ar")
+    bid = book_id_of(py)
+
+    # (1) real page count: present, > 1, and not one of the fabricated constants.
+    pc = _page_count_of(py)
+    if pc is None:
+        return False, f"'{title}' carries no page-count field — ingestion did not record real pages (FC.B1)"
+    if pc <= 1:
+        return False, f"'{title}' reports page_count={pc} (<=1) — not really ingested"
+    if pc in FAB_PAGECOUNTS:
+        return False, f"'{title}' page_count={pc} is a FABRICATED constant {sorted(FAB_PAGECOUNTS)} — FC.B1 not fixed"
+
+    # (2) real multi-chapter TOC for THIS book (not the single-chapter bug).
+    chapters = [c for c in (py.get("chapters") or [])
+                if isinstance(c, dict) and (c.get("title") or c.get("name"))]
+    if len(chapters) <= 1:
+        return False, f"'{title}' has {len(chapters)} chapter(s) — single-chapter bug (FC.B2) not fixed"
+
+    # (3) embedded + vector hit: the agent grounds an answer in THIS book with a [pN] citation.
+    prompt = f"Using the book '{title}', explain one concept it teaches and cite the exact page as [pN]."
+    text, aerr = ask_agent(tok, prompt, [bid] if bid else [])
+    if aerr:
+        return False, aerr
+    if not CITE.search(text):
+        if DEFLECT.search(text.lower()):
+            return False, f"agent deflected on '{title}' — its pages are not embedded/searchable (FC.B3)"
+        return False, f"agent answer over '{title}' had NO [pN] citation — embeddings/vector search not proven for this book"
+    cite = CITE.search(text).group(0)
+    return True, f"Python book fully ingested: '{title}' — {pc} pages, {len(chapters)} chapters, grounded cite {cite}"
+
+
 def verify_perf():
     # Catches the "everything got slow" regression: data path latency.
     t0 = time.time()
@@ -372,13 +461,88 @@ def verify_perf():
     return True, f"perf OK (enter {t1-t0:.1f}s, book list {list_s:.1f}s, {len(books)} books)"
 
 
+def verify_donation():
+    # Landing must carry the 3 one-click PayPal donation links (OR-18/OR-44).
+    codes = ["FKBWYZGBNDKU4", "D5RHBB8M694MN", "QE894AKFVYLZS"]
+    try:
+        html = _get("/en")
+    except Exception as e:
+        return False, f"landing fetch failed: {e}"
+    missing = [c for c in codes if c not in html]
+    if missing:
+        return False, f"landing is missing PayPal donation link(s): {missing}"
+    return True, "landing carries all 3 one-click PayPal donation links"
+
+
+def verify_contact():
+    # Public Contact page renders + the feedback write-path accepts a submission (OR-44).
+    try:
+        page = _get("/en/contact")
+    except Exception as e:
+        return False, f"/en/contact fetch failed: {e}"
+    if "contact" not in page.lower():
+        return False, "/en/contact did not render contact content"
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+    body = {"source": "contact", "category": "general", "title": "reexec-probe",
+            "body": "reexec probe " + str(int(time.time())), "email": "reexec@probe.test", "name": "ReExec"}
+    st, resp = _req("/api/feedback", "POST", body, token=tok, timeout=30)
+    if st != 200:
+        return False, f"/api/feedback POST returned {st} — contact write-path broken: {resp[:140]}"
+    if not any(k in resp.lower() for k in ("success", "\"id\"", "_id", "ok")):
+        return False, f"/api/feedback did not confirm persistence: {resp[:140]}"
+    return True, "Contact page renders + feedback submission persists (200)"
+
+
+def verify_autocomplete():
+    # Autocomplete data source: the subjects resolver returns real named entries (OR-28).
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+    try:
+        data = json.loads(_get("/api/subjects", tok))
+    except Exception as e:
+        return False, f"/api/subjects fetch failed: {e}"
+    items = data if isinstance(data, list) else (data.get("subjects") or data.get("data") or [])
+    named = [s for s in items if isinstance(s, dict) and (s.get("name") or s.get("title"))]
+    if not named:
+        return False, "subjects resolver returned no named entries (autocomplete source empty)"
+    return True, f"autocomplete source OK ({len(named)} subjects resolvable)"
+
+
+def verify_lang():
+    # Companion language lock: ask in Arabic, the reply must contain Arabic script (OR-39).
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+    try:
+        resp = _post("/api/agent",
+                     {"prompt": "اشرح لي فكرة بسيطة من الرياضيات.", "language": "ar", "selected_book_ids": []},
+                     token=tok, timeout=120, stream=True)
+        chunks, start = [], time.time()
+        for line in resp:
+            if time.time() - start > 100:
+                break
+            chunks.append(line.decode("utf-8", "ignore"))
+        text = "".join(chunks)
+    except Exception as e:
+        return False, f"agent (ar) call failed: {e}"
+    if re.search(r"[؀-ۿ]{3,}", text):
+        return True, "companion replied in Arabic when language=ar (no EN flip)"
+    return False, "companion did NOT reply in Arabic for language=ar — language lock broken"
+
+
 REEXEC = {
     "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
     "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
     "D7": verify_d7, "D8": verify_d8, "D9": verify_d9, "PERF": verify_perf,
+    "D-PYBOOK": verify_d_pybook,
+    "D-CONTACT": verify_contact, "D-AUTOCOMPLETE": verify_autocomplete, "D-LANG": verify_lang,
+    "D-DONATION": verify_donation,  # advisory only (client-rendered; not in the gate)
 }
-FAST = ["D1", "D2", "D3", "D7", "D9", "PERF"]            # quick HTTP, no agent — the regression gate
-SLOW = ["D4", "D5", "D6", "D8"]                           # agent/kill/TTS — the full deploy gate
+FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE"]
+SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG"]     # agent/kill/TTS/pybook/lang — the full deploy gate
 
 
 def run_one(name):

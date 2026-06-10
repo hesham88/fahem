@@ -49,7 +49,7 @@ def scan_files():
     
     # Files/folders to skip during scanning
     skipped_paths = [
-        ".git", "node_modules", ".next", "dist", "ignore", ".ignore", 
+        ".git", "node_modules", ".next", "dist", "ignore", ".ignore", "test-results",
         "evaluate_compliance.py", "manage_workspace.py", "turn_log.md" # skip administrative utilities and turn logs
     ]
     

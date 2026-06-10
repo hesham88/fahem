@@ -860,6 +860,338 @@ export default function StickyChat() {
   const [chatPacing, setChatPacing] = useState<"instant" | "pedagogical">("instant");
   const [lockedLanguage, setLockedLanguage] = useState<"auto" | "en" | "ar">("auto");
 
+  // Intent payload card state
+  const [cardLoading, setCardLoading] = useState<Record<string, boolean>>({});
+  const [cardSuccess, setCardSuccess] = useState<Record<string, string>>({});
+
+  interface IntentPayload {
+    type: string;
+    action: string;
+    target: any;
+  }
+
+  const parseIntentFromText = (text: string) => {
+    if (!text) return { cleanText: "", intent: null };
+    
+    // Search for [INTENT: <json>]
+    const intentMatch = text.match(/\[INTENT:\s*(\{.*?\})\s*\]/);
+    if (intentMatch) {
+      try {
+        const jsonStr = intentMatch[1];
+        const intent = JSON.parse(jsonStr) as IntentPayload;
+        // Strip the [INTENT: ...] pattern from display
+        const cleanText = text.replace(/\[INTENT:\s*\{.*?\}\s*\]/g, "").trim();
+        return { cleanText, intent };
+      } catch (err) {
+        console.error("Failed to parse intent JSON:", err);
+      }
+    }
+    return { cleanText: text, intent: null };
+  };
+
+  const renderIntentCard = (intent: IntentPayload, msgId: string) => {
+    if (!intent) return null;
+    const isLoading = !!cardLoading[msgId];
+    const successMsg = cardSuccess[msgId];
+
+    const isAr = language === "ar";
+
+    // Handle Execute Action
+    const handleExecuteAction = async () => {
+      setCardLoading(prev => ({ ...prev, [msgId]: true }));
+      try {
+        if (intent.type === "navigation") {
+          let action = intent.action;
+          let target = intent.target;
+          if (typeof target === "string") {
+            try {
+              target = JSON.parse(target);
+            } catch (_) {}
+          }
+          if (action === "view_page" && target && (target.bookId || target.book_id)) {
+            const bId = target.bookId || target.book_id;
+            const pg = parseInt(target.page, 10) || 1;
+            window.dispatchEvent(new CustomEvent("fahemNavigateBook", { detail: { bookId: bId, page: pg } }));
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم الانتقال بنجاح!" : "Navigated successfully!" }));
+          } else if (action === "view_tab" && target && target.tab) {
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: target.tab } }));
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم الانتقال بنجاح!" : "Navigated successfully!" }));
+          } else {
+            // Default fallback navigation dispatch
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: action } }));
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم الانتقال بنجاح!" : "Navigated successfully!" }));
+          }
+        } else if (intent.type === "write" || intent.action?.startsWith("create_")) {
+          let action = intent.action;
+          let target = intent.target;
+          if (typeof target === "string") {
+            try {
+              target = JSON.parse(target);
+            } catch (_) {}
+          }
+
+          if (action === "create_practice" || action === "practice") {
+            // POST /api/practice/generate
+            const res = await authedFetch("/api/practice/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                subject: target?.subject || "General",
+                bookId: target?.bookId || target?.book_id || "",
+                selectedChapters: target?.selectedChapters || target?.chapters || [],
+                customConcepts: target?.customConcepts || target?.concepts || "",
+                mode: target?.mode || "mcq",
+                language: language,
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) {
+                setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنشاء ممارسة جديدة بنجاح! جاري الانتقال..." : "Practice session created successfully! Navigating..." }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "practice" } }));
+                }, 1500);
+              } else {
+                throw new Error(data.error || "Generation returned success=false");
+              }
+            } else {
+              throw new Error(`HTTP error ${res.status}`);
+            }
+          } else if (action === "create_zatona" || action === "zatona") {
+            // POST /api/zatona
+            const res = await authedFetch("/api/zatona", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                concept: target?.concept || "AI generated focus area",
+                language: language
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.report) {
+                setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنتاج ملخص الزتونة بنجاح! جاري الانتقال..." : "Zatona summary created successfully! Navigating..." }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "zatona" } }));
+                }, 1500);
+              } else {
+                throw new Error(data.error || "Generation returned success=false");
+              }
+            } else {
+              throw new Error(`HTTP error ${res.status}`);
+            }
+          } else if (action === "create_assignment" || action === "assignment") {
+            // POST /api/assignments
+            const res = await authedFetch("/api/assignments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                group_id: target?.group_id || target?.groupId || "default",
+                title: target?.title || "New Assignment",
+                title_ar: target?.title_ar || target?.titleAr || "واجب جديد",
+                subject_id: target?.subject_id || target?.subjectId || null,
+                book_id: target?.book_id || target?.bookId || null,
+                timer_seconds: target?.timer_seconds || target?.timerSeconds || 120,
+                questions: target?.questions || []
+              })
+            });
+            if (res.ok) {
+              setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم نشر الواجب بنجاح! جاري الانتقال..." : "Assignment published successfully! Navigating..." }));
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "social" } }));
+              }, 1500);
+            } else {
+              throw new Error(`HTTP error ${res.status}`);
+            }
+          } else {
+            throw new Error(`Unknown write action: ${action}`);
+          }
+        }
+      } catch (err: any) {
+        console.error("Intent action failed:", err);
+        alert(isAr ? `فشلت العملية: ${err.message || err}` : `Action failed: ${err.message || err}`);
+      } finally {
+        setCardLoading(prev => ({ ...prev, [msgId]: false }));
+      }
+    };
+
+    // Determine card styling, labels, icons, etc.
+    let title = isAr ? "إجراء مقترح" : "Suggested Action";
+    let buttonLabel = isAr ? "موافق وتطبيق" : "Accept Action";
+    let icon = "⚡";
+    let detailsText = "";
+
+    if (intent.type === "navigation") {
+      title = isAr ? "📍 انتقال سريع للمحتوى" : "📍 Instant Content Navigation";
+      buttonLabel = isAr ? "انتقال الآن" : "Navigate Now";
+      icon = "🚀";
+      const action = intent.action;
+      let target = intent.target;
+      if (typeof target === "string") {
+        try { target = JSON.parse(target); } catch (_) {}
+      }
+      if (action === "view_page") {
+        detailsText = isAr 
+          ? `فتح صفحة رقم ${target?.page || 1}` 
+          : `Open textbook page ${target?.page || 1}`;
+      } else if (action === "view_tab") {
+        detailsText = isAr 
+          ? `الذهاب لعلامة تبويب: ${target?.tab || ""}` 
+          : `Go to tab: ${target?.tab || ""}`;
+      } else {
+        detailsText = isAr ? `انتقال سريع` : `Quick navigation`;
+      }
+    } else {
+      const action = intent.action;
+      let target = intent.target;
+      if (typeof target === "string") {
+        try { target = JSON.parse(target); } catch (_) {}
+      }
+      if (action === "create_practice" || action === "practice") {
+        title = isAr ? "🎯 غارة مراجعة نشطة وممارسة" : "🎯 Active Recall & Practice Session";
+        buttonLabel = isAr ? "إنشاء وبدء الممارسة" : "Create & Begin Practice";
+        icon = "🧠";
+        detailsText = isAr 
+          ? `إنشاء ممارسة مخصصة لـ: ${target?.subject || "عام"}` 
+          : `Create personalized practice on: ${target?.subject || "General"}`;
+      } else if (action === "create_zatona" || action === "zatona") {
+        title = isAr ? "⚡ توليد ملخص الزتونة الفوري" : "⚡ Instant Zatona Summary Core";
+        buttonLabel = isAr ? "توليد وعرض الملخص" : "Generate & Read Zatona";
+        icon = "💡";
+        detailsText = isAr 
+          ? `توليد زتونة مخصصة لـ: ${target?.concept?.slice(0, 60) || ""}` 
+          : `Generate custom Zatona for: ${target?.concept?.slice(0, 60) || ""}`;
+      } else if (action === "create_assignment" || action === "assignment") {
+        title = isAr ? "📝 نشر واجب جديد للمجموعة" : "📝 Publish Group Assignment";
+        buttonLabel = isAr ? "نشر وبدء الواجب" : "Publish & Assign";
+        icon = "✏️";
+        detailsText = isAr 
+          ? `واجب: ${target?.title_ar || target?.title || "جديد"}` 
+          : `Assignment: ${target?.title || "New"}`;
+      }
+    }
+
+    return (
+      <div
+        className="intent-interactive-card"
+        style={{
+          marginTop: "1rem",
+          padding: "1rem",
+          borderRadius: "14px",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.25)",
+          boxShadow: "0 8px 32px 0 rgba(16, 107, 163, 0.08), inset 0 1px 1px rgba(255,255,255,0.2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+          textAlign: isAr ? "right" : "left",
+          direction: isAr ? "rtl" : "ltr",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          animation: "cardSlideIn 0.4s ease-out"
+        }}
+      >
+        <style>{`
+          @keyframes cardSlideIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes pulseGlow {
+            0% { box-shadow: 0 0 4px rgba(16, 107, 163, 0.2); }
+            100% { box-shadow: 0 0 12px rgba(16, 107, 163, 0.6); }
+          }
+          .intent-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 107, 163, 0.25) !important;
+            filter: brightness(1.05);
+          }
+          .intent-button:active {
+            transform: translateY(1px);
+          }
+        `}</style>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ fontSize: "1.2rem" }}>{icon}</span>
+          <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "var(--primary)", letterSpacing: isAr ? "0" : "0.5px" }}>
+            {title}
+          </span>
+        </div>
+
+        {detailsText && (
+          <div style={{ fontSize: "0.8rem", color: "var(--foreground)", opacity: 0.85, fontWeight: 500 }}>
+            {detailsText}
+          </div>
+        )}
+
+        {successMsg ? (
+          <div 
+            style={{ 
+              fontSize: "0.82rem", 
+              color: "#27ae60", 
+              fontWeight: 700, 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "0.4rem",
+              background: "rgba(46, 204, 113, 0.1)",
+              padding: "0.5rem",
+              borderRadius: "8px",
+              border: "1px solid rgba(46, 204, 113, 0.2)"
+            }}
+          >
+            ✓ {successMsg}
+          </div>
+        ) : (
+          <button
+            onClick={handleExecuteAction}
+            disabled={isLoading}
+            className="intent-button"
+            style={{
+              width: "100%",
+              padding: "0.65rem 1rem",
+              borderRadius: "10px",
+              background: isLoading 
+                ? "rgba(16, 107, 163, 0.2)" 
+                : "linear-gradient(135deg, var(--primary) 0%, #1a8cc3 100%)",
+              color: "#fff",
+              border: "none",
+              cursor: isLoading ? "not-allowed" : "pointer",
+              fontSize: "0.8rem",
+              fontWeight: 800,
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.5rem",
+              boxShadow: "0 2px 6px rgba(16, 107, 163, 0.15)",
+              animation: isLoading ? "pulseGlow 1s infinite alternate" : "none"
+            }}
+          >
+            {isLoading ? (
+              <>
+                <span 
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    border: "2px solid #fff",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                    animation: "spin 0.8s linear infinite"
+                  }} 
+                />
+                {isAr ? "جاري المعالجة..." : "Processing..."}
+              </>
+            ) : (
+              buttonLabel
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+
   // Helper to parse standard MCQs
   const parseMcqFromText = (text: string) => {
     if (!text) return { isMcq: false, choices: [], correctKey: null, cleanText: "" };
@@ -2495,6 +2827,7 @@ User Question: ${queryText}`;
 
       {/* Slide-out Premium Chat Panel */}
       <div
+        className="sticky-chat-panel"
         style={{
           position: "fixed",
           top: layoutMode === "compact" ? "1.5rem" : "0",
@@ -2505,7 +2838,7 @@ User Question: ${queryText}`;
           width: layoutMode === "fullscreen" ? "100vw" : layoutMode === "side" ? "480px" : "400px",
           maxWidth: layoutMode === "fullscreen" ? "100%" : "calc(100vw - 1rem)",
           height: layoutMode === "compact" ? "calc(100dvh - 3rem)" : "100dvh",
-          backgroundColor: "rgba(253, 251, 247, 0.95)",
+          backgroundColor: "var(--sticky-chat-bg, rgba(253, 251, 247, 0.95))",
           backdropFilter: "blur(24px) saturate(190%)",
           WebkitBackdropFilter: "blur(24px) saturate(190%)",
           borderTop: layoutMode === "compact" ? "1px solid rgba(212, 175, 55, 0.35)" : "0px solid transparent",
@@ -2578,17 +2911,17 @@ User Question: ${queryText}`;
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
 
             {/* Interactive Layout Mode Selectors */}
-            <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", padding: "2px", borderRadius: "10px", marginRight: "0.25rem" }}>
+            <div className="sticky-chat-layout-controls" style={{ display: "flex", background: "var(--sticky-chat-option-toggle-bg, rgba(0,0,0,0.04))", padding: "2px", borderRadius: "10px", marginRight: "0.25rem" }}>
               <button
                 onClick={() => setLayoutMode("compact")}
                 style={{
-                  background: layoutMode === "compact" ? "#ffffff" : "transparent",
+                  background: layoutMode === "compact" ? "var(--sticky-chat-option-active-bg, #ffffff)" : "transparent",
                   border: "none",
                   borderRadius: "8px",
                   padding: "4px 8px",
                   cursor: "pointer",
                   fontSize: "0.75rem",
-                  color: layoutMode === "compact" ? "var(--primary)" : "#5a6e7c",
+                  color: layoutMode === "compact" ? "var(--primary)" : "var(--foreground)",
                   display: "flex",
                   alignItems: "center"
                 }}
@@ -2599,13 +2932,13 @@ User Question: ${queryText}`;
               <button
                 onClick={() => setLayoutMode("side")}
                 style={{
-                  background: layoutMode === "side" ? "#ffffff" : "transparent",
+                  background: layoutMode === "side" ? "var(--sticky-chat-option-active-bg, #ffffff)" : "transparent",
                   border: "none",
                   borderRadius: "8px",
                   padding: "4px 8px",
                   cursor: "pointer",
                   fontSize: "0.75rem",
-                  color: layoutMode === "side" ? "var(--primary)" : "#5a6e7c",
+                  color: layoutMode === "side" ? "var(--primary)" : "var(--foreground)",
                   display: "flex",
                   alignItems: "center"
                 }}
@@ -2616,13 +2949,13 @@ User Question: ${queryText}`;
               <button
                 onClick={() => setLayoutMode("fullscreen")}
                 style={{
-                  background: layoutMode === "fullscreen" ? "#ffffff" : "transparent",
+                  background: layoutMode === "fullscreen" ? "var(--sticky-chat-option-active-bg, #ffffff)" : "transparent",
                   border: "none",
                   borderRadius: "8px",
                   padding: "4px 8px",
                   cursor: "pointer",
                   fontSize: "0.75rem",
-                  color: layoutMode === "fullscreen" ? "var(--primary)" : "#5a6e7c",
+                  color: layoutMode === "fullscreen" ? "var(--primary)" : "var(--foreground)",
                   display: "flex",
                   alignItems: "center"
                 }}
@@ -2676,7 +3009,7 @@ User Question: ${queryText}`;
             alignItems: "center",
             justifyContent: "space-between",
             fontSize: "0.7rem",
-            color: "#5a6e7c"
+            color: "var(--text-muted, #5a6e7c)"
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
@@ -2705,6 +3038,7 @@ User Question: ${queryText}`;
 
         {/* Sliding History Panel */}
         <div
+          className="sticky-chat-history-panel"
           style={{
             position: "absolute",
             top: "5rem", // Below the header
@@ -2712,7 +3046,7 @@ User Question: ${queryText}`;
             left: dir === "rtl" ? (showHistory ? 0 : "-100%") : "auto",
             right: dir === "rtl" ? "auto" : (showHistory ? 0 : "-100%"),
             width: "100%",
-            backgroundColor: "rgba(253, 251, 247, 0.96)",
+            backgroundColor: "var(--sticky-chat-history-bg, rgba(253, 251, 247, 0.96))",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
             zIndex: 10,
@@ -2791,12 +3125,12 @@ User Question: ${queryText}`;
             className="custom-scrollbar"
           >
             {isSessionsLoading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", color: "#8a9ca8" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", color: "var(--text-muted, #8a9ca8)" }}>
                 <FiRefreshCw className="spin-icon" style={{ marginRight: "0.5rem", animation: "spin 2s linear infinite" }} />
                 <span style={{ fontSize: "0.8rem" }}>{ct("loading_chats")}</span>
               </div>
             ) : sessions.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", color: "#8a9ca8", textAlign: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", color: "var(--text-muted, #8a9ca8)", textAlign: "center" }}>
                 <FiFileText style={{ fontSize: "2rem", opacity: 0.3, marginBottom: "0.5rem" }} />
                 <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{ct("no_saved_chats")}</span>
               </div>
@@ -3059,7 +3393,8 @@ User Question: ${queryText}`;
                     className="floating-copy-btn"
                     onClick={(e) => {
                       try {
-                        const mcqData = parseMcqFromText(msg.text);
+                        const { cleanText: intentCleanText } = parseIntentFromText(msg.text);
+                        const mcqData = parseMcqFromText(intentCleanText);
                         navigator.clipboard.writeText(mcqData.cleanText);
                         const btn = e.currentTarget;
                         const origHtml = btn.innerHTML;
@@ -3094,11 +3429,13 @@ User Question: ${queryText}`;
                   <>
                     {msg.text ? (
                       (() => {
-                        const mcqData = parseMcqFromText(msg.text);
+                        const { cleanText: intentCleanText, intent } = parseIntentFromText(msg.text);
+                        const mcqData = parseMcqFromText(intentCleanText);
                         return (
                           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                             <div>{formatMessageText(mcqData.cleanText, msg.id)}</div>
-                            {renderDeepLinkChips(msg.text)}
+                            {renderDeepLinkChips(intentCleanText)}
+                            {intent && renderIntentCard(intent, msg.id)}
                             
                             {mcqData.isMcq && (
                               <div style={{
@@ -3290,7 +3627,8 @@ User Question: ${queryText}`;
                       type="button"
                       onClick={() => {
                         try {
-                          const mcqData = parseMcqFromText(msg.text);
+                          const { cleanText: intentCleanText } = parseIntentFromText(msg.text);
+                          const mcqData = parseMcqFromText(intentCleanText);
                           navigator.clipboard.writeText(mcqData.cleanText);
                         } catch (err) {
                           console.error("Copy failed:", err);
@@ -3390,53 +3728,15 @@ User Question: ${queryText}`;
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggestion Chips */}
-        {!isSending && smartSuggestions.length > 0 && (
-          <div
-            style={{
-              padding: "0.25rem 1.25rem",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "0.5rem",
-              marginBottom: "0.5rem"
-            }}
-          >
-            {smartSuggestions.map((preset, index) => (
-              <button
-                key={index}
-                onClick={() => handleSendMessage(preset.query)}
-                style={{
-                  padding: "0.4rem 0.75rem",
-                  borderRadius: "14px",
-                  border: "1px solid var(--card-border)",
-                  backgroundColor: "rgba(255,255,255,0.6)",
-                  color: "var(--primary)",
-                  fontSize: "0.75rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                  transition: "all 0.2s"
-                }}
-                className="chip-btn"
-              >
-                {preset.icon ? (
-                  <span style={{ fontSize: "0.85rem" }}>{preset.icon}</span>
-                ) : (
-                  <FiCompass style={{ fontSize: "0.8rem" }} />
-                )}
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Suggestion Chips Removed for FC.E2 */}
 
         {/* Interactive Option Toggles (Google Grounding, Voice Selector, Session Logs) */}
         <div
+          className="sticky-chat-options"
           style={{
             padding: "0.5rem 1.25rem",
             borderTop: "1px solid rgba(235, 220, 185, 0.25)",
-            backgroundColor: "rgba(255,255,255,0.2)",
+            backgroundColor: "var(--sticky-chat-form-bg, rgba(255,255,255,0.2))",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -3473,7 +3773,7 @@ User Question: ${queryText}`;
                 padding: "2px 6px",
                 borderRadius: "6px",
                 border: "1px solid var(--card-border)",
-                background: "rgba(255, 255, 255, 0.8)",
+                background: "var(--sticky-chat-input-bg, rgba(255, 255, 255, 0.8))",
                 fontSize: "0.7rem",
                 color: "var(--foreground)",
                 cursor: "pointer",
@@ -3500,11 +3800,12 @@ User Question: ${queryText}`;
             e.preventDefault();
             handleSendMessage();
           }}
+          className="sticky-chat-form"
           style={{
             padding: "1rem",
             paddingInlineEnd: layoutMode === "fullscreen" ? "6.5rem" : "5.5rem",
             borderTop: "1px dashed var(--card-border)",
-            backgroundColor: "rgba(255,255,255,0.45)",
+            backgroundColor: "var(--sticky-chat-form-bg, rgba(255,255,255,0.45))",
             display: "flex",
             flexDirection: "column",
             gap: "0.5rem",
@@ -3519,7 +3820,7 @@ User Question: ${queryText}`;
             gap: "1rem",
             marginBottom: "0.25rem",
             padding: "0.4rem 0.75rem",
-            backgroundColor: "rgba(255, 255, 255, 0.65)",
+            backgroundColor: "var(--sticky-chat-controls-bg, rgba(255, 255, 255, 0.65))",
             border: "1px solid rgba(16, 107, 163, 0.12)",
             borderRadius: "14px",
             backdropFilter: "blur(12px)",
@@ -3579,36 +3880,6 @@ User Question: ${queryText}`;
                 >
                   🐢 {language === "ar" ? "بيداغوجي" : "Pedagogical"}
                 </button>
-              </div>
-            </div>
-
-            {/* Language Lock Selector */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontWeight: 600, color: "var(--primary)", fontSize: "0.75rem" }}>
-                {language === "ar" ? "قفل اللغة:" : "Language Lock:"}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <span style={{ fontSize: "0.8rem" }}>🔒</span>
-                <select
-                  value={lockedLanguage}
-                  onChange={(e) => setLockedLanguage(e.target.value as "auto" | "en" | "ar")}
-                  style={{
-                    padding: "3px 8px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(16, 107, 163, 0.2)",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    fontSize: "0.75rem",
-                    color: "var(--primary)",
-                    cursor: "pointer",
-                    outline: "none",
-                    fontWeight: 700,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                  }}
-                >
-                  <option value="auto">✨ {language === "ar" ? "تلقائي" : "Auto"}</option>
-                  <option value="en">🇬🇧 English</option>
-                  <option value="ar">🇸🇦 العربية</option>
-                </select>
               </div>
             </div>
           </div>
@@ -3815,7 +4086,8 @@ User Question: ${queryText}`;
                 borderRadius: "20px",
                 fontSize: "0.85rem",
                 fontFamily: "var(--font-sans)",
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                backgroundColor: "var(--sticky-chat-input-bg, rgba(255, 255, 255, 0.9))",
+                color: "var(--foreground)",
                 outline: "none"
               }}
             />

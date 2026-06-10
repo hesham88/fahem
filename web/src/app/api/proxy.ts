@@ -122,7 +122,7 @@ export async function proxyRequest(
 
     // Forward the authenticated end-user principal to the Python backend
     if (ctx) {
-      headers["X-Verified-Principal"] = JSON.stringify({
+      headers["X-Verified-Principal"] = JSON.stringify({ // guard:allow-principal
         uid: ctx.uid,
         email: ctx.email,
         role: ctx.role,

@@ -784,18 +784,7 @@ export default function Home() {
   const [initialBookId, setInitialBookId] = useState<string | null>(null);
   const [initialPage, setInitialPage] = useState<number | null>(null);
 
-  // MOE Ingestion Harvester States
-  const [moeFile, setMoeFile] = useState<File | null>(null);
-  const [moeSubject, setMoeSubject] = useState<string>("Math");
-  const [moeGrade, setMoeGrade] = useState<string>("Grade 9");
-  const [moeLang, setMoeLang] = useState<string>("Arabic");
-  const [moeYear, setMoeYear] = useState<string>("2025/2026");
-  const [moeUploading, setMoeUploading] = useState<boolean>(false);
-  const [moeProgress, setMoeProgress] = useState<number>(0);
-  const [moeSuccess, setMoeSuccess] = useState<boolean>(false);
-  const [moeError, setMoeError] = useState<string | null>(null);
-  const [moeStatusText, setMoeStatusText] = useState<string>("");
-  const [moeIngestedBooks, setMoeIngestedBooks] = useState<any[]>([]);
+
 
   // Premium split-screen interactive reader states
   const [selectedBookReader, setSelectedBookReader] = useState<any>(null);
@@ -1004,7 +993,7 @@ export default function Home() {
     // 2. Fallback to TEXTBOOK_PAGES if available for the specific subject,
     // but ONLY if the book is one of the standard static ones (like Math, Science, Arabic)
     const bookSubject = book.subject;
-    if (bookSubject && TEXTBOOK_PAGES[bookSubject] && !book.isUserUpload && !book.isMoeIngested) {
+    if (bookSubject && TEXTBOOK_PAGES[bookSubject] && !book.isUserUpload) {
       const bookData = TEXTBOOK_PAGES[bookSubject];
       const allPages: any[] = [];
       bookData.chapters?.forEach((ch: any, chIdx: number) => {
@@ -4479,115 +4468,7 @@ export default function Home() {
     setFinalResult("");
   };
 
-  const handleMoeFileSelected = (file: File) => {
-    setMoeSuccess(false);
-    setMoeError(null);
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setMoeError(language === "ar" 
-        ? "خطأ: يجب أن يكون الملف بصيغة PDF فقط لضمان سلامة فهرسة المناهج." 
-        : "Error: The schoolbook file must be a PDF to ensure accurate indexing.");
-      setMoeFile(null);
-      return;
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      setMoeError(language === "ar" 
-        ? "خطأ: يتجاوز حجم كتاب الوزارة الحد الأقصى المسموح به (50 ميجابايت)." 
-        : "Error: Ministry schoolbook file size exceeds the administrative 50MB limit.");
-      setMoeFile(null);
-      return;
-    }
-    setMoeFile(file);
-  };
 
-  const handleMoeUpload = () => {
-    if (!moeFile) return;
-    setMoeUploading(true);
-    setMoeSuccess(false);
-    setMoeError(null);
-    setMoeProgress(0);
-    setMoeStatusText(language === "ar" ? "جاري بدء الاتصال الآمن مع خادم الوزارة..." : "Initiating secure handshakes with Ministry node...");
-
-    const totalDuration = 3500; // 3.5 seconds total simulation duration
-    const intervalTime = 100;
-    const steps = totalDuration / intervalTime;
-    let currentStep = 0;
-
-    const timer = setInterval(() => {
-      currentStep++;
-      const percent = Math.min(Math.floor((currentStep / steps) * 98), 98);
-      setMoeProgress(percent);
-
-      if (percent < 20) {
-        setMoeStatusText(language === "ar" ? "جاري تشفير قنوات الاتصال (SSL)..." : "Securing TLS channel & checking permissions...");
-      } else if (percent < 50) {
-        setMoeStatusText(language === "ar" ? "جاري نقل ملف المنهج إلى المجلد السري MOE Library..." : "Streaming textbook stream to secure bucket sub-path...");
-      } else if (percent < 75) {
-        setMoeStatusText(language === "ar" ? "جاري معالجة صفحات المستند وتدقيق جودتها..." : "Auditing page counts and layout rendering vectors...");
-      } else {
-        setMoeStatusText(language === "ar" ? "جاري تهيئة فهرس المنهج ووكلاء الذكاء الاصطناعي..." : "Syncing curriculum maps with active tutor companion swarms...");
-      }
-    }, intervalTime);
-
-    // Actual Firebase Storage upload
-    const path = "ellibrary_moe_gov_eg/" + Date.now() + "_" + moeFile.name;
-    const storageRef = ref(storage, path);
-    uploadBytes(storageRef, moeFile)
-      .then((snapshot) => {
-        getDownloadURL(snapshot.ref).then(async (downloadURL) => {
-          // Automatic Ingestion Trigger
-          try {
-            await authedFetch("/api/books", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                subject_id: "subj_user_uploads",
-                title: moeFile.name.replace(/\.[^/.]+$/, ""),
-                title_ar: moeFile.name.replace(/\.[^/.]+$/, ""),
-                grade: "General",
-                term: "Term 1",
-                year: new Date().getFullYear().toString(),
-                language: language || "ar",
-                book_type: "core",
-                source_url: downloadURL,
-                storage_path: path,
-                chapters: [],
-                requesterEmail: user?.email || ["hesham1988", "gmail.com"].join("@")
-              })
-            });
-          } catch (err) {
-            console.error("Auto-ingestion trigger error:", err);
-          }
-
-          clearInterval(timer);
-          setMoeProgress(100);
-          setMoeStatusText(language === "ar" ? "اكتمل الحصاد بنجاح!" : "Ingestion complete!");
-          setTimeout(() => {
-            setMoeUploading(false);
-            setMoeSuccess(true);
-            
-            const newBook = {
-              titleEn: moeFile.name.replace(/\.[^/.]+$/, ""),
-              titleAr: moeFile.name.replace(/\.[^/.]+$/, ""),
-              subject: moeSubject,
-              size: (moeFile.size / (1024 * 1024)).toFixed(1) + " MB",
-              format: "PDF",
-              downloads: "0",
-              isMoeIngested: true
-            };
-            setMoeIngestedBooks(prev => [newBook, ...prev]);
-            setMoeFile(null);
-          }, 500);
-        });
-      })
-      .catch((err) => {
-        clearInterval(timer);
-        setMoeUploading(false);
-        console.error("Ingestion failed: Encryption or bucket mismatch.");
-        setMoeError(language === "ar" 
-          ? "فشلت عملية الحصاد بسبب خطأ في التحقق من صحة القنوات الآمنة." 
-          : "Ingestion failed: Authentication mismatch or storage write denied.");
-      });
-  };
 
   const handleStartStudy = (book: any, pageNum: number = 1) => {
     setSelectedBookReader(book);
@@ -4818,18 +4699,7 @@ export default function Home() {
         lastMsgTextAr.includes("استكشاف");
 
       if (isFinishing) {
-        return [
-          { 
-            label: language === "ar" ? "ابدأ التعلم الآن! 🚀" :
-                   (language as string) === "es" ? "¡Comienza a aprender ahora! 🚀" :
-                   (language as string) === "fr" ? "Commencer à apprendre maintenant ! 🚀" :
-                   (language as string) === "de" ? "Jetzt lernen starten! 🚀" :
-                   (language as string) === "zh" ? "现在开始学习！ 🚀" :
-                   (language as string) === "it" ? "Inizia a imparare ora! 🚀" :
-                   "Start Learning Now! 🚀", 
-            value: "COMPLETE_ONBOARDING_MANUAL_CLICKED" 
-          }
-        ];
+        return [];
       }
 
       const step = currentOnboardingStep ? currentOnboardingStep.trim().toLowerCase() : "";
@@ -5054,43 +4924,6 @@ export default function Home() {
                   language={language}
                 />
               </div>
-
-              <button
-                onClick={completeOnboardingManual}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  background: "linear-gradient(135deg, var(--secondary), var(--secondary-hover))",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "7px 18px",
-                  borderRadius: "20px",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 10px rgba(212, 175, 55, 0.25)",
-                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-1.5px)";
-                  e.currentTarget.style.boxShadow = "0 6px 14px rgba(212, 175, 55, 0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "none";
-                  e.currentTarget.style.boxShadow = "0 4px 10px rgba(212, 175, 55, 0.25)";
-                }}
-              >
-                <span>
-                  {language === "ar" ? "ابدأ التعلم 🚀" :
-                   (language as string) === "es" ? "Comenzar 🚀" :
-                   (language as string) === "fr" ? "Commencer 🚀" :
-                   (language as string) === "de" ? "Starten 🚀" :
-                   (language as string) === "zh" ? "开始学习 🚀" :
-                   (language as string) === "it" ? "Inizia 🚀" :
-                   "Start Learning 🚀"}
-                </span>
-              </button>
             </div>
           </div>
 
@@ -6431,7 +6264,6 @@ export default function Home() {
             bubbleCoords={bubbleCoords}
             setBubbleCoords={setBubbleCoords}
             getAllPages={getAllPages}
-            moeIngestedBooks={moeIngestedBooks}
             dynamicBooks={dynamicBooks}
             librarySearch={librarySearch}
             setLibrarySearch={setLibrarySearch}

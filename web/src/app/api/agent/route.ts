@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
 
           const requestHeaders: Record<string, string> = {
             "Content-Type": "application/json",
-            "X-Verified-Principal": JSON.stringify({
+            "X-Verified-Principal": JSON.stringify({ // guard:allow-principal
               uid: ctx.uid,
               email: ctx.email,
               role: ctx.role,

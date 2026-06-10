@@ -68,10 +68,9 @@ export async function GET(req: NextRequest) {
           const lib = (db.libraries || []).find((l: any) => l._id === libraryId);
           const isDirectMatch = book.library_id === libraryId;
           const isSubjectMatch = lib && lib.subject_id && book.subject_id === lib.subject_id;
-          const isMoeFallback = libraryId === "lib_moe" && (book.isMoeIngested || (book.subject_id && book.subject_id.includes("moe")) || (book.curriculum_id && book.curriculum_id.includes("moe")));
           const isOpenstaxFallback = libraryId === "lib_openstax" && ((book.titleEn && book.titleEn.toLowerCase().includes("openstax")) || (book.title && book.title.toLowerCase().includes("openstax")) || book.library_id === "lib_openstax");
           
-          if (!isDirectMatch && !isSubjectMatch && !isMoeFallback && !isOpenstaxFallback) {
+          if (!isDirectMatch && !isSubjectMatch && !isOpenstaxFallback) {
             return false;
           }
         }

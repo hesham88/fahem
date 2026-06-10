@@ -143,9 +143,46 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
     // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
     const config = await getDBConfig();
     if (config && config.evalSandboxEnabled === false) {
-      const tokenTier = payload.tier !== undefined ? Number(payload.tier) : 0;
-      if (tokenTier !== 0) {
-        return null; // Reject live verified Tier-1 tokens! But bypass/allow for public Tier-0 (payload.tier === 0).
+      if (payload.role !== "admin" && payload.role !== "super-admin") {
+        const tokenTier = payload.tier !== undefined ? Number(payload.tier) : 0;
+        if (tokenTier !== 0) {
+          return null; // Reject live verified Tier-1 tokens! But bypass/allow for public Tier-0 (payload.tier === 0).
+        }
+      }
+    }
+
+    // Check if this session has been killed or ended by an admin
+    if (payload.sandbox_session_id) {
+      let isKilled = true; // Fail closed by default
+      const ctxPayload = {
+        uid: payload.uid,
+        email: payload.email,
+        role: payload.role as Role,
+        db_target: payload.db_target || "fahem_sandbox",
+        sandbox_session_id: payload.sandbox_session_id,
+        tier: payload.tier
+      };
+      if (isLocalEnv()) {
+        const db = getLocalDb() as any;
+        const session = (db.demo_sessions || []).find((s: any) => s.sandbox_session_id === payload.sandbox_session_id);
+        if (session && session.status !== "killed" && session.status !== "ended") {
+          isKilled = false; // Successfully verified as active (not killed/ended)
+        }
+      } else {
+        try {
+          const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(payload.sandbox_session_id)}`, "GET", undefined, ctxPayload);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.status !== "killed" && data.status !== "ended") {
+              isKilled = false; // Successfully verified as active (not killed/ended)
+            }
+          }
+        } catch (err) {
+          console.error("[auth] Failed to check demo session status in production DB via proxy:", err);
+        }
+      }
+      if (isKilled) {
+        return null; // Token revoked or unverifiable! Fail closed.
       }
     }
 
@@ -172,33 +209,6 @@ export async function verifyAuth(req: Request): Promise<AuthCtx | null> {
   if (token.startsWith("demo-token:")) {
     const ctx = await verifyDemoToken(token);
     if (ctx) {
-      // Check if this session has been killed or ended by an admin
-      let isKilled = true; // Fail closed by default
-      if (ctx.sandbox_session_id) {
-        if (isLocalEnv()) {
-          const db = getLocalDb() as any;
-          const session = (db.demo_sessions || []).find((s: any) => s.sandbox_session_id === ctx.sandbox_session_id);
-          if (session && session.status !== "killed" && session.status !== "ended") {
-            isKilled = false; // Successfully verified as active (not killed/ended)
-          }
-        } else {
-          try {
-            const res = await proxyRequest(`/auth/session-status?sandbox_session_id=${encodeURIComponent(ctx.sandbox_session_id)}`, "GET", undefined, ctx);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success && data.status !== "killed" && data.status !== "ended") {
-                isKilled = false; // Successfully verified as active (not killed/ended)
-              }
-            }
-          } catch (err) {
-            console.error("[auth] Failed to check demo session status in production DB via proxy:", err);
-          }
-        }
-      }
-      if (isKilled) {
-        return null; // Token revoked or unverifiable! Fail closed.
-      }
-
       dbContextStorage.enterWith({ db_target: ctx.db_target || "fahem_sandbox" });
       return ctx;
     }

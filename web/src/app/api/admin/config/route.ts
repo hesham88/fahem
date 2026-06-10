@@ -5,10 +5,7 @@ import { requireAdmin } from "../../_auth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_WHITELIST = [
-  ["judge.evaluation", "fahem.edu"].join("@"),
-  ["hesham1988", "gmail.com"].join("@")
-];
+const DEFAULT_WHITELIST: string[] = [];
 
 export async function GET(req: NextRequest) {
   try {

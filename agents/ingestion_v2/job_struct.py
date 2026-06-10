@@ -124,13 +124,58 @@ Strictly adhere to the following layout parsing rules:
    - Do NOT emit blocks for page headers, footers, page numbering, or decorative logo labels. Filter them out entirely.
 """
 
-def parse_salvaged_json(json_str):
+def sanitize_raw_struct_dict(raw_dict, page_num=None):
+    """
+    Sanitizes raw parsed json dict before Pydantic validation.
+    Normalizes empty code/list blocks into paragraphs with space text: " "
+    """
+    if not isinstance(raw_dict, dict):
+        return raw_dict
+    blocks = raw_dict.get("blocks", [])
+    if not isinstance(blocks, list):
+        return raw_dict
+    
+    parents = set()
+    for b in blocks:
+        if isinstance(b, dict) and b.get("parent"):
+            parents.add(b.get("parent"))
+
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        b_type = b.get("type")
+        b_id = b.get("id")
+
+        if b_type in ["callout", "example"]:
+            if b_id not in parents:
+                print(f"[Pre-Validation Self-Healing] Hollow container '{b_type}' block '{b_id}' on page {page_num} has no child blocks. Demoting to paragraph.", file=sys.stderr)
+                b["type"] = "paragraph"
+                if not b.get("text"):
+                    b["text"] = b.get("title") or b.get("label") or b.get("prompt") or " "
+        elif b_type == "code":
+            text_val = b.get("text")
+            if not text_val or not text_val.strip():
+                print(f"[Pre-Validation Self-Healing] Empty code block '{b_id}' on page {page_num}. Changing to paragraph.", file=sys.stderr)
+                b["type"] = "paragraph"
+                b["text"] = " "
+        elif b_type == "list":
+            items_val = b.get("items")
+            if not items_val or len(items_val) == 0:
+                print(f"[Pre-Validation Self-Healing] Empty list block '{b_id}' on page {page_num}. Demoting to paragraph.", file=sys.stderr)
+                b["type"] = "paragraph"
+                b["text"] = b.get("text") or " "
+    return raw_dict
+
+def parse_salvaged_json(json_str, page_num=None):
     """
     Tries to parse JSON. If truncated, trims trailing fragments, balances brackets,
     and returns a salvageable, partial block array.
     """
     try:
-        return json.loads(json_str)
+        parsed = json.loads(json_str)
+        if parsed:
+            parsed = sanitize_raw_struct_dict(parsed, page_num)
+        return parsed
     except Exception as e:
         print(f"[Salvage Parser] Initial JSON load failed: {e}. Attempting salvage recovery...", file=sys.stderr)
         
@@ -160,7 +205,9 @@ def parse_salvaged_json(json_str):
         blocks_list = json.loads(salvaged_array + ']')
         # Deduce direction
         dir_val = "rtl" if "العربية" in json_str or "rtl" in json_str else "ltr"
-        return {"dir": dir_val, "blocks": blocks_list}
+        parsed = {"dir": dir_val, "blocks": blocks_list}
+        parsed = sanitize_raw_struct_dict(parsed, page_num)
+        return parsed
     except Exception as err2:
         print(f"[Salvage Parser] Salvage failed: {err2}", file=sys.stderr)
         
@@ -292,6 +339,14 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
             
         json_text = strip_markdown_json(json_text)
             
+        # Pre-validation JSON sanitization to normalize empty code/list blocks
+        try:
+            raw_dict = json.loads(json_text)
+            raw_dict = sanitize_raw_struct_dict(raw_dict, page_num)
+            json_text = json.dumps(raw_dict)
+        except Exception as pe:
+            print(f"[Pre-Validation Sanitization Error] Failed to parse/sanitize raw dict: {pe}. Proceeding with raw json.", file=sys.stderr)
+
         parsed_struct = PageStructure.model_validate_json(json_text)
         
         blocks_dict_list = []
@@ -323,7 +378,7 @@ def analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num):
             if 'resp' in locals() and resp and resp.text:
                 json_text = resp.text
                 json_text = strip_markdown_json(json_text)
-                parsed = parse_salvaged_json(json_text)
+                parsed = parse_salvaged_json(json_text, page_num=page_num)
                 if parsed:
                     salvaged_blocks = parsed.get("blocks", [])
                     for b_dict in salvaged_blocks:

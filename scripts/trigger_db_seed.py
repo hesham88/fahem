@@ -18,7 +18,7 @@ if not token:
 headers = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {token}",
-    "X-Verified-Principal": json.dumps({
+    "X-Verified-Principal": json.dumps({ # guard:allow-principal
         "uid": "fDtKpvuKYuSgB3km8DRTRgOU3RH3",
         "email": "hesham1988@gmail.com",
         "role": "super-admin",

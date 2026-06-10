@@ -53,6 +53,33 @@ def main():
     r = root()
     violations = []
 
+    # The re-exec sweeper (reexec_dbox.py) is the SOURCE OF TRUTH (BG.11) but isn't a guard_*.py, so it
+    # wasn't scanned — a builder could swap it for an older/weaker copy (e.g. scripts/_backups/reexec_*)
+    # and revert the un-gameable assertions undetected. Pin a set of CANARY assertions that must be present;
+    # a missing canary = the sweeper was reverted/weakened. (Owner can update canaries when extending it.)
+    reexec_path = os.path.join(r, "scripts", "reexec_dbox.py")
+    REEXEC_CANARIES = [
+        ("150000", "D8 silent-fallback rejection threshold (real-audio size gate)"),
+        ("FAB_PAGECOUNTS", "D-PYBOOK fabricated-page-count guard"),
+        ("SPOOFABLE PROD BACKDOOR", "D2 demo->prod backdoor probe"),
+        ('"D-PYBOOK"', "D-PYBOOK registered in the sweep"),
+    ]
+    if not os.path.exists(reexec_path):
+        violations.append("scripts/reexec_dbox.py is MISSING — the source-of-truth sweeper was removed.")
+    else:
+        try:
+            reexec_src = open(reexec_path, "r", encoding="utf-8").read()
+            for canary, why in REEXEC_CANARIES:
+                if canary not in reexec_src:
+                    violations.append(
+                        f"scripts/reexec_dbox.py LOST canary {canary!r} ({why}) — sweeper reverted/weakened "
+                        f"(possible swap from scripts/_backups/). Restore the hardened checks.")
+        except Exception as e:
+            violations.append(f"Could not read scripts/reexec_dbox.py: {e}")
+    # A stray backup copy of the sweeper is a swap risk — warn (not fatal) so the owner can prune it.
+    for bk in glob.glob(os.path.join(r, "scripts", "_backups", "reexec_dbox*")):
+        print(f"[INTEGRITY][WARN] backup copy of the sweeper present (swap risk): {os.path.relpath(bk, r)}")
+
     guard_files = sorted(glob.glob(os.path.join(r, "scripts", "guard_*.py")))
     spec_files = sorted(glob.glob(os.path.join(r, "web", "e2e", "*.spec.ts")))
 
