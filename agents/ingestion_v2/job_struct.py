@@ -215,15 +215,38 @@ def verify_blocks_integrity(blocks, page_num):
             
         if b_type in ["callout", "example"]:
             if b_id not in parents:
-                raise ValueError(f"Hollow container block: '{b_type}' block '{b_id}' on page {page_num} has no child blocks pointing to it.")
+                # Self-healing: Demote hollow container to paragraph
+                print(f"[Self-Healing] Hollow container '{b_type}' block '{b_id}' on page {page_num} has no child blocks. Demoting to paragraph.", file=sys.stderr)
+                if isinstance(b, dict):
+                    b["type"] = "paragraph"
+                    if not b.get("text"):
+                        b["text"] = b.get("title") or b.get("label") or b.get("prompt") or ""
+                else:
+                    setattr(b, "type", "paragraph")
+                    if not getattr(b, "text", None):
+                        setattr(b, "text", getattr(b, "title", None) or getattr(b, "label", None) or getattr(b, "prompt", None) or "")
         elif b_type == "code":
             text_val = b.get("text") if isinstance(b, dict) else getattr(b, "text", "")
             if not text_val or not text_val.strip():
-                raise ValueError(f"Empty code block: 'code' block '{b_id}' on page {page_num} text payload is missing or empty.")
+                # Self-healing: Demote empty code block to paragraph
+                print(f"[Self-Healing] Empty code block '{b_id}' on page {page_num}. Changing to paragraph.", file=sys.stderr)
+                if isinstance(b, dict):
+                    b["type"] = "paragraph"
+                    b["text"] = " "
+                else:
+                    setattr(b, "type", "paragraph")
+                    setattr(b, "text", " ")
         elif b_type == "list":
             items_val = b.get("items") if isinstance(b, dict) else getattr(b, "items", [])
             if not items_val or len(items_val) == 0:
-                raise ValueError(f"Empty list block: 'list' block '{b_id}' on page {page_num} has no list items.")
+                # Self-healing: Demote empty list block to paragraph
+                print(f"[Self-Healing] Empty list block '{b_id}' on page {page_num}. Demoting to paragraph.", file=sys.stderr)
+                if isinstance(b, dict):
+                    b["type"] = "paragraph"
+                    b["text"] = b.get("text") or " "
+                else:
+                    setattr(b, "type", "paragraph")
+                    setattr(b, "text", getattr(b, "text", None) or " ")
 
 def strip_markdown_json(text):
     text = text.strip()
@@ -447,26 +470,42 @@ def process_single_page_worker(page_num, temp_pdf_path, api_key, model, payload)
         try:
             def _api_call():
                 return analyze_page_with_gemini_vision(png_bytes, api_key, model, page_num)
-            structured_data = execute_with_retry(_api_call, max_retries=3, base_delay=2.0)
+            structured_data = execute_with_retry(_api_call, max_retries=5, base_delay=2.0)
         except Exception as api_err:
             err_msg = str(api_err)
             print(f"[Worker] API Structuring attempt failed on Page {page_num}: {api_err}", file=sys.stderr)
-            
-        if not structured_data:
-            raise RuntimeError(f"Gemini visual structuring failed or returned empty for Page {page_num}. Details: {err_msg}")
-            
-        # Assemble PageDoc structure
+
+        # RESILIENCE (replaces the all-or-nothing abort): a page that fails vision
+        # (429/truncation) or returns no blocks must NOT crash the whole book. Keep the
+        # raw extracted text so the page's content still embeds/searches; a genuinely
+        # blank/image-only page is marked 'empty' (valid, no implications downstream).
+        if structured_data and structured_data.get("blocks"):
+            status = "structured"
+            blocks = structured_data.get("blocks", [])
+            page_dir = structured_data.get("dir", "rtl")
+        else:
+            clean_text = (raw_text or "").strip()
+            page_dir = "rtl" if _has_arabic(clean_text) else "ltr"
+            if clean_text:
+                status = "text_fallback"
+                blocks = [{"id": f"p{page_num}-fallback", "parent": "", "type": "paragraph",
+                           "text": clean_text, "dir": page_dir}]
+                print(f"[Worker] Page {page_num}: vision unavailable ({err_msg or 'empty'}); kept raw-text fallback ({len(clean_text)} chars).", file=sys.stderr)
+            else:
+                status = "empty"
+                blocks = []
+                print(f"[Worker] Page {page_num}: blank/image-only — marked 'empty'.", file=sys.stderr)
+
         page_doc = {
             "_id": f"page_{payload['book_id']}_{page_num}",
             "book_id": payload["book_id"],
             "page_number": page_num,
-            "dir": structured_data.get("dir", "rtl"),
-            "blocks": structured_data.get("blocks", []),
-            "status": "structured",
+            "dir": page_dir,
+            "blocks": blocks,
+            "status": status,
             "pageHash": page_hash,
             "model": model or "gemini-3.1-flash-lite"
         }
-        
         return page_num, page_doc, None
     except Exception as page_err:
         return page_num, None, str(page_err)
@@ -517,8 +556,8 @@ def main():
 
     struct_start_time = time.time()
 
-    # Thread Pool execution with 3 workers
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Thread Pool execution (raised 3->6 now that page failures are non-fatal + 429 backs off)
+    with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(process_single_page_worker, p_num, temp_pdf_path, api_key, model, payload): p_num
             for p_num in range(1, total_pages + 1)
@@ -565,12 +604,22 @@ def main():
                 with db_write_lock:
                     update_job_status(job_id, "processing", "struct", 30, logs, processed_pages, total_pages, False, is_local, **metadata)
 
-    if has_errors or processed_pages < total_pages:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ❌ Job 2 failed. Page structuring did not complete successfully for all pages. Downstream jobs aborted.")
+    fallback_pages = sum(1 for d in final_pages.values() if d.get("status") in ("text_fallback", "empty"))
+    real_pages = processed_pages - fallback_pages
+    unrecoverable = total_pages - processed_pages
+
+    # Only abort on a CATASTROPHIC shortfall (systemic failure: bad model/quota/key),
+    # never over a handful of odd pages on a long book. Resilient pages already carry
+    # raw-text fallback or are marked 'empty', so the book stays usable.
+    if processed_pages < max(1, int(total_pages * 0.5)):
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ❌ Job 2 failed: only {processed_pages}/{total_pages} pages processed ({real_pages} structured). Systemic failure — downstream aborted.")
         update_job_status(job_id, "failed", "struct", 30, logs, processed_pages, total_pages, False, is_local, **metadata)
         sys.exit(1)
 
-    logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ✅ Page structuring completed successfully. Triggering Downstream Job 3 (Translate)...")
+    if fallback_pages or unrecoverable:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ⚠️ Structuring complete (resilient): {real_pages} structured, {fallback_pages} text-fallback/empty, {unrecoverable} unrecoverable of {total_pages}. Proceeding to downstream.")
+    else:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [STRUCT] ✅ Page structuring completed successfully (all {total_pages} pages). Triggering Downstream Job 3 (Translate)...")
     update_job_status(job_id, "processing", "translate", 55, logs, processed_pages, total_pages, False, is_local, **metadata)
 
     # Trigger Job 3 (Translate)
