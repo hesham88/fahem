@@ -6,11 +6,27 @@ import { useTranslation } from "../context/LanguageContext";
 
 interface DonationCardProps {
   variant?: "hero" | "section" | "compact";
+  isDarkMode?: boolean;
 }
 
-export default function DonationCard({ variant = "section" }: DonationCardProps) {
+export default function DonationCard({ variant = "section", isDarkMode: propDarkMode }: DonationCardProps) {
   const { language } = useTranslation();
   const isAr = language === "ar";
+  const [localDarkMode, setLocalDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    if (propDarkMode !== undefined) return;
+    if (typeof window !== "undefined") {
+      setLocalDarkMode(document.documentElement.classList.contains("dark"));
+      const observer = new MutationObserver(() => {
+        setLocalDarkMode(document.documentElement.classList.contains("dark"));
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+      return () => observer.disconnect();
+    }
+  }, [propDarkMode]);
+
+  const isDarkMode = propDarkMode !== undefined ? propDarkMode : localDarkMode;
 
   const t = {
     heroTitle: isAr ? "ادعم استمرارية فاهم" : "Support Fahem's Servers",
@@ -45,28 +61,28 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
       <div 
         className="donation-hero-card"
         style={{
-          background: "rgba(30, 41, 59, 0.4)",
+          background: isDarkMode ? "rgba(30, 41, 59, 0.4)" : "linear-gradient(135deg, rgba(255, 215, 0, 0.07), rgba(249, 115, 22, 0.05))",
           backdropFilter: "blur(12px)",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
+          border: "1px solid rgba(218, 165, 32, 0.4)",
           borderRadius: "20px",
-          padding: "1rem 1.25rem",
+          padding: "1.5rem",
           display: "flex",
           flexDirection: "column",
-          gap: "0.75rem",
+          gap: "0.85rem",
           maxWidth: "480px",
           width: "100%",
-          boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.2)",
+          boxShadow: isDarkMode ? "0 8px 32px 0 rgba(0, 0, 0, 0.2)" : "0 8px 30px rgba(0, 0, 0, 0.1)",
           transition: "all 0.3s ease",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <FiHeart style={{ color: "#ef4444", animation: "pulse 2s infinite" }} />
-          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent-yellow)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDarkMode ? "#fbbf24" : "#b8860b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             {t.heroTitle}
           </span>
         </div>
         
-        <p style={{ fontSize: "0.8rem", color: "var(--foreground-muted, #94a3b8)", margin: 0, lineHeight: "1.4" }}>
+        <p style={{ fontSize: "0.8rem", color: isDarkMode ? "#cbd5e1" : "#475569", margin: 0, lineHeight: "1.4", opacity: 0.9 }}>
           {t.heroDesc}
         </p>
 
@@ -82,9 +98,9 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               alignItems: "center",
               justifyContent: "center",
               gap: "0.35rem",
-              background: "rgba(251, 191, 36, 0.15)",
-              border: "1px solid rgba(251, 191, 36, 0.3)",
-              color: "#fbbf24",
+              background: isDarkMode ? "rgba(251, 191, 36, 0.15)" : "rgba(184, 134, 11, 0.08)",
+              border: isDarkMode ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(184, 134, 11, 0.25)",
+              color: isDarkMode ? "#fbbf24" : "#854d0e",
               borderRadius: "10px",
               padding: "0.4rem 0.5rem",
               fontSize: "0.75rem",
@@ -93,11 +109,11 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(251, 191, 36, 0.25)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(251, 191, 36, 0.25)" : "rgba(184, 134, 11, 0.15)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(251, 191, 36, 0.15)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(251, 191, 36, 0.15)" : "rgba(184, 134, 11, 0.08)";
               e.currentTarget.style.transform = "none";
             }}
           >
@@ -115,9 +131,9 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               alignItems: "center",
               justifyContent: "center",
               gap: "0.35rem",
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#f87171",
+              background: isDarkMode ? "rgba(239, 68, 68, 0.1)" : "rgba(220, 38, 38, 0.06)",
+              border: isDarkMode ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(220, 38, 38, 0.2)",
+              color: isDarkMode ? "#f87171" : "#b91c1c",
               borderRadius: "10px",
               padding: "0.4rem 0.5rem",
               fontSize: "0.75rem",
@@ -126,11 +142,11 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(220, 38, 38, 0.12)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(239, 68, 68, 0.1)" : "rgba(220, 38, 38, 0.06)";
               e.currentTarget.style.transform = "none";
             }}
           >
@@ -148,9 +164,9 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               alignItems: "center",
               justifyContent: "center",
               gap: "0.35rem",
-              background: "rgba(168, 85, 247, 0.15)",
-              border: "1px solid rgba(168, 85, 247, 0.3)",
-              color: "#c084fc",
+              background: isDarkMode ? "rgba(168, 85, 247, 0.15)" : "rgba(147, 51, 234, 0.06)",
+              border: isDarkMode ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(147, 51, 234, 0.2)",
+              color: isDarkMode ? "#c084fc" : "#7e22ce",
               borderRadius: "10px",
               padding: "0.4rem 0.5rem",
               fontSize: "0.75rem",
@@ -159,11 +175,11 @@ export default function DonationCard({ variant = "section" }: DonationCardProps)
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(168, 85, 247, 0.25)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(168, 85, 247, 0.25)" : "rgba(147, 51, 234, 0.14)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(168, 85, 247, 0.15)";
+              e.currentTarget.style.background = isDarkMode ? "rgba(168, 85, 247, 0.15)" : "rgba(147, 51, 234, 0.06)";
               e.currentTarget.style.transform = "none";
             }}
           >

@@ -4,7 +4,6 @@ import { useTranslation } from "../../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiLock, FiEye, FiDatabase, FiUserCheck } from "react-icons/fi";
 import DonationCard from "../../../components/DonationCard";
-import AdSensePlaceholder from "../../../components/AdSensePlaceholder";
 
 export default function PrivacyPage() {
   const { t, language } = useTranslation();
@@ -83,9 +82,6 @@ export default function PrivacyPage() {
 
           {/* Compact donation strip integrated at the footer of the document card */}
           <DonationCard variant="compact" />
-          
-          {/* Dedicated zero-CLS leaderboard ad unit */}
-          <AdSensePlaceholder type="leaderboard" />
         </div>
       </main>
 

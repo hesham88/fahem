@@ -6,7 +6,6 @@ import { signInWithPopup, onAuthStateChanged, User, signInWithPhoneNumber, Recap
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
 import DonationCard from "../../components/DonationCard";
-import AdSensePlaceholder from "../../components/AdSensePlaceholder";
 import { 
   FiGithub,
   FiGlobe,
@@ -35,7 +34,8 @@ import {
   FiTerminal,
   FiDatabase,
   FiSun,
-  FiMoon
+  FiMoon,
+  FiHeart
 } from "react-icons/fi";
 
 export default function LandingPage() {
@@ -387,6 +387,16 @@ export default function LandingPage() {
             </a>
           </li>
           <li>
+            <a href="#tech-stack" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
+              <FiCpu /> {language === "ar" ? "البنية التقنية" : "Tech Stack"}
+            </a>
+          </li>
+          <li>
+            <a href="#donation-section" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
+              <FiHeart style={{ color: "#ef4444" }} /> {language === "ar" ? "ادعم مسيرتنا" : "Support Us"}
+            </a>
+          </li>
+          <li>
             <a href="https://github.com/hesham88/fahem" target="_blank" rel="noopener noreferrer" className="glass-nav-link" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
               <FiGithub /> {t("nav_github")}
             </a>
@@ -461,7 +471,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1.5rem 1.5rem", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
+      <main id="overview" className="glass-hero-section" style={{ zIndex: 1, padding: "90px 1.5rem 1.5rem 1.5rem", maxWidth: "1000px", margin: "0 auto", width: "100%" }}>
         <div 
           className="glass-card" 
           style={{ 
@@ -469,7 +479,7 @@ export default function LandingPage() {
             backdropFilter: "blur(30px) saturate(190%)", 
             border: "1px solid var(--card-border)", 
             borderRadius: "var(--border-radius-lg)", 
-            padding: "3.5rem 2.5rem", 
+            padding: "3.5rem 1.5rem", 
             boxShadow: isDarkMode ? "0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)" : "0 20px 40px -15px rgba(37, 99, 235, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)", 
             width: "100%", 
             maxWidth: "100%", 
@@ -487,8 +497,8 @@ export default function LandingPage() {
             flexDirection: "row", 
             flexWrap: "wrap", 
             alignItems: "center", 
-            justifyContent: "space-between", 
-            gap: "2.5rem",
+            justifyContent: "center", 
+            gap: "1.25rem",
             width: "100%",
             position: "relative",
             zIndex: 1
@@ -521,7 +531,7 @@ export default function LandingPage() {
               };
 
               return (
-                <div style={{ flex: "2 1 420px", display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: "280px", alignItems: "start", textAlign: "start" }}>
+                <div style={{ flex: "1.2 1 420px", maxWidth: "560px", display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: "280px", alignItems: "start", textAlign: "start" }}>
                   {/* Premium Glowing Pill Badge */}
                   <div style={{
                     display: "inline-flex",
@@ -641,45 +651,44 @@ export default function LandingPage() {
               );
             })()}
 
-            {/* Middle Column: Central High-Res Brand Logo with floating animations and glow */}
-            <div style={{ 
-              display: "flex", 
-              flexDirection: "column",
-              justifyContent: "center", 
-              alignItems: "center", 
-              padding: "1rem", 
-              position: "relative",
-              flex: "0 0 auto",
-              margin: "0 auto"
-            }}>
-              <div style={{
-                position: "absolute",
-                width: "160px",
-                height: "160px",
-                background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)",
-                opacity: isDarkMode ? 0.25 : 0.06,
-                zIndex: 0,
-                pointerEvents: "none",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)"
-              }}></div>
-              <img 
-                src="/brand/logo_highres.png" 
-                alt="Fahem Brand Symbol" 
-                style={{ 
-                  height: "120px", 
-                  width: "auto", 
-                  objectFit: "contain",
-                  zIndex: 1,
-                  filter: "drop-shadow(0 10px 25px rgba(0,0,0,0.15))",
-                  animation: "float-logo 6s infinite ease-in-out alternate"
-                }} 
-              />
-            </div>
-
             {/* Right Column: EXPLORE DEMO SANDBOX panel and below it Support Fahem's Servers boxes */}
-            <div style={{ flex: "1.8 1 360px", display: "flex", flexDirection: "column", gap: "1.5rem", minWidth: "280px" }}>
+            <div style={{ flex: "1 1 360px", maxWidth: "380px", display: "flex", flexDirection: "column", gap: "1.5rem", minWidth: "280px", alignItems: "center" }}>
+              
+              {/* Premium Centered/Aligned Compressed Logo */}
+              <div style={{ 
+                display: "flex", 
+                flexDirection: "column",
+                justifyContent: "center", 
+                alignItems: "center", 
+                padding: "0.5rem", 
+                position: "relative",
+                width: "100%"
+              }}>
+                <div style={{
+                  position: "absolute",
+                  width: "220px",
+                  height: "220px",
+                  background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)",
+                  opacity: isDarkMode ? 0.25 : 0.06,
+                  zIndex: 0,
+                  pointerEvents: "none",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)"
+                }}></div>
+                <img 
+                  src="/brand/logo_compressed.png" 
+                  alt="Fahem Brand Symbol" 
+                  style={{ 
+                    height: "200px", 
+                    width: "auto", 
+                    objectFit: "contain",
+                    zIndex: 1,
+                    filter: "drop-shadow(0 12px 28px rgba(0,0,0,0.18))",
+                    animation: "float-logo 6s infinite ease-in-out alternate"
+                  }} 
+                />
+              </div>
               
               {/* EXPLORE DEMO SANDBOX panel */}
               <form 
@@ -842,7 +851,7 @@ export default function LandingPage() {
 
               {/* Support Fahem's Servers boxes */}
               <div style={{ width: "100%" }}>
-                <DonationCard variant="hero" />
+                <DonationCard variant="hero" isDarkMode={isDarkMode} />
               </div>
 
             </div>
@@ -926,9 +935,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </section>
-
-            {/* Non-intrusive AdSense Placeholder container to prevent CLS */}
-            <AdSensePlaceholder type="leaderboard" />
 
             {/* System Features Section */}
             <section id="features" style={sectionStyle}>
@@ -1114,140 +1120,156 @@ export default function LandingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
                   
                   {/* Google Gemini Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                  <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                          <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "تحليل متقدم للمناهج الدراسية مع فهم سياقي فائق للصور والنصوص والكتب التفاعلية."
+                          : "Advanced natural language reasoning and contextual multi-modal textbook analysis."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "تحليل متقدم للمناهج الدراسية مع فهم سياقي فائق للصور والنصوص والكتب التفاعلية."
-                        : "Advanced natural language reasoning and contextual multi-modal textbook analysis."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* Google ADK 2.0 Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(249, 115, 22, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <img src="/brand/adk.png" alt="Google ADK" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                  <a href="https://github.com/google" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: "rgba(249, 115, 22, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                          <img src="/brand/adk.png" alt="Google ADK" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "جوجل ADK 2.0" : "Google ADK 2.0"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "جوجل ADK 2.0" : "Google ADK 2.0"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "توليف صوتي فائق الدقة ومزامنة فورية للحديث الصوتي الطبيعي للمعلمين لتفادي استخدام الردود الصامتة."
+                          : "Advanced audio speech synthesis and local hardware coordination for natural voice tutoring."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "توليف صوتي فائق الدقة ومزامنة فورية للحديث الصوتي الطبيعي للمعلمين لتفادي استخدام الردود الصامتة."
-                        : "Advanced audio speech synthesis and local hardware coordination for natural voice tutoring."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* Antigravity Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(13, 148, 136, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <img src="/brand/antigravity.png" alt="Antigravity" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: "rgba(13, 148, 136, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                          <img src="/brand/antigravity.png" alt="Antigravity" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "أنتي-جرافيتي CLI" : "Antigravity CLI"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "أنتي-جرافيتي CLI" : "Antigravity CLI"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "عميل التطوير الذاتي للأكواد البرمجية البرمجية، تشغيل لوحة التحكم، وتأمين بيئة الـ runtime البرمجية."
+                          : "Autonomous developer execution agent, dashboard control console, and secure prompt runtime environments."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "عميل التطوير الذاتي للأكواد البرمجية البرمجية، تشغيل لوحة التحكم، وتأمين بيئة الـ runtime البرمجية."
-                        : "Autonomous developer execution agent, dashboard control console, and secure prompt runtime environments."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* Firebase Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <img src="/brand/firebase.png" alt="Firebase" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                  <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                          <img src="/brand/firebase.png" alt="Firebase" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "جوجل فيربيز" : "Google Firebase"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "جوجل فيربيز" : "Google Firebase"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "إدارة التحقق من الهوية الشخصية للمستخدمين وتأمين الجلسات واستضافة التطبيق على خوادم فائقة السرعة."
+                          : "Secure global database synchronization, cloud hosting, and robust user session authentication."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "إدارة التحقق من الهوية الشخصية للمستخدمين وتأمين الجلسات واستضافة التطبيق على خوادم فائقة السرعة."
-                        : "Secure global database synchronization, cloud hosting, and robust user session authentication."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* Next.js Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(15, 23, 42, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <span style={{ fontSize: "1.1rem", fontWeight: 900, fontFamily: "var(--font-display)", color: "var(--foreground)" }}>N</span>
+                  <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: isDarkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 42, 0.08)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+                          <img src="/logos/tech_photo_12.png" alt="Next.js" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "نيكست جي إس" : "Next.js"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "نيكست جي إس" : "Next.js 14"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "الإطار البرمجي الرائد لتطوير واجهات المستخدم المذهلة، والمعالجة فائقة السرعة على الخادم (SSR)، وضمان تهيئة مثالية لمحركات البحث (SEO)."
+                          : "The gold-standard framework for building blazing fast user interfaces, seamless server-side rendering (SSR), and state-of-the-art SEO web performance."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "بناء واجهات مستخدم مذهلة، معالجة فورية للملفات على الخادم، وتهيئة مثالية لمحركات البحث."
-                        : "High-performance server-side rendering, seamless client-side routing, and absolute SEO indexing optimization."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* Google Maps Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <span style={{ color: "#10b981", display: "flex" }}><FiGlobe style={{ fontSize: "1.2rem" }} /></span>
+                  <a href="https://mapsplatform.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: isDarkMode ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(16, 185, 129, 0.1)" }}>
+                          <img src="/logos/Untitled design (21).png" alt="Google Maps" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "خرائط جوجل" : "Google Maps"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "خرائط جوجل" : "Google Maps"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "توجيه جغرافي متطور ورسم خرائط المدارس القريبة وتوفير توجيهات جغرافية تفاعلية للمستخدمين لتسهيل العثور على المراكز الأكاديمية."
+                          : "Dynamic visual geospatial APIs, interactive school mapping, and intelligent regional routing to discover educational support centers near you."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "توفير خدمات التوجيه الجغرافي وتحديد مواقع المدارس القريبة ومراكز المساعدة وتوفير سياق إقليمي ممتاز."
-                        : "Geospatial routing and localized visual school directories for easy regional discovery."}
-                    </p>
-                  </div>
+                  </a>
 
                   {/* MongoDB Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <img src="/brand/mongodb.png" alt="MongoDB Atlas" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                  <a href="https://www.mongodb.com/cloud/atlas" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
+                          <img src="/brand/mongodb.png" alt="MongoDB Atlas" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "مونجو دي بي أطلس" : "MongoDB Atlas"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "مونجو دي بي أطلس" : "MongoDB Atlas"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "قاعدة بيانات سحابية موزعة للبحث الدلالي الفوري بالمؤشرات المتجهة (Vector Indexes) واسترجاع الدروس ذكياً."
+                          : "Distributed cloud database, vectors index search, and semantic lesson retrieval via custom MCP servers."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "قاعدة بيانات سحابية موزعة للبحث الدلالي الفوري بالمؤشرات المتجهة (Vector Indexes) واسترجاع الدروس ذكياً."
-                        : "Distributed cloud database, vectors index search, and semantic lesson retrieval via custom MCP servers."}
-                    </p>
-                  </div>
+                  </a>
 
-                  {/* Cloud Armor Card */}
-                  <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
-                      <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                        <span style={{ color: "#3b82f6", display: "flex" }}><FiShield style={{ fontSize: "1.2rem" }} /></span>
+                  {/* Google Cloud Card */}
+                  <a href="https://cloud.google.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                    <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
+                        <div style={{ background: isDarkMode ? "rgba(59, 130, 246, 0.18)" : "rgba(37, 99, 235, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0, boxShadow: "0 4px 12px rgba(37, 99, 235, 0.1)" }}>
+                          <img src="/logos/google_cloud.png" alt="Google Cloud" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                        </div>
+                        <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+                          {language === "ar" ? "جوجل كلاود" : "Google Cloud"}
+                        </h3>
                       </div>
-                      <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-                        {language === "ar" ? "جوجل كلاود آرمور" : "Google Cloud Armor"}
-                      </h3>
+                      <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
+                        {language === "ar" 
+                          ? "بنية تحتية سحابية آمنة وعالمية مع حوسبة فائقة الأداء، ونظام حماية النماذج (Model Armor)، وخوادم سريعة الاستجابة لضمان تشغيل خدمات فاهم على مدار الساعة."
+                          : "Secure enterprise cloud computing, high-performance VM hosting, Model Armor, and Vertex AI nodes to power Fahem's interactive tutoring services globally."}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.92rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: 1.5, margin: 0 }}>
-                      {language === "ar" 
-                        ? "حماية متقدمة للمنصة ضد هجمات حجب الخدمة ومراقبة الطلبات الضارة لضمان أمان تام للطلاب والمدرسين."
-                        : "Enterprise DDOS protection, secure API shields, and intelligent threat defense to preserve platform integrity."}
-                    </p>
-                  </div>
+                  </a>
 
                 </div>
               </div>
@@ -1257,102 +1279,11 @@ export default function LandingPage() {
       })()}
 
       {/* Dedicated Last Landing Section - Warm and informative Support Fahem section */}
-      <DonationCard variant="section" />
+      <DonationCard variant="section" isDarkMode={isDarkMode} />
 
       {/* Styled Interactive Footer with Asdaa.co Attribution */}
       <footer className="metadata-footer" style={{ zIndex: 2, padding: "3rem 1.5rem 2.5rem 1.5rem", width: "100%", borderTop: "1px solid var(--card-border)", background: isDarkMode ? "rgba(9, 13, 22, 0.9)" : "rgba(248, 250, 252, 0.9)", marginTop: "auto" }}>
         
-        {/* Upper Sub-Section: Partners & Infrastructure Marquee */}
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "center", 
-          alignItems: "center", 
-          gap: "2.5rem", 
-          flexWrap: "wrap", 
-          margin: "0 auto 2.5rem auto", 
-          maxWidth: "800px",
-          padding: "1rem",
-          borderBottom: "1px dashed rgba(16, 107, 163, 0.08)"
-        }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>
-            {language === "ar" ? "الشركاء والتقنيات" : "Partners & Technologies"}
-          </span>
-          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
-            {/* Google Cloud Partner */}
-            <a href="https://cloud.google.com" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/google_cloud.png" alt="Google Cloud" width="18" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Google Cloud</span>
-            </a>
-
-            {/* Firebase Partner */}
-            <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/firebase.png" alt="Firebase" width="16" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Firebase</span>
-            </a>
-
-            {/* Gemini Partner */}
-            <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/gemini.png" alt="Gemini" width="18" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Gemini</span>
-            </a>
-
-            {/* MongoDB Partner */}
-            <a href="https://www.mongodb.com" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/mongodb.png" alt="MongoDB" width="12" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>MongoDB</span>
-            </a>
-
-            {/* Devpost Partner */}
-            <a href="https://devpost.com" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2 13h-4v-7h4c1.5 0 2.5 1 2.5 2.5s-1 4.5-2.5 4.5z" fill="#003E54"/>
-              </svg>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Devpost</span>
-            </a>
-
-            {/* ADK Partner */}
-            <a href="https://github.com/google" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/adk.png" alt="Google ADK" width="18" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>ADK 2.0</span>
-            </a>
-
-            {/* Antigravity Partner */}
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/antigravity.png" alt="Antigravity" width="18" height="18" style={{ objectFit: "contain" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--foreground)" }}>Antigravity</span>
-            </a>
-
-            {/* Asdaa Partner */}
-            <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" 
-               style={{ display: "flex", alignItems: "center", gap: "0.35rem", opacity: 0.6, filter: "grayscale(100%)", transition: "all 0.2s", textDecoration: "none" }}
-               onMouseOver={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "grayscale(0%)"; }}
-               onMouseOut={(e) => { e.currentTarget.style.opacity = "0.6"; e.currentTarget.style.filter = "grayscale(100%)"; }}>
-              <img src="/brand/asdaa.png" alt="Asdaa.co" height="18" style={{ objectFit: "contain" }} />
-            </a>
-          </div>
-        </div>
-
         {/* Elegant exactly 3-line Footer Content */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
           
@@ -1373,25 +1304,25 @@ export default function LandingPage() {
 
           {/* Line 2: Premium Social Icons (X, Instagram, Facebook, Email) */}
           <div style={{ display: "flex", justifyContent: "center", gap: "1.75rem", alignItems: "center" }}>
-            <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" 
+            <a href="https://x.com/fahempro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="X" 
                style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
                onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
               <img src="/brand/social_x.png" alt="X" width="22" height="22" style={{ objectFit: "contain", filter: isDarkMode ? "invert(1)" : "none" }} />
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" 
+            <a href="https://www.instagram.com/fahem.pro/" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Instagram" 
                style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
                onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
               <img src="/brand/social_instagram.png" alt="Instagram" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" 
+            <a href="https://www.facebook.com/ai.fahem.pro/" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Facebook" 
                style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
                onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
               <img src="/brand/social_facebook.png" alt="Facebook" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
-            <a href="mailto:info@asdaa.co" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
+            <a href="mailto:contact@fahem.pro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
                style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
                onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
@@ -1399,12 +1330,18 @@ export default function LandingPage() {
             </a>
           </div>
 
-          {/* Line 3: Unified copyright, Project console, and Developer attribution (Asdaa.co) */}
+          {/* Line 3: Unified copyright and attribution line */}
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <span>{t("footer_landing")}</span>
-              <span style={{ color: "#94a3b8" }}>|</span>
-              <span>Project Console • Developed by <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa.co</a></span>
+              {language === "ar" ? (
+                <>
+                  صُنع بكل حب ❤️ جميع الحقوق محفوظة لـ <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa</a> وفريق فاهم
+                </>
+              ) : (
+                <>
+                  Made with love ❤️ All rights reserved to <a href="https://asdaa.co" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", textDecoration: "underline", fontWeight: 700 }}>Asdaa</a> and Fahem Team
+                </>
+              )}
             </p>
           </div>
 
