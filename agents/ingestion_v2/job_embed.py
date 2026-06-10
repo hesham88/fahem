@@ -329,7 +329,7 @@ def main():
             )
 
     # Launch ThreadPoolExecutor
-    max_workers = min(2, actual_pages_count)  # lowered from 3 to stay under the per-minute embed rate limit
+    max_workers = min(8, actual_pages_count)  # increased to speed up the embedding stage under robust retry/backoff
     logs.append(f"[{time.strftime('%H:%M:%S')}] [EMBED] Spawning ThreadPoolExecutor with {max_workers} parallel workers.")
     
     embed_start_time = time.time()
