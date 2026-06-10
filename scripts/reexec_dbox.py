@@ -448,10 +448,15 @@ def verify_perf():
         return False, "demo enter failed: " + err
     
     # Warm up: bypass GCP container cold start scaling latency to separate server boot from code performance.
-    try:
-        get_books(tok)
-    except Exception:
-        pass
+    # Try up to 3 times to get books to ensure the server and cache are fully warmed up and active.
+    for _ in range(3):
+        try:
+            books_warm = get_books(tok)
+            if books_warm:
+                break
+        except Exception:
+            pass
+        time.sleep(1.5)
 
     t1 = time.time()
     books = get_books(tok)
