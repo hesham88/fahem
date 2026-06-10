@@ -2256,7 +2256,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         if (!res.ok) throw new Error("Failed to fetch libraries");
         const data = await res.json();
         if (isMounted && data.success) {
-          setLibraries(data.libraries || []);
+          const filteredLibs = (data.libraries || []).filter((lib: any) => {
+            const isMoe = lib._id === "lib_moe" || lib.source === "moe" || lib._id.toLowerCase().includes("moe");
+            return !isMoe;
+          });
+          setLibraries(filteredLibs);
         }
       } catch (err) {
         console.error("Error loading libraries:", err);

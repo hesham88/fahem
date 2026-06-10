@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { auth, googleProvider } from "../../lib/firebase";
 import { signInWithPopup, onAuthStateChanged, User, signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "../../context/LanguageContext";
 import DonationCard from "../../components/DonationCard";
+import { Dropdown } from "../../components/ui/Dropdown";
 import { 
   FiGithub,
   FiGlobe,
@@ -62,6 +63,17 @@ export default function LandingPage() {
   const [isDemo, setIsDemo] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
+  const pathname = usePathname();
+
+  const publicPagesOptions = [
+    { value: `/${language}`, label: "Welcome / Landing", labelAr: "الصفحة الرئيسية", icon: "✨" },
+    { value: `/${language}/home`, label: "Study Dashboard", labelAr: "لوحة الدراسة الذكية", icon: "📚" },
+    { value: `/${language}/contact`, label: "Contact Us", labelAr: "اتصل بنا", icon: "✉️" },
+    { value: `/${language}/privacy`, label: "Privacy Policy", labelAr: "سياسة الخصوصية", icon: "🔒" },
+    { value: `/${language}/terms`, label: "Terms of Service", labelAr: "شروط الخدمة", icon: "📜" },
+    { value: `/${language}/report`, label: "Report Issues", labelAr: "الإبلاغ عن المشكلات", icon: "⚠️" },
+    { value: `/${language}/profile/demouser`, label: "Public Profile", labelAr: "الملف الشخصي العام", icon: "👤" }
+  ];
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -423,6 +435,17 @@ export default function LandingPage() {
             >
               {isDarkMode ? <FiSun style={{ color: "var(--accent-yellow)" }} /> : <FiMoon style={{ color: "var(--primary)" }} />}
             </button>
+          </li>
+          <li style={{ width: "170px" }}>
+            <Dropdown
+              value={pathname ?? `/${language}`}
+              onChange={(val) => router.push(val)}
+              options={publicPagesOptions}
+              language={language}
+              triggerOnHover={true}
+              placeholder={language === "ar" ? "استكشف الصفحات" : "Explore Pages"}
+              style={{ width: "170px" }}
+            />
           </li>
           <li>
             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--primary)" }}>
@@ -1124,7 +1147,7 @@ export default function LandingPage() {
                     <div className="panel-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", borderRadius: "var(--border-radius-md)", padding: "2rem", height: "100%", transition: "all 0.3s ease" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px dashed var(--card-border)", paddingBottom: "0.75rem" }}>
                         <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "0.5rem", borderRadius: "12px", display: "flex", flexShrink: 0 }}>
-                           <img src="/brand/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
+                           <img src="/logos/gemini.png" alt="Google Gemini" style={{ width: "24px", height: "24px", objectFit: "contain" }} />
                         </div>
                         <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
                           {language === "ar" ? "جوجل جيميناي AI" : "Google Gemini AI"}

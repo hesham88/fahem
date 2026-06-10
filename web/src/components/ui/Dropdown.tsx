@@ -29,6 +29,7 @@ interface DropdownProps {
   label?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  triggerOnHover?: boolean;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -43,6 +44,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   label,
   searchable = false,
   searchPlaceholder = "Search...",
+  triggerOnHover = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -133,6 +135,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
     <div
       ref={containerRef}
       className={`custom-dropdown-container ${className}`}
+      onMouseEnter={() => triggerOnHover && !disabled && setIsOpen(true)}
+      onMouseLeave={() => triggerOnHover && !disabled && setIsOpen(false)}
       style={{
         display: "flex",
         flexDirection: "column",
