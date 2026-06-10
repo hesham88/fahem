@@ -2915,10 +2915,20 @@ User Question: ${queryText}`;
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                border: "1px solid var(--card-border)"
+                border: "1px solid var(--card-border)",
+                overflow: "hidden"
               }}
             >
-              <FiCpu style={{ color: "var(--primary)", fontSize: "1.2rem" }} className="pulse-icon" />
+              <img
+                src="/brand/gemini.png"
+                alt="Gemini Brand Asset"
+                style={{
+                  width: "1.4rem",
+                  height: "1.4rem",
+                  objectFit: "contain",
+                  animation: "pulse-kf 2s infinite ease-in-out"
+                }}
+              />
             </div>
             <div>
               <h3 style={{ fontSize: "1.1rem", margin: 0, fontFamily: "var(--font-display)", fontWeight: 700 }}>

@@ -4899,8 +4899,8 @@ export default function Home() {
             background: "linear-gradient(135deg, rgba(16, 107, 163, 0.06), rgba(212, 175, 55, 0.06))"
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.5rem", borderRadius: "10px", color: "#ffffff", display: "flex", boxShadow: "0 4px 10px rgba(16, 107, 163, 0.25)" }}>
-                <FiCpu className="pulse-icon" style={{ fontSize: "1.3rem" }} />
+              <div style={{ background: "linear-gradient(135deg, var(--primary), var(--secondary))", padding: "0.4rem", borderRadius: "10px", color: "#ffffff", display: "flex", justifyContent: "center", alignItems: "center", boxShadow: "0 4px 10px rgba(16, 107, 163, 0.25)", width: "2.3rem", height: "2.3rem", overflow: "hidden" }}>
+                <img src="/brand/gemini.png" alt="Gemini Avatar" style={{ width: "1.3rem", height: "1.3rem", objectFit: "contain", animation: "pulse-kf 2s infinite ease-in-out" }} />
               </div>
               <div>
                 <span style={{ fontWeight: 800, fontSize: "1.15rem", color: "var(--primary)", display: "block" }}>

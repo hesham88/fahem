@@ -46,16 +46,8 @@ import time
 import argparse
 import socket
 
-_original_getaddrinfo = socket.getaddrinfo
-def _patched_getaddrinfo(host, port, *args, **kwargs):
-    if host == "fahemcluster-shard-00-00.trf718.mongodb.net":
-        return _original_getaddrinfo("34.140.20.199", port, *args, **kwargs)
-    if host == "fahemcluster-shard-00-01.trf718.mongodb.net":
-        return _original_getaddrinfo("34.156.214.113", port, *args, **kwargs)
-    if host == "fahemcluster-shard-00-02.trf718.mongodb.net":
-        return _original_getaddrinfo("34.78.109.234", port, *args, **kwargs)
-    return _original_getaddrinfo(host, port, *args, **kwargs)
-socket.getaddrinfo = _patched_getaddrinfo
+# Allow PyMongo to resolve MongoDB Atlas replica set hosts naturally using DNS
+
 
 import pymongo
 

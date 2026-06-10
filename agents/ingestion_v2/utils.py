@@ -14,6 +14,10 @@ import random
 import tempfile
 import hashlib
 import requests
+import threading
+
+_page_buffer = []
+_page_buffer_lock = threading.Lock()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # ROOT_DIR points to fahem project root C:\Users\hesh1\Desktop\fahem
@@ -394,7 +398,31 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
     """
     Safely update job metadata, logs, and pages in both local_db.json and MongoDB.
     """
+    global _page_buffer, _page_buffer_lock
+
+    if new_page_doc:
+        with _page_buffer_lock:
+            _page_buffer.append(new_page_doc)
+
+    should_write = False
+    pages_to_flush = []
+    with _page_buffer_lock:
+        buffer_size = len(_page_buffer)
+        # Flush if:
+        # 1. Buffer has 30 or more pages
+        # 2. It is completed (is_completed is True)
+        # 3. No new page doc was passed (meaning status/logs only update)
+        # 4. We are at the end of a stage (processed_pages == total_pages and total_pages > 0)
+        if buffer_size >= 30 or is_completed or not new_page_doc or (processed_pages > 0 and processed_pages == total_pages):
+            should_write = True
+            pages_to_flush = list(_page_buffer)
+            _page_buffer = []
+
     if is_local or not is_mongodb_enabled():
+        if not should_write:
+            # Skip write to bypass file serialization bottleneck on Windows
+            return
+
         for attempt in range(5):
             try:
                 if os.path.exists(LOCAL_DB_PATH):
@@ -444,20 +472,20 @@ def update_job_status(job_id, status, current_step, progress, logs, processed_pa
                                 db["books"][idx]["updated_at"] = time.time()
                                 break
                         
-                    # If there's a new page doc, append/update in book_pages collection
-                    if new_page_doc:
+                    # If we have pages to flush, append/update in book_pages collection
+                    if pages_to_flush:
                         if "book_pages" not in db:
                             db["book_pages"] = []
-                        page_id = new_page_doc.get("_id")
-                        existing_idx = -1
-                        for idx, p in enumerate(db["book_pages"]):
-                            if p.get("_id") == page_id:
-                                existing_idx = idx
-                                break
-                        if existing_idx >= 0:
-                            db["book_pages"][existing_idx] = new_page_doc
-                        else:
-                            db["book_pages"].append(new_page_doc)
+                        
+                        existing_map = {p.get("_id"): idx for idx, p in enumerate(db["book_pages"])}
+                        for doc in pages_to_flush:
+                            page_id = doc.get("_id")
+                            existing_idx = existing_map.get(page_id)
+                            if existing_idx is not None:
+                                db["book_pages"][existing_idx] = doc
+                            else:
+                                db["book_pages"].append(doc)
+                                existing_map[page_id] = len(db["book_pages"]) - 1
                             
                     # If the pipeline has completed, upsert the unified book metadata
                     if is_completed:

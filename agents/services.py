@@ -129,12 +129,14 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
                     request.state.verified_email = email
                     
-                    # Reject X-Verified-Principal spoofing on GCP Run:
+                    # Reject X-Verified-Principal spoofing on GCP Run, but trust verified GCP service accounts:
                     # Identity is strictly derived from the verified token
-                    verified_role = "super-admin" if email == "hesham1988@gmail.com" else "user"
-                    # Only the real owner can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
+                    is_service_account = email.endswith("gserviceaccount.com")
+                    passed_role = principal.get("role") if (principal and isinstance(principal, dict)) else "user"
+                    verified_role = passed_role if is_service_account else ("super-admin" if email == "hesham1988@gmail.com" else "user")
+                    # Only the real owner or service account can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
                     passed_db_target = principal.get("db_target") if (principal and isinstance(principal, dict)) else None
-                    db_target = passed_db_target if (email == "hesham1988@gmail.com" and passed_db_target) else "fahem_sandbox"
+                    db_target = passed_db_target if (email == "hesham1988@gmail.com" or is_service_account) and passed_db_target else "fahem_sandbox"
                     
                     principal = {
                         "uid": id_info.get("sub", "unknown_gcp_uid"),
@@ -5804,6 +5806,58 @@ def register_telemetry_route(app: fastapi.FastAPI):
             }
         except Exception as err:
             logger.error(f"[services.py] Orphan recovery failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
+    @app.post("/admin/emergency-sandbox-purge")
+    async def admin_emergency_sandbox_purge(request: fastapi.Request):
+        try:
+            # Verify auth - require super-admin or admin
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ("super-admin", "admin"):
+                return fastapi.responses.JSONResponse(
+                    status_code=403,
+                    content={"success": False, "error": "Forbidden: Admin access required"}
+                )
+
+            data = await request.json()
+            apply = data.get("apply", False)
+            clear_prod_jobs = data.get("clear_prod_jobs", False)
+            purge_prod_demo = data.get("purge_prod_demo", False)
+            i_understand = data.get("i_understand_prod_delete", False)
+
+            import os
+            import subprocess
+            
+            script_path = "scripts/emergency_sandbox_purge.py"
+            if not os.path.exists(script_path):
+                script_path = "agents/scripts/emergency_sandbox_purge.py"
+                if not os.path.exists(script_path):
+                    script_path = "/app/scripts/emergency_sandbox_purge.py"
+            
+            cmd = ["python", script_path]
+            if apply:
+                cmd.append("--apply")
+            if clear_prod_jobs:
+                cmd.append("--clear-prod-jobs")
+            if purge_prod_demo:
+                cmd.append("--purge-prod-demo")
+            if i_understand:
+                cmd.append("--i-understand-prod-delete")
+
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=os.environ)
+
+            return {
+                "success": res.returncode == 0,
+                "returncode": res.returncode,
+                "stdout": res.stdout,
+                "stderr": res.stderr,
+                "cmd": cmd
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Emergency sandbox purge route failed: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 status_code=500,
                 content={"success": False, "error": str(err)}

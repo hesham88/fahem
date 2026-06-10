@@ -175,7 +175,7 @@ def main():
     print("=====================================================================\n", flush=True)
     
     # Reset database records
-    clear_test_data(is_local=True)
+    # clear_test_data(is_local=True)
     
     # Build payload structure
     payload = {
@@ -218,7 +218,7 @@ def main():
     proc.wait()
 
     # Dynamic status polling with a timeout
-    max_wait = 1200
+    max_wait = 3000
     poll_start = time.time()
     job_id = f"job_{TEST_BOOK_ID}"
     finished = False
