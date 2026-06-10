@@ -465,16 +465,17 @@ export default function LandingPage() {
         <div 
           className="glass-card" 
           style={{ 
-            background: isDarkMode ? "rgba(11, 17, 32, 0.65)" : "rgba(255, 255, 255, 0.65)", 
-            backdropFilter: "blur(30px)", 
+            background: isDarkMode ? "rgba(11, 17, 32, 0.7)" : "rgba(255, 255, 255, 0.7)", 
+            backdropFilter: "blur(30px) saturate(190%)", 
             border: "1px solid var(--card-border)", 
             borderRadius: "var(--border-radius-lg)", 
             padding: "3.5rem 2.5rem", 
-            boxShadow: "var(--shadow-lg)", 
+            boxShadow: isDarkMode ? "0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)" : "0 20px 40px -15px rgba(37, 99, 235, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)", 
             width: "100%", 
             maxWidth: "100%", 
             position: "relative",
-            overflow: "hidden"
+            overflow: "hidden",
+            transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)"
           }}
         >
           {/* Subtle decorative internal blur elements inside the card itself for extra depth */}
@@ -494,87 +495,151 @@ export default function LandingPage() {
           }}>
             
             {/* Left Column: Title, Subtitle, Bullet Points, and Sign In with Google */}
-            <div style={{ flex: "2 1 420px", display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: "280px", alignItems: "start", textAlign: "start" }}>
-              <h1 style={{ fontSize: "2.1rem", fontWeight: 850, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.25, margin: 0 }}>
-                {t("welcome_to_fahem")}
-              </h1>
-              <p style={{ fontSize: "1rem", color: "var(--foreground)", opacity: 0.85, lineHeight: 1.6, margin: 0 }}>
-                {t("hero_subtitle")}
-              </p>
+            {(() => {
+              const renderBulletText = (txt: string) => {
+                const cleaned = cleanBullet(txt);
+                const colonIndex = cleaned.indexOf(":");
+                if (colonIndex === -1) {
+                  return (
+                    <span style={{ fontWeight: 600, fontSize: "0.95rem", lineHeight: "1.5", flex: 1 }}>
+                      {cleaned}
+                    </span>
+                  );
+                }
+                const title = cleaned.slice(0, colonIndex).trim();
+                const desc = cleaned.slice(colonIndex + 1).trim();
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", textAlign: "start", flex: 1 }}>
+                    <strong style={{ fontWeight: 700, fontSize: "0.98rem", color: "var(--foreground)", lineHeight: "1.3" }}>
+                      {title}
+                    </strong>
+                    <span style={{ fontWeight: 400, fontSize: "0.85rem", color: isDarkMode ? "#cbd5e1" : "#475569", lineHeight: "1.45" }}>
+                      {desc}
+                    </span>
+                  </div>
+                );
+              };
 
-              {/* Organized bullet points with perfect alignment as beautiful glass list-panels */}
-              <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", padding: "1.5rem 0", margin: "0.25rem 0", borderTop: "1px solid var(--card-border)", borderBottom: "1px solid var(--card-border)" }}>
-                <div className="premium-hero-bullet-item">
-                  <span className="feature-bullet-icon" style={{ 
-                    display: "flex", 
-                    color: "var(--primary)", 
-                    background: "rgba(37, 99, 235, 0.1)", 
-                    padding: "0.55rem", 
-                    borderRadius: "10px",
-                    flexShrink: 0 
+              return (
+                <div style={{ flex: "2 1 420px", display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: "280px", alignItems: "start", textAlign: "start" }}>
+                  {/* Premium Glowing Pill Badge */}
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    background: isDarkMode ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.06)",
+                    border: "1px solid rgba(59, 130, 246, 0.25)",
+                    padding: "0.35rem 1rem",
+                    borderRadius: "100px",
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    color: "var(--primary)",
+                    letterSpacing: "0.5px",
+                    marginBottom: "0.1rem",
+                    alignSelf: "start",
+                    boxShadow: "0 2px 10px rgba(37, 99, 235, 0.04)"
                   }}>
-                    <FiLayers style={{ fontSize: "1.1rem" }} />
-                  </span>
-                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_1"))}</span>
-                </div>
+                    <span style={{ display: "flex", animation: "pulse 2s infinite" }}>✨</span>
+                    <span>{language === "ar" ? "نظام تعليمي متكامل بالذكاء الاصطناعي" : "NEXT-GEN AI TUTORING SWARM"}</span>
+                  </div>
 
-                <div className="premium-hero-bullet-item">
-                  <span className="feature-bullet-icon" style={{ 
-                    display: "flex", 
-                    color: "var(--secondary)", 
-                    background: "rgba(249, 115, 22, 0.1)", 
-                    padding: "0.55rem", 
-                    borderRadius: "10px",
-                    flexShrink: 0 
-                  }}>
-                    <FiActivity style={{ fontSize: "1.1rem" }} />
-                  </span>
-                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_2"))}</span>
-                </div>
+                  <h1 style={{ fontSize: "2.3rem", fontWeight: 850, background: "linear-gradient(135deg, var(--primary) 30%, var(--secondary))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1.25, margin: 0, letterSpacing: "-0.02em" }}>
+                    {t("welcome_to_fahem")}
+                  </h1>
+                  <p style={{ fontSize: "1rem", color: isDarkMode ? "#cbd5e1" : "#475569", opacity: 0.9, lineHeight: 1.65, margin: 0 }}>
+                    {t("hero_subtitle")}
+                  </p>
 
-                <div className="premium-hero-bullet-item">
-                  <span className="feature-bullet-icon" style={{ 
-                    display: "flex", 
-                    color: "var(--accent-green)", 
-                    background: "rgba(13, 148, 136, 0.1)", 
-                    padding: "0.55rem", 
-                    borderRadius: "10px",
-                    flexShrink: 0 
-                  }}>
-                    <FiShield style={{ fontSize: "1.1rem" }} />
-                  </span>
-                  <span style={{ fontWeight: 600, lineHeight: "1.4" }}>{cleanBullet(t("bullet_3"))}</span>
-                </div>
-              </div>
+                  {/* Organized bullet points with perfect alignment as beautiful glass list-panels */}
+                  <div className="feature-bullets" style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", padding: "1rem 0", margin: "0.25rem 0" }}>
+                    <div className="premium-hero-bullet-item" style={{ display: "flex", alignItems: "center", gap: "1.15rem", width: "100%" }}>
+                      <span className="feature-bullet-icon" style={{ 
+                        display: "flex", 
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--primary)", 
+                        background: isDarkMode ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)", 
+                        border: isDarkMode ? "1px solid rgba(59, 130, 246, 0.25)" : "1px solid rgba(37, 99, 235, 0.15)",
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "12px",
+                        flexShrink: 0,
+                        transition: "all 0.3s ease"
+                      }}>
+                        <FiLayers style={{ fontSize: "1.2rem" }} />
+                      </span>
+                      {renderBulletText(t("bullet_1"))}
+                    </div>
 
-              {errorMsg && (
-                <div style={{ color: "var(--secondary)", fontSize: "0.9rem", fontWeight: 600, padding: "0.6rem 1rem", borderRadius: "10px", background: "rgba(249, 115, 22, 0.1)", width: "100%", margin: "0.25rem 0" }}>
-                  {errorMsg}
-                </div>
-              )}
+                    <div className="premium-hero-bullet-item" style={{ display: "flex", alignItems: "center", gap: "1.15rem", width: "100%" }}>
+                      <span className="feature-bullet-icon" style={{ 
+                        display: "flex", 
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--secondary)", 
+                        background: isDarkMode ? "rgba(249, 115, 22, 0.12)" : "rgba(249, 115, 22, 0.08)", 
+                        border: isDarkMode ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid rgba(249, 115, 22, 0.15)",
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "12px",
+                        flexShrink: 0,
+                        transition: "all 0.3s ease"
+                      }}>
+                        <FiActivity style={{ fontSize: "1.2rem" }} />
+                      </span>
+                      {renderBulletText(t("bullet_2"))}
+                    </div>
 
-              {/* Sign In with Google */}
-              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "1px" }}>
-                  {language === "ar" ? "ابدأ رحلتك التعليمية" : "GET STARTED NOW"}
-                </span>
-                <button
-                  onClick={handleGoogleSignIn}
-                  disabled={signingIn || bypassActive}
-                  className="premium-google-btn"
-                  id="google-signin-button"
-                  type="button"
-                >
-                  <svg className="google-icon-svg" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                  </svg>
-                  <span>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
-                </button>
-              </div>
-            </div>
+                    <div className="premium-hero-bullet-item" style={{ display: "flex", alignItems: "center", gap: "1.15rem", width: "100%" }}>
+                      <span className="feature-bullet-icon" style={{ 
+                        display: "flex", 
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--accent-green)", 
+                        background: isDarkMode ? "rgba(13, 148, 136, 0.12)" : "rgba(13, 148, 136, 0.08)", 
+                        border: isDarkMode ? "1px solid rgba(13, 148, 136, 0.25)" : "1px solid rgba(13, 148, 136, 0.15)",
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "12px",
+                        flexShrink: 0,
+                        transition: "all 0.3s ease"
+                      }}>
+                        <FiShield style={{ fontSize: "1.2rem" }} />
+                      </span>
+                      {renderBulletText(t("bullet_3"))}
+                    </div>
+                  </div>
+
+                  {errorMsg && (
+                    <div style={{ color: "var(--secondary)", fontSize: "0.9rem", fontWeight: 600, padding: "0.6rem 1rem", borderRadius: "10px", background: "rgba(249, 115, 22, 0.1)", width: "100%", margin: "0.25rem 0" }}>
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  {/* Sign In with Google */}
+                  <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.25rem" }}>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                      {language === "ar" ? "ابدأ رحلتك التعليمية" : "GET STARTED NOW"}
+                    </span>
+                    <button
+                      onClick={handleGoogleSignIn}
+                      disabled={signingIn || bypassActive}
+                      className="premium-google-btn"
+                      id="google-signin-button"
+                      type="button"
+                    >
+                      <svg className="google-icon-svg" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                      </svg>
+                      <span>{signingIn ? t("btn_connecting_google") : t("btn_signin_google")}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Middle Column: Central High-Res Brand Logo with floating animations and glow */}
             <div style={{ 
@@ -790,7 +855,7 @@ export default function LandingPage() {
         const sectionStyle = {
           zIndex: 1,
           padding: "5rem 1.5rem",
-          background: isDarkMode ? "var(--card-bg)" : "rgba(255, 255, 255, 0.35)",
+          background: "var(--card-bg)",
           backdropFilter: "blur(16px)",
           borderTop: "1px solid var(--card-border)",
           borderBottom: "1px solid var(--card-border)",
