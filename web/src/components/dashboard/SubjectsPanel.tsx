@@ -546,7 +546,8 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
             })()}
           </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 };
