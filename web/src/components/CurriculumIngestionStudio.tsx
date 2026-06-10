@@ -86,6 +86,8 @@ interface QueueJob {
   progress: number;
   totalPages: number;
   processedPages: number;
+  current_step?: string;
+  logs?: string[];
 }
 
 const translations: Record<string, Record<string, string>> = {
@@ -2552,7 +2554,11 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   <Dropdown
                     value={selectedLibId}
                     onChange={(val) => setSelectedLibId(val)}
-                    options={libraries}
+                    options={libraries.map(lib => ({
+                      value: lib._id,
+                      label: lib.name,
+                      labelAr: lib.name_ar
+                    }))}
                     language={isAr ? "ar" : "en"}
                   />
                 </div>
@@ -2564,7 +2570,11 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     placeholder={isAr ? "-- اختر المنهج --" : "-- Choose Curriculum --"}
                     options={[
                       { value: "", label: "-- Choose Curriculum --", labelAr: "-- اختر المنهج --" },
-                      ...curricula
+                      ...curricula.map(c => ({
+                        value: c._id,
+                        label: c.title,
+                        labelAr: c.title_ar
+                      }))
                     ]}
                     language={isAr ? "ar" : "en"}
                   />
@@ -3044,7 +3054,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <FiCpu className="pulse-animation" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
                   <div>
-                    <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "700", tracking: "-0.025em" }}>
+                    <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "700", letterSpacing: "-0.025em" }}>
                       {isAr ? "⚡ مركز مراقبة المعالجة والاستيراد" : "⚡ Live Ingestion Telemetry Hub"}
                     </h3>
                     <p style={{ margin: 0, fontSize: "0.78rem", opacity: 0.7 }}>
