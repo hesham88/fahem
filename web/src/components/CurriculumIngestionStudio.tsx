@@ -2919,6 +2919,11 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                             <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "230px" }}>{job.url}</span>
                             <span>{new Date((job.created_at || 0) * 1000).toLocaleDateString(isAr ? "ar-EG" : "en-US")}</span>
                           </div>
+                          <div style={{ display: "flex", gap: "10px", marginTop: "0.3rem", fontSize: "0.75rem", color: "var(--text-muted, #718096)" }}>
+                            <span>📁 {isAr ? "المكتشفة" : "Found"}: {job.found_count ?? 0}</span>
+                            <span>✅ {isAr ? "المؤرشفة" : "Harvested"}: {job.harvested_count ?? 0}</span>
+                            <span>⏳ {isAr ? "قيد الانتظار" : "Pending"}: {job.pending_count ?? 0}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2926,37 +2931,113 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                 </div>
 
                 {/* Crawled Results */}
-                {discoveredBooks.length > 0 && (
-                  <div className="discovered-catalog-wrapper">
-                    <div className="catalog-header-checkbox" style={{ display: "flex", flexDirection: isRoutingComplete ? "row" : "column", alignItems: isRoutingComplete ? "center" : "stretch", gap: "10px" }}>
-                      <h3>{t("crawled_results")}</h3>
-                      {isRoutingComplete ? (
-                        <button
-                          onClick={handleBulkIngest}
-                          disabled={loading}
-                          className="bulk-ingest-button"
-                        >
-                          {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
-                        </button>
-                      ) : (
-                        renderRoutingChecklist()
-                      )}
+                {discoveredBooks.length > 0 && (() => {
+                  const foundCount = discoveredBooks.length;
+                  const harvestedCount = discoveredBooks.filter((b: any) => b.pagesResolved === true || (typeof b.totalPages === "number" && !isNaN(b.totalPages))).length;
+                  const pendingCount = foundCount - harvestedCount;
+                  
+                  return (
+                    <div className="discovered-catalog-wrapper">
+                      <div className="catalog-header-checkbox" style={{ display: "flex", flexDirection: isRoutingComplete ? "row" : "column", alignItems: isRoutingComplete ? "center" : "stretch", gap: "10px" }}>
+                        <h3>{t("crawled_results")}</h3>
+                        {isRoutingComplete ? (
+                          <button
+                            onClick={handleBulkIngest}
+                            disabled={loading}
+                            className="bulk-ingest-button"
+                          >
+                            {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
+                          </button>
+                        ) : (
+                          renderRoutingChecklist()
+                        )}
+                      </div>
+
+                      {/* Premium responsive metrics grid */}
+                      <div className="metrics-grid" style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                        gap: "1rem",
+                        marginBottom: "1.5rem",
+                        marginTop: "1rem"
+                      }}>
+                        <div className="metric-card" style={{
+                          background: "rgba(79, 70, 229, 0.05)",
+                          border: "1px solid rgba(79, 70, 229, 0.15)",
+                          padding: "1rem",
+                          borderRadius: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)"
+                        }}>
+                          <span style={{ fontSize: "1.5rem" }}>📁</span>
+                          <span style={{ fontSize: "0.78rem", fontWeight: "600", color: "var(--text-muted, #718096)" }}>
+                            {isAr ? "إجمالي الكتب المكتشفة" : "Total PDFs Found"}
+                          </span>
+                          <span style={{ fontSize: "1.6rem", fontWeight: "800", color: "var(--primary)" }}>
+                            {foundCount}
+                          </span>
+                        </div>
+
+                        <div className="metric-card" style={{
+                          background: "rgba(16, 185, 129, 0.05)",
+                          border: "1px solid rgba(16, 185, 129, 0.15)",
+                          padding: "1rem",
+                          borderRadius: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)"
+                        }}>
+                          <span style={{ fontSize: "1.5rem" }}>✅</span>
+                          <span style={{ fontSize: "0.78rem", fontWeight: "600", color: "var(--text-muted, #718096)" }}>
+                            {isAr ? "تم أرشفة الصفحات" : "Harvested & Probed"}
+                          </span>
+                          <span style={{ fontSize: "1.6rem", fontWeight: "800", color: "#10b981" }}>
+                            {harvestedCount}
+                          </span>
+                        </div>
+
+                        <div className="metric-card" style={{
+                          background: "rgba(245, 158, 11, 0.05)",
+                          border: "1px solid rgba(245, 158, 11, 0.15)",
+                          padding: "1rem",
+                          borderRadius: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)"
+                        }}>
+                          <span style={{ fontSize: "1.5rem" }}>⏳</span>
+                          <span style={{ fontSize: "0.78rem", fontWeight: "600", color: "var(--text-muted, #718096)" }}>
+                            {isAr ? "قيد المعالجة" : "Pending Harvest"}
+                          </span>
+                          <span style={{ fontSize: "1.6rem", fontWeight: "800", color: "#f59e0b" }}>
+                            {pendingCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="discovered-list">
+                        {buildDirectoryTree(discoveredBooks).map(node => (
+                          <DirectoryNode
+                            key={node.key}
+                            node={node}
+                            selectedDiscovered={selectedDiscovered}
+                            crawlExpandedNodes={crawlExpandedNodes}
+                            onToggleNode={handleToggleNode}
+                            onToggleExpand={toggleCrawlExpand}
+                            isAr={isAr}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div className="discovered-list">
-                      {buildDirectoryTree(discoveredBooks).map(node => (
-                        <DirectoryNode
-                          key={node.key}
-                          node={node}
-                          selectedDiscovered={selectedDiscovered}
-                          crawlExpandedNodes={crawlExpandedNodes}
-                          onToggleNode={handleToggleNode}
-                          onToggleExpand={toggleCrawlExpand}
-                          isAr={isAr}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </section>
 
               {/* MANUAL INGEST */}
