@@ -53,6 +53,9 @@ def get_db_client() -> Optional[MongoClient]:
 # -------------------------------------------------------------
 # 1. MongoSessionService Implementation
 # -------------------------------------------------------------
+class MongoSessionService(BaseSessionService):
+    """A persistent, MongoDB-backed session service for ADK 2.0 with InMemory fallback."""
+
     @property
     def db_name(self) -> str:
         try:

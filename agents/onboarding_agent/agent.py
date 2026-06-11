@@ -1,7 +1,19 @@
 import os
 import json
 import logging
+import sys
 from typing import Any, Optional
+
+# Securely inject parent and grandparent paths to resolve 'agents' and central services imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
+grandparent_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
+
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+if grandparent_dir not in sys.path:
+    sys.path.insert(0, grandparent_dir)
+
 from pydantic import BaseModel, Field
 from google.adk.agents import LlmAgent
 

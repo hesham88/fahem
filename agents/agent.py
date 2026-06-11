@@ -2,6 +2,15 @@ import os
 import json
 import httpx
 import datetime
+import sys
+
+# Securely inject parent and root directories to sys.path to guarantee robust imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 def get_active_db(client):
     try:

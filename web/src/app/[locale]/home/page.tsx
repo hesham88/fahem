@@ -4693,6 +4693,14 @@ export default function Home() {
       const step = currentOnboardingStep ? currentOnboardingStep.trim().toLowerCase() : "";
 
       switch (step) {
+        case "phone":
+        case "name":
+        case "username":
+        case "parentemail":
+        case "avatar":
+        case "complete":
+          return [];
+
         case "role":
           return [
             { label: language === "ar" ? "🎓 طالب علم" : "🎓 Student", value: "student" },
