@@ -1952,6 +1952,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
             import subprocess
             
             def run_crawler_background(j_id: str, u_str: str, depth: int, email: str):
+                import os
+                import sys
+                import time
+                import json
                 import threading
                 import traceback
                 

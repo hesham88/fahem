@@ -231,7 +231,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine if superadmin approval is required (only for standard admin actions)
-    const needsApproval = !isPrivate && !isSuper;
+    // Bypassed: Set to false to allow standard admins to trigger ingestion immediately
+    const needsApproval = false;
 
     // Generate a unique bookId
     let bookId = body.id || body.book_id;
