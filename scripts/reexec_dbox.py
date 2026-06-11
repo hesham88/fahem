@@ -58,7 +58,11 @@ FAB_PAGECOUNTS = {10, 150, 220, 380}
 
 
 def _headers(token=None):
-    h = {"User-Agent": "Fahem-ReExec", "Content-Type": "application/json"}
+    h = {
+        "User-Agent": "Fahem-ReExec",
+        "Content-Type": "application/json",
+        "X-Fahem-ReExec": "true"
+    }
     if token:
         h["Authorization"] = "Bearer " + token
     return h
@@ -482,6 +486,33 @@ def verify_donation():
     return True, "landing carries all 3 one-click PayPal donation links"
 
 
+def verify_d_crawl_ctrl():
+    # Admin Crawl Controls: (1) action control without URL does not 400 with "Missing crawl URL".
+    # (2) It can pause/resume/kill and return real state change/messages.
+    # (3) Unknown action yields 400 unrecognized.
+    tok, err = enter_demo("admin")
+    if not tok:
+        return False, f"Could not enter demo as admin: {err}"
+        
+    st_missing_url, resp_missing_url = _req("/admin/crawl", "POST", {}, token=tok)
+    if st_missing_url != 400 or "Missing crawl URL" not in resp_missing_url:
+        return False, f"Empty POST to /admin/crawl should return 400 'Missing crawl URL' but got {st_missing_url}: {resp_missing_url}"
+        
+    st_no_job, resp_no_job = _req("/admin/crawl", "POST", {"action": "pause"}, token=tok)
+    if st_no_job != 400 or "Missing jobId" not in resp_no_job:
+        return False, f"Control POST without jobId should return 400 'Missing jobId' but got {st_no_job}: {resp_no_job}"
+        
+    st_not_found, resp_not_found = _req("/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "pause"}, token=tok)
+    if st_not_found != 404 or "Crawl job not found" not in resp_not_found:
+        return False, f"Control POST with non-existent jobId should return 404 'Crawl job not found' but got {st_not_found}: {resp_not_found}"
+        
+    st_bad_act, resp_bad_act = _req("/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "fly"}, token=tok)
+    if st_bad_act != 400 or "Unrecognized action" not in resp_bad_act:
+        return False, f"Control POST with bad action should return 400 'Unrecognized action' but got {st_bad_act}: {resp_bad_act}"
+        
+    return True, "Crawl control endpoints respond with correct semantic error codes and bypass missing-URL check"
+
+
 def verify_contact():
     # Public Contact page renders + the feedback write-path accepts a submission (OR-44).
     try:
@@ -654,12 +685,13 @@ REEXEC = {
     "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
     "D7": verify_d7, "D8": verify_d8, "D9": verify_d9, "PERF": verify_perf,
     "D-PYBOOK": verify_d_pybook,
+    "D-CRAWL-CTRL": verify_d_crawl_ctrl,
     "D-CONTACT": verify_contact, "D-AUTOCOMPLETE": verify_autocomplete, "D-LANG": verify_lang,
     "D-DONATION": verify_donation,  # advisory only (client-rendered; not in the gate)
     "D-AGENT-CREATE": verify_agent_create,
     "D-ZATONA": verify_zatona,
 }
-FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE"]
+FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL"]
 SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
 
 

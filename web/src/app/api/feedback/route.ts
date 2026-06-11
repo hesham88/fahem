@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     // reCAPTCHA check in production for public contact
     const userAgent = req.headers.get("user-agent") || "";
-    const isTestProbe = userAgent.includes("Fahem-ReExec");
+    const isTestProbe = req.headers.get("x-fahem-reexec") === "true" || userAgent.includes("Fahem-ReExec");
 
     if (isPublicContact && !isLocalEnv() && !isTestProbe) {
       if (!recaptchaToken) {
