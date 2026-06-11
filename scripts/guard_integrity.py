@@ -66,6 +66,8 @@ def main():
         ("verify_d_crawl_ctrl", "D-CRAWL-CTRL check function"),
         ("verify_zatona", "D-ZATONA check function"),
         ("verify_agent_create", "D-AGENT-CREATE check function"),
+        ("verify_d_ingest_trigger", "D-INGEST-TRIGGER check function"),
+        ('"D-INGEST-TRIGGER"', "D-INGEST-TRIGGER registered in the sweep"),
     ]
     if not os.path.exists(reexec_path):
         violations.append("scripts/reexec_dbox.py is MISSING — the source-of-truth sweeper was removed.")

@@ -749,6 +749,7 @@ export default function Home() {
   const [settingsAvatar, setSettingsAvatar] = useState<string>("");
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsStatusText, setSettingsStatusText] = useState("");
+  const [realTokenStats, setRealTokenStats] = useState<any>(null);
 
   // Gamification telemetry metrics
   const getLevelBadgeText = () => {
@@ -762,8 +763,8 @@ export default function Home() {
   const activeStreak = userProfile?.streak || 3;
   const nextLevelXp = activeLevel * 1000;
   const xpProgressPercent = (activeXp % 1000) / 10;
-  const consumedClt = userProfile?.consumedClt || 42;
-  const totalAllocatedClt = userProfile?.totalAllocatedClt || 100;
+  const consumedClt = realTokenStats?.used?.weekly ?? (userProfile?.consumedClt || 42);
+  const totalAllocatedClt = realTokenStats?.limit?.weekly ?? (userProfile?.totalAllocatedClt || 100);
   const tokenProgressPercent = (consumedClt / totalAllocatedClt) * 100;
   const remainingClt = totalAllocatedClt - consumedClt;
   const [placesResults, setPlacesResults] = useState<any[]>([]);
@@ -3305,7 +3306,7 @@ export default function Home() {
             });
           } else {
             // Fallback for responses that aren't wrapped in Agent Final Output tags
-            if (!trimmed.startsWith("[") && !trimmed.startsWith("=") && accumulatedText === "") {
+            if (!trimmed.startsWith("[") && !trimmed.startsWith("=")) {
               accumulatedText += line + "\n";
               setOnboardingMessages(prev => {
                 const nextMsgs = [...prev];
@@ -3342,7 +3343,7 @@ export default function Home() {
           }
         }
         if (trimmed && !trimmed.startsWith("[METADATA]") && !trimmed.includes("=== Agent Final Output ===") && !trimmed.includes("==========================") && !trimmed.startsWith("[Fahem Agent]") && !trimmed.startsWith("[SYSTEM]") && !trimmed.startsWith("[ERROR]")) {
-          if (isFinalOutput || accumulatedText === "") {
+          if (isFinalOutput || (!trimmed.startsWith("[") && !trimmed.startsWith("="))) {
             accumulatedText += line;
             setOnboardingMessages(prev => {
               const nextMsgs = [...prev];
@@ -3637,6 +3638,15 @@ export default function Home() {
           total: getVal(rawStats.total),
           history: Array.isArray(rawStats.history) ? rawStats.history : []
         });
+      }
+
+      // Also query real /api/user/token-stats
+      const realStatsRes = await authedFetch("/api/user/token-stats");
+      if (realStatsRes.ok) {
+        const realStatsData = await realStatsRes.json();
+        if (realStatsData && realStatsData.success) {
+          setRealTokenStats(realStatsData);
+        }
       }
     } catch (err) {
       console.error("Error fetching token stats:", err);
@@ -4866,7 +4876,7 @@ export default function Home() {
             {onboardingMessages.map((msg, index) => {
               const isFahem = msg.sender === "fahem";
               // Skip rendering empty messages that might act as temporary stream holders
-              if (!isFahem && !msg.text) return null;
+              if (!msg.text) return null;
               return (
                 <div key={index} className="onboarding-message" style={{
                   display: "flex", gap: "0.85rem", alignSelf: isFahem ? "flex-start" : "flex-end",
@@ -6041,7 +6051,7 @@ export default function Home() {
                     gap: "0.35rem",
                     textShadow: "0 0 10px rgba(16, 107, 163, 0.15)"
                   }}>
-                    🧠 {language === "ar" ? "الحصة المعرفية" : "CLT Budget"}
+                    🪙 {language === "ar" ? "ميزانية التوكن الأسبوعية" : "Weekly Token Budget"}
                   </span>
                   <span style={{ 
                     fontWeight: 800, 

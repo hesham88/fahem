@@ -3,6 +3,8 @@
   "nav_toolkit": "代理工具包",
   "nav_github": "GitHub",
   "nav_signin": "登录",
+  "nav_signin_explore": "登录",
+  "go_to_dashboard": "进入控制面板",
   "nav_signing_in": "登录中...",
   "welcome_to_fahem": "欢迎使用 Fahem",
   "hero_subtitle": "由 Google 代理开发套件 (ADK) 和 MongoDB MCP 工具包提供支持的智能 AI 助手控制台。",

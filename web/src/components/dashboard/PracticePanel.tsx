@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FiCpu, FiClock, FiRefreshCw } from "react-icons/fi";
 import { authedFetch } from "../../lib/authedFetch";
 
@@ -299,6 +299,91 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [selectedVoice]);
 
+  const startQuest = useCallback(async (overrideParams?: {
+    scopeType?: "subject" | "book";
+    bookId?: string;
+    chapters?: string[];
+    customConcepts?: string;
+    subject?: string;
+    mode?: "mcq" | "text" | "oral";
+    format?: "infinite" | "quiz";
+  }) => {
+    setPracticeLoading(true);
+    setPracticeFeedback(null);
+    setPracticeHasAnswered(false);
+    setPracticeAnswer("");
+    setPracticeSelectedOptionStr("");
+    setPracticeShowHint(false);
+
+    // Reset session stats
+    setPracticeSessionXpGained(0);
+    setPracticeSessionCorrectAnswers(0);
+    setPracticeSessionTotalQuestions(1);
+
+    const finalScopeType = overrideParams?.scopeType ?? practiceScopeType;
+    const finalBookId = overrideParams?.bookId ?? practiceSelectedBookId;
+    const finalChapters = overrideParams?.chapters ?? practiceSelectedChapters;
+    const finalCustomConcepts = overrideParams?.customConcepts ?? practiceCustomConcepts;
+    const finalSubject = overrideParams?.subject ?? practiceSubject;
+    const finalMode = overrideParams?.mode ?? practiceMode;
+    const finalFormat = overrideParams?.format ?? practiceSessionType;
+
+    setPracticeQuizTimeLeft(practiceQuizDurationLimit);
+
+    try {
+      const targetSubject =
+        finalScopeType === "book"
+          ? dynamicBooks?.find((b: any) => (b._id || b.id) === finalBookId)?.subject || "General"
+          : finalSubject;
+
+      addSpaceHistory(
+        `Launched ${finalMode.toUpperCase()} Active Recall Quest for subject: ${targetSubject}`,
+        `تم إطلاق غارة المراجعة النشطة (${finalMode.toUpperCase()}) لمادة: ${targetSubject}`
+      );
+
+      const res = await authedFetch("/api/practice/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: targetSubject,
+          bookId: finalScopeType === "book" ? finalBookId : "",
+          selectedChapters: finalChapters,
+          customConcepts: finalCustomConcepts,
+          mode: finalMode,
+          language: language,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setPracticeCurrentQuestion(data);
+          setPracticeGameState("active");
+        } else {
+          alert(language === "ar" ? "حدث خطأ أثناء توليد السؤال." : "Failed to generate question.");
+        }
+      } else {
+        alert(language === "ar" ? "خطأ في الاتصال بالخادم." : "Server connection failure.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(language === "ar" ? "حدث خطأ غير متوقع." : "An unexpected error occurred.");
+    } finally {
+      setPracticeLoading(false);
+    }
+  }, [
+    practiceScopeType,
+    practiceSelectedBookId,
+    practiceSelectedChapters,
+    practiceCustomConcepts,
+    practiceSubject,
+    practiceMode,
+    practiceSessionType,
+    practiceQuizDurationLimit,
+    dynamicBooks,
+    language,
+    addSpaceHistory
+  ]);
+
   // Listen for custom launch practice event from companion agent
   useEffect(() => {
     const handleLaunchPractice = (e: Event) => {
@@ -341,6 +426,46 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     window.addEventListener("fahemLaunchPractice", handleLaunchPractice);
     return () => window.removeEventListener("fahemLaunchPractice", handleLaunchPractice);
   }, [practiceQuizDurationLimit, addSpaceHistory]);
+
+  // Listen for custom fill and launch practice event
+  useEffect(() => {
+    const handleFillAndLaunch = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        const {
+          scopeType,
+          bookId,
+          chapters,
+          customConcepts,
+          subject,
+          mode,
+          format
+        } = customEvent.detail;
+
+        if (scopeType) setPracticeScopeType(scopeType);
+        if (bookId) setPracticeSelectedBookId(bookId);
+        if (chapters) setPracticeSelectedChapters(chapters);
+        if (customConcepts !== undefined) setPracticeCustomConcepts(customConcepts);
+        if (subject) setPracticeSubject(subject);
+        if (mode) setPracticeMode(mode);
+        if (format) setPracticeSessionType(format);
+
+        // Auto-fire the quest with the incoming params to avoid state sync latency
+        startQuest({
+          scopeType,
+          bookId,
+          chapters,
+          customConcepts,
+          subject,
+          mode,
+          format
+        });
+      }
+    };
+
+    window.addEventListener("fahemFillAndLaunchPractice", handleFillAndLaunch);
+    return () => window.removeEventListener("fahemFillAndLaunchPractice", handleFillAndLaunch);
+  }, [startQuest]);
 
   const speakPracticeText = async (text: string, type: string) => {
     if (speakingType === type) {
@@ -1028,61 +1153,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
             {/* Start Quest Button */}
             <button
-              onClick={async () => {
-                setPracticeLoading(true);
-                setPracticeFeedback(null);
-                setPracticeHasAnswered(false);
-                setPracticeAnswer("");
-                setPracticeSelectedOptionStr("");
-                setPracticeShowHint(false);
-
-                // Reset session stats
-                setPracticeSessionXpGained(0);
-                setPracticeSessionCorrectAnswers(0);
-                setPracticeSessionTotalQuestions(1);
-                setPracticeQuizTimeLeft(practiceQuizDurationLimit);
-
-                try {
-                  const targetSubject =
-                    practiceScopeType === "book"
-                      ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
-                      : practiceSubject;
-
-                  addSpaceHistory(
-                    `Launched ${practiceMode.toUpperCase()} Active Recall Quest for subject: ${targetSubject}`,
-                    `تم إطلاق غارة المراجعة النشطة (${practiceMode.toUpperCase()}) لمادة: ${targetSubject}`
-                  );
-
-                  const res = await authedFetch("/api/practice/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      subject: targetSubject,
-                      bookId: practiceScopeType === "book" ? practiceSelectedBookId : "",
-                      selectedChapters: practiceSelectedChapters,
-                      customConcepts: practiceCustomConcepts,
-                      mode: practiceMode,
-                      language: language,
-                    }),
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    if (data.success) {
-                      setPracticeCurrentQuestion(data);
-                      setPracticeGameState("active");
-                    } else {
-                      alert(language === "ar" ? "حدث خطأ أثناء توليد السؤال." : "Failed to generate question.");
-                    }
-                  } else {
-                    alert(language === "ar" ? "خطأ في الاتصال بالخادم." : "Server connection failure.");
-                  }
-                } catch (err) {
-                  console.error(err);
-                  alert(language === "ar" ? "حدث خطأ غير متوقع." : "An unexpected error occurred.");
-                } finally {
-                  setPracticeLoading(false);
-                }
-              }}
+              onClick={() => startQuest()}
               style={{
                 padding: "0.85rem",
                 borderRadius: "var(--border-radius-md)",

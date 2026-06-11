@@ -142,7 +142,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         "uid": id_info.get("sub", "unknown_gcp_uid"),
                         "email": email,
                         "role": verified_role,
-                        "db_target": db_target
+                        "db_target": db_target,
+                        "selected_book_ids": principal.get("selected_book_ids") if (principal and isinstance(principal, dict)) else [],
+                        "selected_text": principal.get("selected_text") if (principal and isinstance(principal, dict)) else None,
+                        "book_id": principal.get("book_id") if (principal and isinstance(principal, dict)) else None,
+                        "page": principal.get("page") if (principal and isinstance(principal, dict)) else None
                     }
                 except Exception as err:
                     logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
@@ -4061,9 +4065,64 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "userId": user_id
                 })
             
+            force_reindex = bool(data.get("forceReindex") or data.get("force_reindex", False))
+            needs_approval = bool(data.get("needs_approval", False))
+            initial_logs = [
+                "[INIT] Ingestion container spawned successfully.",
+                "[INIT] Awaiting direct binary pipeline allocation...",
+                f"[DOWNLOAD] Queuing download from: {source_url}"
+            ]
+
             if existing_book:
-                client.close()
-                return {"success": True, "message": "Book already exists.", "book": existing_book}
+                status = existing_book.get("ingestion_status") or existing_book.get("status")
+                # If they explicitly requested a force reindex, or the book has failed/cancelled, re-ingest it
+                if force_reindex or status in ["failed", "cancelled", "pending_approval"]:
+                    logger.info(f"[Ingestion] Existing book {existing_book['_id']} found in status '{status}'. Re-triggering ingestion.")
+                    db["books"].update_one(
+                        {"_id": existing_book["_id"]},
+                        {"$set": {
+                            "ingestion_status": "pending_approval" if needs_approval else "queued",
+                            "ingestion_progress": 5,
+                            "ingestion_logs": initial_logs,
+                            "is_downloaded": not needs_approval,
+                            "is_completed": False,
+                            "is_indexed": False,
+                            "is_vectored": False,
+                            "is_embedded": False,
+                            "is_analyzed": False,
+                            "is_extracted": False,
+                            "is_processed": False
+                        }}
+                    )
+                    if not needs_approval:
+                        payload = {
+                            "book_id": existing_book["_id"],
+                            "subject_id": subject_id,
+                            "title": title,
+                            "title_ar": title_ar,
+                            "source_url": source_url,
+                            "storage_path": storage_path,
+                            "grade": grade,
+                            "term": term,
+                            "year": year,
+                            "language": language,
+                            "book_type": book_type,
+                            "is_private": bool(user_id),
+                            "userId": user_id,
+                            "is_local": False
+                        }
+                        run_ingest_in_background(payload)
+                        message = "Existing book ingestion re-triggered."
+                    else:
+                        message = "Existing book ingestion re-queued for Superadmin approval."
+                    
+                    client.close()
+                    # Return modified existing_book for tracking
+                    updated_book = db["books"].find_one({"_id": existing_book["_id"]})
+                    return {"success": True, "message": message, "book": updated_book}
+                else:
+                    client.close()
+                    return {"success": True, "message": "Book already exists.", "book": existing_book}
             
             clean_title = re.sub(r'[^a-z0-9]', '_', title.lower())
             book_id = f"book_{clean_title}_{int(time.time() * 1000)}"

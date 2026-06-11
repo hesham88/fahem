@@ -3,6 +3,8 @@
   "nav_toolkit": "Agenten-Toolkit",
   "nav_github": "GitHub",
   "nav_signin": "Anmelden",
+  "nav_signin_explore": "Anmelden",
+  "go_to_dashboard": "Gehe zum Dashboard",
   "nav_signing_in": "Anmeldung...",
   "welcome_to_fahem": "Willkommen bei Fahem",
   "hero_subtitle": "Eine intelligente KI-Assistentenkonsole, betrieben durch das Google Agent Development Kit (ADK) und MongoDB MCP.",

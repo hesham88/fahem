@@ -65,9 +65,21 @@ export default function LandingPage() {
   const [bypassActive, setBypassActive] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [coreDropdownOpen, setCoreDropdownOpen] = useState(false);
   const router = useRouter();
   const { language, setLanguage, t } = useTranslation();
   const pathname = usePathname();
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".glass-nav-dropdown-wrapper")) {
+        setCoreDropdownOpen(false);
+      }
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, []);
 
 
   useEffect(() => {
@@ -399,10 +411,14 @@ export default function LandingPage() {
             </a>
           </li>
           <li className="glass-nav-dropdown-wrapper">
-            <div className="glass-nav-link glass-nav-dropdown-trigger" style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}>
+            <div 
+              onClick={() => setCoreDropdownOpen(!coreDropdownOpen)}
+              className={`glass-nav-link glass-nav-dropdown-trigger ${coreDropdownOpen ? "active" : ""}`} 
+              style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.95rem", fontWeight: 500, color: "var(--foreground)", opacity: 0.85 }}
+            >
               <FiLayers /> {language === "ar" ? "النواة" : "Core"} <FiChevronDown style={{ fontSize: "0.8rem", transition: "transform 0.2s" }} className="chevron-icon" />
             </div>
-            <ul className="glass-nav-dropdown-menu">
+            <ul className={`glass-nav-dropdown-menu ${coreDropdownOpen ? "show-mobile-dropdown" : ""}`}>
               <li>
                 <a href={`/${language}/gcp-infrastructure`}>
                   <FiCloud className="menu-item-icon" style={{ color: "#2563eb" }} />

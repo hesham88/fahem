@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FiRefreshCw, FiBookOpen, FiActivity, FiFolder } from "react-icons/fi";
 import { authedFetch } from "../../lib/authedFetch";
 
@@ -118,31 +118,45 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   /**
    * Triggers the server endpoint to digest and summarize the user-provided textbook topic or textbook scope.
    */
-  const handleDigestEssence = async () => {
+  const handleDigestEssence = useCallback(async (overrideParams?: {
+    scopeType?: "text" | "subject" | "book";
+    subject?: string;
+    bookId?: string;
+    chapters?: string[];
+    customConcepts?: string;
+    prompt?: string;
+  }) => {
     if (zatonaLoading) return;
+
+    const finalScopeType = overrideParams?.scopeType ?? scopeType;
+    const finalSubject = overrideParams?.subject ?? selectedSubject;
+    const finalBookId = overrideParams?.bookId ?? selectedBookId;
+    const finalChapters = overrideParams?.chapters ?? selectedChapters;
+    const finalCustomConcepts = overrideParams?.customConcepts ?? customConcepts;
+    const finalPrompt = overrideParams?.prompt ?? zatonaPrompt;
 
     // Compose custom concept prompt depending on target scope
     let conceptQuery = "";
     let materialDescEn = "";
     let materialDescAr = "";
 
-    if (scopeType === "text") {
-      if (!zatonaPrompt.trim()) return;
-      conceptQuery = zatonaPrompt;
+    if (finalScopeType === "text") {
+      if (!finalPrompt.trim()) return;
+      conceptQuery = finalPrompt;
       materialDescEn = "Pasted Custom Excerpt";
       materialDescAr = "مقتطف دراسي مخصص";
-    } else if (scopeType === "subject") {
-      conceptQuery = `General academic subject: ${selectedSubject}. ${zatonaPrompt ? `Focus on: ${zatonaPrompt}` : ""}`;
-      materialDescEn = `General Subject (${selectedSubject})`;
-      materialDescAr = `مادة عامة (${selectedSubject})`;
-    } else if (scopeType === "book") {
-      const activeBook = dynamicBooks.find(b => (b._id || b.id) === selectedBookId);
+    } else if (finalScopeType === "subject") {
+      conceptQuery = `General academic subject: ${finalSubject}. ${finalPrompt ? `Focus on: ${finalPrompt}` : ""}`;
+      materialDescEn = `General Subject (${finalSubject})`;
+      materialDescAr = `مادة عامة (${finalSubject})`;
+    } else if (finalScopeType === "book") {
+      const activeBook = dynamicBooks?.find(b => (b._id || b.id) === finalBookId);
       const bookTitleEn = activeBook?.title || "Selected Book";
       const bookTitleAr = activeBook?.titleAr || "الكتاب المحدد";
-      const chsStr = selectedChapters.length > 0 ? ` chapters: ${selectedChapters.join(", ")}` : "all chapters";
-      conceptQuery = `Textbook "${bookTitleEn}" (${chsStr}). ${customConcepts ? `Concepts to focus: ${customConcepts}.` : ""} ${zatonaPrompt ? `Instructions: ${zatonaPrompt}` : ""}`;
-      materialDescEn = `Textbook: ${bookTitleEn} (${selectedChapters.length > 0 ? selectedChapters.length + " chs" : "Full Book"})`;
-      materialDescAr = `كتاب: ${bookTitleAr} (${selectedChapters.length > 0 ? selectedChapters.length + " فصول" : "الكتاب كاملاً"})`;
+      const chsStr = finalChapters.length > 0 ? ` chapters: ${finalChapters.join(", ")}` : "all chapters";
+      conceptQuery = `Textbook "${bookTitleEn}" (${chsStr}). ${finalCustomConcepts ? `Concepts to focus: ${finalCustomConcepts}.` : ""} ${finalPrompt ? `Instructions: ${finalPrompt}` : ""}`;
+      materialDescEn = `Textbook: ${bookTitleEn} (${finalChapters.length > 0 ? finalChapters.length + " chs" : "Full Book"})`;
+      materialDescAr = `كتاب: ${bookTitleAr} (${finalChapters.length > 0 ? finalChapters.length + " فصول" : "الكتاب كاملاً"})`;
     }
 
     setZatonaLoading(true);
@@ -168,12 +182,12 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
               action: "zatona_session",
               status: "success",
               details: {
-                scopeType,
-                subject: selectedSubject,
-                bookId: selectedBookId,
-                chapters: selectedChapters,
-                concepts: customConcepts,
-                prompt: zatonaPrompt,
+                scopeType: finalScopeType,
+                subject: finalSubject,
+                bookId: finalBookId,
+                chapters: finalChapters,
+                concepts: finalCustomConcepts,
+                prompt: finalPrompt,
                 result: data.report,
                 materialDescEn,
                 materialDescAr,
@@ -209,7 +223,57 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
     } finally {
       setZatonaLoading(false);
     }
-  };
+  }, [
+    scopeType,
+    selectedSubject,
+    selectedBookId,
+    selectedChapters,
+    customConcepts,
+    zatonaPrompt,
+    zatonaLoading,
+    dynamicBooks,
+    language,
+    setZatonaLoading,
+    setZatonaResult,
+    addSpaceHistory
+  ]);
+
+  // Listen for custom fill and launch Zatona event
+  useEffect(() => {
+    const handleFillAndLaunch = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        const {
+          scopeType: incomingScope,
+          subject,
+          bookId,
+          chapters,
+          customConcepts: incomingConcepts,
+          prompt
+        } = customEvent.detail;
+
+        if (incomingScope) setScopeType(incomingScope);
+        if (subject) setSelectedSubject(subject);
+        if (bookId) setSelectedBookId(bookId);
+        if (chapters) setSelectedChapters(chapters);
+        if (incomingConcepts !== undefined) setCustomConcepts(incomingConcepts);
+        if (prompt !== undefined) setZatonaPrompt(prompt);
+
+        // Auto-fire digest!
+        handleDigestEssence({
+          scopeType: incomingScope,
+          subject,
+          bookId,
+          chapters,
+          customConcepts: incomingConcepts,
+          prompt
+        });
+      }
+    };
+
+    window.addEventListener("fahemFillAndLaunchZatona", handleFillAndLaunch);
+    return () => window.removeEventListener("fahemFillAndLaunchZatona", handleFillAndLaunch);
+  }, [handleDigestEssence]);
 
   // Open/Resume previous saved summary
   const handleOpenPreviousSummary = (run: any) => {
@@ -459,7 +523,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
 
           <button
             disabled={zatonaLoading || (scopeType === "text" && !zatonaPrompt.trim())}
-            onClick={handleDigestEssence}
+            onClick={() => handleDigestEssence()}
             className="btn btn-primary"
             style={{ padding: "10px", fontWeight: 700 }}
           >

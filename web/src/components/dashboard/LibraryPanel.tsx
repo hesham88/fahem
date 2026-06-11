@@ -4270,6 +4270,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         const customEvent = new CustomEvent("fahemAskCompanion", {
                           detail: {
                             text: promptText,
+                            selected_text: targetText,
+                            book_id: selectedBookReader?._id || selectedBookReader?.id,
+                            page: readerCurrentPage,
                             bookId: selectedBookReader?._id || selectedBookReader?.id,
                             pageNumber: readerCurrentPage,
                             book: selectedBookReader,
@@ -4300,6 +4303,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         const customEvent = new CustomEvent("fahemAskCompanion", {
                           detail: {
                             text: promptText,
+                            selected_text: targetText,
+                            book_id: selectedBookReader?._id || selectedBookReader?.id,
+                            page: readerCurrentPage,
                             bookId: selectedBookReader?._id || selectedBookReader?.id,
                             pageNumber: readerCurrentPage,
                             book: selectedBookReader,
@@ -4507,7 +4513,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)",
                 width: "100%",
                 maxWidth: "380px",
-                margin: "0 0 1rem 0"
+                margin: "0 0 1rem 0",
+                position: "relative",
+                zIndex: 50
               }}>
                 <label style={{
                   fontSize: "0.8rem",

@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { prompt, language, sessionId, onboarding, recaptchaToken, selected_book_ids } = body;
+    const { prompt, language, sessionId, onboarding, recaptchaToken, selected_book_ids, selected_text, book_id, page } = body;
     const userId = ctx.uid;
     const userEmail = ctx.email || "anonymous@fahem.ai";
 
@@ -308,7 +308,10 @@ export async function POST(req: NextRequest) {
               email: ctx.email,
               role: ctx.role,
               db_target: ctx.db_target || "fahem",
-              selected_book_ids: selected_book_ids || []
+              selected_book_ids: selected_book_ids || [],
+              selected_text: selected_text || undefined,
+              book_id: book_id || undefined,
+              page: page || undefined
             })
           };
           if (oidcToken) {
@@ -327,7 +330,10 @@ export async function POST(req: NextRequest) {
               parts: [{ text: prompt }]
             },
             streaming: true,
-            selected_book_ids: selected_book_ids || []
+            selected_book_ids: selected_book_ids || [],
+            selected_text: selected_text || undefined,
+            book_id: book_id || undefined,
+            page: page || undefined
           };
 
           const sseResponse = await fetch(`${cloudRunUrl}/run_sse`, {

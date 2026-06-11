@@ -551,7 +551,8 @@ def verify_autocomplete():
 
 
 def verify_lang():
-    # Companion language lock: ask in Arabic, the reply must contain Arabic script (OR-39).
+    # Companion language lock:
+    # 1. Ask in Arabic, the reply must contain Arabic script (OR-39).
     tok, err = enter_demo("student")
     if not tok:
         return False, err
@@ -564,12 +565,33 @@ def verify_lang():
             if time.time() - start > 100:
                 break
             chunks.append(line.decode("utf-8", "ignore"))
-        text = "".join(chunks)
+        text_ar = "".join(chunks)
     except Exception as e:
         return False, f"agent (ar) call failed: {e}"
-    if re.search(r"[؀-ۿ]{3,}", text):
-        return True, "companion replied in Arabic when language=ar (no EN flip)"
-    return False, "companion did NOT reply in Arabic for language=ar — language lock broken"
+        
+    if not re.search(r"[؀-ۿ]{3,}", text_ar):
+        return False, "companion did NOT reply in Arabic for language=ar — language lock broken"
+        
+    # 2. Ask in English, the reply must be in English and NOT Arabic (English->English assertion).
+    try:
+        resp = _post("/api/agent",
+                     {"prompt": "Explain a simple mathematical concept.", "language": "en", "selected_book_ids": []},
+                     token=tok, timeout=120, stream=True)
+        chunks, start = [], time.time()
+        for line in resp:
+            if time.time() - start > 100:
+                break
+            chunks.append(line.decode("utf-8", "ignore"))
+        text_en = "".join(chunks)
+    except Exception as e:
+        return False, f"agent (en) call failed: {e}"
+        
+    if re.search(r"[؀-ۿ]{5,}", text_en):
+        return False, f"companion flipped/replied in Arabic script when language=en: {text_en[:140]}"
+    if not re.search(r"[a-zA-Z]{5,}", text_en):
+        return False, f"companion reply contained no English text when language=en: {text_en[:140]}"
+        
+    return True, "companion correctly handles language lock (Ar->Ar, En->En with no flips)"
 
 
 def verify_zatona():
@@ -599,8 +621,67 @@ def verify_zatona():
     return True, "Zatona report generated successfully without a 400"
 
 
+def verify_d_ingest_trigger():
+    # D-INGEST-TRIGGER: triggers a book ingestion and asserts that the book leaves the "queued" status
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, f"demo enter failed: {err}"
+        
+    book_id = None
+    try:
+        body = {
+            "subject_id": "subj_user_uploads",
+            "title": f"Trigger-Test-{int(time.time())}",
+            "title_ar": "كتاب اختبار التفعيل",
+            "source_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+            "sizeBytes": 1000
+        }
+        st, resp = _req("/api/books", "POST", body, token=tok, timeout=60)
+        if st != 200:
+            return False, f"/api/books POST returned status {st}: {resp[:140]}"
+            
+        data = json.loads(resp)
+        book = data.get("book") or {}
+        book_id = book.get("_id") or book.get("id")
+        if not book_id:
+            return False, f"Could not retrieve book_id from response: {resp[:140]}"
+            
+        # Poll book status to confirm it leaves "queued" state
+        start_time = time.time()
+        while time.time() - start_time < 45:
+            st_g, resp_g = _req(f"/api/books?bookId={book_id}", "GET", token=tok)
+            if st_g == 200:
+                data_g = json.loads(resp_g)
+                books = data_g.get("books", [])
+                if books:
+                    b_status = books[0].get("ingestion_status") or books[0].get("status")
+                    if b_status != "queued":
+                        # Best-effort cancellation cleanup
+                        _req(f"/api/books/cancel?bookId={book_id}", "POST", token=tok)
+                        return True, f"Book {book_id} left 'queued' and entered status '{b_status}'"
+            time.sleep(2.5)
+            
+        return False, f"Book {book_id} did not leave 'queued' status within timeout"
+    except Exception as e:
+        if book_id:
+            _req(f"/api/books/cancel?bookId={book_id}", "POST", token=tok)
+        return False, f"D-INGEST-TRIGGER error: {e}"
+
+
 def verify_agent_create():
     # D-AGENT-CREATE:
+    # ⚠️ NOTE ON THE MANDATORY EYEBALL POLICY (BG.11):
+    # This automated test ONLY asserts static code invariants (no fabricated links in agent.py)
+    # and basic backend API schema round-trips.
+    # The actual user-facing companion interaction flow, launch context propagation,
+    # visibility of intent cards in the UI, and book anchoring are NOT fully covered
+    # by this script and MUST be manually eyeballed and verified by the OWNER.
+    # NEVER report "17/17 = done" without real, manual end-to-end eyeball of these components!
+    
+    print("\n[D-AGENT-CREATE] ⚠️  MANDATORY OWNER-EYEBALL NOTICE:")
+    print("[D-AGENT-CREATE] ⚠️  Automated check only covers static Grep & API schema round-trips.")
+    print("[D-AGENT-CREATE] ⚠️  Manual eyeball of launch, specs propagation, UI visibility, and book-anchoring is REQUIRED.")
+
     # 1. Statically assert that "navigation_link" with "/viewer?action" is completely absent from agent.py
     try:
         agent_py_path = os.path.join(os.path.dirname(__file__), "..", "agents", "agent.py")
@@ -690,9 +771,10 @@ REEXEC = {
     "D-DONATION": verify_donation,  # advisory only (client-rendered; not in the gate)
     "D-AGENT-CREATE": verify_agent_create,
     "D-ZATONA": verify_zatona,
+    "D-INGEST-TRIGGER": verify_d_ingest_trigger,
 }
 FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL"]
-SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
+SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA", "D-INGEST-TRIGGER"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
 
 
 def run_one(name):

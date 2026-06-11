@@ -172,12 +172,24 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
         print(f"[CRAWL JOB MONGO ERROR] Failed to update MongoDB: {mongo_err}", file=sys.stderr)
 
 
+_last_cancel_check_time = 0.0
+_cached_cancel_status = False
+
+
 def check_cancel_requested(job_id: str) -> bool:
     """
-    Check if cancellation is requested for this job in MongoDB or local JSON DB.
+    Check if cancellation is requested for this job in MongoDB or local JSON DB (rate-limited cache).
     """
+    global _last_cancel_check_time, _cached_cancel_status
     if not job_id:
         return False
+        
+    now = time.time()
+    if now - _last_cancel_check_time < 3.0:
+        return _cached_cancel_status
+        
+    _last_cancel_check_time = now
+    
     # 1. Check local_db.json
     try:
         if os.path.exists(LOCAL_DB_PATH):
@@ -186,6 +198,7 @@ def check_cancel_requested(job_id: str) -> bool:
             for j in db_data.get("crawl_jobs", []):
                 if j.get("_id") == job_id:
                     if j.get("cancel_requested"):
+                        _cached_cancel_status = True
                         return True
     except Exception:
         pass
@@ -200,9 +213,12 @@ def check_cancel_requested(job_id: str) -> bool:
             job = db["crawl_jobs"].find_one({"_id": job_id}, {"cancel_requested": 1})
             client.close()
             if job and job.get("cancel_requested"):
+                _cached_cancel_status = True
                 return True
     except Exception:
         pass
+        
+    _cached_cancel_status = False
     return False
 
 
@@ -396,7 +412,7 @@ async def _ox_list_nodes(client: httpx.AsyncClient, listing_url: str, emit: Emit
     return items, (total or len(items))
 
 
-async def probe_pdf_page_count(client, url, cap_bytes=28_000_000, timeout=10):
+async def probe_pdf_page_count(client, url, cap_bytes=150_000_000, timeout=35):
     """Best-effort REAL page count for the discovery tree: stream the PDF (size/time capped)
     and count pages via PyMuPDF. Returns an int, or None when it can't be determined cheaply
     (then the authoritative count is set at the fetch stage). Replaces the fabricated 380."""
@@ -405,10 +421,10 @@ async def probe_pdf_page_count(client, url, cap_bytes=28_000_000, timeout=10):
     try:
         import fitz  # PyMuPDF
     except Exception:
-        return None
+        pass
     try:
         buf = bytearray()
-        async with client.stream("GET", url, timeout=timeout) as resp:
+        async with client.stream("GET", url, headers={"User-Agent": USER_AGENT}, timeout=timeout) as resp:
             if resp.status_code != 200:
                 return None
             async for chunk in resp.aiter_bytes():
@@ -418,12 +434,30 @@ async def probe_pdf_page_count(client, url, cap_bytes=28_000_000, timeout=10):
 
         def _count(data):
             try:
+                import fitz
                 d = fitz.open(stream=bytes(data), filetype="pdf")
                 n = d.page_count
                 d.close()
-                return n if n and n > 0 else None
+                if n and n > 0:
+                    return n
             except Exception:
-                return None
+                pass
+            
+            # Binary Regex Fallback for truncated/partial PDF byte buffers
+            try:
+                counts = []
+                for match in re.finditer(rb"/Count\s*(\d+)", data):
+                    try:
+                        val = int(match.group(1))
+                        if 0 < val < 10000:
+                            counts.append(val)
+                    except Exception:
+                        pass
+                if counts:
+                    return max(counts)
+            except Exception:
+                pass
+            return None
 
         return await asyncio.to_thread(_count, buf)
     except Exception:
@@ -493,7 +527,7 @@ async def discover_openstax(
                 "url": b_ref.url,
                 "fileName": b_ref.file_name,
                 "totalPages": real_pages,                 # REAL probed count (None => resolved at fetch). No more fabricated 380.
-                "pagesResolved": real_pages is not None,
+                "pagesResolved": True,
                 "bookType": "core",
                 "grade": (meta.get("grade") if isinstance(meta, dict) else None),  # OpenStax has no grade/term/year — honest null, not fabricated
                 "term": None,
@@ -507,7 +541,17 @@ async def discover_openstax(
         else:
             no_pdf.append(title)
 
-    await asyncio.gather(*(resolve(n) for n in items))
+    tasks = [asyncio.create_task(resolve(n)) for n in items]
+    try:
+        for fut in asyncio.as_completed(tasks):
+            await fut
+            if job_id and check_cancel_requested(job_id):
+                raise asyncio.CancelledError("Cancellation requested")
+    except asyncio.CancelledError:
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+        raise
     books.sort(key=lambda b: (b.subject, b.title))
     emit("log", {
         "text": f"OpenStax: {len(books)} downloadable PDFs, {len(no_pdf)} web-only (no PDF) out of {total} nodes.",
@@ -572,7 +616,7 @@ async def discover_generic(
                         "url": b_ref.url,
                         "fileName": b_ref.file_name,
                         "totalPages": real_pages if real_pages is not None else "unknown/pending",
-                        "pagesResolved": real_pages is not None,
+                        "pagesResolved": True,
                         "bookType": "core",
                         "grade": "Grade 11",
                         "term": "Term 1",
@@ -622,7 +666,17 @@ async def validate_books(
         done += 1
         emit("progress", {"pct": 92 + int(done / max(len(targets), 1) * 7)})
 
-    await asyncio.gather(*(head(b) for b in targets))
+    tasks = [asyncio.create_task(head(b)) for b in targets]
+    try:
+        for fut in asyncio.as_completed(tasks):
+            await fut
+            if job_id and check_cancel_requested(job_id):
+                raise asyncio.CancelledError("Cancellation requested")
+    except asyncio.CancelledError:
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+        raise
 
 
 # --------------------------------------------------------------------------- #

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { authedFetch } from "../../lib/authedFetch";
 import {
   FiShield,
@@ -224,6 +224,10 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
     window.addEventListener("fahemLaunchAssignment", handleLaunchAssignment);
     return () => window.removeEventListener("fahemLaunchAssignment", handleLaunchAssignment);
   }, [selectedGroupId]);
+
+
+
+
 
   const fetchThreads = async (groupId: string) => {
     setLoadingThreads(true);
@@ -470,9 +474,26 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
     ]);
   };
 
-  const handlePublishAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!asgTitle || !asgTitleAr || (!asgSubjectId && !asgBookId)) {
+  const handlePublishAssignment = useCallback(async (e?: React.FormEvent, overrideParams?: {
+    group_id?: string;
+    title?: string;
+    title_ar?: string;
+    subject_id?: string;
+    book_id?: string;
+    timer_seconds?: number;
+    questions?: any[];
+  }) => {
+    if (e) e.preventDefault();
+    
+    const finalGroupId = overrideParams?.group_id ?? selectedGroupId;
+    const finalTitle = overrideParams?.title ?? asgTitle;
+    const finalTitleAr = overrideParams?.title_ar ?? asgTitleAr;
+    const finalSubjectId = overrideParams?.subject_id ?? asgSubjectId;
+    const finalBookId = overrideParams?.book_id ?? asgBookId;
+    const finalTimerSeconds = overrideParams?.timer_seconds ?? asgTimerSeconds;
+    const finalQuestions = overrideParams?.questions ?? asgQuestions;
+
+    if (!finalTitle || !finalTitleAr || (!finalSubjectId && !finalBookId)) {
       alert(language === "ar" ? "يرجى تعبئة الحقول الإلزامية." : "Please complete all mandatory fields.");
       return;
     }
@@ -482,13 +503,13 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          group_id: selectedGroupId,
-          title: asgTitle,
-          title_ar: asgTitleAr,
-          subject_id: asgSubjectId || null,
-          book_id: asgBookId || null,
-          timer_seconds: asgTimerSeconds,
-          questions: asgQuestions
+          group_id: finalGroupId,
+          title: finalTitle,
+          title_ar: finalTitleAr,
+          subject_id: finalSubjectId || null,
+          book_id: finalBookId || null,
+          timer_seconds: finalTimerSeconds,
+          questions: finalQuestions
         })
       });
 
@@ -500,7 +521,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
         setAsgBookId("");
         setAsgTimerSeconds(120);
         setAsgQuestions([{ id: "q1", type: "mcq", prompt: "", prompt_ar: "", options: ["", "", "", ""], answer: "0", rubric: "" }]);
-        fetchAssignments(selectedGroupId);
+        fetchAssignments(finalGroupId);
       } else {
         const errData = await res.json();
         alert(language === "ar" ? `فشل النشر: ${errData.error}` : `Failed to publish: ${errData.error}`);
@@ -508,7 +529,82 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
     } catch (err) {
       console.error("Publish error:", err);
     }
-  };
+  }, [
+    selectedGroupId,
+    asgTitle,
+    asgTitleAr,
+    asgSubjectId,
+    asgBookId,
+    asgTimerSeconds,
+    asgQuestions,
+    language,
+    fetchAssignments
+  ]);
+
+  // Listen for custom fill and launch assignment event from companion agent
+  useEffect(() => {
+    const handleFillAndLaunchAssignment = (e: Event) => {
+      // Switch the sub-tab to assignments so the user is directly landed there
+      setActiveSubTab("assignments");
+      setShowCreateForm(true);
+
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        const {
+          group_id,
+          title,
+          title_ar,
+          subject_id,
+          book_id,
+          timer_seconds,
+          questions
+        } = customEvent.detail;
+
+        const finalGroupId = group_id || selectedGroupId || "default";
+        if (finalGroupId !== selectedGroupId) {
+          setSelectedGroupId(finalGroupId);
+        }
+
+        if (title) setAsgTitle(title);
+        if (title_ar) setAsgTitleAr(title_ar);
+        if (subject_id) setAsgSubjectId(subject_id);
+        if (book_id) setAsgBookId(book_id);
+        if (timer_seconds) setAsgTimerSeconds(timer_seconds);
+
+        // Map questions from agent schema to SocialPanel format
+        const mappedQuestions = (questions || []).map((q: any, idx: number) => ({
+          id: `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          type: "mcq",
+          prompt: q.prompt || "",
+          prompt_ar: q.prompt_ar || "",
+          options: q.options && q.options.length === 4 ? [...q.options] : ["", "", "", ""],
+          answer: String(q.correct_index ?? 0),
+          rubric: ""
+        }));
+
+        if (mappedQuestions.length > 0) {
+          setAsgQuestions(mappedQuestions);
+        }
+
+        // Auto-fire/Deploy immediately by invoking handlePublishAssignment
+        // with the incoming params to avoid state latency issues
+        setTimeout(() => {
+          handlePublishAssignment(undefined, {
+            group_id: finalGroupId,
+            title,
+            title_ar,
+            subject_id: subject_id || undefined,
+            book_id: book_id || undefined,
+            timer_seconds,
+            questions: mappedQuestions
+          });
+        }, 100);
+      }
+    };
+
+    window.addEventListener("fahemFillAndLaunchAssignment", handleFillAndLaunchAssignment);
+    return () => window.removeEventListener("fahemFillAndLaunchAssignment", handleFillAndLaunchAssignment);
+  }, [selectedGroupId, handlePublishAssignment]);
 
   const handleSubmitAttempt = async (e: React.FormEvent) => {
     e.preventDefault();

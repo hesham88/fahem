@@ -397,13 +397,22 @@ def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
             if system_instruction:
                 from guardrails import verified_principal_ctx
                 principal = verified_principal_ctx.get()
-                book_ids = None
+                book_ids = []
                 if principal and isinstance(principal, dict):
-                    book_ids = principal.get("selected_book_ids")
+                    bids = principal.get("selected_book_ids")
+                    if bids:
+                        if isinstance(bids, str):
+                            book_ids = [bids]
+                        else:
+                            book_ids = list(bids)
+                    single_book_id = principal.get("book_id")
+                    if single_book_id and single_book_id not in book_ids:
+                        book_ids.append(single_book_id)
+
                 if not book_ids:
                     try:
                         from agents.mongodb_engine import selected_book_ids_var
-                        book_ids = selected_book_ids_var.get()
+                        book_ids = selected_book_ids_var.get() or []
                     except Exception:
                         pass
                 if book_ids:
@@ -438,16 +447,59 @@ def before_model_callback(*args, **kwargs) -> Optional[LlmResponse]:
                     except Exception:
                         pass
                         
+                    additional_instruction = ""
                     if book_titles:
                         titles_str = ", ".join(list(set(book_titles)))
-                        additional_instruction = f"\n\nACTIVE BOOK CONTEXT:\nThe user has selected the following active book(s): {titles_str}. The current conversational scope is strictly restricted to these books. Ground your answers in them. If the user's prompt is general but can be answered using content from these books, do so. Never ask the user 'which book' they are referring to, as they have already selected {titles_str}.\n"
+                        additional_instruction += f"\n\nACTIVE BOOK CONTEXT:\nThe user has selected the following active book(s): {titles_str}. The current conversational scope is strictly restricted to these books. Ground your answers in them. If the user's prompt is general but can be answered using content from these books, do so. Never ask the user 'which book' they are referring to, as they have already selected {titles_str}.\n"
+
+                    selected_text = principal.get("selected_text") if principal else None
+                    page = principal.get("page") if principal else None
+                    if selected_text:
+                        target_book_title = ""
+                        single_book_id = principal.get("book_id") if principal else None
+                        if single_book_id:
+                            try:
+                                local_db_path = "C:\\Users\\hesh1\\Desktop\\fahem\\web\\src\\app\\api\\local_db.json"
+                                if os.path.exists(local_db_path):
+                                    with open(local_db_path, "r", encoding="utf-8") as f:
+                                        local_db = json.load(f)
+                                    books = local_db.get("books", [])
+                                    found = next((b for b in books if b.get("_id") == single_book_id), None)
+                                    if found:
+                                        target_book_title = found.get("title") or found.get("title_ar")
+                            except Exception:
+                                pass
+                            if not target_book_title:
+                                try:
+                                    from mongodb_engine import MongoDBEngine
+                                    db_engine = MongoDBEngine()
+                                    if db_engine._db is not None:
+                                        doc = db_engine._db["books"].find_one({"_id": single_book_id}, {"title": 1, "title_ar": 1})
+                                        if doc:
+                                            target_book_title = doc.get("title") or doc.get("title_ar")
+                                except Exception:
+                                    pass
+                        
+                        book_ref_str = f" in textbook '{target_book_title}'" if target_book_title else ""
+                        page_ref_str = f" on page {page}" if page else ""
+                        
+                        additional_instruction += (
+                            f"\n\nFLYING SELECTION CONTEXT:\n"
+                            f"The user has highlighted/selected the following text{book_ref_str}{page_ref_str}:\n"
+                            f'"""\n{selected_text}\n"""\n'
+                            f"Provide a highly engaging, precise pedagogical explanation or summary of this selected text. "
+                            f"Tailor your response directly to this selection, referencing the specific context of the book and page if mentioned above. "
+                            f"Use clear formatting and make it readable for a student.\n"
+                        )
+
+                    if additional_instruction:
                         if isinstance(system_instruction, str):
                             request.config.system_instruction = system_instruction + additional_instruction
                         elif hasattr(system_instruction, "parts") and system_instruction.parts:
                             for p in system_instruction.parts:
                                 if hasattr(p, "text") and p.text:
                                     p.text = p.text + additional_instruction
-                        logger.info(f"[R21 SYSTEM PROMPT INJECTION] Injected active book context: {titles_str}")
+                        logger.info(f"[PROMPT INJECTION] Injected selection and book context.")
         except Exception as e:
             logger.warning(f"Failed to inject active book context into system prompt: {e}")
 

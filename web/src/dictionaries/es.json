@@ -3,6 +3,8 @@
   "nav_toolkit": "Herramientas",
   "nav_github": "GitHub",
   "nav_signin": "Iniciar Sesión",
+  "nav_signin_explore": "Iniciar Sesión",
+  "go_to_dashboard": "Ir al panel de control",
   "nav_signing_in": "Conectando...",
   "welcome_to_fahem": "Bienvenido a Fahem",
   "hero_subtitle": "Consola de asistente de IA inteligente potenciada programáticamente por Google Agent Development Kit (ADK) y MongoDB MCP.",

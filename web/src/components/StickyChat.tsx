@@ -931,100 +931,81 @@ export default function StickyChat() {
           }
 
           if (action === "create_practice" || action === "practice") {
-            // POST /api/practice/generate
-            const res = await authedFetch("/api/practice/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                subject: target?.subject || "General",
-                bookId: target?.bookId || target?.book_id || "",
-                selectedChapters: target?.selectedChapters || target?.chapters || [],
-                customConcepts: target?.customConcepts || target?.concepts || "",
-                mode: target?.mode || "mcq",
-                language: language,
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success) {
-                setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنشاء ممارسة جديدة بنجاح! جاري الانتقال..." : "Practice session created successfully! Navigating..." }));
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("fahemLaunchPractice", {
-                    detail: {
-                      data: {
-                        ...data,
-                        mode: target?.mode || "mcq",
-                        subject: target?.subject || "General"
-                      }
-                    }
-                  }));
-                  window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "practice" } }));
-                }, 1500);
-              } else {
-                throw new Error(data.error || "Generation returned success=false");
-              }
-            } else {
-              throw new Error(`HTTP error ${res.status}`);
-            }
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "practice" } }));
+            
+            const scopeType = target?.bookId || target?.book_id ? "book" : "subject";
+            const bookId = target?.bookId || target?.book_id || "";
+            const chapters = target?.selectedChapters || target?.chapters || [];
+            const customConcepts = target?.customConcepts || target?.concepts || "";
+            const subject = target?.subject || "General";
+            const mode = target?.mode || "mcq";
+            const format = target?.format || "infinite";
+
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("fahemFillAndLaunchPractice", {
+                detail: {
+                  scopeType,
+                  bookId,
+                  chapters,
+                  customConcepts,
+                  subject,
+                  mode,
+                  format
+                }
+              }));
+            }, 300);
+
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم ملء الحقول وإطلاق الممارسة!" : "Practice fields populated and quest launched!" }));
           } else if (action === "create_zatona" || action === "zatona") {
-            // POST /api/zatona
-            const res = await authedFetch("/api/zatona", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                concept: target?.concept || "AI generated focus area",
-                language: language
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success && data.report) {
-                setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم إنتاج ملخص الزتونة بنجاح! جاري الانتقال..." : "Zatona summary created successfully! Navigating..." }));
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("fahemLaunchZatona", {
-                    detail: {
-                      data: {
-                        report: data.report,
-                        concept: target?.concept || "AI generated focus area"
-                      }
-                    }
-                  }));
-                  window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "zatona" } }));
-                }, 1500);
-              } else {
-                throw new Error(data.error || "Generation returned success=false");
-              }
-            } else {
-              throw new Error(`HTTP error ${res.status}`);
-            }
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "zatona" } }));
+            
+            const scopeType = target?.bookId || target?.book_id ? "book" : (target?.subject ? "subject" : "text");
+            const subject = target?.subject || "Math";
+            const bookId = target?.bookId || target?.book_id || "";
+            const chapters = target?.selectedChapters || target?.chapters || [];
+            const customConcepts = target?.customConcepts || target?.concepts || "";
+            const prompt = target?.concept || "";
+
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("fahemFillAndLaunchZatona", {
+                detail: {
+                  scopeType,
+                  subject,
+                  bookId,
+                  chapters,
+                  customConcepts,
+                  prompt
+                }
+              }));
+            }, 300);
+
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم ملء الحقول وبدء العصر!" : "Zatona fields populated and digest started!" }));
           } else if (action === "create_assignment" || action === "assignment") {
-            // POST /api/assignments
-            const res = await authedFetch("/api/assignments", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                group_id: target?.group_id || target?.groupId || "default",
-                title: target?.title || "New Assignment",
-                title_ar: target?.title_ar || target?.titleAr || "واجب جديد",
-                subject_id: target?.subject_id || target?.subjectId || null,
-                book_id: target?.book_id || target?.bookId || null,
-                timer_seconds: target?.timer_seconds || target?.timerSeconds || 120,
-                questions: target?.questions || []
-              })
-            });
-            if (res.ok) {
-              setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم نشر الواجب بنجاح! جاري الانتقال..." : "Assignment published successfully! Navigating..." }));
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent("fahemLaunchAssignment", {
-                  detail: {
-                    groupId: target?.group_id || target?.groupId || "default"
-                  }
-                }));
-                window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "social" } }));
-              }, 1500);
-            } else {
-              throw new Error(`HTTP error ${res.status}`);
-            }
+            window.dispatchEvent(new CustomEvent("fahemNavigateTab", { detail: { tab: "social" } }));
+            
+            const groupId = target?.group_id || target?.groupId || "default";
+            const title = target?.title || "New Assignment";
+            const titleAr = target?.title_ar || target?.titleAr || "واجب جديد";
+            const subjectId = target?.subject_id || target?.subjectId || null;
+            const bookId = target?.book_id || target?.bookId || null;
+            const timerSeconds = target?.timer_seconds || target?.timerSeconds || 120;
+            const questions = target?.questions || [];
+
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("fahemFillAndLaunchAssignment", {
+                detail: {
+                  group_id: groupId,
+                  title,
+                  title_ar: titleAr,
+                  subject_id: subjectId,
+                  book_id: bookId,
+                  timer_seconds: timerSeconds,
+                  questions
+                }
+              }));
+            }, 300);
+
+            setCardSuccess(prev => ({ ...prev, [msgId]: isAr ? "تم ملء حقول الواجب ونشره!" : "Assignment fields populated and deployed!" }));
           } else {
             throw new Error(`Unknown write action: ${action}`);
           }
@@ -1398,10 +1379,14 @@ export default function StickyChat() {
         setLayoutMode("side");
         setUseGrounded(true); // Auto-enable grounding for selection explain/summary (OR-25)
         
-        // Ensure active page/book context is set for grounding
-        if (detail.book) {
-          setBookContext(detail);
-        }
+        // Ensure active page/book context is set for grounding with normalized selection fields
+        const bookContextObj = {
+          ...detail,
+          selected_text: detail.selected_text || detail.text,
+          book_id: detail.book_id || detail.bookId,
+          page: detail.page || detail.pageNumber || detail.currentPage
+        };
+        setBookContext(bookContextObj);
         
         if (detail.bookId) {
           const bId = String(detail.bookId);
@@ -2636,7 +2621,10 @@ User Question: ${queryText}`;
           prompt: promptPayload,
           language: lockedLanguage !== "auto" ? lockedLanguage : ((bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language),
           sessionId: currentSessionId || undefined,
-          selected_book_ids: selectedBookIds
+          selected_book_ids: selectedBookIds,
+          selected_text: bookContext?.selected_text || undefined,
+          book_id: bookContext?.book_id || undefined,
+          page: bookContext?.page || undefined
         }),
       });
 
@@ -3844,77 +3832,7 @@ User Question: ${queryText}`;
             position: "relative"
           }}
         >
-          {/* Premium Chat Controls: Output Pacing & Language Lock */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-            marginBottom: "0.25rem",
-            padding: "0.4rem 0.75rem",
-            backgroundColor: "var(--sticky-chat-controls-bg, rgba(255, 255, 255, 0.65))",
-            border: "1px solid rgba(16, 107, 163, 0.12)",
-            borderRadius: "14px",
-            backdropFilter: "blur(12px)",
-            fontSize: "0.8rem",
-            color: "var(--foreground)",
-            animation: "fadeIn 0.25s ease-out"
-          }}>
-            {/* Output Pacing Selector */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontWeight: 600, color: "var(--primary)", fontSize: "0.75rem" }}>
-                {language === "ar" ? "سرعة الاستجابة:" : "Output Pacing:"}
-              </span>
-              <div style={{
-                display: "inline-flex",
-                background: "rgba(16, 107, 163, 0.06)",
-                padding: "2px",
-                borderRadius: "8px",
-                border: "1px solid rgba(16, 107, 163, 0.1)"
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setChatPacing("instant")}
-                  style={{
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: chatPacing === "instant" ? "var(--primary)" : "transparent",
-                    color: chatPacing === "instant" ? "#ffffff" : "var(--primary)",
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease-out",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.25rem"
-                  }}
-                >
-                  ⚡ {language === "ar" ? "فوري" : "Instant"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatPacing("pedagogical")}
-                  style={{
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: chatPacing === "pedagogical" ? "var(--primary)" : "transparent",
-                    color: chatPacing === "pedagogical" ? "#ffffff" : "var(--primary)",
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease-out",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.25rem"
-                  }}
-                >
-                  🐢 {language === "ar" ? "بيداغوجي" : "Pedagogical"}
-                </button>
-              </div>
-            </div>
-          </div>
+
 
           {/* Mentions Dropdown Popover */}
           {showMentionsDropdown && getMentionOptions().length > 0 && (
