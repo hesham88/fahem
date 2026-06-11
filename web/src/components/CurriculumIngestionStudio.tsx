@@ -2938,19 +2938,20 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                   
                   return (
                     <div className="discovered-catalog-wrapper">
-                      <div className="catalog-header-checkbox" style={{ display: "flex", flexDirection: isRoutingComplete ? "row" : "column", alignItems: isRoutingComplete ? "center" : "stretch", gap: "10px" }}>
+                      <div className="catalog-header-checkbox" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "10px" }}>
                         <h3>{t("crawled_results")}</h3>
-                        {isRoutingComplete ? (
-                          <button
-                            onClick={handleBulkIngest}
-                            disabled={loading}
-                            className="bulk-ingest-button"
-                          >
-                            {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
-                          </button>
-                        ) : (
-                          renderRoutingChecklist()
-                        )}
+                        <button
+                          onClick={handleBulkIngest}
+                          disabled={loading}
+                          className="bulk-ingest-button"
+                          style={{
+                            opacity: !isRoutingComplete ? 0.65 : 1,
+                            cursor: "pointer",
+                            filter: !isRoutingComplete ? "grayscale(40%)" : "none"
+                          }}
+                        >
+                          {t("bulk_ingest_btn", { count: Object.values(selectedDiscovered).filter(Boolean).length })}
+                        </button>
                       </div>
 
                       {/* Premium responsive metrics grid */}
@@ -3104,17 +3105,18 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                     </div>
                   </div>
 
-                  {isRoutingComplete ? (
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="primary-submit-btn"
-                    >
-                      <FiLayers /> {t("direct_ingest_btn")}
-                    </button>
-                  ) : (
-                    renderRoutingChecklist()
-                  )}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="primary-submit-btn"
+                    style={{
+                      opacity: !isRoutingComplete ? 0.65 : 1,
+                      cursor: "pointer",
+                      filter: !isRoutingComplete ? "grayscale(40%)" : "none"
+                    }}
+                  >
+                    <FiLayers /> {t("direct_ingest_btn")}
+                  </button>
                 </form>
               </section>
             </div>
