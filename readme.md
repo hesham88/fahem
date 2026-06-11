@@ -63,8 +63,8 @@ graph TD
 ```
 
 * **Fetcher (`job_fetch.py`)**: Fetches raw textbook PDFs, validates MD5 integrity, and extracts native Table of Contents (TOC) bookmarks (`doc.get_toc()`).
-* **Layout OCR (`job_struct.py`)**: Rasterizes PDF pages into standard PNG buffers. It invokes the Google Vision API via `gemini-2.5-flash` with a strict Pydantic schema (`PageStructure`) to recover layout grids, paragraph blocks, mathematical formula overlays, and tables.
-* **Translation (`job_translate.py`)**: Applies key-based translation concurrently using `gemini-2.5-flash`, keeping layouts intact and mapping dual Arabic/English representations under the page's `i18n` metadata dictionary.
+* **Layout OCR (`job_struct.py`)**: Rasterizes PDF pages into standard PNG buffers. It invokes the Google Vision API via `gemini-3.1-flash` with a strict Pydantic schema (`PageStructure`) to recover layout grids, paragraph blocks, mathematical formula overlays, and tables.
+* **Translation (`job_translate.py`)**: Applies key-based translation concurrently using `gemini-3.1-flash`, keeping layouts intact and mapping dual Arabic/English representations under the page's `i18n` metadata dictionary.
 * **Outlines Compilation & DB Finalizer (`job_assemble.py`)**: Chapter-clusters pages, uses Pillow to generate custom premium glassmorphic cover designs based on subject-specific color palettes, and constructs spatial Mind Maps.
 * **Parallel Threaded Embed (`job_embed.py`)**:
   - Launches a concurrent `ThreadPoolExecutor` (gated at `max_workers=3` to avoid Gemini rate limits) to embed pages in parallel.
