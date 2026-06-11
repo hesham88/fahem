@@ -1463,8 +1463,8 @@ export default function Home() {
   };
 
   const parseInlineMarkdown = (text: string) => {
-    // Support bolding (**text**), code (`text`), and book page citations [book_id:pN] or [pN]
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
+    // Support bolding (**text**), code (`text`), standard markdown links ([text](url)), and book page citations [book_id:pN] or [pN]
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
     return parts.map((part, pIdx) => {
       if (!part) return null;
       if (part.startsWith("**") && part.endsWith("**")) {
@@ -1472,6 +1472,82 @@ export default function Home() {
       }
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      if (part.startsWith("[") && part.includes("](")) {
+        const closeBracketIdx = part.indexOf("](");
+        const linkText = part.slice(1, closeBracketIdx);
+        const linkUrl = part.slice(closeBracketIdx + 2, -1);
+        
+        if (linkUrl.includes("bookId=") || linkUrl.includes("page=")) {
+          let bookId = "";
+          let pageNum = 1;
+          try {
+            const urlObj = new URL(linkUrl.startsWith("?") ? `http://dummy.com${linkUrl}` : linkUrl);
+            bookId = urlObj.searchParams.get("bookId") || "";
+            const pageParam = urlObj.searchParams.get("page");
+            if (pageParam) {
+              pageNum = parseInt(pageParam, 10) || 1;
+            }
+          } catch (e) {
+            const bookMatch = linkUrl.match(/bookId=([^&]+)/);
+            const pageMatch = linkUrl.match(/page=(\d+)/);
+            if (bookMatch) bookId = decodeURIComponent(bookMatch[1]);
+            if (pageMatch) pageNum = parseInt(pageMatch[1], 10) || 1;
+          }
+          
+          bookId = bookId.replace(/[^a-zA-Z0-9_\u0600-\u06FF\s-]/g, "").trim();
+          
+          let cleanLinkText = linkText;
+          const textMatch = linkText.match(/(?:^|\[)?([^\]:]+)\s*:\s*[pP](\d+)(?:\])?$/i);
+          if (textMatch) {
+            const matchedPage = textMatch[2];
+            cleanLinkText = `[p${matchedPage}]`;
+          } else if (/^[pP](\d+)$/i.test(linkText)) {
+            cleanLinkText = `[p${linkText.match(/[pP](\d+)/i)![1]}]`;
+          }
+          
+          return (
+            <a
+              key={pIdx}
+              href={linkUrl}
+              onClick={(e) => {
+                e.preventDefault();
+                const event = new CustomEvent("fahemNavigateBook", {
+                  detail: { bookId, page: pageNum }
+                });
+                window.dispatchEvent(event);
+              }}
+              style={{
+                color: "var(--secondary, #d4af37)",
+                textDecoration: "underline",
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                background: "rgba(212, 175, 55, 0.08)",
+                padding: "2px 6px",
+                borderRadius: "6px",
+                border: "1px solid rgba(212, 175, 55, 0.15)",
+                transition: "all 0.2s"
+              }}
+              title={`Go to ${bookId} - Page ${pageNum}`}
+            >
+              📖 {cleanLinkText}
+            </a>
+          );
+        }
+        return (
+          <a
+            key={pIdx}
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--primary)", textDecoration: "underline" }}
+          >
+            {linkText}
+          </a>
+        );
       }
       
       const customMatch = part.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
@@ -4084,7 +4160,9 @@ export default function Home() {
             name: "⭐ DEMO (Sandbox)",
             username: "demo_evaluation",
             avatar: "/avatars/space_explorer.svg",
-            onboardingCompleted: true,
+            onboardingCompleted: (currentUser.email && currentUser.email.toLowerCase().includes("onboarding-test")) ? false : true,
+            phoneVerified: (currentUser.email && currentUser.email.toLowerCase().includes("onboarding-test")) ? true : undefined,
+            phone_verified: (currentUser.email && currentUser.email.toLowerCase().includes("onboarding-test")) ? true : undefined,
             userType: savedPersona === "teacher" ? "teacher" : "student",
             role: savedPersona === "admin" ? "admin" : savedPersona,
             isWhitelisted: true,
@@ -4101,6 +4179,9 @@ export default function Home() {
           setUserProfile(judgeProfile);
           setLoadingProfile(false);
           setIsAdmin(savedPersona === "admin"); // Allow judge Standard/Superadmin console access for auditing
+          if (judgeProfile.onboardingCompleted === false) {
+            setCurrentOnboardingStep("role");
+          }
         } else {
           authedFetch(`/api/user/profile?userId=${encodeURIComponent(currentUser.uid)}&email=${encodeURIComponent(currentUser.email || "")}&t=${Date.now()}`, { cache: "no-store" })
             .then((res) => {
@@ -4438,10 +4519,87 @@ export default function Home() {
                 </code>
               );
             }
-            // Parse book page citations within standard text parts
-            const citeParts = codePart.split(/(\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
+            // Parse book page citations and standard markdown links within standard text parts
+            const citeParts = codePart.split(/(\[[^\]]+\]\([^)]+\)|\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
             return citeParts.map((citePart, citeIndex) => {
               if (!citePart) return null;
+              if (citePart.startsWith("[") && citePart.includes("](")) {
+                const closeBracketIdx = citePart.indexOf("](");
+                const linkText = citePart.slice(1, closeBracketIdx);
+                const linkUrl = citePart.slice(closeBracketIdx + 2, -1);
+                
+                if (linkUrl.includes("bookId=") || linkUrl.includes("page=")) {
+                  let bookId = "";
+                  let pageNum = 1;
+                  try {
+                    const urlObj = new URL(linkUrl.startsWith("?") ? `http://dummy.com${linkUrl}` : linkUrl);
+                    bookId = urlObj.searchParams.get("bookId") || "";
+                    const pageParam = urlObj.searchParams.get("page");
+                    if (pageParam) {
+                      pageNum = parseInt(pageParam, 10) || 1;
+                    }
+                  } catch (e) {
+                    const bookMatch = linkUrl.match(/bookId=([^&]+)/);
+                    const pageMatch = linkUrl.match(/page=(\d+)/);
+                    if (bookMatch) bookId = decodeURIComponent(bookMatch[1]);
+                    if (pageMatch) pageNum = parseInt(pageMatch[1], 10) || 1;
+                  }
+                  
+                  bookId = bookId.replace(/[^a-zA-Z0-9_\u0600-\u06FF\s-]/g, "").trim();
+                  
+                  let cleanLinkText = linkText;
+                  const textMatch = linkText.match(/(?:^|\[)?([^\]:]+)\s*:\s*[pP](\d+)(?:\])?$/i);
+                  if (textMatch) {
+                    const matchedPage = textMatch[2];
+                    cleanLinkText = `[p${matchedPage}]`;
+                  } else if (/^[pP](\d+)$/i.test(linkText)) {
+                    cleanLinkText = `[p${linkText.match(/[pP](\d+)/i)![1]}]`;
+                  }
+                  
+                  return (
+                    <a
+                      key={`${codeIndex}-${citeIndex}`}
+                      href={linkUrl}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const event = new CustomEvent("fahemNavigateBook", {
+                          detail: { bookId, page: pageNum }
+                        });
+                        window.dispatchEvent(event);
+                      }}
+                      style={{
+                        color: "var(--secondary, #d4af37)",
+                        textDecoration: "underline",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "2px",
+                        background: "rgba(212, 175, 55, 0.08)",
+                        padding: "2px 6px",
+                        borderRadius: "6px",
+                        border: "1px solid rgba(212, 175, 55, 0.15)",
+                        transition: "all 0.2s"
+                      }}
+                      title={`Go to ${bookId} - Page ${pageNum}`}
+                    >
+                      📖 {cleanLinkText}
+                    </a>
+                  );
+                }
+                return (
+                  <a
+                    key={`${codeIndex}-${citeIndex}`}
+                    href={linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--primary)", textDecoration: "underline" }}
+                  >
+                    {linkText}
+                  </a>
+                );
+              }
+              
               const customMatch = citePart.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
               if (customMatch) {
                 const bookId = customMatch[1].trim();

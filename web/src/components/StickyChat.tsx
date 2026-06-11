@@ -2078,6 +2078,15 @@ export default function StickyChat() {
           
           bookId = bookId.replace(/[^a-zA-Z0-9_\u0600-\u06FF\s-]/g, "").trim();
           
+          let cleanLinkText = linkText;
+          const textMatch = linkText.match(/(?:^|\[)?([^\]:]+)\s*:\s*[pP](\d+)(?:\])?$/i);
+          if (textMatch) {
+            const matchedPage = textMatch[2];
+            cleanLinkText = `[p${matchedPage}]`;
+          } else if (/^[pP](\d+)$/i.test(linkText)) {
+            cleanLinkText = `[p${linkText.match(/[pP](\d+)/i)![1]}]`;
+          }
+          
           return (
             <a
               key={pIdx}
@@ -2105,7 +2114,7 @@ export default function StickyChat() {
               }}
               title={`Go to ${bookId} - Page ${pageNum}`}
             >
-              📖 {linkText}
+              📖 {cleanLinkText}
             </a>
           );
         }
