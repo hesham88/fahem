@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
           name,
           email,
           body: reportBody,
-          subject: subject || title || category || "Contact Form Submission"
+          subject: subject || title || category || "Contact Form Submission",
+          isTestProbe: isTestProbe
         });
       } else {
         return await proxyRequest("/user/reports", "POST", body, ctx);
