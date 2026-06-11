@@ -3207,11 +3207,6 @@ export default function Home() {
   const sendOnboardingMessage = async (msgText: string) => {
     if (!msgText.trim() || !user) return;
     
-    if (msgText === "COMPLETE_ONBOARDING_MANUAL_CLICKED") {
-      await completeOnboardingManual();
-      return;
-    }
-    
     setOnboardingInput("");
     setOnboardingLoading(true);
     setOnboardingStatusText(language === "ar" ? "جاري الإرسال للذكاء الاصطناعي..." : "Sending to AI assistant...");
@@ -3493,72 +3488,7 @@ export default function Home() {
     }
   };
 
-  const completeOnboardingManual = async () => {
-    if (!user) return;
-    setLoadingProfile(true);
-    
-    const emailPrefix = user.email ? user.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "") : "";
-    const usernameVal = emailPrefix.length >= 3 
-      ? `${emailPrefix}_${Math.floor(100 + Math.random() * 900)}` 
-      : `user_${user.uid.slice(0, 6)}`;
 
-    const fallbackProfile = {
-      userId: user.uid,
-      username: usernameVal,
-      email: user.email || "",
-      name: user.displayName || user.email?.split("@")[0] || "User",
-      age: 18,
-      country: "Egypt",
-      grade: "N/A",
-      avatar: "🚀",
-      school: "N/A",
-      userType: "student",
-      role: "student",
-      isApproved: true,
-      friends: [],
-      groupsJoined: [],
-      privacySettings: {
-        profileVisibility: "public",
-        allowMessages: true,
-        showActivity: true
-      }
-    };
-
-    const finalProfile = userProfile ? {
-      ...userProfile,
-      onboardingCompleted: true
-    } : {
-      ...fallbackProfile,
-      onboardingCompleted: true
-    };
-
-    try {
-      const res = await authedFetch("/api/user/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.uid,
-          profile: finalProfile
-        })
-      });
-      if (res.ok) {
-        setUserProfile(finalProfile);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("onboarding_completed_" + user.uid, "true");
-        }
-        setLocalCompleted(true);
-        await logActivity("onboarding_dismissed", "success", "Completed/Dismissed onboarding manually and synchronized profile state");
-      }
-    } catch (err) {
-      console.error("Error completing onboarding manually:", err);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("onboarding_completed_" + user.uid, "true");
-      }
-      setLocalCompleted(true);
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
 
   const handleAdminUpdateUser = async (targetUserId: string, updatedFields: any) => {
     const targetUser = allUsers.find(u => u.userId === targetUserId);
@@ -5672,31 +5602,27 @@ export default function Home() {
                 {/* Quick Reply Chips Container */}
                 {quickReplies.length > 0 && !onboardingLoading && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
-                    {quickReplies.map((chip, chipIdx) => {
-                      const isCompleteBtn = chip.value === "COMPLETE_ONBOARDING_MANUAL_CLICKED";
-                      return (
-                        <button
-                          key={chipIdx}
-                          className="onboarding-chip"
-                          onClick={() => sendOnboardingMessage(chip.value)}
-                          type="button"
-                          style={{
-                            padding: isCompleteBtn ? "10px 24px" : "8px 16px",
-                            borderRadius: "30px",
-                            border: isCompleteBtn ? "none" : "1px solid rgba(16, 107, 163, 0.15)",
-                            background: isCompleteBtn ? "linear-gradient(135deg, var(--secondary), var(--secondary-hover))" : "#ffffff",
-                            color: isCompleteBtn ? "#ffffff" : "var(--primary)",
-                            fontSize: isCompleteBtn ? "0.95rem" : "0.88rem",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            transition: "all 0.25s",
-                            boxShadow: isCompleteBtn ? "0 4px 12px rgba(212, 175, 55, 0.35)" : "none"
-                          }}
-                        >
-                          {chip.label}
-                        </button>
-                      );
-                    })}
+                    {quickReplies.map((chip, chipIdx) => (
+                      <button
+                        key={chipIdx}
+                        className="onboarding-chip"
+                        onClick={() => sendOnboardingMessage(chip.value)}
+                        type="button"
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "30px",
+                          border: "1px solid rgba(16, 107, 163, 0.15)",
+                          background: "#ffffff",
+                          color: "var(--primary)",
+                          fontSize: "0.88rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.25s"
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
                   </div>
                 )}
 

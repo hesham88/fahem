@@ -3212,13 +3212,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               padding: "4px"
                             }}>
                               {filteredPages.map((p) => {
-                                const isActive = p.pageNum === readerCurrentPage;
+                                const isActive = hasCover ? (p.pageNum + 1 === readerCurrentPage) : (p.pageNum === readerCurrentPage);
                                 const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
                                 
                                 return (
                                   <button
                                     key={p.pageNum}
-                                    onClick={() => setReaderCurrentPage(p.pageNum)}
+                                    onClick={() => setReaderCurrentPage(hasCover ? p.pageNum + 1 : p.pageNum)}
                                     title={`${pTitle} (${language === "ar" ? `صفحة ${p.pageNum}` : `Page ${p.pageNum}`})`}
                                     style={{
                                       display: "flex",
@@ -3369,7 +3369,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
                             const chTitle = isAr ? ch.titleAr : ch.titleEn;
                             const isExpanded = searchQuery ? true : (expandedChapters[ch.id] !== false);
-                            const isChActive = ch.topics.some((top: any) => top.pageNum === readerCurrentPage);
+                            const isChActive = ch.topics.some((top: any) => hasCover ? (top.pageNum + 1 === readerCurrentPage) : (top.pageNum === readerCurrentPage));
 
                             return (
                               <div key={ch.id} style={{
@@ -3438,13 +3438,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                     borderTop: "1px solid rgba(16, 107, 163, 0.04)"
                                   }}>
                                     {ch.topics.map((top: any) => {
-                                      const isTopActive = top.pageNum === readerCurrentPage;
+                                      const isTopActive = hasCover ? (top.pageNum + 1 === readerCurrentPage) : (top.pageNum === readerCurrentPage);
                                       const topTitle = isAr ? top.titleAr : top.titleEn;
 
                                       return (
                                         <button
                                           key={top.id}
-                                          onClick={() => setReaderCurrentPage(top.pageNum)}
+                                          onClick={() => setReaderCurrentPage(hasCover ? top.pageNum + 1 : top.pageNum)}
                                           style={{
                                             display: "flex",
                                             justifyContent: "space-between",

@@ -314,8 +314,6 @@ def main():
         payload["temp_pdf_path"] = temp_pdf_path
         payload["total_pages"] = actual_total_pages
         
-        # To prevent stdout/stderr swallow and ensure visibility in GCP container logs,
-        # we write standard streams directly without local file log cache redirection.
         popen_kwargs = {
             "stdin": subprocess.PIPE,
             "stdout": None,
@@ -325,9 +323,7 @@ def main():
             "env": dict(os.environ, PYTHONIOENCODING="utf-8")
         }
         if sys.platform == "win32":
-            popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
-        else:
-            popen_kwargs["start_new_session"] = True
+            popen_kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
 
         proc = subprocess.Popen(
             [python_path, assemble_script],
@@ -335,7 +331,14 @@ def main():
         )
         proc.stdin.write(JSON_Encoder().encode(payload))
         proc.stdin.close()
-        print(f"[JOB 3: TRANSLATE] Successfully triggered Job 4 (Assemble) with PID {proc.pid}", flush=True)
+        print(f"[JOB 3: TRANSLATE] Successfully triggered Job 4 (Assemble) with PID {proc.pid}. Waiting for completion...", flush=True)
+        
+        ret_code = proc.wait()
+        if ret_code != 0:
+            print(f"[JOB 3: TRANSLATE] Downstream Job 4 (Assemble) failed with return code {ret_code}", file=sys.stderr)
+            sys.exit(ret_code)
+            
+        print(f"[JOB 3: TRANSLATE] Downstream Job 4 (Assemble) completed successfully.", flush=True)
 
     except Exception as trigger_err:
         logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] Failed to trigger Job 4: {trigger_err}")

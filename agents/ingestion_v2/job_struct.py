@@ -686,8 +686,6 @@ def main():
         payload["ingestion_logs"] = logs
         payload["temp_pdf_path"] = temp_pdf_path
         
-        # To prevent stdout/stderr swallow and ensure visibility in GCP container logs,
-        # we write standard streams directly without local file log cache redirection.
         popen_kwargs = {
             "stdin": subprocess.PIPE,
             "stdout": None,
@@ -697,9 +695,7 @@ def main():
             "env": dict(os.environ, PYTHONIOENCODING="utf-8")
         }
         if sys.platform == "win32":
-            popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
-        else:
-            popen_kwargs["start_new_session"] = True
+            popen_kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
 
         proc = subprocess.Popen(
             [python_path, translate_script],
@@ -707,7 +703,14 @@ def main():
         )
         proc.stdin.write(JSON_Encoder().encode(payload))
         proc.stdin.close()
-        print(f"[JOB 2: STRUCT] Successfully triggered Job 3 (Translate) with PID {proc.pid}", flush=True)
+        print(f"[JOB 2: STRUCT] Successfully triggered Job 3 (Translate) with PID {proc.pid}. Waiting for completion...", flush=True)
+        
+        ret_code = proc.wait()
+        if ret_code != 0:
+            print(f"[JOB 2: STRUCT] Downstream Job 3 (Translate) failed with return code {ret_code}", file=sys.stderr)
+            sys.exit(ret_code)
+            
+        print(f"[JOB 2: STRUCT] Downstream Job 3 (Translate) completed successfully.", flush=True)
 
     except Exception as trigger_err:
         logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] Failed to trigger Job 3: {trigger_err}")

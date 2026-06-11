@@ -254,7 +254,7 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
             WebkitTextFillColor: "transparent",
             letterSpacing: "-0.02em"
           }}>
-            {language === "ar" ? "قريباً: جدول الحصص الذكي المطور" : "Coming Soon: Smart Class Timetable"}
+            {language === "ar" ? "قريباً: مخطط الدراسة الذكي بالذكاء الاصطناعي" : "Coming Soon: Intelligent AI Study Planner"}
           </h3>
           <p style={{ 
             fontSize: "0.95rem", 
@@ -264,8 +264,8 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
             fontWeight: 500
           }}>
             {language === "ar" 
-              ? "نحن نعمل حالياً على صياغة نظام جدولة دراسي آلي بالكامل لدمجه مع مساعد فاهم الذكي. هذا النظام سيتيح لك جدولة حصصك وحضور فصولك الافتراضية، مع تذكيرات ذكية مبنية على تحليلات أدائك اليومية."
-              : "We are actively crafting a fully-automated scheduling system integrated directly with the Fahem Companion. It will feature automated class tracking, study session alarms, and personalized calendar insights built on your daily academic journey."}
+              ? "نحن نعمل حالياً على صياغة نظام تخطيط دراسي مخصص بالكامل لدمجه مع مساعد فاهم الذكي. هذا النظام سيتيح لك توليد خطط دراسية ذكية مبنية على أدائك وأهدافك الأكاديمية اليومية."
+              : "We are actively crafting a fully-automated customized study planning system integrated directly with the Fahem Companion. It will feature dynamic curriculum progress tracking, automated revision milestones, and personalized blueprints built on your daily academic journey."}
           </p>
         </div>
 

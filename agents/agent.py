@@ -923,10 +923,184 @@ async def navigation_tool(action: str, target: str) -> Dict[str, Any]:
         "type": "navigation",
         "action": action,
         "target": target,
-        "navigation_link": f"/viewer?action={action}&target={target}",
         "instruction_to_model": (
             "You MUST append the following exact token to the very end of your final response "
             f"so the frontend can render an interactive navigation card: [INTENT: {intent_json}]"
+        )
+    }
+
+
+async def create_practice_tool(
+    subject: str,
+    mode: str,
+    book_id: Optional[str] = None,
+    chapters: Optional[List[str]] = None,
+    custom_concepts: Optional[str] = None,
+    format: Optional[str] = None
+) -> Dict[str, Any]:
+    """Creates an interactive personalized recall & practice session.
+    
+    Args:
+        subject: The academic subject name (e.g. 'Mathematics', 'Biology').
+        mode: The practice session mode (e.g. 'mcq', 'flashcard', 'summary').
+        book_id: Optional reference book entity ID.
+        chapters: Optional list of chapter names or identifiers to practice on.
+        custom_concepts: Optional comma-separated or text describing specific focus concepts.
+        format: Optional format specification.
+    """
+    logger.info(f"[TOOL] create_practice_tool subject='{subject}' mode='{mode}' book_id='{book_id}' chapters={chapters}")
+    
+    errors = []
+    if not subject:
+        errors.append("subject is required")
+    if not mode:
+        errors.append("mode is required")
+        
+    if errors:
+        return {
+            "status": "error",
+            "message": f"Missing required fields: {', '.join(errors)}.",
+            "instruction_to_model": "You are missing required specifications to create the practice session. Please ask the user ONE clear clarifying question to collect the missing details."
+        }
+        
+    target_dict = {
+        "subject": subject,
+        "bookId": book_id or "",
+        "selectedChapters": chapters or [],
+        "customConcepts": custom_concepts or "",
+        "mode": mode
+    }
+    
+    intent_json = json.dumps({
+        "type": "write",
+        "action": "create_practice",
+        "target": target_dict
+    })
+    
+    return {
+        "status": "success",
+        "type": "write",
+        "action": "create_practice",
+        "target": target_dict,
+        "instruction_to_model": (
+            "You MUST append the following exact token to the very end of your final response "
+            f"so the frontend can render an interactive practice creation card: [INTENT: {intent_json}]"
+        )
+    }
+
+
+async def create_zatona_tool(
+    concept: str,
+    language: Optional[str] = None
+) -> Dict[str, Any]:
+    """Generates an instant, highly focused 'Zatona' summary core for a given academic concept.
+    
+    Args:
+        concept: The key concept or topic to summarize (e.g. 'Photosynthesis', 'Linear Equations').
+        language: Optional language preference ('en', 'ar').
+    """
+    logger.info(f"[TOOL] create_zatona_tool concept='{concept}' language='{language}'")
+    
+    if not concept:
+        return {
+            "status": "error",
+            "message": "Concept is required.",
+            "instruction_to_model": "The concept specification is missing. Please ask the user ONE clear clarifying question to specify the concept they want to summarize."
+        }
+        
+    target_dict = {
+        "concept": concept
+    }
+    
+    intent_json = json.dumps({
+        "type": "write",
+        "action": "create_zatona",
+        "target": target_dict
+    })
+    
+    return {
+        "status": "success",
+        "type": "write",
+        "action": "create_zatona",
+        "target": target_dict,
+        "instruction_to_model": (
+            "You MUST append the following exact token to the very end of your final response "
+            f"so the frontend can render an interactive Zatona summarization card: [INTENT: {intent_json}]"
+        )
+    }
+
+
+async def create_assignment_tool(
+    group_id: str,
+    title: str,
+    title_ar: str,
+    timer_seconds: int,
+    questions: List[dict],
+    subject_id: Optional[str] = None,
+    book_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Creates a structured academic group assignment containing multiple choice questions (MCQs).
+    
+    Args:
+        group_id: The target student group/class identifier (e.g. 'group_physics_a', 'default').
+        title: The title of the assignment in English.
+        title_ar: The title of the assignment in Arabic.
+        timer_seconds: The duration limit for the assignment in seconds (e.g. 120).
+        questions: A list of MCQ dictionaries. Each MCQ dictionary MUST have the following structure:
+                   {
+                     "prompt": "Question text in English",
+                     "prompt_ar": "Question text in Arabic",
+                     "options": ["Option A", "Option B", "Option C", "Option D"],
+                     "correct_index": 0
+                   }
+        subject_id: Optional academic subject identifier.
+        book_id: Optional reference book entity ID.
+    """
+    logger.info(f"[TOOL] create_assignment_tool group_id='{group_id}' title='{title}' count={len(questions) if questions else 0}")
+    
+    errors = []
+    if not group_id:
+        errors.append("group_id is required")
+    if not title:
+        errors.append("title is required")
+    if not title_ar:
+        errors.append("title_ar is required")
+    if not questions:
+        errors.append("questions list is required and cannot be empty")
+    if not subject_id and not book_id:
+        errors.append("either subject_id or book_id is required to anchor the assignment")
+        
+    if errors:
+        return {
+            "status": "error",
+            "message": f"Missing required fields: {', '.join(errors)}.",
+            "instruction_to_model": "You are missing required specifications to create the assignment. Please ask the user ONE clear clarifying question in chat to specify either the subject (subject_id) or the textbook (book_id) to anchor the assignment."
+        }
+        
+    target_dict = {
+        "group_id": group_id,
+        "title": title,
+        "title_ar": title_ar,
+        "subject_id": subject_id,
+        "book_id": book_id,
+        "timer_seconds": timer_seconds,
+        "questions": questions
+    }
+    
+    intent_json = json.dumps({
+        "type": "write",
+        "action": "create_assignment",
+        "target": target_dict
+    })
+    
+    return {
+        "status": "success",
+        "type": "write",
+        "action": "create_assignment",
+        "target": target_dict,
+        "instruction_to_model": (
+            "You MUST append the following exact token to the very end of your final response "
+            f"so the frontend can render an interactive assignment creation card: [INTENT: {intent_json}]"
         )
     }
 
@@ -1051,6 +1225,15 @@ fahem_companion = LlmAgent(
         - Immediately run `search_tool` with the query (stripping the `[Grounded Web Search Request]` prefix).
         - Once you receive the search results, format and stylize them into a premium, stunning, executive-grade presentation in the user's language.
         - Use rich markdown tables, structured sections, highlight blocks, and relevant emojis to make it look premium and state-of-the-art.
+
+        ACTIONS AND OBJECT CREATION:
+        - When the user wants to start or create a practice session, a "Zatona" summary, or an assignment, you MUST use the corresponding creation tool:
+          * For starting/creating a practice session: Use `create_practice_tool`.
+          * For starting/creating a Zatona summary: Use `create_zatona_tool`.
+          * For starting/creating an assignment: Use `create_assignment_tool`.
+        - You MUST NOT use `navigation_tool` for these creation actions. `navigation_tool` is ONLY for direct navigation/redirection (e.g., "go to X", "view page X", or "open tab X").
+        - Always collect and infer all possible details for the creation action. If a required specification is completely missing (such as the subject/mode for a practice, the concept for a Zatona summary, or the title/questions for an assignment), ask exactly ONE clarifying question in your response before calling the creation tool. Do not proceed until you have sufficient details.
+        - When a creation tool succeeds, it returns an instruction with an `[INTENT: ...]` token. You MUST append this exact token to the very end of your final response to trigger the frontend object creation and navigation.
     """,
     tools=[
         academic_tool,
@@ -1065,7 +1248,10 @@ fahem_companion = LlmAgent(
         vault_tool,
         search_tool,
         navigation_tool,
-        usage_tool
+        usage_tool,
+        create_practice_tool,
+        create_zatona_tool,
+        create_assignment_tool
     ],
     before_agent_callback=before_agent_callback,
     before_model_callback=before_model_callback,

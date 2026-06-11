@@ -3789,7 +3789,7 @@ User Question: ${queryText}`;
                 cursor: "pointer"
               }}
             />
-            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: useGrounded ? "var(--primary)" : "#5a6e7c", fontWeight: useGrounded ? 600 : 400 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: useGrounded ? "var(--primary)" : "var(--text-muted, #5a6e7c)", fontWeight: useGrounded ? 600 : 400 }}>
               <FiGlobe />
               <span>{ct("ground_with_google")}</span>
             </div>
@@ -4130,8 +4130,8 @@ User Question: ${queryText}`;
                 width: "2.5rem",
                 height: "2.5rem",
                 borderRadius: "50%",
-                backgroundColor: isSending || !inputValue.trim() ? "#e2decb" : "var(--primary)",
-                color: "#ffffff",
+                backgroundColor: isSending || !inputValue.trim() ? "var(--card-border)" : "var(--primary)",
+                color: isSending || !inputValue.trim() ? "var(--text-muted)" : "#ffffff",
                 border: "none",
                 display: "flex",
                 justifyContent: "center",

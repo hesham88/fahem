@@ -541,6 +541,106 @@ def verify_lang():
     return False, "companion did NOT reply in Arabic for language=ar — language lock broken"
 
 
+def verify_zatona():
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+    
+    body = {
+        "concept": "Photosynthesis",
+        "language": "en"
+    }
+    
+    st, resp = _req("/api/zatona", "POST", body, token=tok, timeout=90)
+    if st != 200:
+        return False, f"/api/zatona POST returned {st} — Zatona failed: {resp[:140]}"
+        
+    try:
+        data = json.loads(resp)
+        if not data.get("success") or not data.get("report"):
+            return False, f"/api/zatona returned success=false or empty report: {resp[:140]}"
+        report = data.get("report")
+        if "Interactions API" in report or "Interactions API" in resp:
+            return False, "Zatona response contains Interactions API error message"
+    except Exception as e:
+        return False, f"Could not parse /api/zatona response: {e}"
+        
+    return True, "Zatona report generated successfully without a 400"
+
+
+def verify_agent_create():
+    # D-AGENT-CREATE:
+    # 1. Statically assert that "navigation_link" with "/viewer?action" is completely absent from agent.py
+    try:
+        agent_py_path = os.path.join(os.path.dirname(__file__), "..", "agents", "agent.py")
+        if not os.path.exists(agent_py_path):
+            agent_py_path = os.path.join(os.path.dirname(__file__), "agents", "agent.py")
+        with open(agent_py_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if "/viewer?action" in content:
+            return False, "agents/agent.py still contains the fabricated '/viewer?action' navigation_link"
+    except Exception as e:
+        return False, f"Static check of agents/agent.py failed: {e}"
+        
+    # 2. Assert that create_practice API round-trips to a real object
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+        
+    body = {
+        "subject": "Mathematics",
+        "bookId": "book_math_101",
+        "selectedChapters": ["Chapter 3"],
+        "customConcepts": "Quadratic Equations",
+        "mode": "mcq"
+    }
+    
+    st, resp = _req("/api/practice/generate", "POST", body, token=tok, timeout=60)
+    if st != 200:
+        return False, f"/api/practice/generate POST returned {st} — practice generation failed: {resp[:140]}"
+        
+    try:
+        data = json.loads(resp)
+        if not data.get("success"):
+            return False, f"/api/practice/generate returned success=false: {resp[:140]}"
+    except Exception as e:
+        return False, f"Could not parse /api/practice/generate response: {e}"
+        
+    # 3. Assert that create_assignment API round-trips to a real object (Instructor-only)
+    tok_teacher, err_t = enter_demo("teacher")
+    if not tok_teacher:
+        return False, f"Teacher demo entry failed: {err_t}"
+        
+    asg_body = {
+        "group_id": "group_physics_a",
+        "title": "Python Control Flow",
+        "title_ar": "التحكم في التدفق بايثون",
+        "book_id": "book_math_101",
+        "timer_seconds": 120,
+        "questions": [
+            {
+                "prompt": "What is the output of print(2**3)?",
+                "prompt_ar": "ما هو ناتج طباعة print(2**3)؟",
+                "options": ["6", "8", "9", "5"],
+                "correct_index": 1
+            }
+        ]
+    }
+    
+    st_asg, resp_asg = _req("/api/assignments", "POST", asg_body, token=tok_teacher, timeout=60)
+    if st_asg != 200:
+        return False, f"/api/assignments POST returned {st_asg} — assignment creation failed: {resp_asg[:140]}"
+        
+    try:
+        data_asg = json.loads(resp_asg)
+        if not data_asg.get("success"):
+            return False, f"/api/assignments returned success=false: {resp_asg[:140]}"
+    except Exception as e:
+        return False, f"Could not parse /api/assignments response: {e}"
+        
+    return True, "agents/agent.py has no fake links + create_practice and create_assignment APIs round-trip successfully"
+
+
 REEXEC = {
     "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
     "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
@@ -548,9 +648,11 @@ REEXEC = {
     "D-PYBOOK": verify_d_pybook,
     "D-CONTACT": verify_contact, "D-AUTOCOMPLETE": verify_autocomplete, "D-LANG": verify_lang,
     "D-DONATION": verify_donation,  # advisory only (client-rendered; not in the gate)
+    "D-AGENT-CREATE": verify_agent_create,
+    "D-ZATONA": verify_zatona,
 }
 FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE"]
-SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG"]     # agent/kill/TTS/pybook/lang — the full deploy gate
+SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
 
 
 def run_one(name):

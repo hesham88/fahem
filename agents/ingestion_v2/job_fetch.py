@@ -180,8 +180,6 @@ def main():
             SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
             struct_script = os.path.join(SCRIPT_DIR, "job_struct.py")
             
-            # To prevent stdout/stderr swallow and ensure visibility in GCP container logs,
-            # we write standard streams directly without local file log cache redirection.
             popen_kwargs = {
                 "stdin": subprocess.PIPE,
                 "stdout": None,
@@ -191,11 +189,7 @@ def main():
                 "env": dict(os.environ, PYTHONIOENCODING="utf-8")
             }
             if sys.platform == "win32":
-                # CREATE_NEW_PROCESS_GROUP = 0x00000200
-                # CREATE_NO_WINDOW = 0x08000000
-                popen_kwargs["creationflags"] = 0x00000200 | 0x08000000
-            else:
-                popen_kwargs["start_new_session"] = True
+                popen_kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
 
             proc = subprocess.Popen(
                 [python_path, struct_script],
@@ -203,7 +197,14 @@ def main():
             )
             proc.stdin.write(JSON_Encoder().encode(payload))
             proc.stdin.close()
-            print(f"[JOB 1: FETCH] Successfully triggered Job 2 (Struct) with PID {proc.pid}", flush=True)
+            print(f"[JOB 1: FETCH] Successfully triggered Job 2 (Struct) with PID {proc.pid}. Waiting for completion...", flush=True)
+            
+            ret_code = proc.wait()
+            if ret_code != 0:
+                print(f"[JOB 1: FETCH] Downstream Job 2 (Struct) failed with return code {ret_code}", file=sys.stderr)
+                sys.exit(ret_code)
+                
+            print(f"[JOB 1: FETCH] Downstream Job 2 (Struct) completed successfully.", flush=True)
 
         except Exception as trigger_err:
             logs.append(f"[{time.strftime('%H:%M:%S')}] [CRITICAL] Failed to trigger Job 2: {trigger_err}")

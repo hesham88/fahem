@@ -39,7 +39,7 @@ You MUST respond with a JSON object strictly matching this schema:
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), { status: 500 });
     }
 
-    const modelName = "deep-research-preview-04-2026";
+    const modelName = "gemini-3.1-pro-preview";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
     const response = await fetch(url, {
