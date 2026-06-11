@@ -1,4 +1,4 @@
-# 🌟 Fahem AI: Localized Curriculum Multi-Agent AI Tutor
+# 🌟 Fahem: Localized Curriculum Multi-Agent AI Tutor
 ## Programmatic Swarm Architecture, Ingestion Pipelines, and Enterprise Guardrails
 
 Fahem (Arabic for **"Comprehending"**) is a state-of-the-art, secure, localized curriculum multi-agent AI tutor designed for students and educators. Tailored strictly to local school curricula, the platform combines premium visual design, deep Retrieval-Augmented Generation (RAG) over official textbook layouts, and an enterprise-grade compliance-first architectural framework. 
