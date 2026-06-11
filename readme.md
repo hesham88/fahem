@@ -183,7 +183,7 @@ Ensure your computer has the following tools installed:
    ```env
    # Gemini API Credentials
    GEMINI_API_KEY=your_gemini_api_key_here
-   GEMINI_MODEL=gemini-2.5-flash
+   GEMINI_MODEL=gemini-3.1-flash
    
    # MongoDB Atlas Connection URI
    MONGODB_URI=mongodb+srv://your_username:your_password@your-cluster.mongodb.net/fahem
@@ -224,13 +224,13 @@ Ensure your computer has the following tools installed:
      ```powershell
      $env:GEMINI_API_KEY="your-key"
      $env:MONGODB_URI="mongodb+srv://your_username:your_password@your-cluster.mongodb.net/fahem"
-     $env:GEMINI_MODEL="gemini-2.5-flash"
+     $env:GEMINI_MODEL="gemini-3.1-flash"
      ```
    - **On Linux / macOS**:
      ```bash
      export GEMINI_API_KEY="your-key"
      export MONGODB_URI="mongodb+srv://your_username:your_password@your-cluster.mongodb.net/fahem"
-     export GEMINI_MODEL="gemini-2.5-flash"
+     export GEMINI_MODEL="gemini-3.1-flash"
      ```
 6. Run the agent locally by invoking the command-line script:
    ```bash
@@ -284,7 +284,7 @@ To package the Python ADK backend service into a production-ready docker contain
      --region us-east4 `
      --no-allow-unauthenticated `
      --vpc-egress private-ranges-only `
-     --set-env-vars="GEMINI_MODEL=gemini-2.5-flash,GCP_PROJECT=fahem-88d40"
+     --set-env-vars="GEMINI_MODEL=gemini-3.1-flash,GCP_PROJECT=fahem-88d40"
    ```
    > [!IMPORTANT]
    > The private routing flag `--no-allow-unauthenticated` must always be enforced in production. The Next.js frontend will communicate securely via authenticated service-to-service OIDC tokens.
