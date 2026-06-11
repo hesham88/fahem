@@ -225,3 +225,39 @@ Examples:
 # Expose both app and root_agent to ensure 100% compatibility with AgentLoader
 app = onboarding_agent
 root_agent = onboarding_agent
+
+# -------------------------------------------------------------
+# Force Mongo Memory/Session Services through service_factory Monkeypatching
+# -------------------------------------------------------------
+try:
+    import google.adk.cli.utils.service_factory as sf
+    try:
+        from mongo_services import MongoSessionService, MongoMemoryService
+    except ImportError:
+        from agents.mongo_services import MongoSessionService, MongoMemoryService
+    
+    _original_create_session = sf.create_session_service_from_options
+    _original_create_memory = sf.create_memory_service_from_options
+    
+    def patched_create_session(*args, **kwargs):
+        try:
+            logger.info("[MONKEYPATCH] Intercepted session service creation for onboarding. Directing to MongoSessionService.")
+            return MongoSessionService()
+        except Exception as e:
+            logger.warning(f"[MONKEYPATCH] MongoSessionService build failed: {e}. Falling back to default service.")
+            return _original_create_session(*args, **kwargs)
+            
+    def patched_create_memory(*args, **kwargs):
+        try:
+            logger.info("[MONKEYPATCH] Intercepted memory service creation for onboarding. Directing to MongoMemoryService.")
+            return MongoMemoryService()
+        except Exception as e:
+            logger.warning(f"[MONKEYPATCH] MongoMemoryService build failed: {e}. Falling back to default service.")
+            return _original_create_memory(*args, **kwargs)
+            
+    sf.create_session_service_from_options = patched_create_session
+    sf.create_memory_service_from_options = patched_create_memory
+    logger.info("[MONKEYPATCH] ADK Service Factory successfully monkeypatched in Onboarding to force MongoDB-backed services!")
+except Exception as patch_err:
+    logger.warning(f"Could not monkeypatch ADK Service Factory in Onboarding: {patch_err}")
+
