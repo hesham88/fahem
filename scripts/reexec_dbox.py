@@ -494,19 +494,19 @@ def verify_d_crawl_ctrl():
     if not tok:
         return False, f"Could not enter demo as admin: {err}"
         
-    st_missing_url, resp_missing_url = _req("/admin/crawl", "POST", {}, token=tok)
+    st_missing_url, resp_missing_url = _req("/api/admin/crawl", "POST", {}, token=tok)
     if st_missing_url != 400 or "Missing crawl URL" not in resp_missing_url:
-        return False, f"Empty POST to /admin/crawl should return 400 'Missing crawl URL' but got {st_missing_url}: {resp_missing_url}"
+        return False, f"Empty POST to /api/admin/crawl should return 400 'Missing crawl URL' but got {st_missing_url}: {resp_missing_url}"
         
-    st_no_job, resp_no_job = _req("/admin/crawl", "POST", {"action": "pause"}, token=tok)
+    st_no_job, resp_no_job = _req("/api/admin/crawl", "POST", {"action": "pause"}, token=tok)
     if st_no_job != 400 or "Missing jobId" not in resp_no_job:
         return False, f"Control POST without jobId should return 400 'Missing jobId' but got {st_no_job}: {resp_no_job}"
         
-    st_not_found, resp_not_found = _req("/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "pause"}, token=tok)
+    st_not_found, resp_not_found = _req("/api/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "pause"}, token=tok)
     if st_not_found != 404 or "Crawl job not found" not in resp_not_found:
         return False, f"Control POST with non-existent jobId should return 404 'Crawl job not found' but got {st_not_found}: {resp_not_found}"
         
-    st_bad_act, resp_bad_act = _req("/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "fly"}, token=tok)
+    st_bad_act, resp_bad_act = _req("/api/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "fly"}, token=tok)
     if st_bad_act != 400 or "Unrecognized action" not in resp_bad_act:
         return False, f"Control POST with bad action should return 400 'Unrecognized action' but got {st_bad_act}: {resp_bad_act}"
         

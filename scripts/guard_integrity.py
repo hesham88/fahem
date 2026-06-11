@@ -63,6 +63,9 @@ def main():
         ("FAB_PAGECOUNTS", "D-PYBOOK fabricated-page-count guard"),
         ("SPOOFABLE PROD BACKDOOR", "D2 demo->prod backdoor probe"),
         ('"D-PYBOOK"', "D-PYBOOK registered in the sweep"),
+        ("verify_d_crawl_ctrl", "D-CRAWL-CTRL check function"),
+        ("verify_zatona", "D-ZATONA check function"),
+        ("verify_agent_create", "D-AGENT-CREATE check function"),
     ]
     if not os.path.exists(reexec_path):
         violations.append("scripts/reexec_dbox.py is MISSING — the source-of-truth sweeper was removed.")

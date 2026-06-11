@@ -144,7 +144,13 @@ export async function POST(req: NextRequest) {
     const requesterEmail = ctx.email || "";
 
     // 1. Cooperative/force crawl job controls (pause/resume/stop/kill)
-    if (jobIdParam && action) {
+    if (action) {
+      if (!jobIdParam) {
+        return new Response(JSON.stringify({ error: "Missing jobId parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
       if (!isLocalEnv()) {
         return await proxyRequest("/admin/crawl", "POST", { jobId: jobIdParam, action, requesterEmail }, ctx);
       }
