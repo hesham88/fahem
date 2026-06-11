@@ -1,6 +1,6 @@
 {
   "part_id": "tour-overlay",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "screenshots": [
     "evidence/shots/parts/tour-overlay-desktop.png",
@@ -10,6 +10,6 @@
     "evidence/shots/parts/tour-overlay-desktop.png": "9586f8e3a6787ca6ebced501710521cdc305b1b72f45d463ff6a88d465da5a12",
     "evidence/shots/parts/tour-overlay-mobile.png": "c876f3998f5b7dbdebc7b08186d7c3f8971252dc252c7244954cb55ef117dfad"
   },
-  "vision_verdict": "pass - The tour-overlay view is fully functional and clearly shows the overlay and evaluator features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
-  "timestamp": 1780998150
+  "vision_verdict": "pass - The tour-overlay view is fully functional and clearly shows the onboarding and guiding features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1781167202
 }

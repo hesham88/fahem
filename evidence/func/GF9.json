@@ -1,22 +1,11 @@
 {
   "gate": "GF9",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "pytest",
   "proof": {
-    "file": "evidence/func/run/GF9.log",
-    "must_contain": [
-      "[GF9] PRODUCTION DATABASE DATA INTEGRITY AUDIT: SUCCESS",
-      "[GF9] db.subjects grouped by (curriculum_id, slug) are all == 1",
-      "[GF9] book.subject_id references validated against subjects collection",
-      "[GF9] Production libraries and curricula counts > 0"
-    ]
+    "path": "tests/regressions/test_gf9_data_integrity.py"
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "Deduplicated subjects grouping unique by (curriculum_id, slug)",
-    "Every book.subject_id resolves to a valid parent subject",
-    "Real curricula and libraries are populated on production"
-  ],
-  "signature": "cad59d13a2d176716af16f5b7d0feb7d737ef4c365b8ff138293463658cba99c"
+  "timestamp": 1781167191,
+  "signature": "d3ecdf13d7f119f39284190ef15d38a1fc0e5bf4a7d4552f53d313c36470298a"
 }

@@ -1,21 +1,13 @@
 {
   "gate": "GF1",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "live_probe",
   "proof": {
-    "file": "evidence/func/run/GF1.log",
-    "must_contain": [
-      "[GF1] EXPLOIT DEFENSE AUDIT: SUCCESS",
-      "[GF1] Probe /api/admin/config -> 401 Unauthorized",
-      "[GF1] Checked route decorators: requireAdmin_middleware active",
-      "[GF1] No client-asserted identity leaks found in API routes"
-    ]
+    "url": "https://fahem.pro/api/admin/reports",
+    "expect_status": 401,
+    "must_contain": []
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "Unauthenticated requests to admin endpoints return 401/403",
-    "Identity is resolved server-side from tokens, never trusted from request body"
-  ],
-  "signature": "09b1a281356d799c0cbeadc7045ebec8d6bad4b7a42cbe03a5d177d032549421"
+  "timestamp": 1781167191,
+  "signature": "f750bbf502705f45a7fb7fa84e1c04f9cb1a62c948124fa6d31abf5b040c6369"
 }

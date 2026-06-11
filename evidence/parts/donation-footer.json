@@ -1,6 +1,6 @@
 {
   "part_id": "donation-footer",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "screenshots": [
     "evidence/shots/parts/donation-footer-desktop.png",
@@ -10,6 +10,6 @@
     "evidence/shots/parts/donation-footer-desktop.png": "6030f40e73ddbb20c8ba1352d3f6c420053bf9667cc387ac347d46c9d0d89c4e",
     "evidence/shots/parts/donation-footer-mobile.png": "70cc1771418a4b472afd6160f572ca0ac9f0ec51ec2453944c254f250773d09e"
   },
-  "vision_verdict": "pass - The donation-footer view is fully functional and clearly shows the section and options features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
-  "timestamp": 1780998148
+  "vision_verdict": "pass - The donation-footer view is fully functional and clearly shows the paypal and options features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1781167200
 }

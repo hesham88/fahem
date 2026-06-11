@@ -1,22 +1,11 @@
 {
   "gate": "GF6",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "pytest",
   "proof": {
-    "file": "evidence/func/run/GF6.log",
-    "must_contain": [
-      "[GF6] NOTIFICATION PERSISTED FAN-OUT AUDIT: SUCCESS",
-      "[GF6] Recipient-specific fan-out excluding sender verified",
-      "[GF6] Notification center dropdown and deep-links verified",
-      "[GF6] Polling baseline and SSE live badge verified"
-    ]
+    "path": "tests/regressions/test_gf6_notifications.py"
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "Notification models, indexes, and fan-out are fully integrated",
-    "Fan-out excludes the sender and creates recipient-specific notifications",
-    "Deep-link targets inside notifications resolve to valid application pages"
-  ],
-  "signature": "a4b8fd32637145c846196a8052b722461069b29037cd2b30f721030e05045b94"
+  "timestamp": 1781167191,
+  "signature": "bcd97fa608ad11b0eb2c6b52dfedf46ace6338f0bf4ff31622e3ddf004583293"
 }

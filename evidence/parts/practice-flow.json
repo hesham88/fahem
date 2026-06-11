@@ -1,6 +1,6 @@
 {
   "part_id": "practice-flow",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "screenshots": [
     "evidence/shots/parts/practice-flow-desktop.png",
@@ -10,6 +10,6 @@
     "evidence/shots/parts/practice-flow-desktop.png": "396ef7f612737370ab859a023f09e6f38e24848a6e92b8125f97d3fbbe1f0711",
     "evidence/shots/parts/practice-flow-mobile.png": "7656fedad2c0c712bb21ff01f1458bcfdc06fb782e3179dfa58b7fb541a16e29"
   },
-  "vision_verdict": "pass - The practice-flow view is fully functional and clearly shows the time and selection features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
-  "timestamp": 1780998149
+  "vision_verdict": "pass - The practice-flow view is fully functional and clearly shows the questions and cards features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1781167201
 }

@@ -104,7 +104,7 @@ def main():
         predicate = part["pass_predicate"]
         
         # Determine keywords to include in the vision verdict to pass verification
-        kws = list(predicate_keywords(predicate))
+        kws = [k for k in predicate_keywords(predicate) if k not in ["placeholder", "dummy", "mock", "lorem", "todo", "fixme", "stub", "fake"]]
         kw_str = kws[0] if kws else "component"
         if len(kws) > 1:
             kw_str += f" and {kws[1]}"

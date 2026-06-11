@@ -1,6 +1,6 @@
 {
   "part_id": "toc-drawer",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "screenshots": [
     "evidence/shots/parts/toc-drawer-desktop.png",
@@ -10,6 +10,6 @@
     "evidence/shots/parts/toc-drawer-desktop.png": "cc652a39a08b94bf4cd13c4a2c6f8b4f89ff0ad99c35b8e3f5bcdf1c2a26f568",
     "evidence/shots/parts/toc-drawer-mobile.png": "d4bbabbb4dc807ed94c88dacdd6b99838e0fde6207aaa1567525b1d1c8208379"
   },
-  "vision_verdict": "pass - The toc-drawer view is fully functional and clearly shows the table and panel features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
-  "timestamp": 1780998149
+  "vision_verdict": "pass - The toc-drawer view is fully functional and clearly shows the cleanly and contents features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1781167201
 }

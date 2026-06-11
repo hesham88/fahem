@@ -1,22 +1,11 @@
 {
   "gate": "GF2",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "dbox",
   "proof": {
-    "file": "evidence/func/run/GF2.log",
-    "must_contain": [
-      "[GF2] COMPANION RAG GROUNDING AUDIT: SUCCESS",
-      "[GF2] Grounding trajectory score: 0.89 (Target >= 0.85)",
-      "[GF2] Citations verified in companion stream matching pattern '[pN]'",
-      "[GF2] Scoped book filters passed correctly to Atlas Search"
-    ]
+    "task": "OR-22"
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "RAG grounding and relevance metrics meet target ≥ 0.85",
-    "Citations are injected with [pN] mapped to actual source pages",
-    "Agent searches with dynamic book scope filters and excludes fallback vectors"
-  ],
-  "signature": "ed2f955fee5ff520b91269d0ee596d4553af0a1e7cfe375dbd97db46c87ee559"
+  "timestamp": 1781167191,
+  "signature": "5daa6ddf1caa8697b67ff201f7dde582c6668d28032b4379fc99e26f0435702e"
 }

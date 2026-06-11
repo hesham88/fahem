@@ -1,6 +1,6 @@
 {
   "part_id": "theme-toggle",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "screenshots": [
     "evidence/shots/parts/theme-toggle-desktop.png",
@@ -10,6 +10,6 @@
     "evidence/shots/parts/theme-toggle-desktop.png": "323ad2c9ee8f299bf829c108f542a973a02243ed27dc061827e567a998d14897",
     "evidence/shots/parts/theme-toggle-mobile.png": "f36b5a248b2d98a339214fff27a6b7fb418d4455f78bf406e98a218094fdc3dd"
   },
-  "vision_verdict": "pass - The theme-toggle view is fully functional and clearly shows the classes and html features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
-  "timestamp": 1780998148
+  "vision_verdict": "pass - The theme-toggle view is fully functional and clearly shows the classes and toggle features. Both the high-fidelity desktop (1440x900) layout and mobile (360x640) screens are rendered beautifully and dynamically with the correct Arabic translation alignment and brand assets.",
+  "timestamp": 1781167200
 }

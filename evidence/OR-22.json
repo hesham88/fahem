@@ -2,7 +2,7 @@
   "task": "OR-22",
   "builder": "builder-5",
   "d_box": "D5",
-  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "frontend_revision": "2026-06-09T11:00:00.000Z",
   "backend_revision": "fahem-be-prod-v1.0.0",
   "smoke": {
@@ -17,9 +17,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D5-grounding.png": "1461e26761da9b63a753d001e46ba8f22b21a797c0ade73ecd1a18432e3b2e96"
+    "evidence/shots/D5-grounding.png": "a3a0e08c60937bf8d61e09961a6aaa263f8266f955fb35c289127b7eb4a0852e"
   },
   "vision_verdict": "pass. Visual verification of grounded AI companion interface. The chat panel renders citations to real books correctly, showing verified [p3] citation references. The library section displays multiple active books and standard items.",
-  "timestamp": 1781009450,
-  "run_signature": "645f8ec8e61886c693b3465f82405d13e0e6896dd6e5f702770b00730b410e9c"
+  "timestamp": 1781167191,
+  "run_signature": "7f265d0267ddc90327b8eabfe1116e782aae2f30a69137360902f812419ebb5d"
 }

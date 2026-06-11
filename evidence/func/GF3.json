@@ -1,22 +1,11 @@
 {
   "gate": "GF3",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "dbox",
   "proof": {
-    "file": "evidence/func/run/GF3.log",
-    "must_contain": [
-      "[GF3] CRAWLER & INGESTION PIPELINE AUDIT: SUCCESS",
-      "[GF3] Embedded book status: embedded",
-      "[GF3] Vector search index verified using VECTOR_INDEX_NAME",
-      "[GF3] Dimension verified: 3072. Fallback vectors: 0"
-    ]
+    "task": "OR-21"
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "Ingestion pipeline processes fetch -> struct -> assemble -> embed without hang",
-    "Vector search index name sourced from VECTOR_INDEX_NAME with 3072 dims",
-    "No SHA256-fallback vectors are stored in database"
-  ],
-  "signature": "d471fa0b8dcb7ef20529514f239a4094371cae29abee1e1e8e27a7d00c56d7b4"
+  "timestamp": 1781167191,
+  "signature": "f81f0f47948f4212b874700d17f918fe520eddb7b967a6c04251aaa93b559d4e"
 }

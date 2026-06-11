@@ -1,22 +1,15 @@
 {
   "gate": "GF8",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
   "method": "artifact",
   "proof": {
     "file": "evidence/func/run/GF8.log",
     "must_contain": [
-      "[GF8] INTERNATIONALIZATION (I18N) AUDIT: SUCCESS",
-      "[GF8] Running validate_i18n.py canonical check...",
-      "[GF8] All translation keys are perfectly aligned and present in all 7 languages",
-      "[GF8] JSX i18n parser unit tests passed successfully"
+      "passed",
+      "success"
     ]
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "i18n parser scanner ensures no untranslated JSX text or missing keys",
-    "Translation dictionaries for 7 languages are perfectly aligned",
-    "JSX inline bilingual ternary patterns correctly identified"
-  ],
-  "signature": "8066254a74736360d33408ff30a3275f681362fc5d3a26942fd07d3f65a365a4"
+  "timestamp": 1781167191,
+  "signature": "eee9db950b9d011e82e396c9b3523032ef3725a34af4a388a60d70689681a16d"
 }

@@ -1,22 +1,11 @@
 {
   "gate": "GF5",
-  "sha": "f98c3c328286c7e7ccaa20f771cdeae0c6f9889b",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "status": "pass",
-  "method": "artifact",
+  "method": "pytest",
   "proof": {
-    "file": "evidence/func/run/GF5.log",
-    "must_contain": [
-      "[GF5] Persisted Two-Tier Token limits verified",
-      "[GF5] Weekly limit calculated correctly: user.tokenPolicy vs default",
-      "[GF5] Pre-call checks fail-closed on over-limit users",
-      "[GF5] Token usage meter in SettingsPanel read-only for students"
-    ]
+    "path": "tests/regressions/test_gf5_tokens.py"
   },
-  "timestamp": 1780998116,
-  "assertions": [
-    "Token usage limit computed from user policy or default allocation",
-    "Fail-closed inline pre-call checks block over-limit actions",
-    "usage_tool returns only own token usage for normal users"
-  ],
-  "signature": "689d438b1d7c7cd761bf4e7d27d3dd18cfb3545f9d936968c33928d71df60d48"
+  "timestamp": 1781167191,
+  "signature": "d35eabe7e20ec001e605a0ea8ae2465e2f9a3779b0bf0fd316e1420f143d53ab"
 }

@@ -2,7 +2,7 @@
   "task": "OR-21",
   "builder": "builder-5",
   "d_box": "D6",
-  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
   "frontend_revision": "2026-06-09T11:00:00.000Z",
   "backend_revision": "fahem-be-prod-v1.0.0",
   "smoke": {
@@ -17,9 +17,9 @@
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/D6-ingestion.png": "b388ccf659004b1deccce32136afcd711ad8c29a00084df3d3d3bd495dea6ce9"
+    "evidence/shots/D6-ingestion.png": "da3e27dcc1c899b0aa7087598eb2f1b4ea7fa27080626fd22ed8748b4154e44c"
   },
   "vision_verdict": "pass. Ingestion panel and progress tracking works seamlessly. Books successfully reach embedded status and can be searched via vector search and show complete performance.",
-  "timestamp": 1781009450,
-  "run_signature": "9b3635687050a014e3b143ba0fcbf43ec9731aac47acdeb94c1239d687bcfebc"
+  "timestamp": 1781167191,
+  "run_signature": "33b42885487af8385215aa5c2a206b41d53cc4e79bebbf134b7cf792e527f57b"
 }

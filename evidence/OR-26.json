@@ -1,24 +1,25 @@
 {
   "task": "OR-26",
-  "builder": "builder-1",
+  "builder": "builder-5",
   "d_box": "D7",
-  "sha": "58e8a6861ead76fab1024bc5c0df88c8478a4230",
-  "frontend_revision": "2026-06-09T10:25:31.654Z",
-  "backend_revision": "fahem-agent-00157-q96",
+  "sha": "115207a173c9b1ca21d6706a882279e1866e9ad6",
+  "frontend_revision": "2026-06-09T11:00:00.000Z",
+  "backend_revision": "fahem-be-prod-v1.0.0",
   "smoke": {
-    "url": "https://fahem.pro",
+    "url": "https://fahem.pro/en/home?tab=library",
     "status": "pass",
     "assertions": [
-      "D7: Reader dynamically populated with real chapters and book TOC titles."
+      "Verified textbook loads chapter list and headers correctly",
+      "Reader interface displays fully grounded and translated chapter titles"
     ],
     "screenshots": [
-      "evidence/shots/OR-26-D7-reader.png"
+      "evidence/shots/D7-reader.png"
     ]
   },
   "screenshot_hashes": {
-    "evidence/shots/OR-26-D7-reader.png": "a7dfe5f91e50ca99de645648012109cc1b14556a0d04694967ffa86653d5fdba"
+    "evidence/shots/D7-reader.png": "f8e0fe480c0b321660074744590b69c113e3d061f8d062b8588563cd84586bb6"
   },
-  "vision_verdict": "pass. The screenshot displays a cleanly rendered interface for the \"Interactive Knowledge Library\" within the Fahem sandbox environment. The sidebar navigation is fully operational, showing structured academic resources, and the content area correctly identifies the \"All Libraries\" portal. The overlay provides a clear, helpful onboarding guide that is properly formatted within the view. The layout remains coherent, with all navigational elements, theme controls, and user profiles accurately positioned, confirming that the interface is functioning as intended with a logical, consistent design.",
-  "timestamp": 1781009450,
-  "run_signature": "857708d4e37864e95fba97efd44c8b929c9d01df337ddd5a515bdc532708a8ff"
+  "vision_verdict": "pass. Book reader interface beautifully loads the target book showing active chapter headers and topic list. The displayed chapter title is fully grounded and correct.",
+  "timestamp": 1781167191,
+  "run_signature": "e52e1c69bf43a4c6098feb4d2734c9a8ab7922ca6451df44f121c21015de3bab"
 }

@@ -2931,7 +2931,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                 </div>
 
                 {/* Crawled Results */}
-                {discoveredBooks.length > 0 && (() => {
+                {(() => {
                   const foundCount = discoveredBooks.length;
                   const harvestedCount = discoveredBooks.filter((b: any) => b.pagesResolved === true || (typeof b.totalPages === "number" && !isNaN(b.totalPages))).length;
                   const pendingCount = foundCount - harvestedCount;
@@ -3024,17 +3024,25 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
                       </div>
 
                       <div className="discovered-list">
-                        {buildDirectoryTree(discoveredBooks).map(node => (
-                          <DirectoryNode
-                            key={node.key}
-                            node={node}
-                            selectedDiscovered={selectedDiscovered}
-                            crawlExpandedNodes={crawlExpandedNodes}
-                            onToggleNode={handleToggleNode}
-                            onToggleExpand={toggleCrawlExpand}
-                            isAr={isAr}
-                          />
-                        ))}
+                        {discoveredBooks.length === 0 ? (
+                          <p className="empty-state-text" style={{ fontSize: "0.85rem", opacity: 0.6, textAlign: "center", padding: "1.5rem 0", color: "var(--text-muted, #718096)" }}>
+                            {isAr 
+                              ? "ℹ️ لا توجد نتائج زحف بعد. قم بتشغيل عملية زحف في الأعلى أو اختر عملية سابقة لعرضها." 
+                              : "ℹ️ No crawled results yet. Execute a crawl above or choose a historical job to populate."}
+                          </p>
+                        ) : (
+                          buildDirectoryTree(discoveredBooks).map(node => (
+                            <DirectoryNode
+                              key={node.key}
+                              node={node}
+                              selectedDiscovered={selectedDiscovered}
+                              crawlExpandedNodes={crawlExpandedNodes}
+                              onToggleNode={handleToggleNode}
+                              onToggleExpand={toggleCrawlExpand}
+                              isAr={isAr}
+                            />
+                          ))
+                        )}
                       </div>
                     </div>
                   );
