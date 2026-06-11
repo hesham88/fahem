@@ -5940,6 +5940,52 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 content={"success": False, "error": str(err)}
             )
 
+    @app.post("/admin/delete-moe-library")
+    async def admin_delete_moe_library(request: fastapi.Request):
+        try:
+            # Verify auth - require super-admin or admin
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ("super-admin", "admin"):
+                return fastapi.responses.JSONResponse(
+                    status_code=403,
+                    content={"success": False, "error": "Forbidden: Admin access required"}
+                )
+
+            data = await request.json()
+            confirm = data.get("confirm", False)
+            db_target = data.get("db", None)
+
+            import os
+            import subprocess
+            
+            script_path = "scripts/delete_moe_library.py"
+            if not os.path.exists(script_path):
+                script_path = "agents/scripts/delete_moe_library.py"
+                if not os.path.exists(script_path):
+                    script_path = "/app/scripts/delete_moe_library.py"
+            
+            cmd = ["python", script_path]
+            if confirm:
+                cmd.append("--confirm")
+            if db_target:
+                cmd.extend(["--db", db_target])
+
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=os.environ)
+
+            return {
+                "success": res.returncode == 0,
+                "returncode": res.returncode,
+                "stdout": res.stdout,
+                "stderr": res.stderr,
+                "cmd": cmd
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Delete MOE library route failed: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                status_code=500,
+                content={"success": False, "error": str(err)}
+            )
+
     @app.post("/admin/emergency-sandbox-purge")
     async def admin_emergency_sandbox_purge(request: fastapi.Request):
         try:
