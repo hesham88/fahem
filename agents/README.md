@@ -149,7 +149,7 @@ pip install -r requirements.txt
 Create an `.env.local` inside the `agents/` folder (or rely on the parent/sibling ones) with:
 ```env
 GEMINI_API_KEY="your-gemini-api-key"
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_MODEL="gemini-3.1-flash"
 MONGODB_URI="mongodb+srv://user:pass@cluster.mongodb.net/fahem"
 ```
 
@@ -175,7 +175,7 @@ gcloud run deploy fahem-agent \
   --region us-east4 \
   --no-allow-unauthenticated \
   --vpc-egress private-ranges-only \
-  --set-env-vars="GEMINI_MODEL=gemini-2.5-flash,GCP_PROJECT=fahem-88d40"
+  --set-env-vars="GEMINI_MODEL=gemini-3.1-flash,GCP_PROJECT=fahem-88d40"
 ```
 
 > [!IMPORTANT]
