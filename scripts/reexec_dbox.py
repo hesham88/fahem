@@ -582,14 +582,22 @@ def verify_agent_create():
     except Exception as e:
         return False, f"Static check of agents/agent.py failed: {e}"
         
-    # 2. Assert that create_practice API round-trips to a real object
+    # 2. Get a valid book_id dynamically to guarantee anchor validation passes
     tok, err = enter_demo("student")
     if not tok:
         return False, err
         
+    books = get_books(tok)
+    if not books:
+        return False, "No books found on fahem.pro to anchor the creation tests"
+    book_id = book_id_of(books[0])
+    if not book_id:
+        return False, "Could not resolve a valid book_id from the first book"
+        
+    # 3. Assert that create_practice API round-trips to a real object
     body = {
         "subject": "Mathematics",
-        "bookId": "book_math_101",
+        "bookId": book_id,
         "selectedChapters": ["Chapter 3"],
         "customConcepts": "Quadratic Equations",
         "mode": "mcq"
@@ -606,7 +614,7 @@ def verify_agent_create():
     except Exception as e:
         return False, f"Could not parse /api/practice/generate response: {e}"
         
-    # 3. Assert that create_assignment API round-trips to a real object (Instructor-only)
+    # 4. Assert that create_assignment API round-trips to a real object (Instructor-only)
     tok_teacher, err_t = enter_demo("teacher")
     if not tok_teacher:
         return False, f"Teacher demo entry failed: {err_t}"
@@ -615,7 +623,7 @@ def verify_agent_create():
         "group_id": "group_physics_a",
         "title": "Python Control Flow",
         "title_ar": "التحكم في التدفق بايثون",
-        "book_id": "book_math_101",
+        "book_id": book_id,
         "timer_seconds": 120,
         "questions": [
             {

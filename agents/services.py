@@ -1790,6 +1790,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         j["_id"] = str(j["_id"])
                     if "created_at" not in j:
                         j["created_at"] = 0
+                    disc = j.get("discovered", []) or []
+                    j["found_count"] = len(disc)
+                    j["harvested_count"] = sum(1 for item in disc if item.get("pagesResolved") is True)
+                    j["pending_count"] = j["found_count"] - j["harvested_count"]
                 return {
                     "success": True,
                     "jobs": jobs
@@ -1804,15 +1808,26 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "status": "queued",
                     "progress": 5,
                     "logs": ["[INIT] Job scheduled. Awaiting database and background spider execution..."],
-                    "discovered": []
+                    "discovered": [],
+                    "found_count": 0,
+                    "harvested_count": 0,
+                    "pending_count": 0
                 }
                 
+            discovered = job.get("discovered", []) or []
+            found_count = len(discovered)
+            harvested_count = sum(1 for item in discovered if item.get("pagesResolved") is True)
+            pending_count = found_count - harvested_count
+
             return {
                 "success": True,
                 "status": job.get("status"),
                 "progress": job.get("progress"),
                 "logs": job.get("logs", []),
-                "discovered": job.get("discovered", [])
+                "discovered": discovered,
+                "found_count": found_count,
+                "harvested_count": harvested_count,
+                "pending_count": pending_count
             }
         except Exception as err:
             logger.error(f"[services.py] Failed to get crawl job: {err}", exc_info=True)
@@ -1822,13 +1837,74 @@ def register_telemetry_route(app: fastapi.FastAPI):
     async def trigger_crawl_job(request: fastapi.Request, background_tasks: fastapi.BackgroundTasks):
         try:
             body = await request.json()
+            action = body.get("action")
+            job_id_param = body.get("jobId")
+            
+            from pymongo import MongoClient
+            from tools import get_mongodb_uri
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+            db = get_active_db(client)
+
+            if action or job_id_param:
+                if not job_id_param:
+                    client.close()
+                    return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing jobId parameter"})
+                if action not in ["pause", "resume", "stop", "kill"]:
+                    client.close()
+                    return fastapi.responses.JSONResponse(status_code=400, content={"error": f"Unrecognized action: {action}"})
+                
+                job = db["crawl_jobs"].find_one({"_id": job_id_param})
+                if not job:
+                    client.close()
+                    return fastapi.responses.JSONResponse(status_code=404, content={"error": "Crawl job not found"})
+                
+                import time
+                timestamp = time.strftime('%H:%M:%S')
+                status = job.get("status")
+                logs = job.get("logs", []) or []
+                cancel_requested = job.get("cancel_requested", False)
+                
+                if action == "pause":
+                    status = "paused"
+                    logs.append(f"[{timestamp}] [CONTROL] ⏸️ Ingestion crawl paused cooperatively.")
+                elif action == "resume":
+                    status = "harvesting"
+                    logs.append(f"[{timestamp}] [CONTROL] ▶️ Ingestion crawl resumed.")
+                elif action in ["stop", "kill"]:
+                    cancel_requested = True
+                    p_id = job.get("active_pid")
+                    if p_id:
+                        try:
+                            import os
+                            import signal
+                            os.kill(p_id, signal.SIGKILL)
+                        except Exception as kill_err:
+                            logger.error(f"Failed to SIGKILL crawler PID {p_id}: {kill_err}")
+                    status = "killed" if action == "kill" else "failed"
+                    logs.append(f"[{timestamp}] [CONTROL] 🛑 Ingestion crawl manually {'force-killed' if action == 'kill' else 'stopped'}.")
+                
+                db["crawl_jobs"].update_one(
+                    {"_id": job_id_param},
+                    {"$set": {
+                        "status": status,
+                        "logs": logs,
+                        "cancel_requested": cancel_requested,
+                        "updated_at": time.time()
+                    }}
+                )
+                client.close()
+                return {"success": True, "message": f"Crawl job {action}ed successfully."}
+
             url = body.get("url")
             max_depth = body.get("maxDepth", 3)
             requester_email = body.get("requesterEmail")
             
             if not url:
+                client.close()
                 return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing crawl URL"})
             if not requester_email:
+                client.close()
                 return fastapi.responses.JSONResponse(status_code=400, content={"error": "Missing requesterEmail parameter"})
                 
             target_url = url.strip()
@@ -1846,11 +1922,17 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 f"[INIT] 🔒 Secured sandbox initialized. Awaiting background spider execution..."
             ]
             
-            from pymongo import MongoClient
-            from tools import get_mongodb_uri
-            uri = get_mongodb_uri()
-            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
-            db = get_active_db(client)
+            # Mark any stale running/paused crawl jobs as failed/superseded
+            db["crawl_jobs"].update_many(
+                {"status": {"$in": ["harvesting", "paused"]}},
+                {"$set": {
+                    "status": "failed",
+                    "updated_at": time.time(),
+                }, "$push": {
+                    "logs": f"[{time.strftime('%H:%M:%S')}] [SYSTEM] Job superseded by a new crawl request."
+                }}
+            )
+
             db["crawl_jobs"].update_one(
                 {"_id": job_id},
                 {"$set": {

@@ -172,6 +172,40 @@ def update_job_db(job_id, url, status, progress, logs, discovered):
         print(f"[CRAWL JOB MONGO ERROR] Failed to update MongoDB: {mongo_err}", file=sys.stderr)
 
 
+def check_cancel_requested(job_id: str) -> bool:
+    """
+    Check if cancellation is requested for this job in MongoDB or local JSON DB.
+    """
+    if not job_id:
+        return False
+    # 1. Check local_db.json
+    try:
+        if os.path.exists(LOCAL_DB_PATH):
+            with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
+                db_data = json.load(f)
+            for j in db_data.get("crawl_jobs", []):
+                if j.get("_id") == job_id:
+                    if j.get("cancel_requested"):
+                        return True
+    except Exception:
+        pass
+
+    # 2. Check MongoDB
+    try:
+        uri = get_mongodb_uri()
+        if uri:
+            from pymongo import MongoClient
+            client = MongoClient(uri, serverSelectionTimeoutMS=800)
+            db = client["fahem"]
+            job = db["crawl_jobs"].find_one({"_id": job_id}, {"cancel_requested": 1})
+            client.close()
+            if job and job.get("cancel_requested"):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 # --------------------------------------------------------------------------- #
 # Classifiers and normalization helpers
 # --------------------------------------------------------------------------- #
@@ -397,7 +431,7 @@ async def probe_pdf_page_count(client, url, cap_bytes=28_000_000, timeout=10):
 
 
 async def discover_openstax(
-    client: httpx.AsyncClient, listing_url: str, emit: Emit, discovered: list[dict]
+    client: httpx.AsyncClient, listing_url: str, emit: Emit, discovered: list[dict], job_id: str = ""
 ) -> list[BookRef]:
     emit("log", {"text": f"OpenStax CMS listing: GET {listing_url}", "level": "info"})
     items, total = await _ox_list_nodes(client, listing_url, emit)
@@ -413,6 +447,8 @@ async def discover_openstax(
 
     async def resolve(node: dict) -> None:
         nonlocal done
+        if job_id and check_cancel_requested(job_id):
+            raise asyncio.CancelledError("Cancellation requested")
         title = node.get("title", "Untitled")
         meta = node.get("meta", {}) or {}
         detail_url = meta.get("detail_url", "")
@@ -421,6 +457,8 @@ async def discover_openstax(
         pdf_url = node.get("high_resolution_pdf_url") or node.get("low_resolution_pdf_url")
         async with sem:
             try:
+                if job_id and check_cancel_requested(job_id):
+                    raise asyncio.CancelledError("Cancellation requested")
                 if (not pdf_url or subject == "General" or not category) and detail_url:
                     d = await client.get(
                         detail_url, headers={"User-Agent": USER_AGENT}, timeout=25.0, follow_redirects=True
@@ -432,6 +470,8 @@ async def discover_openstax(
                             subject = _ox_subject(dj)
                         if not category:
                             category = _ox_category(dj)
+            except asyncio.CancelledError:
+                raise
             except Exception as exc:
                 emit("log", {"text": f"detail fetch failed for '{title}': {exc}", "level": "warn"})
         done += 1
@@ -484,7 +524,7 @@ _HREF_RE = re.compile(r'<a\s+(?:[^>]*?\s+)?href=["\']([^"\']+)["\']', re.IGNOREC
 
 async def discover_generic(
     client: httpx.AsyncClient, start_url: str, max_depth: int, max_pages: int,
-    emit: Emit, discovered: list[dict]
+    emit: Emit, discovered: list[dict], job_id: str = ""
 ) -> list[BookRef]:
     host = urlparse(start_url).netloc
     visited: set[str] = set()
@@ -494,6 +534,8 @@ async def discover_generic(
     pages = 0
 
     while queue and pages < max_pages:
+        if job_id and check_cancel_requested(job_id):
+            raise asyncio.CancelledError("Cancellation requested")
         url, depth = queue.pop(0)
         if url in visited:
             continue
@@ -502,6 +544,8 @@ async def discover_generic(
         emit("progress", {"pct": min(15 + pages, 92)})
         emit("log", {"text": f"crawl p{pages} d{depth}: {url}", "level": "info"})
         try:
+            if job_id and check_cancel_requested(job_id):
+                raise asyncio.CancelledError("Cancellation requested")
             await asyncio.sleep(0.8)  # politeness
             r = await client.get(url, headers={"User-Agent": USER_AGENT}, timeout=15.0, follow_redirects=True)
             if r.status_code != 200 or "text/html" not in r.headers.get("content-type", ""):
@@ -541,6 +585,8 @@ async def discover_generic(
                     emit("log", {"text": f"✨ PDF: {title}", "level": "ok"})
                 elif depth < max_depth and urlparse(link).netloc == host and link not in visited:
                     queue.append((link, depth + 1))
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
             emit("log", {"text": f"fetch error {url}: {exc}", "level": "warn"})
 
@@ -549,7 +595,7 @@ async def discover_generic(
 
 
 async def validate_books(
-    client: httpx.AsyncClient, books: list[BookRef], cap: int, emit: Emit, discovered: list[dict]
+    client: httpx.AsyncClient, books: list[BookRef], cap: int, emit: Emit, discovered: list[dict], job_id: str = ""
 ) -> None:
     targets = books[:cap]
     emit("log", {"text": f"Validating {len(targets)} PDF paths (HEAD)...", "level": "info"})
@@ -558,13 +604,19 @@ async def validate_books(
 
     async def head(b: BookRef) -> None:
         nonlocal done
+        if job_id and check_cancel_requested(job_id):
+            raise asyncio.CancelledError("Cancellation requested")
         async with sem:
             try:
+                if job_id and check_cancel_requested(job_id):
+                    raise asyncio.CancelledError("Cancellation requested")
                 r = await client.head(b.url, headers={"User-Agent": USER_AGENT}, timeout=20.0, follow_redirects=True)
                 b.http_status = r.status_code
                 cl = r.headers.get("content-length")
                 if cl and cl.isdigit():
                     b.size_bytes = int(cl)
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 b.http_status = -1
         done += 1
@@ -589,6 +641,8 @@ async def crawl_and_explore(job_id: str, target_url: str, requester_email: str) 
 
     def emit(kind: str, payload: dict) -> None:
         nonlocal progress_pct
+        if job_id and check_cancel_requested(job_id):
+            raise asyncio.CancelledError("Cancellation requested")
         if kind == "log":
             prefix = "[CRAWL]" if payload["level"] == "info" else "[OK]" if payload["level"] == "ok" else "[WARNING]"
             logs.append(f"[{time.strftime('%H:%M:%S')}] {prefix} {payload['text']}")
@@ -604,17 +658,22 @@ async def crawl_and_explore(job_id: str, target_url: str, requester_email: str) 
         source = "generic"
 
     timeout = httpx.Timeout(30.0, connect=15.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        if source == "openstax":
-            books = await discover_openstax(client, OPENSTAX_LISTING, emit, discovered)
-        else:
-            books = await discover_generic(client, target_url, max_depth=3, max_pages=80, emit=emit, discovered=discovered)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            if source == "openstax":
+                books = await discover_openstax(client, OPENSTAX_LISTING, emit, discovered, job_id)
+            else:
+                books = await discover_generic(client, target_url, max_depth=3, max_pages=80, emit=emit, discovered=discovered, job_id=job_id)
 
-        if books:
-            await validate_books(client, books, cap=300, emit=emit, discovered=discovered)
+            if books:
+                await validate_books(client, books, cap=300, emit=emit, discovered=discovered, job_id=job_id)
 
-    logs.append(f"[COMPLETE] ✅ Dynamic catalog spider finished! Discovered {len(discovered)} textbook documents successfully mapped.")
-    update_job_db(job_id, target_url, "completed", 100, logs, discovered)
+        logs.append(f"[COMPLETE] ✅ Dynamic catalog spider finished! Discovered {len(discovered)} textbook documents successfully mapped.")
+        update_job_db(job_id, target_url, "completed", 100, logs, discovered)
+    except asyncio.CancelledError:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [CRAWL] 🛑 Crawl job cancelled cooperatively.")
+        update_job_db(job_id, target_url, "killed", progress_pct, logs, discovered)
+        print(f"[{time.strftime('%H:%M:%S')}] [CRAWL] Crawl job cancelled cooperatively.", flush=True)
 
 
 def main():

@@ -22,6 +22,15 @@ export async function GET(req: NextRequest) {
         const db = getLocalDb() as any;
         const crawlJobs = db.crawl_jobs || [];
         const sortedJobs = [...crawlJobs].sort((a: any, b: any) => (b.created_at || 0) - (a.created_at || 0));
+        
+        // Decorate counts
+        for (const j of sortedJobs) {
+          const disc = j.discovered || [];
+          j.found_count = disc.length;
+          j.harvested_count = disc.filter((item: any) => item.pagesResolved === true).length;
+          j.pending_count = j.found_count - j.harvested_count;
+        }
+
         return new Response(JSON.stringify({
           success: true,
           jobs: sortedJobs
@@ -47,7 +56,10 @@ export async function GET(req: NextRequest) {
           status: "queued",
           progress: 5,
           logs: ["[INIT] Job scheduled. Awaiting background spider execution..."],
-          discovered: []
+          discovered: [],
+          found_count: 0,
+          harvested_count: 0,
+          pending_count: 0
         }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
@@ -88,12 +100,20 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const disc = job.discovered || [];
+      const found_count = disc.length;
+      const harvested_count = disc.filter((item: any) => item.pagesResolved === true).length;
+      const pending_count = found_count - harvested_count;
+
       return new Response(JSON.stringify({
         success: true,
         status: job.status,
         progress: job.progress,
         logs: job.logs,
-        discovered: job.discovered || []
+        discovered: job.discovered || [],
+        found_count,
+        harvested_count,
+        pending_count
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
@@ -228,6 +248,17 @@ export async function POST(req: NextRequest) {
     if (isLocalEnv()) {
       const db = getLocalDb() as any;
       if (!db.crawl_jobs) db.crawl_jobs = [];
+      
+      const timestamp = new Date().toLocaleTimeString();
+      db.crawl_jobs.forEach((j: any) => {
+        if (j.status === "harvesting" || j.status === "paused") {
+          j.status = "failed";
+          j.updated_at = Date.now() / 1000;
+          if (!j.logs) j.logs = [];
+          j.logs.push(`[${timestamp}] [SYSTEM] Job superseded by a new crawl request.`);
+        }
+      });
+
       db.crawl_jobs.push({
         _id: jobId,
         url: targetUrl,
