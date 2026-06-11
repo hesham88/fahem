@@ -10,3 +10,4 @@ pydantic
 arabic-reshaper
 python-bidi
 google-cloud-storage
+Pillow
