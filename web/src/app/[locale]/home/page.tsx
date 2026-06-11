@@ -129,7 +129,7 @@ const historyTranslations = {
     noSavedChats: "No saved chats yet",
     loadingChats: "Loading chats...",
     tokenAnalytics: "Token Consumption",
-    dailyTokens: "Daily Tokens",
+    dailyTokens: "Daily Token Budget",
     weeklyTokens: "Weekly Tokens",
     monthlyTokens: "Monthly Tokens",
     totalTokens: "Total Lifetime",
@@ -145,7 +145,7 @@ const historyTranslations = {
     noSavedChats: "لا توجد محادثات محفوظة بعد",
     loadingChats: "جاري تحميل المحادثات...",
     tokenAnalytics: "استهلاك الرموز (Tokens)",
-    dailyTokens: "الاستهلاك اليومي",
+    dailyTokens: "ميزانية التوكن اليومية",
     weeklyTokens: "الاستهلاك الأسبوعي",
     monthlyTokens: "الاستهلاك الشهري",
     totalTokens: "الإجمالي الكلي",
@@ -720,6 +720,10 @@ export default function Home() {
   const [localCompleted, setLocalCompleted] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [currentOnboardingStep, setCurrentOnboardingStep] = useState<string>("phone");
+  const currentOnboardingStepRef = useRef<string>("phone");
+  useEffect(() => {
+    currentOnboardingStepRef.current = currentOnboardingStep;
+  }, [currentOnboardingStep]);
   const [onboardingPhoneNumber, setOnboardingPhoneNumber] = useState("");
   const [onboardingVerificationCode, setOnboardingVerificationCode] = useState("");
   const [onboardingConfirmationResult, setOnboardingConfirmationResult] = useState<any>(null);
@@ -763,10 +767,12 @@ export default function Home() {
   const activeStreak = userProfile?.streak || 3;
   const nextLevelXp = activeLevel * 1000;
   const xpProgressPercent = (activeXp % 1000) / 10;
-  const consumedClt = realTokenStats?.used?.weekly ?? (userProfile?.consumedClt || 42);
-  const totalAllocatedClt = realTokenStats?.limit?.weekly ?? (userProfile?.totalAllocatedClt || 100);
-  const tokenProgressPercent = (consumedClt / totalAllocatedClt) * 100;
-  const remainingClt = totalAllocatedClt - consumedClt;
+  const consumedClt = realTokenStats?.used?.daily ?? 0;
+  const totalAllocatedClt = Math.round((realTokenStats?.limit?.weekly ?? (userProfile?.totalAllocatedClt || 250000)) / 7);
+  const dailyUsed = consumedClt;
+  const dailyLimit = totalAllocatedClt;
+  const tokenProgressPercent = dailyLimit > 0 ? (dailyUsed / dailyLimit) * 100 : 0;
+  const remainingClt = dailyLimit - dailyUsed;
   const [placesResults, setPlacesResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [selectedPlaceForBranch, setSelectedPlaceForBranch] = useState<any | null>(null);
@@ -1698,6 +1704,9 @@ export default function Home() {
     setActiveZatonas(prev => prev.map(z => {
       if (z.id === selectedZatonaId) {
         const nextVal = typeof valOrFunc === "function" ? valOrFunc(z.zatonaResult) : valOrFunc;
+        if (nextVal === "") {
+          return { ...z, zatonaResult: "", zatonaResultAr: "" };
+        }
         if (language === "ar") {
           return { ...z, zatonaResultAr: nextVal };
         } else {
@@ -3208,6 +3217,25 @@ export default function Home() {
   const sendOnboardingMessage = async (msgText: string) => {
     if (!msgText.trim() || !user) return;
     
+    // Intercept role selection locally to immediately advance onboarding flow and avoid getting stuck
+    const trimmedMsg = msgText.trim().toLowerCase();
+    let matchedRole: "student" | "teacher" | "parent" | "admin" | null = null;
+    if (trimmedMsg === "student" || trimmedMsg.includes("طالب")) {
+      matchedRole = "student";
+    } else if (trimmedMsg === "teacher" || trimmedMsg.includes("معلم")) {
+      matchedRole = "teacher";
+    } else if (trimmedMsg === "parent" || trimmedMsg.includes("ولي")) {
+      matchedRole = "parent";
+    } else if (trimmedMsg === "admin" || trimmedMsg.includes("مشرف") || trimmedMsg.includes("مسؤول")) {
+      matchedRole = "admin";
+    }
+
+    if (currentOnboardingStep === "role" && matchedRole) {
+      setOnboardingUserType(matchedRole);
+      setCurrentOnboardingStep("name");
+      currentOnboardingStepRef.current = "name";
+    }
+
     setOnboardingInput("");
     setOnboardingLoading(true);
     setOnboardingStatusText(language === "ar" ? "جاري الإرسال للذكاء الاصطناعي..." : "Sending to AI assistant...");
@@ -3266,7 +3294,17 @@ export default function Home() {
               const stateObj = JSON.parse(jsonStr);
               if (stateObj) {
                 latestOnboardingStateRef.current = stateObj;
-                if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
+                if (stateObj.step) {
+                  const stepOrder = ["phone", "role", "name", "username", "age", "parentEmail", "country", "grade", "school", "children", "childrenInSchool", "avatar", "complete"];
+                  const currentIdx = stepOrder.indexOf(currentOnboardingStepRef.current);
+                  const incomingIdx = stepOrder.indexOf(stateObj.step);
+                  if (incomingIdx >= 0 && currentIdx >= 0 && incomingIdx < currentIdx) {
+                    console.log(`[Onboarding] Ignoring state reversion from ${currentOnboardingStepRef.current} to ${stateObj.step}`);
+                  } else {
+                    currentOnboardingStepRef.current = stateObj.step;
+                    setCurrentOnboardingStep(stateObj.step);
+                  }
+                }
                 if (stateObj.role) setOnboardingUserType(stateObj.role);
                 if (stateObj.country) setOnboardingCountry(stateObj.country);
                 if (stateObj.name) setOnboardingName(stateObj.name);
@@ -3330,7 +3368,17 @@ export default function Home() {
             const stateObj = JSON.parse(jsonStr);
             if (stateObj) {
               latestOnboardingStateRef.current = stateObj;
-              if (stateObj.step) setCurrentOnboardingStep(stateObj.step);
+              if (stateObj.step) {
+                const stepOrder = ["phone", "role", "name", "username", "age", "parentEmail", "country", "grade", "school", "children", "childrenInSchool", "avatar", "complete"];
+                const currentIdx = stepOrder.indexOf(currentOnboardingStepRef.current);
+                const incomingIdx = stepOrder.indexOf(stateObj.step);
+                if (incomingIdx >= 0 && currentIdx >= 0 && incomingIdx < currentIdx) {
+                  console.log(`[Onboarding] Ignoring state reversion from ${currentOnboardingStepRef.current} to ${stateObj.step}`);
+                } else {
+                  currentOnboardingStepRef.current = stateObj.step;
+                  setCurrentOnboardingStep(stateObj.step);
+                }
+              }
               if (stateObj.role) setOnboardingUserType(stateObj.role);
               if (stateObj.country) setOnboardingCountry(stateObj.country);
               if (stateObj.name) setOnboardingName(stateObj.name);
@@ -6051,7 +6099,7 @@ export default function Home() {
                     gap: "0.35rem",
                     textShadow: "0 0 10px rgba(16, 107, 163, 0.15)"
                   }}>
-                    🪙 {language === "ar" ? "ميزانية التوكن الأسبوعية" : "Weekly Token Budget"}
+                    🪙 {getHistoryT("dailyTokens")}
                   </span>
                   <span style={{ 
                     fontWeight: 800, 
@@ -6061,7 +6109,7 @@ export default function Home() {
                     borderRadius: "8px",
                     fontFamily: "monospace"
                   }}>
-                    {consumedClt.toLocaleString()} <span style={{ fontSize: "0.65rem", opacity: 0.6 }}>/ {totalAllocatedClt.toLocaleString()}</span>
+                    {dailyUsed.toLocaleString()} <span style={{ fontSize: "0.65rem", opacity: 0.6 }}>/ {dailyLimit.toLocaleString()}</span>
                   </span>
                 </div>
 

@@ -62,6 +62,13 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   const [zatonaHistoryList, setZatonaHistoryList] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
 
+  // Local Presentation Result State (prevents stale text display on submit)
+  const [localResult, setLocalResult] = useState<string>("");
+
+  useEffect(() => {
+    setLocalResult(zatonaResult || "");
+  }, [zatonaResult]);
+
   // Initialize selectedBookId when dynamicBooks load
   useEffect(() => {
     if (dynamicBooks && dynamicBooks.length > 0 && !selectedBookId) {
@@ -159,6 +166,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
       materialDescAr = `كتاب: ${bookTitleAr} (${finalChapters.length > 0 ? finalChapters.length + " فصول" : "الكتاب كاملاً"})`;
     }
 
+    setLocalResult("");
     setZatonaLoading(true);
     setZatonaResult("");
 
@@ -558,9 +566,33 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
             }}
             className="custom-scrollbar"
           >
-            {zatonaResult ? (
+            {zatonaLoading ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: "100%",
+                  minHeight: "310px",
+                  color: "var(--primary)",
+                  fontSize: "0.9rem",
+                  gap: "0.75rem",
+                  padding: "2rem",
+                  textAlign: "center"
+                }}
+              >
+                <FiRefreshCw className="spinning-icon" style={{ fontSize: "2rem", animation: "spin 2s linear infinite" }} />
+                <span style={{ fontWeight: 700 }}>
+                  {language === "ar" ? "جاري عصر واستخراج الزتونة..." : "Digesting textbook essence..."}
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                  {language === "ar" ? "المحرك الذكي يقوم بتحليل المحتوى وتكثيفه" : "Smart engine is analyzing and condensing the content"}
+                </span>
+              </div>
+            ) : localResult ? (
               <div style={{ fontSize: "0.85rem", lineHeight: "1.6", fontFamily: "var(--font-sans)" }}>
-                {renderPremiumContent(zatonaResult)}
+                {renderPremiumContent(localResult)}
               </div>
             ) : (
               <div
@@ -570,6 +602,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                   justifyContent: "center",
                   alignItems: "center",
                   height: "100%",
+                  minHeight: "310px",
                   color: "#6a7c88",
                   fontSize: "0.85rem",
                   gap: "0.5rem",
@@ -608,10 +641,12 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }} className="grid-cols-1">
             {zatonaHistoryList.map((run, index) => {
               const details = run.details || {};
-              const formattedDate = new Date(run.timestamp || Date.now()).toLocaleDateString(
-                language === "ar" ? "ar-EG" : "en-US",
-                { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
-              );
+              const formattedDate = run.timestamp
+                ? new Date(run.timestamp).toLocaleDateString(
+                    language === "ar" ? "ar-EG" : "en-US",
+                    { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+                  )
+                : "";
               return (
                 <div
                   key={run._id || index}
@@ -640,7 +675,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                     </h4>
                     {details.prompt && (
                       <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                        "{details.prompt}"
+                        &quot;{details.prompt}&quot;
                       </p>
                     )}
                   </div>

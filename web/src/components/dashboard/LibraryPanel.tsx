@@ -4254,12 +4254,17 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                 {/* Bubble popup actions */}
                 {bubbleCoords && (
-                  <div style={{
-                    position: "absolute", top: `${bubbleCoords.y}px`, left: `${bubbleCoords.x}px`,
-                    transform: "translateX(-50%)", background: "var(--foreground)", color: "var(--background)",
-                    padding: "4px 8px", borderRadius: "20px", display: "flex", gap: "0.5rem",
-                    zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", whiteSpace: "nowrap"
-                  }}>
+                  <div 
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseUp={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                    style={{
+                      position: "absolute", top: `${bubbleCoords.y}px`, left: `${bubbleCoords.x}px`,
+                      transform: "translateX(-50%)", background: "var(--foreground)", color: "var(--background)",
+                      padding: "4px 8px", borderRadius: "20px", display: "flex", gap: "0.5rem",
+                      zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", whiteSpace: "nowrap"
+                    }}
+                  >
                     <button
                       onClick={() => {
                         const targetText = window.getSelection()?.toString() || selectedText || "";
@@ -4505,17 +4510,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.5rem",
-                background: "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.35))",
-                backdropFilter: "blur(16px)",
+                background: "var(--card-bg)",
                 padding: "1rem 1.25rem",
                 borderRadius: "20px",
-                border: "1px solid var(--card-border-glass, rgba(16, 107, 163, 0.12))",
+                border: "1px solid var(--card-border, rgba(16, 107, 163, 0.12))",
                 boxShadow: "0 10px 40px rgba(16, 107, 163, 0.03)",
                 width: "100%",
                 maxWidth: "380px",
-                margin: "0 0 1rem 0",
-                position: "relative",
-                zIndex: 50
+                margin: "0 0 1rem 0"
               }}>
                 <label style={{
                   fontSize: "0.8rem",
@@ -4551,8 +4553,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {/* Dynamic Scope Filters Form */}
             {activeLibraryTab === "curriculum" && activeLibrary && activeLibrary.scopeSchema && activeLibrary.scopeSchema.length > 0 && (
               <div style={{
-                background: "rgba(255, 255, 255, 0.4)",
-                backdropFilter: "blur(12px)",
+                background: "var(--card-bg)",
                 padding: "1.5rem",
                 borderRadius: "24px",
                 border: "1px solid rgba(16, 107, 163, 0.08)",

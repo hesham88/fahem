@@ -527,7 +527,7 @@ async def discover_openstax(
                 "url": b_ref.url,
                 "fileName": b_ref.file_name,
                 "totalPages": real_pages,                 # REAL probed count (None => resolved at fetch). No more fabricated 380.
-                "pagesResolved": True,
+                "pagesResolved": real_pages is not None,
                 "bookType": "core",
                 "grade": (meta.get("grade") if isinstance(meta, dict) else None),  # OpenStax has no grade/term/year — honest null, not fabricated
                 "term": None,
@@ -616,7 +616,7 @@ async def discover_generic(
                         "url": b_ref.url,
                         "fileName": b_ref.file_name,
                         "totalPages": real_pages if real_pages is not None else "unknown/pending",
-                        "pagesResolved": True,
+                        "pagesResolved": real_pages is not None,
                         "bookType": "core",
                         "grade": "Grade 11",
                         "term": "Term 1",

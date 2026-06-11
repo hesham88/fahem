@@ -1921,7 +1921,7 @@ export default function StickyChat() {
   };
 
   const parseInlineMarkdown = (text: string, msgId?: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[pP]\d+\]|\[Blank:[^\]]+\])/gi);
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[a-zA-Z0-9_\u0600-\u06FF\s-]+:[pP]\d+\]|\[[pP]\d+\]|\[Blank:[^\]]+\])/gi);
     return parts.map((part, pIdx) => {
       if (!part) return null;
       if (/^\[Blank:\s*(.+)\s*\]$/i.test(part)) {
@@ -1983,6 +1983,42 @@ export default function StickyChat() {
       }
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
+      }
+      const customMatch = part.match(/^\[([a-zA-Z0-9_\u0600-\u06FF\s-]+):([pP])(\d+)\]$/i);
+      if (customMatch) {
+        const bookId = customMatch[1].trim();
+        const pageNum = parseInt(customMatch[3], 10) || 1;
+        const displayLabel = `[p${pageNum}]`;
+        return (
+          <a
+            key={pIdx}
+            href={`?bookId=${bookId}&page=${pageNum}`}
+            onClick={(e) => {
+              e.preventDefault();
+              const event = new CustomEvent("fahemNavigateBook", {
+                detail: { bookId, page: pageNum }
+              });
+              window.dispatchEvent(event);
+            }}
+            style={{
+              color: "var(--secondary, #d4af37)",
+              textDecoration: "underline",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "2px",
+              background: "rgba(212, 175, 55, 0.08)",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              border: "1px solid rgba(212, 175, 55, 0.15)",
+              transition: "all 0.2s"
+            }}
+            title={`Go to Book ${bookId}, Page ${pageNum}`}
+          >
+            📖 {displayLabel}
+          </a>
+        );
       }
       if (/^\[[pP]\d+\]$/.test(part)) {
         const pageNum = parseInt(part.slice(2, -1), 10) || 1;

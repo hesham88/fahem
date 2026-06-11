@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { prompt, language, sessionId, selected_text, book_id, page } = body;
+    const { prompt, language, sessionId, selected_book_ids, selected_text, book_id, page } = body;
     const userId = ctx.uid;
     const userEmail = ctx.email || "anonymous@fahem.ai";
 
@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
               email: ctx.email,
               role: ctx.role,
               db_target: ctx.db_target || "fahem",
+              selected_book_ids: selected_book_ids || [],
               selected_text: selected_text || undefined,
               book_id: book_id || undefined,
               page: page || undefined
@@ -200,6 +201,7 @@ export async function POST(req: NextRequest) {
               parts: [{ text: groundedPrompt }]
             },
             streaming: true,
+            selected_book_ids: selected_book_ids || [],
             selected_text: selected_text || undefined,
             book_id: book_id || undefined,
             page: page || undefined

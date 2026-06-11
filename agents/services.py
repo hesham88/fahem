@@ -132,21 +132,26 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     # Reject X-Verified-Principal spoofing on GCP Run, but trust verified GCP service accounts:
                     # Identity is strictly derived from the verified token
                     is_service_account = email.endswith("gserviceaccount.com")
-                    passed_role = principal.get("role") if (principal and isinstance(principal, dict)) else "user"
+                    passed_principal = principal if (principal and isinstance(principal, dict)) else {}
+                    passed_role = passed_principal.get("role") if passed_principal else "user"
                     verified_role = passed_role if is_service_account else ("super-admin" if email == "hesham1988@gmail.com" else "user")
                     # Only the real owner or service account can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
-                    passed_db_target = principal.get("db_target") if (principal and isinstance(principal, dict)) else None
+                    passed_db_target = passed_principal.get("db_target") if passed_principal else None
                     db_target = passed_db_target if (email == "hesham1988@gmail.com" or is_service_account) and passed_db_target else "fahem_sandbox"
                     
+                    # Trust verified service accounts to forward actual user identity (uid/email)
+                    verified_uid = passed_principal.get("uid") if is_service_account and passed_principal.get("uid") else id_info.get("sub", "unknown_gcp_uid")
+                    verified_email = passed_principal.get("email") if is_service_account and passed_principal.get("email") else email
+                    
                     principal = {
-                        "uid": id_info.get("sub", "unknown_gcp_uid"),
-                        "email": email,
+                        "uid": verified_uid,
+                        "email": verified_email,
                         "role": verified_role,
                         "db_target": db_target,
-                        "selected_book_ids": principal.get("selected_book_ids") if (principal and isinstance(principal, dict)) else [],
-                        "selected_text": principal.get("selected_text") if (principal and isinstance(principal, dict)) else None,
-                        "book_id": principal.get("book_id") if (principal and isinstance(principal, dict)) else None,
-                        "page": principal.get("page") if (principal and isinstance(principal, dict)) else None
+                        "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
+                        "selected_text": passed_principal.get("selected_text"),
+                        "book_id": passed_principal.get("book_id"),
+                        "page": passed_principal.get("page")
                     }
                 except Exception as err:
                     logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
@@ -4299,61 +4304,109 @@ def register_telemetry_route(app: fastapi.FastAPI):
             message = ""
             success = True
             
+            updated_logs = None
             if action == "pause":
-                job = db["ingestion_jobs"].find_one({"_id": job_id})
-                if job:
-                    updated_logs = (job.get("logs") or []) + [
-                        f"[{timestamp}] [CONTROL] ⏸️ Administrative cooperative pause request sent."
-                    ]
-                    db["ingestion_jobs"].update_one(
-                        {"_id": job_id},
-                        {"$set": {"status": "paused", "logs": updated_logs, "updated_at": time.time()}}
-                    )
-                    db["books"].update_one(
-                        {"_id": book_id},
-                        {"$set": {"ingestion_status": "paused", "ingestion_logs": updated_logs, "updated_at": time.time()}}
-                    )
+                status = "paused"
+                book_status = "paused"
+                log_text = f"[{timestamp}] [CONTROL] ⏸️ Administrative cooperative pause request sent."
                 message = "Ingestion job set to pause state. Processing threads are cooperatively resting."
-                
             elif action == "resume":
-                job = db["ingestion_jobs"].find_one({"_id": job_id})
-                if job:
-                    updated_logs = (job.get("logs") or []) + [
-                        f"[{timestamp}] [CONTROL] ▶️ Administrative cooperative resume request sent. Activating processing thread."
-                    ]
-                    db["ingestion_jobs"].update_one(
-                        {"_id": job_id},
-                        {"$set": {"status": "processing", "logs": updated_logs, "updated_at": time.time()}}
-                    )
-                    db["books"].update_one(
-                        {"_id": book_id},
-                        {"$set": {"ingestion_status": "processing", "ingestion_logs": updated_logs, "updated_at": time.time()}}
-                    )
+                status = "processing"
+                book_status = "processing"
+                log_text = f"[{timestamp}] [CONTROL] ▶️ Administrative cooperative resume request sent. Activating processing thread."
                 message = "Ingestion job set to processing state. Processing thread context resumed."
-                
             elif action in ["kill", "stop"]:
-                job = db["ingestion_jobs"].find_one({"_id": job_id})
-                if job:
-                    updated_logs = (job.get("logs") or []) + [
-                        f"[{timestamp}] [CONTROL] 🛑 Ingestion job manually killed/terminated by administrator: {requester_email}",
-                        f"[{timestamp}] [SYSTEM] Process context released."
-                    ]
-                    db["ingestion_jobs"].update_one(
-                        {"_id": job_id},
-                        {"$set": {"status": "killed", "logs": updated_logs, "updated_at": time.time()}}
-                    )
-                    db["books"].update_one(
-                        {"_id": book_id},
-                        {"$set": {"ingestion_status": "failed", "ingestion_logs": updated_logs, "updated_at": time.time()}}
-                    )
+                status = "killed"
+                book_status = "failed"
+                log_text = f"[{timestamp}] [CONTROL] 🛑 Ingestion job manually killed/terminated by administrator: {requester_email}"
                 message = "Job was not running in memory; status set to failed/killed in database."
-                
             else:
                 client.close()
                 return fastapi.responses.JSONResponse(
                     content={"error": f"Unrecognized action: {action}"},
                     status_code=400
                 )
+                
+            # 1. Update MongoDB
+            try:
+                job = db["ingestion_jobs"].find_one({"_id": job_id})
+                if job:
+                    updated_logs = (job.get("logs") or []) + [log_text]
+                    if action in ["kill", "stop"]:
+                        updated_logs.append(f"[{timestamp}] [SYSTEM] Process context released.")
+                        
+                    db["ingestion_jobs"].update_one(
+                        {"_id": job_id},
+                        {"$set": {"status": status, "logs": updated_logs, "updated_at": time.time()}}
+                    )
+                    db["books"].update_one(
+                        {"_id": book_id},
+                        {"$set": {"ingestion_status": book_status, "ingestion_logs": updated_logs, "updated_at": time.time()}}
+                    )
+            except Exception as mongo_err:
+                logger.error(f"[control_books_endpoint] Failed to update MongoDB: {mongo_err}")
+                
+            # 2. Update local db (local_db.json)
+            local_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "src", "app", "api", "local_db.json")
+            if os.path.exists(local_db_path):
+                try:
+                    import json
+                    with open(local_db_path, "r", encoding="utf-8") as f:
+                        db_data = json.load(f)
+                    
+                    local_job = None
+                    if "ingestion_jobs" in db_data:
+                        for j in db_data["ingestion_jobs"]:
+                            if j.get("_id") == job_id:
+                                local_job = j
+                                break
+                                
+                    if local_job:
+                        local_logs = (local_job.get("logs") or []) + [log_text]
+                        if action in ["kill", "stop"]:
+                            local_logs.append(f"[{timestamp}] [SYSTEM] Process context released.")
+                    else:
+                        local_logs = [log_text]
+                        if action in ["kill", "stop"]:
+                            local_logs.append(f"[{timestamp}] [SYSTEM] Process context released.")
+                            
+                    # Always ensure updated_logs has a fallback value for books if not already computed from Mongo
+                    if not updated_logs:
+                        updated_logs = local_logs
+                        
+                    # Update ingestion_jobs in local JSON
+                    job_found = False
+                    if "ingestion_jobs" in db_data:
+                        for j in db_data["ingestion_jobs"]:
+                            if j.get("_id") == job_id:
+                                j["status"] = status
+                                j["logs"] = local_logs
+                                j["updated_at"] = time.time()
+                                job_found = True
+                                break
+                    if not job_found:
+                        if "ingestion_jobs" not in db_data:
+                            db_data["ingestion_jobs"] = []
+                        db_data["ingestion_jobs"].append({
+                            "_id": job_id,
+                            "status": status,
+                            "logs": local_logs,
+                            "updated_at": time.time()
+                        })
+                        
+                    # Update books in local JSON
+                    if "books" in db_data:
+                        for b in db_data["books"]:
+                            if b.get("_id") == book_id:
+                                b["ingestion_status"] = book_status
+                                b["ingestion_logs"] = local_logs
+                                b["updated_at"] = time.time()
+                                break
+                                
+                    with open(local_db_path, "w", encoding="utf-8") as f:
+                        json.dump(db_data, f, indent=2, ensure_ascii=False)
+                except Exception as local_db_err:
+                    logger.error(f"[control_books_endpoint] Failed to update local db: {local_db_err}")
                 
             client.close()
             return {"success": success, "message": message}

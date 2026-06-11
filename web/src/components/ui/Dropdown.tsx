@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { FiChevronDown, FiSearch } from "react-icons/fi";
 
 export interface DropdownOption {
@@ -51,6 +52,9 @@ export const Dropdown: React.FC<DropdownProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const [isMounted, setIsMounted] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
   const isRtl = language === "ar";
 
   // Normalize options
@@ -81,10 +85,42 @@ export const Dropdown: React.FC<DropdownProps> = ({
   // Find currently selected option
   const selectedOption = normalizedOptions.find((opt) => opt.value === value);
 
-  // Close when clicking outside
+  // Set mounted flag
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Update fixed coordinates when open
+  useEffect(() => {
+    const updateCoords = () => {
+      if (isOpen && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    };
+
+    if (isOpen) {
+      updateCoords();
+      window.addEventListener("scroll", updateCoords, true);
+      window.addEventListener("resize", updateCoords, true);
+    }
+    return () => {
+      window.removeEventListener("scroll", updateCoords, true);
+      window.removeEventListener("resize", updateCoords, true);
+    };
+  }, [isOpen]);
+
+  // Close when clicking outside both trigger and portal list
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const clickedInsideContainer = containerRef.current?.contains(target);
+      const clickedInsideList = listRef.current?.contains(target);
+      if (!clickedInsideContainer && !clickedInsideList) {
         setIsOpen(false);
       }
     };
@@ -106,6 +142,14 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
   const handleToggle = () => {
     if (!disabled) {
+      if (!isOpen && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
       setIsOpen(!isOpen);
     }
   };
@@ -120,6 +164,14 @@ export const Dropdown: React.FC<DropdownProps> = ({
     if (disabled) return;
     if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
       e.preventDefault();
+      if (!isOpen && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
       setIsOpen(true);
     }
     if (e.key === "Escape") {
@@ -135,7 +187,19 @@ export const Dropdown: React.FC<DropdownProps> = ({
     <div
       ref={containerRef}
       className={`custom-dropdown-container ${className}`}
-      onMouseEnter={() => triggerOnHover && !disabled && setIsOpen(true)}
+      onMouseEnter={() => {
+        if (triggerOnHover && !disabled) {
+          if (!isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setCoords({
+              top: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+            });
+          }
+          setIsOpen(true);
+        }
+      }}
       onMouseLeave={() => triggerOnHover && !disabled && setIsOpen(false)}
       style={{
         display: "flex",
@@ -219,18 +283,17 @@ export const Dropdown: React.FC<DropdownProps> = ({
         />
       </div>
 
-      {/* Floating Options Panel */}
-      {isOpen && (
+      {/* Floating Options Panel (rendered in Portal to document.body) */}
+      {isOpen && isMounted && createPortal(
         <div
           ref={listRef}
           className="custom-dropdown-panel"
           style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            marginTop: "6px",
-            zIndex: 9999,
+            position: "fixed",
+            top: `${coords.top + 6}px`,
+            left: `${coords.left}px`,
+            width: `${coords.width}px`,
+            zIndex: 99999,
             background: "var(--card-bg-glass-dense, rgba(255, 255, 255, 0.95))",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
@@ -244,6 +307,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
             flexDirection: "column",
             gap: "2px",
             animation: "dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+            direction: isRtl ? "rtl" : "ltr",
           }}
         >
           {searchable && (
@@ -345,7 +409,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
               );
             })
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Global CSS animation */}
