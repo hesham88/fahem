@@ -797,6 +797,7 @@ export default function Home() {
   const [selectedBookReader, setSelectedBookReader] = useState<any>(null);
   const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
+  const [pendingNavigatePage, setPendingNavigatePage] = useState<number | null>(null);
   const [translationLanguage, setTranslationLanguage] = useState<string>("Original");
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
@@ -1109,6 +1110,19 @@ export default function Home() {
     }
   }, [loadedBookPages, selectedBookReader]);
 
+  // Effect to apply pendingNavigatePage once pages load/settle
+  useEffect(() => {
+    if (selectedBookReader && pendingNavigatePage !== null && !loadingBookPages) {
+      const allPages = getAllPages(selectedBookReader, loadedBookPages);
+      if (allPages.length > 0) {
+        const targetPage = Math.min(Math.max(1, pendingNavigatePage), allPages.length);
+        console.log(`[Navigation-Race-Fix] Pages loaded/settled. Navigating to page: ${targetPage} (clamped from ${pendingNavigatePage})`);
+        setReaderCurrentPage(targetPage);
+        setPendingNavigatePage(null);
+      }
+    }
+  }, [loadedBookPages, selectedBookReader, pendingNavigatePage, loadingBookPages]);
+
   const [dynamicMaxUploadSize, setDynamicMaxUploadSize] = useState<number>(2);
 
   useEffect(() => {
@@ -1158,11 +1172,18 @@ export default function Home() {
 
       console.log(`[Deep-Linking] Received fahemNavigateBook event for bookId: "${bookId}", page: ${page}`);
 
+      const currentBookId = selectedBookReader?._id || selectedBookReader?.id;
+      const isSameBook = currentBookId === bookId;
+
       // 1. Search in dynamicBooks
       const matchedBook = (dynamicBooks || []).find(b => b._id === bookId || b.id === bookId || b.subject === bookId);
       if (matchedBook) {
-        setSelectedBookReader(matchedBook);
-        setReaderCurrentPage(page || 1);
+        if (!isSameBook) {
+          setLoadedBookPages([]);
+          setLoadingBookPages(true);
+          setSelectedBookReader(matchedBook);
+        }
+        setPendingNavigatePage(page || 1);
         setActiveTab("library");
       } else {
         // 2. Fallback check for static books
@@ -1173,8 +1194,12 @@ export default function Home() {
         };
         const staticBook = staticBooks[bookId];
         if (staticBook) {
-          setSelectedBookReader(staticBook);
-          setReaderCurrentPage(page || 1);
+          if (!isSameBook) {
+            setLoadedBookPages([]);
+            setLoadingBookPages(true);
+            setSelectedBookReader(staticBook);
+          }
+          setPendingNavigatePage(page || 1);
           setActiveTab("library");
         }
       }
@@ -1184,7 +1209,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("fahemNavigateBook", handleNavigateBook);
     };
-  }, [dynamicBooks]);
+  }, [dynamicBooks, selectedBookReader]);
 
   // Global listener for navigating to specific tabs and updating subject context
   useEffect(() => {
@@ -1243,7 +1268,7 @@ export default function Home() {
       const matchedBook = dynamicBooks.find(b => b._id === initialBookId || b.id === initialBookId || b.subject === initialBookId);
       if (matchedBook) {
         setSelectedBookReader(matchedBook);
-        setReaderCurrentPage(initialPage || 1);
+        setPendingNavigatePage(initialPage || 1);
         setActiveTab("library");
       } else {
         // Fallback check for static books
@@ -1255,7 +1280,7 @@ export default function Home() {
         const staticBook = staticBooks[initialBookId];
         if (staticBook) {
           setSelectedBookReader(staticBook);
-          setReaderCurrentPage(initialPage || 1);
+          setPendingNavigatePage(initialPage || 1);
           setActiveTab("library");
         }
       }
@@ -1438,15 +1463,88 @@ export default function Home() {
   };
 
   const parseInlineMarkdown = (text: string) => {
-    // Support bolding (**text**) and code (`text`)
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    // Support bolding (**text**), code (`text`), and book page citations [book_id:pN] or [pN]
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
     return parts.map((part, pIdx) => {
+      if (!part) return null;
       if (part.startsWith("**") && part.endsWith("**")) {
         return <strong key={pIdx} style={{ color: "var(--primary)", fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
       }
+      
+      const customMatch = part.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
+      if (customMatch) {
+        const bookId = customMatch[1].trim();
+        const pageNum = parseInt(customMatch[3], 10) || 1;
+        const displayLabel = `[p${pageNum}]`;
+        return (
+          <a
+            key={pIdx}
+            href={`?bookId=${bookId}&page=${pageNum}`}
+            onClick={(e) => {
+              e.preventDefault();
+              const event = new CustomEvent("fahemNavigateBook", {
+                detail: { bookId, page: pageNum }
+              });
+              window.dispatchEvent(event);
+            }}
+            style={{
+              color: "var(--secondary, #d4af37)",
+              textDecoration: "underline",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "2px",
+              background: "rgba(212, 175, 55, 0.08)",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              border: "1px solid rgba(212, 175, 55, 0.15)",
+              transition: "all 0.2s"
+            }}
+            title={`Go to Book ${bookId}, Page ${pageNum}`}
+          >
+            📖 {displayLabel}
+          </a>
+        );
+      }
+      if (/^\[[pP]\d+\]$/.test(part)) {
+        const pageNum = parseInt(part.slice(2, -1), 10) || 1;
+        const bookId = selectedBookReader ? (selectedBookReader._id || selectedBookReader.id || "") : "";
+        return (
+          <a
+            key={pIdx}
+            href={`?bookId=${bookId}&page=${pageNum}`}
+            onClick={(e) => {
+              e.preventDefault();
+              const event = new CustomEvent("fahemNavigateBook", {
+                detail: { bookId, page: pageNum }
+              });
+              window.dispatchEvent(event);
+            }}
+            style={{
+              color: "var(--secondary, #d4af37)",
+              textDecoration: "underline",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "2px",
+              background: "rgba(212, 175, 55, 0.08)",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              border: "1px solid rgba(212, 175, 55, 0.15)",
+              transition: "all 0.2s"
+            }}
+            title={`Go to Page ${pageNum}`}
+          >
+            📖 {part}
+          </a>
+        );
+      }
+
       return part;
     });
   };
@@ -3214,230 +3312,371 @@ export default function Home() {
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [onboardingStatusText, setOnboardingStatusText] = useState("");
 
+  const getOnboardingQuestion = (
+    step: string, 
+    role: string, 
+    lang: string, 
+    overrideName?: string, 
+    overrideUsername?: string, 
+    overrideAge?: string, 
+    overrideCountry?: string
+  ): string => {
+    const isAr = lang === "ar";
+    const s = step.toLowerCase().trim();
+    const activeName = overrideName || onboardingName;
+    const activeUsername = overrideUsername || onboardingUsername;
+    const activeAge = overrideAge || onboardingAge;
+    const activeCountry = overrideCountry || onboardingCountry;
+
+    if (s === "role") {
+      return isAr
+        ? "في البداية، ما هو دورك في منصتنا اليوم؟ اختر من البطاقات أدناه: 🎓 طالب علم، 🍎 معلم متميز، 👪 ولي أمر، أو 🛡️ مشرف نظام."
+        : "To begin, what is your role on our platform today? Select from the cards below: Student, Teacher, Parent, or Admin.";
+    }
+    if (s === "name") {
+      return isAr
+        ? "مرحباً بك! ما هو اسمك الكامل؟ 👋"
+        : "Excellent! What is your full name? 👋";
+    }
+    if (s === "username") {
+      return isAr
+        ? `سعدت بلقائك يا ${activeName || "صديقي"}! 🌟 يرجى اختيار اسم مستخدم (Username) فريد لحسابك. سيتم استخدامه في رابط ملفك الشخصي بدلاً من الأرقام:`
+        : `Nice to meet you, ${activeName || "my friend"}! 🌟 Please choose a unique username for your account. This will be used in your profile URL instead of numbers:`;
+    }
+    if (s === "age") {
+      return isAr
+        ? `رائع جداً! اسم المستخدم @${activeUsername} متاح لحسابك. كم عمرك الآن؟ 🎂`
+        : `Awesome! Username @${activeUsername} is available. How old are you? 🎂`;
+    }
+    if (s === "country") {
+      return isAr
+        ? "رائع! ما هي بلد إقامتك؟ 🌍"
+        : "Great! What is your country of residence? 🌍";
+    }
+    if (s === "grade") {
+      const localizedCountry = getLocalizedCountryName(activeCountry, isAr);
+      const proposedGradeText = getGradeSuggestion(activeAge, activeCountry, isAr);
+      return isAr
+        ? `بناءً على عمرك (${activeAge} سنة) وإقامتك في (${localizedCountry})، نقترح عليك المسار الدراسي: **${proposedGradeText}**.\n\nهل ترغب في قبول هذا الاقتراح، أو إدخال صف مخصص، أو اختيار متعلم مدى الحياة، أو تخطي هذه الخطوة؟`
+        : `Based on your age of ${activeAge} and residing in ${localizedCountry}, we recommend: **${proposedGradeText}**.\n\nWould you like to accept this recommendation, enter a custom grade, choose 'Lifelong Learner', or skip this step?`;
+    }
+    if (s === "parentemail") {
+      return isAr
+        ? "تنبيه الأمان والرقابة الأبوية 🛡️: بما أن عمرك أقل من 13 سنة، فإننا نطبق معايير الخصوصية لحماية الأطفال. يرجى كتابة البريد الإلكتروني لولي أمرك ليقوم بالموافقة على تفعيل حسابك من لوحته الخاصة:"
+        : "Safety & Parental Consent Notice 🛡️: Since you are under 13, standard age limit protections apply. Please enter your parent's email address so they can approve your account from their portal:";
+    }
+    if (s === "school") {
+      if (role === "student") {
+        return isAr
+          ? "رائع جداً! ما هو اسم المدرسة أو الجامعة التي تدرس بها حالياً؟ 🏫 (اكتب للبحث في الخريطة)"
+          : "Awesome! What is the name of the school or university where you currently study? 🏫 (Type to search)";
+      } else if (role === "teacher") {
+        return isAr
+          ? "ممتاز! ما هو اسم المدرسة أو المؤسسة التعليمية التي تعمل بها حالياً؟ 🏫 (اكتب للبحث)"
+          : "Excellent! What is the name of the school or educational institution where you work? 🏫 (Type to search)";
+      } else {
+        return isAr
+          ? "ممتاز! ما هو اسم مدرسة أو جامعة أطفالك؟ 🏫 (اكتب للبحث)"
+          : "Excellent! What is the name of your children's school or university? 🏫 (Type to search)";
+      }
+    }
+    if (s === "children") {
+      return isAr
+        ? "كم عدد أطفالك بشكل عام؟ 👪"
+        : "How many children do you have in general? 👪";
+    }
+    if (s === "childreninschool") {
+      return isAr
+        ? "منهم، كم عدد الأطفال الذين يدرسون حالياً في المدارس أو الجامعات؟ 🏫"
+        : "Out of those, how many are studying in schools or universities? 🏫";
+    }
+    if (s === "avatar") {
+      if (role === "admin") {
+        return isAr
+          ? "رائع جداً! بصفتك مشرفاً، سننتقل الآن مباشرةً لاختيار صورتك الرمزية (الرمز التعبيري) لإتمام الإعداد:"
+          : "Awesome! As an Admin, we will now skip directly to choosing your profile avatar to finish:";
+      } else if (role === "parent") {
+        return isAr
+          ? "رائع جداً! لقد أكملنا كل التفاصيل الخاصة بك. أخيراً، اختر صورتك الرمزية المفضلة والحديثة من المكتبة الفاخرة أدناه:"
+          : "Wonderful! We have gathered all details. Finally, select your favorite, modern avatar from our premium library below to complete onboarding:";
+      } else {
+        return isAr
+          ? "رائع جداً! لقد أكملنا البيانات الأساسية. الآن، اختر صورتك الرمزية المفضلة لملفك الشخصي من المكتبة المتنوعة أدناه:"
+          : "Excellent! We have captured your core info. Now, select your preferred avatar from our diverse library below to complete onboarding:";
+      }
+    }
+    if (s === "complete") {
+      return isAr
+        ? "✨ تهانينا! لقد أكملت إعداد حسابك بنجاح في عائلة فاهم. نحن متحمسون جداً لرحلتك التعليمية معنا! دعنا نستكشف المنصة الآن.\n\nSUCCESS_ONBOARDING_COMPLETE"
+        : "✨ Congratulations! You have successfully completed your profile setup in the Fahem family. We are incredibly excited to support your educational journey! Let's explore the platform now.\n\nSUCCESS_ONBOARDING_COMPLETE";
+    }
+    return "";
+  };
+
   const sendOnboardingMessage = async (msgText: string) => {
     if (!msgText.trim() || !user) return;
-    
-    // Intercept role selection locally to immediately advance onboarding flow and avoid getting stuck
-    const trimmedMsg = msgText.trim().toLowerCase();
-    let matchedRole: "student" | "teacher" | "parent" | "admin" | null = null;
-    if (trimmedMsg === "student" || trimmedMsg.includes("طالب")) {
-      matchedRole = "student";
-    } else if (trimmedMsg === "teacher" || trimmedMsg.includes("معلم")) {
-      matchedRole = "teacher";
-    } else if (trimmedMsg === "parent" || trimmedMsg.includes("ولي")) {
-      matchedRole = "parent";
-    } else if (trimmedMsg === "admin" || trimmedMsg.includes("مشرف") || trimmedMsg.includes("مسؤول")) {
-      matchedRole = "admin";
-    }
 
-    if (currentOnboardingStep === "role" && matchedRole) {
-      setOnboardingUserType(matchedRole);
-      setCurrentOnboardingStep("name");
-      currentOnboardingStepRef.current = "name";
-    }
+    let currentAvatarVal = onboardingAvatar;
 
     setOnboardingInput("");
     setOnboardingLoading(true);
-    setOnboardingStatusText(language === "ar" ? "جاري الإرسال للذكاء الاصطناعي..." : "Sending to AI assistant...");
+    setOnboardingStatusText(language === "ar" ? "جاري المعالجة..." : "Processing...");
 
-    // 1. Add user message to history
-    setOnboardingMessages(prev => [...prev, { sender: "user", text: msgText }]);
+    // Check if it's a special system message (e.g. phone verification done)
+    if (msgText.startsWith("[SYSTEM]")) {
+      setOnboardingMessages(prev => [...prev, { sender: "fahem", text: "" }]);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const nextQuestion = getOnboardingQuestion("role", onboardingUserType, language);
+      setOnboardingMessages(prev => {
+        const copy = [...prev];
+        if (copy.length > 0 && copy[copy.length - 1].sender === "fahem" && copy[copy.length - 1].text === "") {
+          copy[copy.length - 1] = { sender: "fahem", text: nextQuestion };
+        } else {
+          copy.push({ sender: "fahem", text: nextQuestion });
+        }
+        return copy;
+      });
+      setOnboardingLoading(false);
+      setOnboardingStatusText("");
+      return;
+    }
 
-    // 2. Prepare streaming placeholder message from the assistant
-    setOnboardingMessages(prev => [...prev, { sender: "fahem", text: "" }]);
+    // Add user message to history
+    let userMsgDisplay = msgText;
+    if (currentOnboardingStep === "role") {
+      const lowerMsg = msgText.toLowerCase();
+      if (lowerMsg.includes("student") || lowerMsg.includes("طالب")) {
+        userMsgDisplay = language === "ar" ? "🎓 طالب علم" : "🎓 Student";
+      } else if (lowerMsg.includes("teacher") || lowerMsg.includes("معلم")) {
+        userMsgDisplay = language === "ar" ? "🍎 معلم متميز" : "🍎 Teacher";
+      } else if (lowerMsg.includes("parent") || lowerMsg.includes("ولي")) {
+        userMsgDisplay = language === "ar" ? "👪 ولي أمر" : "👪 Parent";
+      } else if (lowerMsg.includes("admin") || lowerMsg.includes("مشرف") || lowerMsg.includes("مسؤول")) {
+        userMsgDisplay = language === "ar" ? "🛡️ مشرف نظام" : "🛡️ Admin";
+      }
+    } else if (currentOnboardingStep === "grade") {
+      const isArabic = language === "ar";
+      const proposed = getGradeSuggestion(onboardingAge, onboardingCountry, isArabic);
+      if (msgText.includes("Accept") || msgText.includes("قبول") || msgText.toLowerCase().includes(proposed.toLowerCase())) {
+        userMsgDisplay = isArabic ? `قبول المقترح: ${proposed}` : `Accept Recommendation: ${proposed}`;
+      } else if (msgText.toLowerCase() === "lifelong learner" || msgText.includes("مدى الحياة")) {
+        userMsgDisplay = isArabic ? "متعلم مدى الحياة" : "Lifelong Learner";
+      } else if (msgText.toLowerCase() === "skip" || msgText.includes("تخطي")) {
+        userMsgDisplay = isArabic ? "تخطي الخطوة" : "Skip Step";
+      }
+    } else if (currentOnboardingStep === "school" && (msgText.toLowerCase() === "skip" || msgText.includes("تخطي"))) {
+      userMsgDisplay = language === "ar" ? "تخطي خطوة المدرسة" : "Skip School Step";
+    } else if (currentOnboardingStep === "avatar" && (msgText === "Skip" || msgText.toLowerCase() === "skip")) {
+      userMsgDisplay = language === "ar" ? "تخطي الخطوة" : "Skip Step";
+    }
+
+    // Append the user message and instantly show the empty placeholder for Fahem thinking
+    setOnboardingMessages(prev => [
+      ...prev,
+      { sender: "user", text: userMsgDisplay },
+      { sender: "fahem", text: "" }
+    ]);
+
+    // Small delay to simulate AI thinking and guarantee smooth rendering
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      const response = await authedFetch("/api/agent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: msgText,
-          language,
-          sessionId: `onboarding_session_${user.uid}`,
-          onboarding: true
-        }),
+      const activeStep = currentOnboardingStepRef.current || currentOnboardingStep;
+      let roleVal = onboardingUserType;
+      
+      const trimmedMsg = msgText.trim();
+      let nextStep = activeStep;
+
+      if (activeStep === "phone") {
+        nextStep = "role";
+      } else if (activeStep === "role") {
+        const lowerMsg = trimmedMsg.toLowerCase();
+        let matchedRole: "student" | "teacher" | "parent" | "admin" = "student";
+        if (lowerMsg === "student" || lowerMsg.includes("طالب")) {
+          matchedRole = "student";
+        } else if (lowerMsg === "teacher" || lowerMsg.includes("معلم")) {
+          matchedRole = "teacher";
+        } else if (lowerMsg === "parent" || lowerMsg.includes("ولي")) {
+          matchedRole = "parent";
+        } else if (lowerMsg === "admin" || lowerMsg.includes("مشرف") || lowerMsg.includes("مسؤول")) {
+          matchedRole = "admin";
+        }
+        setOnboardingUserType(matchedRole);
+        roleVal = matchedRole;
+        nextStep = "name";
+      } else if (activeStep === "name") {
+        setOnboardingName(trimmedMsg);
+        nextStep = "username";
+      } else if (activeStep === "username") {
+        const usernameVal = trimmedMsg.replace(/^@/, "").trim();
+        setOnboardingUsername(usernameVal);
+        if (roleVal === "admin") {
+          nextStep = "avatar";
+        } else if (roleVal === "student") {
+          nextStep = "age";
+        } else {
+          nextStep = "country";
+        }
+      } else if (activeStep === "age") {
+        setOnboardingAge(trimmedMsg);
+        nextStep = "country";
+      } else if (activeStep === "country") {
+        setOnboardingCountry(trimmedMsg);
+        if (roleVal === "student") {
+          nextStep = "grade";
+        } else {
+          nextStep = "school";
+        }
+      } else if (activeStep === "grade") {
+        const isAr = language === "ar";
+        const ageVal = parseInt(onboardingAge) || 0;
+        const proposed = getGradeSuggestion(onboardingAge, onboardingCountry, isAr);
+        if (trimmedMsg.includes("Accept") || trimmedMsg.includes("قبول") || trimmedMsg.toLowerCase().includes(proposed.toLowerCase())) {
+          setOnboardingGradeOption("recommended");
+          setOnboardingCustomGrade(proposed);
+        } else if (trimmedMsg.toLowerCase() === "lifelong learner" || trimmedMsg.includes("مدى الحياة")) {
+          setOnboardingGradeOption("lifelong");
+          setOnboardingCustomGrade(isAr ? "متعلم مدى الحياة" : "Lifelong Learner");
+        } else if (trimmedMsg.toLowerCase() === "skip" || trimmedMsg.includes("تخطي")) {
+          setOnboardingGradeOption("skip");
+          setOnboardingCustomGrade("");
+        } else {
+          setOnboardingGradeOption("custom");
+          setOnboardingCustomGrade(trimmedMsg);
+        }
+
+        if (ageVal < 13) {
+          nextStep = "parentEmail";
+        } else {
+          nextStep = "school";
+        }
+      } else if (activeStep === "parentEmail") {
+        setOnboardingParentEmail(trimmedMsg);
+        nextStep = "school";
+      } else if (activeStep === "school") {
+        if (trimmedMsg.toLowerCase() === "skip" || trimmedMsg.includes("تخطي")) {
+          setOnboardingSchool("");
+        } else {
+          setOnboardingSchool(trimmedMsg);
+        }
+        if (roleVal === "parent") {
+          nextStep = "children";
+        } else {
+          nextStep = "avatar";
+        }
+      } else if (activeStep === "children") {
+        setOnboardingChildrenCount(trimmedMsg);
+        nextStep = "childrenInSchool";
+      } else if (activeStep === "childrenInSchool") {
+        setOnboardingChildrenInSchool(trimmedMsg);
+        nextStep = "avatar";
+      } else if (activeStep === "avatar") {
+        let avatarVal = trimmedMsg;
+        if (trimmedMsg === "Skip" || !trimmedMsg) {
+          avatarVal = "/avatars/space_explorer.svg";
+        }
+        setOnboardingAvatar(avatarVal);
+        currentAvatarVal = avatarVal;
+        nextStep = "complete";
+      }
+
+      // Update active step
+      currentOnboardingStepRef.current = nextStep;
+      setCurrentOnboardingStep(nextStep);
+
+      // Generate the next question
+      const resolvedRole = roleVal;
+      const resolvedName = activeStep === "name" ? trimmedMsg : onboardingName;
+      const resolvedUsername = activeStep === "username" ? trimmedMsg.replace(/^@/, "").trim() : onboardingUsername;
+      const resolvedAge = activeStep === "age" ? trimmedMsg : onboardingAge;
+      const resolvedCountry = activeStep === "country" ? trimmedMsg : onboardingCountry;
+
+      const nextQuestion = getOnboardingQuestion(
+        nextStep, 
+        resolvedRole, 
+        language, 
+        resolvedName, 
+        resolvedUsername, 
+        resolvedAge, 
+        resolvedCountry
+      );
+
+      // Replace the last empty "fahem" placeholder with the next question
+      setOnboardingMessages(prev => {
+        const copy = [...prev];
+        if (copy.length > 0 && copy[copy.length - 1].sender === "fahem" && copy[copy.length - 1].text === "") {
+          copy[copy.length - 1] = { sender: "fahem", text: nextQuestion };
+        } else {
+          copy.push({ sender: "fahem", text: nextQuestion });
+        }
+        return copy;
       });
 
-      if (!response.body) {
-        throw new Error("Streaming is not supported by the response.");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let accumulatedText = "";
-      let isFinalOutput = false;
-      let buffer = "";
-
-      while (!done) {
-        const { value, done: isDone } = await reader.read();
-        done = isDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-        } else if (done) {
-          buffer += decoder.decode();
-        }
-
-        let lineEndIndex;
-        while ((lineEndIndex = buffer.indexOf("\n")) !== -1) {
-          const line = buffer.substring(0, lineEndIndex);
-          buffer = buffer.substring(lineEndIndex + 1);
-
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          if (trimmed.startsWith("[METADATA] state:")) {
-            try {
-              const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
-              const stateObj = JSON.parse(jsonStr);
-              if (stateObj) {
-                latestOnboardingStateRef.current = stateObj;
-                if (stateObj.step) {
-                  const stepOrder = ["phone", "role", "name", "username", "age", "parentEmail", "country", "grade", "school", "children", "childrenInSchool", "avatar", "complete"];
-                  const currentIdx = stepOrder.indexOf(currentOnboardingStepRef.current);
-                  const incomingIdx = stepOrder.indexOf(stateObj.step);
-                  if (incomingIdx >= 0 && currentIdx >= 0 && incomingIdx < currentIdx) {
-                    console.log(`[Onboarding] Ignoring state reversion from ${currentOnboardingStepRef.current} to ${stateObj.step}`);
-                  } else {
-                    currentOnboardingStepRef.current = stateObj.step;
-                    setCurrentOnboardingStep(stateObj.step);
-                  }
-                }
-                if (stateObj.role) setOnboardingUserType(stateObj.role);
-                if (stateObj.country) setOnboardingCountry(stateObj.country);
-                if (stateObj.name) setOnboardingName(stateObj.name);
-                if (stateObj.username) setOnboardingUsername(stateObj.username);
-                if (stateObj.age) setOnboardingAge(stateObj.age.toString());
-                if (stateObj.grade) setOnboardingCustomGrade(stateObj.grade);
-              }
-            } catch (err) {
-              console.error("Error parsing metadata state:", err);
-            }
-          }
-
-          if (trimmed.startsWith("[METADATA]")) {
-            continue;
-          }
-          if (trimmed.includes("=== Agent Final Output ===")) {
-            isFinalOutput = true;
-            continue;
-          }
-          if (trimmed.includes("==========================")) {
-            isFinalOutput = false;
-            continue;
-          }
-          if (trimmed.startsWith("[Fahem Agent]") || trimmed.startsWith("[SYSTEM]") || trimmed.startsWith("[ERROR]")) {
-            setOnboardingStatusText(trimmed.replace("[Fahem Agent]", "").replace("[SYSTEM]", "").trim());
-            continue;
-          }
-
-          if (isFinalOutput) {
-            accumulatedText += line + "\n";
-            setOnboardingMessages(prev => {
-              const nextMsgs = [...prev];
-              if (nextMsgs.length > 0) {
-                nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
-              }
-              return nextMsgs;
-            });
-          } else {
-            // Fallback for responses that aren't wrapped in Agent Final Output tags
-            if (!trimmed.startsWith("[") && !trimmed.startsWith("=")) {
-              accumulatedText += line + "\n";
-              setOnboardingMessages(prev => {
-                const nextMsgs = [...prev];
-                if (nextMsgs.length > 0) {
-                  nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
-                }
-                return nextMsgs;
-              });
-            }
-          }
-        }
-      }
-
-      // Handle any leftover in buffer (no trailing newline)
-      if (buffer.trim()) {
-        const line = buffer;
-        const trimmed = line.trim();
-        if (trimmed.startsWith("[METADATA] state:")) {
-          try {
-            const jsonStr = trimmed.replace("[METADATA] state:", "").trim();
-            const stateObj = JSON.parse(jsonStr);
-            if (stateObj) {
-              latestOnboardingStateRef.current = stateObj;
-              if (stateObj.step) {
-                const stepOrder = ["phone", "role", "name", "username", "age", "parentEmail", "country", "grade", "school", "children", "childrenInSchool", "avatar", "complete"];
-                const currentIdx = stepOrder.indexOf(currentOnboardingStepRef.current);
-                const incomingIdx = stepOrder.indexOf(stateObj.step);
-                if (incomingIdx >= 0 && currentIdx >= 0 && incomingIdx < currentIdx) {
-                  console.log(`[Onboarding] Ignoring state reversion from ${currentOnboardingStepRef.current} to ${stateObj.step}`);
-                } else {
-                  currentOnboardingStepRef.current = stateObj.step;
-                  setCurrentOnboardingStep(stateObj.step);
-                }
-              }
-              if (stateObj.role) setOnboardingUserType(stateObj.role);
-              if (stateObj.country) setOnboardingCountry(stateObj.country);
-              if (stateObj.name) setOnboardingName(stateObj.name);
-              if (stateObj.username) setOnboardingUsername(stateObj.username);
-              if (stateObj.age) setOnboardingAge(stateObj.age.toString());
-              if (stateObj.grade) setOnboardingCustomGrade(stateObj.grade);
-            }
-          } catch (err) {
-            console.error("Error parsing metadata state:", err);
-          }
-        }
-        if (trimmed && !trimmed.startsWith("[METADATA]") && !trimmed.includes("=== Agent Final Output ===") && !trimmed.includes("==========================") && !trimmed.startsWith("[Fahem Agent]") && !trimmed.startsWith("[SYSTEM]") && !trimmed.startsWith("[ERROR]")) {
-          if (isFinalOutput || (!trimmed.startsWith("[") && !trimmed.startsWith("="))) {
-            accumulatedText += line;
-            setOnboardingMessages(prev => {
-              const nextMsgs = [...prev];
-              if (nextMsgs.length > 0) {
-                nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: accumulatedText.trim() };
-              }
-              return nextMsgs;
-            });
-          }
-        }
-      }
-
-      // 3. Post-stream processing: check if the onboarding was completed successfully
-      if (accumulatedText.includes("SUCCESS_ONBOARDING_COMPLETE")) {
-        const cleanedText = accumulatedText.replace("SUCCESS_ONBOARDING_COMPLETE", "").trim();
-        setOnboardingMessages(prev => {
-          const nextMsgs = [...prev];
-          if (nextMsgs.length > 0) {
-            nextMsgs[nextMsgs.length - 1] = { sender: "fahem", text: cleanedText };
-          }
-          return nextMsgs;
-        });
-
+      // Post-processing: check if completed
+      if (nextStep === "complete") {
         setOnboardingStatusText(language === "ar" ? "✨ اكتمل الإعداد بنجاح! جاري تحميل المنصة..." : "✨ Onboarding complete! Loading dashboard...");
 
         setTimeout(async () => {
           setLoadingProfile(true);
           try {
-            const res = await authedFetch(`/api/user/profile?userId=${encodeURIComponent(user.uid)}&email=${encodeURIComponent(user.email || "")}&t=${Date.now()}`, { cache: "no-store" });
+            // Build the final profile document
+            const finalProfile = {
+              ...(userProfile || {}),
+              userId: user.uid,
+              username: resolvedUsername || `user_${user.uid.slice(0, 6)}`,
+              email: user.email || "",
+              name: resolvedName || user.displayName || user.email?.split("@")[0] || "User",
+              age: parseInt(resolvedAge) || 18,
+              country: resolvedCountry || "Egypt",
+              grade: resolvedRole === "student" ? (onboardingCustomGrade || getGradeSuggestion(resolvedAge, resolvedCountry, language === "ar") || "N/A") : "N/A",
+              avatar: currentAvatarVal || "/avatars/space_explorer.svg",
+              school: onboardingSchool || "N/A",
+              userType: resolvedRole,
+              role: resolvedRole,
+              onboardingCompleted: true,
+              onboardingSkipped: false,
+              isApproved: true,
+              friends: userProfile?.friends || [],
+              groupsJoined: userProfile?.groupsJoined || [],
+              privacySettings: userProfile?.privacySettings || {
+                profileVisibility: "public",
+                allowMessages: true,
+                showActivity: true
+              },
+              // Additional role-specific fields
+              parentEmail: onboardingParentEmail || "",
+              childrenCount: onboardingChildrenCount || "",
+              childrenInSchool: onboardingChildrenInSchool || ""
+            };
+
+            const res = await authedFetch("/api/user/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: user.uid,
+                profile: finalProfile
+              })
+            });
+
             if (res.ok) {
               const data = await res.json();
-              if (data.profile && data.profile.userId) {
-                setUserProfile({
-                  ...data.profile,
-                  onboardingCompleted: true
-                });
-                setSettingsAvatar(data.profile.avatar || "");
-              }
+              setUserProfile({
+                ...finalProfile,
+                ...(data.profile || {})
+              });
+              setSettingsAvatar(finalProfile.avatar);
+            } else {
+              // Fail-safe local state backup
+              setUserProfile(finalProfile);
             }
+
             if (typeof window !== "undefined") {
               localStorage.setItem("onboarding_completed_" + user.uid, "true");
             }
             setLocalCompleted(true);
-            await logActivity("onboarding_completed", "success", "Completed onboarding via conversational agent");
+            await logActivity("onboarding_completed", "success", "Completed onboarding via local step machine");
           } catch (err) {
-            console.error("Error reloading profile on completion:", err);
+            console.error("Error saving profile on completion:", err);
             if (typeof window !== "undefined") {
               localStorage.setItem("onboarding_completed_" + user.uid, "true");
             }
@@ -3450,20 +3689,15 @@ export default function Home() {
         setOnboardingStatusText("");
       }
 
-    } catch (err: any) {
-      console.error("Onboarding streaming failed:", err);
+    } catch (err) {
+      console.error("Local onboarding transition failed:", err);
       setOnboardingStatusText("");
+      // clean up empty fahem message if it exists
       setOnboardingMessages(prev => {
-        const nextMsgs = [...prev];
-        if (nextMsgs.length > 0) {
-          nextMsgs[nextMsgs.length - 1] = { 
-            sender: "fahem", 
-            text: language === "ar" 
-              ? "عذراً، واجهت مشكلة أثناء الاتصال بالخادم. يرجى المحاولة مرة أخرى." 
-              : "Sorry, I encountered an issue connecting to the server. Please try again." 
-          };
+        if (prev.length > 0 && prev[prev.length - 1].sender === "fahem" && prev[prev.length - 1].text === "") {
+          return prev.slice(0, -1);
         }
-        return nextMsgs;
+        return prev;
       });
     } finally {
       setOnboardingLoading(false);
@@ -4204,7 +4438,82 @@ export default function Home() {
                 </code>
               );
             }
-            return codePart;
+            // Parse book page citations within standard text parts
+            const citeParts = codePart.split(/(\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
+            return citeParts.map((citePart, citeIndex) => {
+              if (!citePart) return null;
+              const customMatch = citePart.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
+              if (customMatch) {
+                const bookId = customMatch[1].trim();
+                const pageNum = parseInt(customMatch[3], 10) || 1;
+                const displayLabel = `[p${pageNum}]`;
+                return (
+                  <a
+                    key={`${codeIndex}-${citeIndex}`}
+                    href={`?bookId=${bookId}&page=${pageNum}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const event = new CustomEvent("fahemNavigateBook", {
+                        detail: { bookId, page: pageNum }
+                      });
+                      window.dispatchEvent(event);
+                    }}
+                    style={{
+                      color: "var(--secondary, #d4af37)",
+                      textDecoration: "underline",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "2px",
+                      background: "rgba(212, 175, 55, 0.08)",
+                      padding: "2px 6px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(212, 175, 55, 0.15)",
+                      transition: "all 0.2s"
+                    }}
+                    title={`Go to Book ${bookId}, Page ${pageNum}`}
+                  >
+                    📖 {displayLabel}
+                  </a>
+                );
+              }
+              if (/^\[[pP]\d+\]$/.test(citePart)) {
+                const pageNum = parseInt(citePart.slice(2, -1), 10) || 1;
+                const bookId = selectedBookReader ? (selectedBookReader._id || selectedBookReader.id || "") : "";
+                return (
+                  <a
+                    key={`${codeIndex}-${citeIndex}`}
+                    href={`?bookId=${bookId}&page=${pageNum}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const event = new CustomEvent("fahemNavigateBook", {
+                        detail: { bookId, page: pageNum }
+                      });
+                      window.dispatchEvent(event);
+                    }}
+                    style={{
+                      color: "var(--secondary, #d4af37)",
+                      textDecoration: "underline",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "2px",
+                      background: "rgba(212, 175, 55, 0.08)",
+                      padding: "2px 6px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(212, 175, 55, 0.15)",
+                      transition: "all 0.2s"
+                    }}
+                    title={`Go to Page ${pageNum}`}
+                  >
+                    📖 {citePart}
+                  </a>
+                );
+              }
+              return citePart;
+            });
           });
         });
       });

@@ -1921,7 +1921,7 @@ export default function StickyChat() {
   };
 
   const parseInlineMarkdown = (text: string, msgId?: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[a-zA-Z0-9_\u0600-\u06FF\s-]+:[pP]\d+\]|\[[pP]\d+\]|\[Blank:[^\]]+\])/gi);
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[[^\]]+\]\([^)]+\)|\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\]|\[Blank:[^\]]+\])/gi);
     return parts.map((part, pIdx) => {
       if (!part) return null;
       if (/^\[Blank:\s*(.+)\s*\]$/i.test(part)) {
@@ -1984,7 +1984,7 @@ export default function StickyChat() {
       if (part.startsWith("`") && part.endsWith("`")) {
         return <code key={pIdx} style={{ background: "rgba(16, 107, 163, 0.08)", padding: "1px 4px", borderRadius: "4px", fontSize: "0.9em", color: "var(--primary)", fontFamily: "monospace" }}>{part.slice(1, -1)}</code>;
       }
-      const customMatch = part.match(/^\[([a-zA-Z0-9_\u0600-\u06FF\s-]+):([pP])(\d+)\]$/i);
+      const customMatch = part.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
       if (customMatch) {
         const bookId = customMatch[1].trim();
         const pageNum = parseInt(customMatch[3], 10) || 1;

@@ -361,10 +361,17 @@ const isLineMathFormula = (line: string): boolean => {
   return /^[a-zA-Z\d\s\+\-\*\/\=\(\)\{\}\^_\,\.\θ\π\σ\Σ\∫\Δ]+$/.test(clean) && clean.length > 5 && (clean.includes("=") || clean.includes("+") || clean.includes("-") || clean.includes("*") || clean.includes("/"));
 };
 
+let activeBookReader: any = null;
+
 const parseInlineStyles = (textStr: string): React.ReactNode => {
   if (!textStr) return "";
   
-  type Token = { type: "text" | "highlight" | "bold" | "underline" | "italic"; content: string };
+  type Token = { 
+    type: "text" | "highlight" | "bold" | "underline" | "italic" | "citation" | "page_citation"; 
+    content: string;
+    bookId?: string;
+    pageNum?: number;
+  };
   let tokens: Token[] = [{ type: "text", content: textStr }];
   
   // 1. Highlight ==text==
@@ -438,6 +445,35 @@ const parseInlineStyles = (textStr: string): React.ReactNode => {
     }
   });
   tokens = nextTokens;
+
+  // 5. Citations [book_id:pN] or [pN]
+  nextTokens = [];
+  tokens.forEach(tok => {
+    if (tok.type === "text") {
+      const parts = tok.content.split(/(\[[^\]:]+\s*:\s*[pP]\d+\]|\[[pP]\d+\])/gi);
+      parts.forEach((p, idx) => {
+        if (!p) return;
+        if (idx % 2 === 1) {
+          const customMatch = p.match(/^\[([^\]:]+)\s*:\s*([pP])(\d+)\]$/i);
+          if (customMatch) {
+            const bookId = customMatch[1].trim();
+            const pageNum = parseInt(customMatch[3], 10) || 1;
+            nextTokens.push({ type: "citation", content: p, bookId, pageNum });
+          } else if (/^\[[pP]\d+\]$/.test(p)) {
+            const pageNum = parseInt(p.slice(2, -1), 10) || 1;
+            nextTokens.push({ type: "page_citation", content: p, pageNum });
+          } else {
+            nextTokens.push({ type: "text", content: p });
+          }
+        } else {
+          nextTokens.push({ type: "text", content: p });
+        }
+      });
+    } else {
+      nextTokens.push(tok);
+    }
+  });
+  tokens = nextTokens;
   
   return (
     <>
@@ -477,6 +513,75 @@ const parseInlineStyles = (textStr: string): React.ReactNode => {
               fontStyle: "italic",
               opacity: 0.9
             }}>{tok.content}</em>
+          );
+        }
+        if (tok.type === "citation") {
+          const bookId = tok.bookId || "";
+          const pageNum = tok.pageNum || 1;
+          const displayLabel = `[p${pageNum}]`;
+          return (
+            <a
+              key={idx}
+              href={`?bookId=${bookId}&page=${pageNum}`}
+              onClick={(e) => {
+                e.preventDefault();
+                const event = new CustomEvent("fahemNavigateBook", {
+                  detail: { bookId, page: pageNum }
+                });
+                window.dispatchEvent(event);
+              }}
+              style={{
+                color: "var(--secondary, #d4af37)",
+                textDecoration: "underline",
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                background: "rgba(212, 175, 55, 0.08)",
+                padding: "2px 6px",
+                borderRadius: "6px",
+                border: "1px solid rgba(212, 175, 55, 0.15)",
+                transition: "all 0.2s"
+              }}
+              title={`Go to Book ${bookId}, Page ${pageNum}`}
+            >
+              📖 {displayLabel}
+            </a>
+          );
+        }
+        if (tok.type === "page_citation") {
+          const pageNum = tok.pageNum || 1;
+          const bookId = activeBookReader ? (activeBookReader._id || activeBookReader.id || "") : "";
+          return (
+            <a
+              key={idx}
+              href={`?bookId=${bookId}&page=${pageNum}`}
+              onClick={(e) => {
+                e.preventDefault();
+                const event = new CustomEvent("fahemNavigateBook", {
+                  detail: { bookId, page: pageNum }
+                });
+                window.dispatchEvent(event);
+              }}
+              style={{
+                color: "var(--secondary, #d4af37)",
+                textDecoration: "underline",
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                background: "rgba(212, 175, 55, 0.08)",
+                padding: "2px 6px",
+                borderRadius: "6px",
+                border: "1px solid rgba(212, 175, 55, 0.15)",
+                transition: "all 0.2s"
+              }}
+              title={`Go to Page ${pageNum}`}
+            >
+              📖 {tok.content}
+            </a>
           );
         }
         return tok.content;
@@ -1150,6 +1255,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   translationLanguage: propsTranslationLanguage,
   setTranslationLanguage: propsSetTranslationLanguage
 }) => {
+  activeBookReader = selectedBookReader;
+
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifierLog, setVerifierLog] = useState<string[]>([]);
   const [showRejectModal, setShowRejectModal] = useState(false);
