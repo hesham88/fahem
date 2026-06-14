@@ -2492,7 +2492,15 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
 
     const cleanedText = cleanTextForTts(textToRead);
-    if (!cleanedText) return;
+    if (!cleanedText) {
+      // The page has no readable text (e.g. a page whose content failed to ingest).
+      // Tell the user instead of silently doing nothing — the previous behaviour looked
+      // like "Read Page" failing and stopping immediately.
+      alert(language === "ar"
+        ? "لا يوجد نص قابل للقراءة في هذه الصفحة بعد. قد يكون محتوى الصفحة لم يكتمل تحميله."
+        : "This page has no readable text yet — its content may not have finished loading.");
+      return;
+    }
 
     try {
       setIsReadingPage(true);
@@ -2560,9 +2568,15 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           await audio.play();
         } else {
           setIsReadingPage(false);
+          alert(language === "ar"
+            ? "تعذّر إنشاء الصوت لهذه الصفحة. يرجى المحاولة مرة أخرى."
+            : "Couldn't generate audio for this page. Please try again.");
         }
       } else {
         setIsReadingPage(false);
+        alert(language === "ar"
+          ? "تعذّر إنشاء الصوت لهذه الصفحة. يرجى المحاولة مرة أخرى."
+          : "Couldn't generate audio for this page. Please try again.");
       }
     } catch (err) {
       console.error("TTS processing error:", err);
