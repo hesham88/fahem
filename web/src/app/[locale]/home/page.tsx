@@ -800,6 +800,13 @@ export default function Home() {
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
   const [pendingNavigatePage, setPendingNavigatePage] = useState<number | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  // Demo sandbox: admin tabs are shown to everyone but strictly read-only (view-only fake data).
+  const [isDemoSandbox, setIsDemoSandbox] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsDemoSandbox(localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token"));
+    }
+  }, []);
   const [translationLanguage, setTranslationLanguage] = useState<string>("Original");
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
@@ -4387,8 +4394,10 @@ export default function Home() {
   // Enforce superadmin-only tab restrictions
   useEffect(() => {
     if (!loadingUser && !loadingProfile) {
-      const adminTabs = ["admin", "super-admin-users"];
-      if (!isAdmin && adminTabs.includes(activeTab)) {
+      const adminTabs = ["admin", "super-admin-users", "admin-ingestion"];
+      // In the demo sandbox the admin tabs are open to everyone (read-only); only redirect
+      // away when the user is neither an admin nor in the sandbox.
+      if (!isAdmin && !isDemoSandbox && adminTabs.includes(activeTab)) {
         setActiveTab("library");
       }
     }
@@ -6300,7 +6309,7 @@ export default function Home() {
 
           {/* Navigation Items (Toolkit & Admin) */}
           <nav className="sidebar-nav custom-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: "4px" }}>
-            {isAdmin && (
+            {(isAdmin || isDemoSandbox) && (
               <>
                 <div className="sidebar-nav-header">
                   {language === "ar" ? "لوحات التحكم والتحليل" : "ADMIN CONTROLS"}
@@ -6723,28 +6732,45 @@ export default function Home() {
         </header>
 
         {activeTab === "admin" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", pointerEvents: isDemoSandbox ? "none" : undefined }}>
+            {isDemoSandbox && (
+              <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem" }}>
+                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+              </div>
+            )}
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
             <AdminSecurityDashboard language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "admin-ingestion" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", minWidth: 0, width: "100%", maxWidth: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", minWidth: 0, width: "100%", maxWidth: "100%", pointerEvents: isDemoSandbox ? "none" : undefined }}>
+            {isDemoSandbox && (
+              <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem" }}>
+                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+              </div>
+            )}
             {/* Premium Curriculum Ingestion Studio Panel */}
             <CurriculumIngestionStudio language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "super-admin-users" ? (
-          <UserAccountsPanel
-            language={language}
-            allUsers={allUsers}
-            adminUserSearch={adminUserSearch}
-            setAdminUserSearch={setAdminUserSearch}
-            fetchAllUsersList={fetchAllUsersList}
-            handleAdminUpdateUser={handleAdminUpdateUser}
-            inspectedUser={inspectedUser}
-            setInspectedUser={setInspectedUser}
-            renderAvatar={renderAvatar}
-            t={t}
-          />
+          <div style={{ pointerEvents: isDemoSandbox ? "none" : undefined }}>
+            {isDemoSandbox && (
+              <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem", marginBottom: "1rem" }}>
+                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+              </div>
+            )}
+            <UserAccountsPanel
+              language={language}
+              allUsers={allUsers}
+              adminUserSearch={adminUserSearch}
+              setAdminUserSearch={setAdminUserSearch}
+              fetchAllUsersList={fetchAllUsersList}
+              handleAdminUpdateUser={handleAdminUpdateUser}
+              inspectedUser={inspectedUser}
+              setInspectedUser={setInspectedUser}
+              renderAvatar={renderAvatar}
+              t={t}
+            />
+          </div>
         ) : activeTab === "library" ? (
           <LibraryPanel
             language={language}
