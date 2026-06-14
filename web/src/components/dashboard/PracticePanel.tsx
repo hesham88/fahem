@@ -95,9 +95,11 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceQuizDurationLimit, setPracticeQuizDurationLimit] = useState<number>(120); // 120s default
   const [practiceQuizTimeLeft, setPracticeQuizTimeLeft] = useState<number>(120);
 
-  const [practiceXP, setPracticeXP] = useState<number>(35);
-  const [practiceLevel, setPracticeLevel] = useState<number>(3);
-  const [practiceStreak, setPracticeStreak] = useState<number>(4);
+  // Real cumulative gamification — derived from the durable activity log (see the
+  // effect below), not hardcoded demo values, so XP/level actually persist and count.
+  const [practiceXP, setPracticeXP] = useState<number>(0);
+  const [practiceLevel, setPracticeLevel] = useState<number>(1);
+  const [practiceStreak, setPracticeStreak] = useState<number>(0);
 
   // Practice History List & Fetching States
   const [practiceHistoryList, setPracticeHistoryList] = useState<any[]>([]);
@@ -162,6 +164,20 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   useEffect(() => {
     fetchPracticeHistory();
   }, [user]);
+
+  // Derive real cumulative XP & level from the activity log so gamification counts
+  // properly across sessions instead of resetting to a hardcoded value.
+  useEffect(() => {
+    if (!allActivities || allActivities.length === 0) return;
+    const totalXp = allActivities.reduce((sum: number, act: any) => {
+      if (act.action === "practice_session") {
+        return sum + (Number(act.details?.xpGained) || 0);
+      }
+      return sum;
+    }, 0);
+    setPracticeLevel(Math.floor(totalXp / 100) + 1);
+    setPracticeXP(totalXp % 100);
+  }, [allActivities]);
 
   // Aggregate user practice achievements dynamically into the mastery heatmap list
   const subtopicMastery = useMemo(() => {
@@ -1973,6 +1989,8 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                   userAnswer: answerStr,
                                   isCorrect: data.isCorrect,
                                   xpGained: computedXp,
+                                  subject: targetSubject,
+                                  subtopic: subtopic,
                                   feedback: data.feedback,
                                   explanation: data.correctExplanation || "",
                                   rubric: data.rubric || null

@@ -107,8 +107,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           const topicMap: { [key: string]: { correct: number; total: number; bookId?: string } } = {};
           practiceRuns.forEach((run: any) => {
             const details = run.details || {};
-            const topic = details.topic || details.chapter || "General Practice";
-            const isCorrect = run.status === "success" || details.score >= 70 || details.correct;
+            const topic = details.subtopic || details.topic || details.subject || details.chapter || "General Practice";
+            const isCorrect = run.status === "correct" || run.status === "success" || !!details.isCorrect || !!details.correct || (typeof details.score === "number" && details.score >= 70);
             
             if (!topicMap[topic]) {
               topicMap[topic] = { correct: 0, total: 0, bookId: details.bookId || details.book_id };
