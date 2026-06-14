@@ -131,7 +131,7 @@ const historyTranslations = {
     noSavedChats: "No saved chats yet",
     loadingChats: "Loading chats...",
     tokenAnalytics: "Token Consumption",
-    dailyTokens: "Daily Token Budget",
+    dailyTokens: "Token usage",
     weeklyTokens: "Weekly Tokens",
     monthlyTokens: "Monthly Tokens",
     totalTokens: "Total Lifetime",
@@ -147,7 +147,7 @@ const historyTranslations = {
     noSavedChats: "لا توجد محادثات محفوظة بعد",
     loadingChats: "جاري تحميل المحادثات...",
     tokenAnalytics: "استهلاك الرموز (Tokens)",
-    dailyTokens: "ميزانية التوكن اليومية",
+    dailyTokens: "استهلاك التوكن",
     weeklyTokens: "الاستهلاك الأسبوعي",
     monthlyTokens: "الاستهلاك الشهري",
     totalTokens: "الإجمالي الكلي",
@@ -1946,10 +1946,10 @@ export default function Home() {
 
   // --- ACADEMIC SPACES CRUD & UI HELPERS ---
   const renderSpaceSelectorBar = (tab: "practice" | "plan" | "timetable" | "zatona") => {
-    // The "Active Academic Space" workstation bar is removed from Practice and Zatona.
-    // Use a boolean guard (not a direct `tab ===` return) so TypeScript does not narrow
+    // The "Active Academic Space" workstation bar is removed from Practice, Zatona, Plan and
+    // Schedule. Use a boolean guard (not a direct `tab ===` return) so TypeScript does not narrow
     // the `tab` union for the rest of the function below.
-    const hideSpaceBar: boolean = tab === "practice" || tab === "zatona";
+    const hideSpaceBar: boolean = tab === "practice" || tab === "zatona" || tab === "plan" || tab === "timetable";
     if (hideSpaceBar) return null;
     let list: any[] = [];
     let selectedId = "";
@@ -6705,7 +6705,7 @@ export default function Home() {
                       boxShadow: `0 0 8px ${tokenProgressPercent > 80 ? "var(--accent)" : "var(--accent-green)"}`,
                       animation: "pulse 1.5s infinite"
                     }} />
-                    {tokenProgressPercent}%
+                    {Math.round(tokenProgressPercent)}%
                   </span>
                 </div>
               </div>
@@ -6749,30 +6749,30 @@ export default function Home() {
         </header>
 
         {activeTab === "admin" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", pointerEvents: isDemoSandbox ? "none" : undefined }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             {isDemoSandbox && (
               <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem" }}>
-                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+                {language === "ar" ? "👁️ معاينة تجريبية — تصفّح وبدّل بين التبويبات بحرية؛ أي تغييرات هنا مؤقتة وتُحذف عند الخروج." : "👁️ Sandbox preview — browse and switch tabs freely; any changes here are temporary and reset on sign-out."}
               </div>
             )}
             {/* Visual Security Configurations & Workflow Pipeline DAG */}
             <AdminSecurityDashboard language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "admin-ingestion" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", minWidth: 0, width: "100%", maxWidth: "100%", pointerEvents: isDemoSandbox ? "none" : undefined }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", minWidth: 0, width: "100%", maxWidth: "100%" }}>
             {isDemoSandbox && (
               <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem" }}>
-                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+                {language === "ar" ? "👁️ معاينة تجريبية — تصفّح وبدّل بين التبويبات بحرية؛ أي تغييرات هنا مؤقتة وتُحذف عند الخروج." : "👁️ Sandbox preview — browse and switch tabs freely; any changes here are temporary and reset on sign-out."}
               </div>
             )}
             {/* Premium Curriculum Ingestion Studio Panel */}
             <CurriculumIngestionStudio language={language} email={user?.email || undefined} />
           </div>
         ) : activeTab === "super-admin-users" ? (
-          <div style={{ pointerEvents: isDemoSandbox ? "none" : undefined }}>
+          <div>
             {isDemoSandbox && (
               <div style={{ pointerEvents: "auto", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", color: "#b45309", borderRadius: "10px", padding: "8px 14px", fontWeight: 700, fontSize: "0.85rem", marginBottom: "1rem" }}>
-                {language === "ar" ? "👁️ عرض تجريبي للقراءة فقط — جميع الإجراءات معطّلة في الوضع التجريبي." : "👁️ Read-only demo view — all actions are disabled in the sandbox."}
+                {language === "ar" ? "👁️ معاينة تجريبية — تصفّح وبدّل بين التبويبات بحرية؛ أي تغييرات هنا مؤقتة وتُحذف عند الخروج." : "👁️ Sandbox preview — browse and switch tabs freely; any changes here are temporary and reset on sign-out."}
               </div>
             )}
             <UserAccountsPanel
