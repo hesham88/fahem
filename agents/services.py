@@ -4627,6 +4627,16 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         message = "Existing book ingestion re-triggered."
                     else:
                         message = "Existing book ingestion re-queued for Superadmin approval."
+                        try:
+                            notify_admins_of(
+                                client["fahem"], "admin_approval_request",
+                                "Approval needed: book re-ingestion", "مطلوب موافقة: إعادة استيعاب كتاب",
+                                f"'{title}' is awaiting Superadmin approval before re-ingestion.",
+                                f"الكتاب '{title}' بانتظار موافقة المشرف قبل إعادة الاستيعاب.",
+                                {"deep_link": "?tab=admin-ingestion", "book_id": existing_book["_id"]}
+                            )
+                        except Exception as _e:
+                            logger.warning(f"Failed to notify admins of book re-approval request: {_e}")
                     
                     client.close()
                     # Return modified existing_book for tracking
@@ -4710,6 +4720,16 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 message = "Book registered and background ingestion started."
             else:
                 message = "Book registered and queued for Superadmin approval."
+                try:
+                    notify_admins_of(
+                        client["fahem"], "admin_approval_request",
+                        "Approval needed: new book ingestion", "مطلوب موافقة: استيعاب كتاب جديد",
+                        f"'{title}' is awaiting Superadmin approval before ingestion.",
+                        f"الكتاب '{title}' بانتظار موافقة المشرف قبل الاستيعاب.",
+                        {"deep_link": "?tab=admin-ingestion", "book_id": book_id}
+                    )
+                except Exception as _e:
+                    logger.warning(f"Failed to notify admins of book approval request: {_e}")
             
             client.close()
             return {"success": True, "message": message, "book": draft_book}

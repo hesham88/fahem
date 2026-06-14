@@ -906,6 +906,27 @@ class MongoDBEngine:
                     "createdAt": _ts
                 })
                 _i += 1
+            # A teacher/admin account needs Superadmin approval — raise an approval request.
+            if final_role in ("teacher", "admin"):
+                _ts2 = int(_t.time() * 1000)
+                _j = 0
+                for _sa in self._db["users"].find({"role": "super-admin"}, {"userId": 1}):
+                    _sauid = _sa.get("userId")
+                    if not _sauid or _sauid == user_id:
+                        continue
+                    self._db["notifications"].insert_one({
+                        "_id": f"ntf_{_ts2}_adminreq_{str(_sauid)[:8]}_{_j}",
+                        "recipient_uid": _sauid,
+                        "type": "admin_approval_request",
+                        "title": f"New {final_role} approval request",
+                        "title_ar": f"طلب موافقة على حساب ({final_role})",
+                        "body": f"{name or username} ({email}) registered as {final_role} and needs approval.",
+                        "body_ar": f"سجّل {name or username} ({email}) كـ{final_role} ويحتاج إلى موافقتك.",
+                        "payload": {"new_user_id": user_id, "deep_link": "?tab=super-admin-users"},
+                        "read": False,
+                        "createdAt": _ts2
+                    })
+                    _j += 1
         except Exception as _e:
             logger.warning(f"Failed to notify admins of new signup: {_e}")
 
