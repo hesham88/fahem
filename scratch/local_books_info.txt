@@ -1,0 +1,47 @@
+Keys in local_db.json:
+['subjects', 'books', 'admins', 'config', 'social_groups', 'social_threads', 'social_replies', 'users', 'admin_change_requests', 'user_activities', 'crawl_jobs', 'book_pages', 'chat_sessions', 'feedback', 'ingestion_jobs', 'ingestion_chunks_draft', 'libraries', 'curricula', 'reading_sessions', 'notifications', 'group_assignments', 'assignment_submissions', 'assignment_reports', 'active_practice_sessions', 'demo_sessions', 'reports']
+
+libraries count: 4
+  - lib_math_1: Standard Math Syllabus
+  - lib_science_1: General Science Curriculum
+  - lib_openstax: OpenStax Library
+  - lib_private: Private Vault
+
+curricula count: 5
+  - curr_grade_9: None
+  - curr_grade_10: None
+  - cur_openstax_math_college: OpenStax — Mathematics & CS College Series
+  - cur_test_01: Testing New Curr
+  - openstax_all: OpenStax
+
+subjects count: 9
+  - subj_cur_general_pure-mathematics: Pure Mathematics
+  - subj_cur_general_physics-chemistry: Physics & Chemistry
+  - subj_cur_general_arabic-grammar-literature: Arabic Grammar & Literature
+  - subj_cur_openstax_math_college_computer-science: Computer Science
+  - subj_cur_openstax_math_college_lab: Lab
+  - subj_cur_test_01_subject-010: Subject 010
+  - subj_openstax_all_anatomy-and-physiology: Anatomy and Physiology
+  - subj_egypt_secondary2_term2_python: Python Programming
+  - subj_egypt_secondary2_term2_history: History of Egypt
+
+books count: 19
+  - book_science_201: Essentials of Physics
+  - book_introduction_to_anthropology_1780850979378: Introduction to Anthropology
+  - book_instructions_1780852741234: Instructions
+  - book_astronomy_1780922254231: Astronomy
+  - book_elementary_algebra_1780925086322: Elementary Algebra
+  - book_anatomy_and_physiology_1781003610770: Anatomy and Physiology
+  - book_psychology_2e_1781059206404: Psychology 2e
+  - book_introduction_to_python_programming_1780535737559: Introduction to Python Programming
+  - book_math_101: Introduction to Algebra
+  - book_moe_alg_g10_t1: High School Algebra and Analytic Geometry
+  - book_moe_bio_g11_t1: High School Biology
+  - book_moe_grammar_g12: High School Arabic Grammar & Rhetoric
+  - book_history_1780729770402: History of Modern Egypt
+  - book_or_21_tiny_ingest_1781046973_1781046974949: OR-21 Tiny Ingest 1781046973
+  - book_or_21_live_ingest_1781050489_1781050490971: OR-21 Live Ingest 1781050489
+
+All books in local_db.json['books'] with python in title:
+  - ID: book_introduction_to_python_programming_1780535737559, Title: Introduction to Python Programming, Subject: sub_computer_science_1780535716963, Curriculum: None, Visibility: None
+  - ID: openstax_python_programming, Title: Introduction to Python Programming, Subject: subj_computer_science, Curriculum: None, Visibility: None

@@ -1113,12 +1113,25 @@ export default function Home() {
   // Effect to apply pendingNavigatePage once pages load/settle
   useEffect(() => {
     if (selectedBookReader && pendingNavigatePage !== null && !loadingBookPages) {
-      const allPages = getAllPages(selectedBookReader, loadedBookPages);
-      if (allPages.length > 0) {
-        const targetPage = Math.min(Math.max(1, pendingNavigatePage), allPages.length);
-        console.log(`[Navigation-Race-Fix] Pages loaded/settled. Navigating to page: ${targetPage} (clamped from ${pendingNavigatePage})`);
-        setReaderCurrentPage(targetPage);
-        setPendingNavigatePage(null);
+      const bookId = (selectedBookReader._id || selectedBookReader.id || "").toString().trim().toLowerCase();
+      const realPages = (loadedBookPages || []).filter((p: any) => {
+        const pBookId = (p.book_id || p.bookId || "").toString().trim().toLowerCase();
+        return pBookId === bookId;
+      });
+      
+      const isStaticBook = !selectedBookReader.isUserUpload && 
+        ["math", "science", "arabic"].includes((selectedBookReader.subject || "").toLowerCase());
+
+      const loadFinished = !loadingBookPages;
+
+      if (realPages.length > 0 || isStaticBook || (loadFinished && loadedBookPages.length === 0)) {
+        const allPages = getAllPages(selectedBookReader, loadedBookPages);
+        if (allPages.length > 0) {
+          const targetPage = Math.min(Math.max(1, pendingNavigatePage), allPages.length);
+          console.log(`[Navigation-Race-Fix] Pages loaded/settled. Navigating to page: ${targetPage} (clamped from ${pendingNavigatePage})`);
+          setReaderCurrentPage(targetPage);
+          setPendingNavigatePage(null);
+        }
       }
     }
   }, [loadedBookPages, selectedBookReader, pendingNavigatePage, loadingBookPages]);

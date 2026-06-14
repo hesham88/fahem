@@ -472,7 +472,7 @@ class MongoDBEngine:
                 "color": "#6366F1",
                 "emoji": "💻",
                 "category": "Computer Science",
-                "core_book_ids": ["book_introduction_to_python_programming_1780627757426"],
+                "core_book_ids": ["book_introduction_to_python_programming_1780535737559"],
                 "supporting_book_ids": [],
                 "books_count": 1
             }
@@ -494,7 +494,7 @@ class MongoDBEngine:
                 visibility = book.get("visibility", "public")
                 owner_uid = book.get("userId")
 
-                if book_id == "book_introduction_to_python_programming_1780627757426":
+                if book_id == "book_introduction_to_python_programming_1780535737559":
                     lib_id = "lib_openstax"
                     curr_id = "cur_openstax_math_college"
                     subj_id = "sub_computer_science_1780535716963"

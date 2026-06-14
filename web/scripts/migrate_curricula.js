@@ -138,7 +138,7 @@ function migrate() {
     color: "#6366F1",
     emoji: "💻",
     category: "Computer Science",
-    core_book_ids: ["book_introduction_to_python_programming_1780627757426"],
+    core_book_ids: ["book_introduction_to_python_programming_1780535737559"],
     supporting_book_ids: [],
     books_count: 1
   };
@@ -153,7 +153,7 @@ function migrate() {
     let visibility = book.visibility || "public";
     let ownerUid = book.userId || null;
 
-    if (book._id === "book_introduction_to_python_programming_1780627757426") {
+    if (book._id === "book_introduction_to_python_programming_1780535737559") {
       libId = "lib_openstax";
       currId = "cur_openstax_math_college";
       subjId = "sub_computer_science_1780535716963";

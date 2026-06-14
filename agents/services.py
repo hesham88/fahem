@@ -2642,6 +2642,79 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed in user/knowledge: {err}", exc_info=True)
             return {"success": False, "subjects": [], "total_books": 0, "error": str(err)}
 
+    @app.get("/user/debug/db_stats")
+    async def get_db_stats_debug_endpoint():
+        try:
+            from tools import get_cached_mongodb_client
+            client = get_cached_mongodb_client()
+            
+            dbs = client.list_database_names()
+            results = {
+                "active_db": get_active_db(client).name,
+                "all_databases": dbs,
+                "search_results": {}
+            }
+            
+            target_id_str = "1781369827787"
+            target_book_id = f"book_introduction_to_computer_science_{target_id_str}"
+            target_job_id = f"job_book_introduction_to_computer_science_{target_id_str}"
+            
+            for db_name in dbs:
+                if db_name in ["admin", "local", "config"]:
+                    continue
+                    
+                db_results = {}
+                db = client[db_name]
+                colls = db.list_collection_names()
+                
+                # Search collections containing target ID
+                matching_colls = [c for c in colls if target_id_str in c]
+                if matching_colls:
+                    db_results["matching_collections"] = {}
+                    for mc in matching_colls:
+                        db_results["matching_collections"][mc] = {
+                            "count": db[mc].count_documents({}),
+                            "sample_keys": list(db[mc].find_one({}).keys()) if db[mc].find_one({}) else []
+                        }
+                        
+                # Search in books collection
+                if "books" in colls:
+                    book_doc = db["books"].find_one({"$or": [{"_id": target_book_id}, {"id": target_book_id}, {"book_id": target_book_id}]})
+                    if book_doc:
+                        # exclude large fields
+                        db_results["book_found"] = {k: v for k, v in book_doc.items() if k not in ["cover_image", "pages", "chunks"]}
+                    else:
+                        # search by title regex
+                        any_cs = db["books"].find_one({"title": {"$regex": "Computer Science", "$options": "i"}})
+                        if any_cs:
+                            db_results["similar_cs_book"] = {k: v for k, v in any_cs.items() if k not in ["cover_image", "pages", "chunks"]}
+                            
+                # Search pages count in book_pages collection
+                if "book_pages" in colls:
+                    cnt_normal = db["book_pages"].count_documents({"book_id": target_book_id})
+                    cnt_job = db["book_pages"].count_documents({"book_id": target_job_id})
+                    db_results["book_pages_count"] = {
+                        "normal_book_id": cnt_normal,
+                        "job_book_id": cnt_job
+                    }
+                    if cnt_normal > 0 or cnt_job > 0:
+                        sample_pg = db["book_pages"].find_one({"$or": [{"book_id": target_book_id}, {"book_id": target_job_id}]})
+                        if sample_pg:
+                            db_results["book_pages_sample_keys"] = list(sample_pg.keys())
+                            db_results["book_pages_sample_book_id_field"] = sample_pg.get("book_id") or sample_pg.get("bookId")
+                            db_results["book_pages_sample_page_number"] = sample_pg.get("page_number") or sample_pg.get("pageNum")
+                            
+                if db_results:
+                    results["search_results"][db_name] = db_results
+                    
+            return {
+                "success": True,
+                "results": results
+            }
+        except Exception as err:
+            logger.error(f"[services.py] db_stats error: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
 
     @app.get("/user/books/pages")
     async def get_book_pages_endpoint(book_id: str):
@@ -2651,7 +2724,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = get_cached_mongodb_client()
             db = get_active_db(client)
             
-            pages = list(db["book_pages"].find({"book_id": book_id}).sort("page_number", 1))
+            pages = list(db["book_pages"].find({"book_id": book_id}, {"embedding": 0, "page_image_base64": 0, "image": 0}).sort("page_number", 1))
             # Convert ObjectId to string for JSON serialization
             for p in pages:
                 if "_id" in p:
