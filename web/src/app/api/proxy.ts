@@ -122,7 +122,7 @@ export async function proxyRequest(
 
     // Forward the authenticated end-user principal to the Python backend
     if (ctx) {
-      const principal: any = { // guard:allow-principal
+      const principal: any = {
         uid: ctx.uid,
         email: ctx.email,
         role: ctx.role,
@@ -131,7 +131,7 @@ export async function proxyRequest(
       // Carry the demo session id + tier so the backend can isolate per-session token budgets.
       if (ctx.sandbox_session_id) principal.sandbox_session_id = ctx.sandbox_session_id;
       if (ctx.tier !== undefined) principal.tier = ctx.tier;
-      headers["X-Verified-Principal"] = JSON.stringify(principal);
+      headers["X-Verified-Principal"] = JSON.stringify(principal); // guard:allow-principal
     }
 
     const url = `${cloudRunUrl}${path}`;
