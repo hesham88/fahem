@@ -16,7 +16,6 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
   const isAr = language === "ar";
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isVisible, setIsVisible] = useState<boolean>(false);
-  const [isMinimized, setIsVisibleMinimized] = useState<boolean>(false);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
 
   // Initialize: Check localStorage and fetch/sync state on mount
@@ -29,20 +28,10 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
       return;
     }
 
-    const skipped = localStorage.getItem("demo_tutorial_skipped") === "true";
-    const savedStep = localStorage.getItem("demo_tutorial_step");
-
-    if (skipped) {
-      setIsVisible(false);
-      return;
-    }
-
-    if (savedStep) {
-      setCurrentStep(parseInt(savedStep, 10) || 1);
-    }
-    
-    // Auto-open if we are in demo mode and haven't skipped yet
-    setIsVisible(true);
+    // In the sandbox the interactive AI Companion replaces the legacy quick tour.
+    // Surface the companion immediately and keep the tour fully suppressed.
+    setIsVisible(false);
+    window.dispatchEvent(new CustomEvent("fahem_chat_open"));
   }, []);
 
   // Synchronize active tab & companion chat drawer based on step changes
@@ -187,51 +176,14 @@ export const DemoTourGuide: React.FC<DemoTourGuideProps> = ({
     setIsVisible(false);
   };
 
-  const handleRestart = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("demo_tutorial_skipped");
-    }
-    setCurrentStep(1);
-    setIsVisible(true);
-    setIsVisibleMinimized(false);
-  };
-
   if (typeof window !== "undefined" && localStorage.getItem("app_mode") !== "demo") {
     return null;
   }
 
-  // If skipped or fully completed, show a small Floating Action Button to restart the tour anytime
+  // The interactive AI Companion now stands in for the quick tour inside the sandbox,
+  // so the legacy guided tour UI (and its restart button) is never surfaced.
   if (!isVisible) {
-    return (
-      <button
-        onClick={handleRestart}
-        title={isAr ? "دليل الجولة التفاعلية" : "Interactive Tour Guide"}
-        style={{
-          position: "fixed",
-          bottom: "1.5rem",
-          left: isAr ? "1.5rem" : "auto",
-          right: isAr ? "auto" : "1.5rem",
-          zIndex: 10000,
-          background: "linear-gradient(135deg, #106ba3, #0d5482)",
-          color: "#ffffff",
-          border: "none",
-          width: "44px",
-          height: "44px",
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          boxShadow: "0 4px 15px rgba(16, 107, 163, 0.4)",
-          transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          fontSize: "1.2rem",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15) rotate(15deg)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1) rotate(0deg)")}
-      >
-        🎓
-      </button>
-    );
+    return null;
   }
 
   const stepsContent = [

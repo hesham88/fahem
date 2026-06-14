@@ -514,6 +514,49 @@ export default function StickyChat() {
   const [user, setUser] = useState<User | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Demo sandbox identity (Tier-0/Tier-1 evaluation sessions, no Firebase user).
+  // The companion must run with the exact same features but routed to the sandbox DB.
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoIdentity, setDemoIdentity] = useState<{ uid: string; email: string | null; tier: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const decodeDemoToken = (raw: string): { uid: string; email: string | null; tier: number } | null => {
+      try {
+        const body = raw.split(".")[1];
+        if (!body) return null;
+        const normalized = body.replace(/-/g, "+").replace(/_/g, "/");
+        const json = JSON.parse(decodeURIComponent(escape(window.atob(normalized))));
+        // Strictly clamp the sandbox to Tier-0 or Tier-1 only.
+        const tier = Number(json.tier) === 1 ? 1 : 0;
+        return { uid: json.uid, email: json.email ?? null, tier };
+      } catch (err) {
+        console.error("[Companion] Failed to decode sandbox session token:", err);
+        return null;
+      }
+    };
+
+    const syncDemo = () => {
+      const isDemo = localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+      setDemoMode(isDemo);
+      if (isDemo) {
+        setDemoIdentity(decodeDemoToken(localStorage.getItem("demo_auth_token") || ""));
+        // The companion replaces the quick tour in the sandbox, so surface it on first entry.
+        // Once the visitor opens/closes it, that preference is respected via sessionStorage.
+        if (sessionStorage.getItem("fahem_companion_is_open") === null) {
+          setIsOpen(true);
+        }
+      } else {
+        setDemoIdentity(null);
+      }
+    };
+
+    syncDemo();
+    window.addEventListener("storage", syncDemo);
+    return () => window.removeEventListener("storage", syncDemo);
+  }, []);
+
   // Load initial isOpen state from sessionStorage after mount to avoid Next.js SSR hydration mismatch
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -874,13 +917,13 @@ export default function StickyChat() {
     if (!text) return { cleanText: "", intent: null };
     
     // Search for [INTENT: <json>]
-    const intentMatch = text.match(/\[INTENT:\s*(\{.*?\})\s*\]/);
+    const intentMatch = text.match(/\[INTENT:\s*(\{[\s\S]*?\})\s*\]/);
     if (intentMatch) {
       try {
         const jsonStr = intentMatch[1];
         const intent = JSON.parse(jsonStr) as IntentPayload;
         // Strip the [INTENT: ...] pattern from display
-        const cleanText = text.replace(/\[INTENT:\s*\{.*?\}\s*\]/g, "").trim();
+        const cleanText = text.replace(/\[INTENT:\s*\{[\s\S]*?\}\s*\]/g, "").trim();
         return { cleanText, intent };
       } catch (err) {
         console.error("Failed to parse intent JSON:", err);
@@ -1323,10 +1366,10 @@ export default function StickyChat() {
 
   // Automatically trigger dynamic capabilities-grounded streaming welcome message
   useEffect(() => {
-    if (user && messages.length === 1 && messages[0]?.id === "welcome") {
+    if ((user || demoMode) && messages.length === 1 && messages[0]?.id === "welcome") {
       triggerDynamicWelcome(language);
     }
-  }, [user, language]);
+  }, [user, demoMode, language]);
 
   // Sync authentication state
   useEffect(() => {
@@ -1338,11 +1381,12 @@ export default function StickyChat() {
 
   // Fetch Saved Chats & Activities on Open
   useEffect(() => {
-    if (user && isOpen) {
-      fetchSessions(user.uid);
-      fetchUserActivities(user.uid);
+    const activeUid = user?.uid || demoIdentity?.uid;
+    if ((user || demoMode) && isOpen && activeUid) {
+      fetchSessions(activeUid);
+      fetchUserActivities(activeUid);
     }
-  }, [user, isOpen]);
+  }, [user, demoMode, demoIdentity, isOpen]);
 
   // Listen to custom textbook context changes from page.tsx
   useEffect(() => {
@@ -1607,7 +1651,7 @@ export default function StickyChat() {
 
 
   async function fetchSessions(userIdVal?: string) {
-    const activeUserId = userIdVal || user?.uid;
+    const activeUserId = userIdVal || user?.uid || demoIdentity?.uid;
     if (!activeUserId) return;
     setIsSessionsLoading(true);
     try {
@@ -1624,7 +1668,7 @@ export default function StickyChat() {
   }
 
   async function fetchUserActivities(userIdVal?: string) {
-    const activeUserId = userIdVal || user?.uid;
+    const activeUserId = userIdVal || user?.uid || demoIdentity?.uid;
     if (!activeUserId) return;
     try {
       const response = await authedFetch(`/api/activity?userId=${encodeURIComponent(activeUserId)}`);
@@ -1718,7 +1762,7 @@ export default function StickyChat() {
   }
 
   const triggerDynamicWelcome = async (lang: string) => {
-    if (!user) return;
+    if (!user && !demoMode) return;
     try {
       const promptPayload = `Please provide an engaging welcome introduction outlining your actual capabilities as the Fahem AI Companion (such as book reading, smart study schedules, oral practice, adaptive quizzes, page-cited answers, and research node). Keep it friendly and concise, in the user's language: ${lang === "ar" ? "Arabic" : "English"}. Do not use markdown headers of level 1 or 2, use list bullet-points or emojis instead. Keep it extremely welcoming and premium.`;
 
@@ -2491,11 +2535,11 @@ export default function StickyChat() {
     sendMessageRef.current = handleSendMessage;
   });
 
-  if (!user) return null; // Only show after successful sign-in
+  if (!user && !demoMode) return null; // Show after sign-in OR inside the Tier-0/Tier-1 demo sandbox
 
   async function handleSendMessage(textToSend?: string) {
     const activeUser = user;
-    if (!activeUser) return;
+    if (!activeUser && !demoMode) return;
     const queryText = (textToSend || inputValue).trim();
     if (!queryText || isSending) return;
 
@@ -2668,8 +2712,8 @@ User Question: ${queryText}`;
           sessionId: currentSessionId || undefined,
           selected_book_ids: selectedBookIds,
           selected_text: bookContext?.selected_text || undefined,
-          book_id: bookContext?.book_id || undefined,
-          page: bookContext?.page || undefined
+          book_id: bookContext?.book_id || bookContext?.book?._id || bookContext?.book?.id || undefined,
+          page: bookContext?.page || bookContext?.currentPage || undefined
         }),
       });
 
@@ -3079,10 +3123,10 @@ User Question: ${queryText}`;
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
             <FiShield style={{ color: "var(--primary)" }} />
-            <span>ID: <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem" }}>{user.uid.substring(0, 8)}...</code></span>
+            <span>ID: <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem" }}>{(user?.uid || demoIdentity?.uid || "sandbox").substring(0, 8)}...</code></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span>{ct("email_label")} <strong style={{ color: "var(--foreground)" }}>{user.email}</strong></span>
+            <span>{ct("email_label")} <strong style={{ color: "var(--foreground)" }}>{user?.email || demoIdentity?.email || (demoMode ? `Sandbox · Tier-${demoIdentity?.tier ?? 0}` : "")}</strong></span>
             {credits !== null && (
               <span style={{
                 background: credits > 20 ? "rgba(46, 125, 50, 0.15)" : "rgba(198, 40, 40, 0.15)",

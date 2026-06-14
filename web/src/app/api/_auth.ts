@@ -139,7 +139,19 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
     if (payload.exp && now > payload.exp) {
       return null; // Expired
     }
-    
+
+    // Demo sandbox sessions must strictly be Tier-0 (anonymous/typed) or Tier-1 (verified judge domain).
+    // Any other tier is invalid and is rejected to keep the sandbox scoped and fail-closed.
+    const declaredTier = payload.tier !== undefined ? Number(payload.tier) : 0;
+    if (declaredTier !== 0 && declaredTier !== 1) {
+      return null;
+    }
+
+    // Demo tokens are sandbox-only: never allow one to resolve to the production database.
+    if (payload.db_target && payload.db_target !== "fahem_sandbox") {
+      return null;
+    }
+
     // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
     const config = await getDBConfig();
     if (config && config.evalSandboxEnabled === false) {
