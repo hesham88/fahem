@@ -1000,26 +1000,32 @@ async def create_practice_tool(
 
 async def create_zatona_tool(
     concept: str,
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    book_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Generates an instant, highly focused 'Zatona' summary core for a given academic concept.
-    
+
     Args:
         concept: The key concept or topic to summarize (e.g. 'Photosynthesis', 'Linear Equations').
         language: Optional language preference ('en', 'ar').
+        book_id: Optional reference book entity ID to scope the summary to (resolve "this book"/"from
+            this book" to the active selected book's database _id).
     """
-    logger.info(f"[TOOL] create_zatona_tool concept='{concept}' language='{language}'")
-    
+    logger.info(f"[TOOL] create_zatona_tool concept='{concept}' language='{language}' book_id='{book_id}'")
+
     if not concept:
         return {
             "status": "error",
             "message": "Concept is required.",
             "instruction_to_model": "The concept specification is missing. Please ask the user ONE clear clarifying question to specify the concept they want to summarize."
         }
-        
+
     target_dict = {
         "concept": concept
     }
+    if book_id:
+        target_dict["bookId"] = book_id
+        target_dict["scopeType"] = "book"
     
     intent_json = json.dumps({
         "type": "write",

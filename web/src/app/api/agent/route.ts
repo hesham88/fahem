@@ -359,6 +359,7 @@ export async function POST(req: NextRequest) {
           let finalResponseText = "";
           let hasStartedFinalOutput = false;
           let currentActiveAgent = "";
+          let capturedIntent: any = null;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -417,6 +418,16 @@ export async function POST(req: NextRequest) {
                           hasStartedFinalOutput = false;
                         }
                         controller.enqueue(encoder.encode(`[Fahem Agent] [SYSTEM LOG] Running tool: ${call.name}...\n`));
+                      }
+                      // Deterministically capture a create/navigate intent from the tool RESULT so the
+                      // frontend action fires even if the model forgets to echo the [INTENT] token.
+                      if (part.functionResponse || part.function_response) {
+                        const fr = part.functionResponse || part.function_response;
+                        const resp = (fr && fr.response) || {};
+                        if (resp && resp.action && resp.target &&
+                            (resp.type === "write" || resp.action === "navigate" || String(resp.action).startsWith("create_"))) {
+                          capturedIntent = { type: resp.type || "write", action: resp.action, target: resp.target };
+                        }
                       }
                     }
                   }
@@ -501,6 +512,16 @@ export async function POST(req: NextRequest) {
                 }
               }
             } catch (e) {}
+          }
+
+          // Deterministic intent injection: if a create/navigate tool returned an intent but the
+          // model did not echo the [INTENT] token, append it now so the action still fires reliably.
+          if (capturedIntent && !finalResponseText.includes("[INTENT:")) {
+            if (!hasStartedFinalOutput) {
+              controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+              hasStartedFinalOutput = true;
+            }
+            controller.enqueue(encoder.encode(` [INTENT: ${JSON.stringify(capturedIntent)}]`));
           }
 
           // Close markers
