@@ -1673,6 +1673,95 @@ def register_telemetry_route(app: fastapi.FastAPI):
             for ps in active_practice_sessions_data:
                 db["active_practice_sessions"].replace_one({"_id": ps["_id"]}, ps, upsert=True)
 
+            # --- 11b. SEED RICH USER HISTORY (activities, zatona, reading, telemetry, audit, demos, notifications) ---
+            import datetime as _dt
+            _now = _dt.datetime.utcnow()
+            def _iso(days_ago, hour=10):
+                return (_now - _dt.timedelta(days=days_ago)).replace(hour=hour % 24, minute=0, second=0, microsecond=0).isoformat() + "Z"
+
+            _student_uid = "test_user_id_gemini_2026"
+            _student_email = "ziad.student@fahem.pro"
+            _admin_uid = "fDtKpvuKYuSgB3km8DRTRgOU3RH3"
+
+            # Varied practice history → drives Insights, XP, heatmap, practice history & Activity Trail
+            _practice_topics = [
+                ("Mathematics", "Matrices", True), ("Mathematics", "Determinants", True),
+                ("Mathematics", "Cramer's Rule", False), ("Mathematics", "Matrices", True),
+                ("Mathematics", "Determinants", False), ("Science", "Photosynthesis", True),
+                ("Science", "Cell Structure", True), ("Science", "Thermodynamics", False),
+                ("Science", "Photosynthesis", True), ("Computer Science", "Boolean Operations", True),
+                ("Computer Science", "Loops", True), ("Computer Science", "Functions", False),
+                ("Computer Science", "Data Structures", True), ("Computer Science", "Boolean Operations", True),
+            ]
+            user_activities_data = []
+            for _i, (_subj, _sub, _correct) in enumerate(_practice_topics):
+                _details = {
+                    "question": f"Practice question on {_sub}",
+                    "subject": _subj, "subtopic": _sub,
+                    "isCorrect": _correct, "xpGained": 12 if _correct else 0, "mode": "mcq",
+                }
+                _ts = _iso(_i % 9, 9 + (_i % 9))
+                _st = "correct" if _correct else "incorrect"
+                user_activities_data.append({"_id": f"act_prac_{_i}", "userId": _student_uid, "userEmail": _student_email,
+                    "action": "practice_session", "status": _st, "timestamp": _ts, "details": _details})
+                user_activities_data.append({"_id": f"act_attempt_{_i}", "userId": _student_uid, "userEmail": _student_email,
+                    "action": "practice_attempt", "status": _st, "timestamp": _ts, "details": _details})
+            for _i, (_topic, _topic_ar) in enumerate([
+                ("Photosynthesis", "التمثيل الضوئي"), ("Matrices & Determinants", "المصفوفات والمحددات"),
+                ("Boolean Operations", "العمليات المنطقية")]):
+                user_activities_data.append({"_id": f"act_zatona_{_i}", "userId": _student_uid, "userEmail": _student_email,
+                    "action": "zatona_session", "status": "completed", "timestamp": _iso(_i + 1, 14),
+                    "details": {"prompt": _topic, "prompt_ar": _topic_ar, "summary": f"High-yield digest of {_topic}."}})
+            for _a in user_activities_data:
+                db["user_activities"].replace_one({"_id": _a["_id"]}, _a, upsert=True)
+
+            # Reading sessions (keyed by uid)
+            reading_sessions_data = [
+                {"_id": "rs_seed_1", "uid": _student_uid, "userEmail": _student_email, "book_id": "book_moe_alg_g10_t1_core", "bookTitle": "Algebra G10", "pagesRead": 14, "durationSeconds": 1620, "lastPage": 14, "timestamp": _iso(1, 16)},
+                {"_id": "rs_seed_2", "uid": _student_uid, "userEmail": _student_email, "book_id": "book_openstax_calc_core", "bookTitle": "Calculus Volume 1", "pagesRead": 9, "durationSeconds": 1100, "lastPage": 9, "timestamp": _iso(3, 18)},
+                {"_id": "rs_seed_3", "uid": _student_uid, "userEmail": _student_email, "book_id": "book_moe_alg_g10_t1_core", "bookTitle": "Algebra G10", "pagesRead": 6, "durationSeconds": 720, "lastPage": 20, "timestamp": _iso(5, 9)},
+            ]
+            for _rs in reading_sessions_data:
+                db["reading_sessions"].replace_one({"_id": _rs["_id"]}, _rs, upsert=True)
+
+            # Token telemetry → Daily Token Budget shows real numbers in the sandbox
+            token_telemetry_data = []
+            for _i in range(10):
+                token_telemetry_data.append({"_id": f"tok_seed_{_i}", "userId": _student_uid, "userEmail": _student_email,
+                    "promptTokens": 700 + _i * 30, "completionTokens": 350 + _i * 15, "totalTokens": 1050 + _i * 45,
+                    "model": "gemini-3.1-flash-lite", "type": "chat", "timestamp": _iso(_i % 4, 8 + _i % 10)})
+            for _t in token_telemetry_data:
+                db["token_telemetry"].replace_one({"_id": _t["_id"]}, _t, upsert=True)
+
+            # Audit logs → admin Activity Trail
+            audit_logs_data = [
+                {"_id": "aud_seed_1", "category": "AUTH", "agent": "Auth Service", "message": "Student Ziad signed in", "details": "role=student", "timestamp": _iso(0, 8)},
+                {"_id": "aud_seed_2", "category": "INGESTION", "agent": "Ingestion Pipeline", "message": "Book embedding completed", "details": "book_openstax_calc_core • 9 pages", "timestamp": _iso(1, 11)},
+                {"_id": "aud_seed_3", "category": "CRAWLER", "agent": "Crawler", "message": "Crawl job finished", "details": "openstax.org • 12 PDFs found", "timestamp": _iso(2, 13)},
+                {"_id": "aud_seed_4", "category": "AUDIO_TTS", "agent": "Audio Service", "message": "Page read aloud", "details": "voice=Aoede", "timestamp": _iso(1, 15)},
+                {"_id": "aud_seed_5", "category": "PRACTICE", "agent": "Quiz Agent", "message": "Practice quiz graded", "details": "Boolean Operations • correct", "timestamp": _iso(0, 17)},
+            ]
+            for _al in audit_logs_data:
+                db["audit_logs"].replace_one({"_id": _al["_id"]}, _al, upsert=True)
+
+            # Demo sessions → admin demo monitor
+            demo_sessions_data = []
+            for _i in range(4):
+                demo_sessions_data.append({"_id": f"demo_seed_{_i}", "sandbox_session_id": f"sbx_demo_{_i}",
+                    "email": f"guest{_i}@demo.fahem.pro", "role": "student" if _i % 2 == 0 else "teacher",
+                    "tier": 0, "status": "active" if _i < 2 else "ended",
+                    "createdAt": int((_now - _dt.timedelta(hours=_i)).timestamp() * 1000)})
+            for _ds in demo_sessions_data:
+                db["demo_sessions"].replace_one({"_id": _ds["_id"]}, _ds, upsert=True)
+
+            # Notifications → admin bell
+            notifications_data = [
+                {"_id": "ntf_seed_1", "recipient_uid": _admin_uid, "type": "admin_signup", "title": "New student signed up", "title_ar": "تسجيل طالب جديد", "body": "Ziad Al-Ghazali (student) joined.", "body_ar": "انضم زياد الغزالي (طالب).", "payload": {}, "read": False, "createdAt": int((_now - _dt.timedelta(hours=2)).timestamp() * 1000)},
+                {"_id": "ntf_seed_2", "recipient_uid": _admin_uid, "type": "admin_ingestion", "title": "Ingestion completed", "title_ar": "اكتمل الاستيعاب", "body": "Calculus Volume 1 finished embedding.", "body_ar": "اكتمل استيعاب كتاب التفاضل.", "payload": {}, "read": False, "createdAt": int((_now - _dt.timedelta(hours=5)).timestamp() * 1000)},
+            ]
+            for _n in notifications_data:
+                db["notifications"].replace_one({"_id": _n["_id"]}, _n, upsert=True)
+
             # --- 12. CREATE TUNED COMPOUND AND SINGLE INDEXES ---
             db["subjects"].create_index([("curriculum_id", 1), ("slug", 1)], unique=True)
             db["books"].create_index([("subject_id", 1)])
@@ -1697,7 +1786,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "assignment_submissions": len(assignment_submissions_data),
                     "companion_facts": len(companion_facts_data),
                     "question_bank": len(questions_data),
-                    "active_practice_sessions": len(active_practice_sessions_data)
+                    "active_practice_sessions": len(active_practice_sessions_data),
+                    "user_activities": len(user_activities_data),
+                    "reading_sessions": len(reading_sessions_data),
+                    "token_telemetry": len(token_telemetry_data),
+                    "audit_logs": len(audit_logs_data),
+                    "demo_sessions": len(demo_sessions_data),
+                    "notifications": len(notifications_data)
                 }
             }
         except Exception as err:
