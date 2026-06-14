@@ -11,6 +11,7 @@ import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
 import CurriculumIngestionStudio from "../../../components/CurriculumIngestionStudio";
 import HelpManual from "../../../components/HelpManual";
+import { registerPushNotifications } from "../../../lib/registerPush";
 import { NotificationBell } from "../../../components/NotificationBell";
 import { UserAccountsPanel } from "../../../components/dashboard/UserAccountsPanel";
 import { LibraryPanel } from "../../../components/dashboard/LibraryPanel";
@@ -807,6 +808,13 @@ export default function Home() {
       setIsDemoSandbox(localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token"));
     }
   }, []);
+
+  // Register browser push once the user is signed in (graceful no-op until VAPID keys are set).
+  useEffect(() => {
+    if (user) {
+      registerPushNotifications(authedFetch);
+    }
+  }, [user]);
   const [translationLanguage, setTranslationLanguage] = useState<string>("Original");
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);

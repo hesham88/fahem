@@ -46,10 +46,46 @@ def notify_admins_of(db, ntf_type: str, title: str, title_ar: str, body: str, bo
                 "createdAt": ts
             })
             count += 1
+            send_web_push(db, uid, title, body, (payload or {}).get("deep_link"))
         return count
     except Exception as err:
         logger.warning(f"[notify_admins_of] Failed to fan out '{ntf_type}': {err}")
         return 0
+
+
+def send_web_push(db, recipient_uid: str, title: str, body: str, url: str = None):
+    """Best-effort browser (Web-Push/VAPID) delivery to a user's stored subscriptions.
+
+    Activates only once VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are configured; otherwise it
+    is a graceful no-op (in-app notifications still work). Expired subscriptions are pruned.
+    """
+    try:
+        private_key = os.environ.get("VAPID_PRIVATE_KEY")
+        public_key = os.environ.get("VAPID_PUBLIC_KEY")
+        if not private_key or not public_key or not recipient_uid:
+            return
+        try:
+            from pywebpush import webpush, WebPushException
+        except Exception:
+            return
+        subject = os.environ.get("VAPID_SUBJECT", "mailto:contact@fahem.pro")
+        import json as _json
+        payload = _json.dumps({"title": title, "body": body, "url": url or "/"})
+        for sub in db["push_subscriptions"].find({"userId": recipient_uid}):
+            info = sub.get("subscription")
+            if not info:
+                continue
+            try:
+                webpush(subscription_info=info, data=payload,
+                        vapid_private_key=private_key, vapid_claims={"sub": subject})
+            except WebPushException as wpe:
+                status = getattr(getattr(wpe, "response", None), "status_code", None)
+                if status in (404, 410):
+                    db["push_subscriptions"].delete_one({"_id": sub.get("_id")})
+            except Exception:
+                pass
+    except Exception as err:
+        logger.warning(f"[send_web_push] Failed for {recipient_uid}: {err}")
 
 
 # Helper to register route on a FastAPI app
@@ -5452,6 +5488,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         "read": False,
                         "createdAt": _ts
                     })
+                    send_web_push(_db, recipient_id, f"New message from {sender_name or 'someone'}", _snip, "?tab=social")
                     _c.close()
                 except Exception as _e:
                     logger.warning(f"Failed to notify recipient of private message: {_e}")
@@ -5710,7 +5747,39 @@ def register_telemetry_route(app: fastapi.FastAPI):
             "createdAt": int(time.time() * 1000)
         }
         db["notifications"].insert_one(notification)
+        send_web_push(db, recipient_uid, title, body, (payload or {}).get("deep_link"))
         return notification
+
+    @app.get("/user/push-public-key")
+    async def get_push_public_key():
+        return {"success": True, "publicKey": os.environ.get("VAPID_PUBLIC_KEY", "")}
+
+    @app.post("/user/push-subscribe")
+    async def post_push_subscribe(request: fastapi.Request):
+        try:
+            principal = getattr(request.state, "principal", None)
+            uid = principal.get("uid") if principal else None
+            if not uid:
+                return fastapi.responses.JSONResponse(status_code=401, content={"success": False, "error": "Unauthorized"})
+            body = await request.json()
+            subscription = body.get("subscription")
+            if not subscription or not subscription.get("endpoint"):
+                return fastapi.responses.JSONResponse(status_code=400, content={"success": False, "error": "Missing subscription"})
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import hashlib
+            import time
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+            sub_id = "push_" + hashlib.sha256(subscription["endpoint"].encode()).hexdigest()[:24]
+            db["push_subscriptions"].replace_one({"_id": sub_id}, {
+                "_id": sub_id, "userId": uid, "subscription": subscription, "createdAt": int(time.time() * 1000)
+            }, upsert=True)
+            client.close()
+            return {"success": True}
+        except Exception as err:
+            logger.error(f"[services.py] push-subscribe failed: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
 
     @app.get("/notifications")
     async def get_notifications_endpoint(request: fastapi.Request, unreadOnly: str = "false"):
