@@ -58,16 +58,24 @@ export async function GET(req: NextRequest) {
       used = { daily: 12000, weekly: 45000, monthly: 110000, total: 110000 };
     } else {
       try {
-        const proxyRes = await proxyRequest(`/user/token-stats?userId=${encodeURIComponent(userId)}`, "GET", undefined, ctx);
+        const emailQs = ctx.email ? `&userEmail=${encodeURIComponent(ctx.email)}` : "";
+        const proxyRes = await proxyRequest(`/user/token-stats?userId=${encodeURIComponent(userId)}${emailQs}`, "GET", undefined, ctx);
         if (proxyRes.ok) {
           const data = await proxyRes.json();
           if (data && data.stats) {
             const stats = data.stats;
+            // The backend may return each bucket either as a plain number or as an
+            // object { total: n }. Normalise both shapes so the widget never reads 0.
+            const num = (v: any): number => {
+              if (v === null || v === undefined) return 0;
+              if (typeof v === "object") return Number(v.total) || 0;
+              return Number(v) || 0;
+            };
             used = {
-              daily: stats.daily?.total || 0,
-              weekly: stats.weekly?.total || 0,
-              monthly: stats.monthly?.total || 0,
-              total: stats.total?.total || 0
+              daily: num(stats.daily),
+              weekly: num(stats.weekly),
+              monthly: num(stats.monthly),
+              total: num(stats.total)
             };
           }
         }

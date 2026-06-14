@@ -2290,13 +2290,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"status": "error", "error": str(err)}
 
     @app.get("/user/token-stats")
-    async def get_token_stats(userId: str):
+    async def get_token_stats(userId: str, userEmail: str = None):
         try:
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             from agent_communications import get_user_token_stats
-            stats = await get_user_token_stats(userId)
+            stats = await get_user_token_stats(userId, userEmail)
             return {"stats": stats}
         except Exception as err:
             logger.error(f"[services.py] Failed to get user token stats: {err}", exc_info=True)
@@ -2655,10 +2655,6 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 "search_results": {}
             }
             
-            target_id_str = "1781369827787"
-            target_book_id = f"book_introduction_to_computer_science_{target_id_str}"
-            target_job_id = f"job_book_introduction_to_computer_science_{target_id_str}"
-            
             for db_name in dbs:
                 if db_name in ["admin", "local", "config"]:
                     continue
@@ -2666,44 +2662,53 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 db_results = {}
                 db = client[db_name]
                 colls = db.list_collection_names()
+                db_results["collections"] = colls
                 
-                # Search collections containing target ID
-                matching_colls = [c for c in colls if target_id_str in c]
-                if matching_colls:
-                    db_results["matching_collections"] = {}
-                    for mc in matching_colls:
-                        db_results["matching_collections"][mc] = {
-                            "count": db[mc].count_documents({}),
-                            "sample_keys": list(db[mc].find_one({}).keys()) if db[mc].find_one({}) else []
-                        }
-                        
-                # Search in books collection
+                # 1. Get all books in books collection
                 if "books" in colls:
-                    book_doc = db["books"].find_one({"$or": [{"_id": target_book_id}, {"id": target_book_id}, {"book_id": target_book_id}]})
-                    if book_doc:
-                        # exclude large fields
-                        db_results["book_found"] = {k: v for k, v in book_doc.items() if k not in ["cover_image", "pages", "chunks"]}
-                    else:
-                        # search by title regex
-                        any_cs = db["books"].find_one({"title": {"$regex": "Computer Science", "$options": "i"}})
-                        if any_cs:
-                            db_results["similar_cs_book"] = {k: v for k, v in any_cs.items() if k not in ["cover_image", "pages", "chunks"]}
-                            
-                # Search pages count in book_pages collection
+                    all_books = list(db["books"].find({}, {"cover_image": 0, "pages": 0, "chunks": 0}))
+                    db_results["all_books"] = []
+                    for b in all_books:
+                        db_results["all_books"].append({
+                            "_id": str(b.get("_id")),
+                            "title": b.get("title") or b.get("titleEn") or b.get("titleAr"),
+                            "language": b.get("language"),
+                            "subject_id": str(b.get("subject_id")) if b.get("subject_id") else None,
+                            "role": b.get("role")
+                        })
+                
+                # 2. Get distinct book_ids in book_pages collection with counts
                 if "book_pages" in colls:
-                    cnt_normal = db["book_pages"].count_documents({"book_id": target_book_id})
-                    cnt_job = db["book_pages"].count_documents({"book_id": target_job_id})
-                    db_results["book_pages_count"] = {
-                        "normal_book_id": cnt_normal,
-                        "job_book_id": cnt_job
-                    }
-                    if cnt_normal > 0 or cnt_job > 0:
-                        sample_pg = db["book_pages"].find_one({"$or": [{"book_id": target_book_id}, {"book_id": target_job_id}]})
-                        if sample_pg:
-                            db_results["book_pages_sample_keys"] = list(sample_pg.keys())
-                            db_results["book_pages_sample_book_id_field"] = sample_pg.get("book_id") or sample_pg.get("bookId")
-                            db_results["book_pages_sample_page_number"] = sample_pg.get("page_number") or sample_pg.get("pageNum")
-                            
+                    pipeline = [
+                        {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}
+                    ]
+                    distinct_pages = list(db["book_pages"].aggregate(pipeline))
+                    db_results["book_pages_distinct_book_ids"] = [
+                        {"book_id": str(dp["_id"]), "count": dp["count"]} for dp in distinct_pages
+                    ]
+                    
+                    # Also try grouped by 'bookId' just in case
+                    pipeline2 = [
+                        {"$group": {"_id": "$bookId", "count": {"$sum": 1}}}
+                    ]
+                    distinct_pages2 = list(db["book_pages"].aggregate(pipeline2))
+                    db_results["book_pages_distinct_bookIds"] = [
+                        {"bookId": str(dp["_id"]), "count": dp["count"]} for dp in distinct_pages2 if dp["_id"] is not None
+                    ]
+                
+                # 3. Get all ingestion jobs
+                if "ingestion_jobs" in colls:
+                    all_jobs = list(db["ingestion_jobs"].find({}))
+                    db_results["all_jobs"] = []
+                    for j in all_jobs:
+                        db_results["all_jobs"].append({
+                            "_id": str(j.get("_id")),
+                            "book_id": j.get("book_id"),
+                            "status": j.get("status"),
+                            "current_stage": j.get("current_stage"),
+                            "progress": j.get("progress")
+                        })
+                
                 if db_results:
                     results["search_results"][db_name] = db_results
                     
@@ -2723,13 +2728,39 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             client = get_cached_mongodb_client()
             db = get_active_db(client)
-            
-            pages = list(db["book_pages"].find({"book_id": book_id}, {"embedding": 0, "page_image_base64": 0, "image": 0}).sort("page_number", 1))
+
+            projection = {"embedding": 0, "page_image_base64": 0, "image": 0}
+
+            def _query(field, bid):
+                return list(db["book_pages"].find({field: bid}, projection).sort("page_number", 1))
+
+            pages = _query("book_id", book_id)
+
+            # Same-DB id-variant fallback. The ingestion/job pipeline sometimes keys pages
+            # under a prefixed id (job_book_..., custom_...) or the legacy `bookId` field while
+            # the viewer requests the canonical id, leaving the page view stuck on "Retrieving
+            # book pages...". Try the common variants in the SAME database before giving up —
+            # we deliberately never read another DB here, to preserve sandbox/prod isolation.
+            if not pages:
+                variants = []
+                if book_id.startswith("job_"):
+                    variants.append(book_id[len("job_"):])
+                else:
+                    variants.append("job_" + book_id)
+                if book_id.startswith("custom_"):
+                    variants.append(book_id[len("custom_"):])
+                for v in variants:
+                    pages = _query("book_id", v)
+                    if pages:
+                        break
+                if not pages:
+                    pages = _query("bookId", book_id)
+
             # Convert ObjectId to string for JSON serialization
             for p in pages:
                 if "_id" in p:
                     p["_id"] = str(p["_id"])
-            return {"success": True, "pages": pages}
+            return {"success": True, "pages": pages, "active_db": db.name, "count": len(pages)}
         except Exception as err:
             logger.error(f"[services.py] Failed to get book pages: {err}", exc_info=True)
             return {"success": False, "pages": [], "error": str(err)}
@@ -6470,7 +6501,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         },
                         "createdAt": datetime.datetime.utcnow()
                     }
-                    db_local.user_token_usage.insert_one(usage_doc)
+                    usage_doc.setdefault("timestamp", datetime.datetime.utcnow().isoformat() + "Z")
+                    db_local.token_telemetry.insert_one(usage_doc)
                 except Exception as usage_err:
                     logger.warning(f"Failed to log backend translation token usage: {usage_err}")
             
@@ -6616,7 +6648,8 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             "page": int(page_number),
                             "feature": "audio"
                         }
-                    db_local.user_token_usage.insert_one(usage_doc)
+                    usage_doc.setdefault("timestamp", datetime.datetime.utcnow().isoformat() + "Z")
+                    db_local.token_telemetry.insert_one(usage_doc)
             except Exception as usage_err:
                 logger.warning(f"Failed to log backend TTS token usage: {usage_err}")
                 

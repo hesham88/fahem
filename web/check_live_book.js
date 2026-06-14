@@ -47,6 +47,15 @@ async function main() {
       console.log("Sample page sample data (first page):", JSON.stringify(dataJob.pages[0]).substring(0, 300) + "...");
     }
 
+    console.log(`\n--- Querying ingestion jobs from /user/books/jobs ---`);
+    const resJobs = await fetch(`${cloudRunUrl}/user/books/jobs`, {
+      method: "GET",
+      headers
+    });
+    console.log("Jobs Status:", resJobs.status);
+    const dataJobs = await resJobs.json();
+    console.log("Jobs Response:", JSON.stringify(dataJobs, null, 2));
+
     console.log(`\n--- Querying database statistics from /user/debug/db_stats ---`);
     const resStats = await fetch(`${cloudRunUrl}/user/debug/db_stats`, {
       method: "GET",

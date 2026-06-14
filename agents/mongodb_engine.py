@@ -1097,23 +1097,61 @@ class MongoDBEngine:
             logger.error(f"Failed to record token usage: {e}")
             return False
 
-    async def get_user_token_stats(self, user_id: str) -> Dict[str, Any]:
-        """Calculates precise consolidated telemetry statistics for a specific user ID."""
+    async def get_user_token_stats(self, user_id: str, user_email: str = None) -> Dict[str, Any]:
+        """Calculates precise consolidated telemetry statistics for a specific user.
+
+        Returns true rolling windows (daily/weekly/monthly) plus the all-time total.
+        Token documents are matched by userId OR userEmail so usage is never dropped
+        when one identifier differs between the writer and the reader, and timestamps
+        are read from either the ISO ``timestamp`` field or the datetime ``createdAt``
+        field so every historical write shape is counted.
+        """
         if self._db is None:
             return {"daily": 0, "weekly": 0, "monthly": 0, "total": 0}
         try:
-            pipeline = [
-                {"$match": {"userId": user_id}},
-                {"$group": {"_id": None, "total": {"$sum": "$totalTokens"}}}
-            ]
-            res = list(self._db["token_telemetry"].aggregate(pipeline))
-            total = res[0]["total"] if res else 0
-            return {
-                "daily": total,
-                "weekly": total,
-                "monthly": total,
-                "total": total
-            }
+            match_or = []
+            if user_id:
+                match_or.append({"userId": user_id})
+            if user_email:
+                match_or.append({"userEmail": user_email.strip().lower()})
+            if not match_or:
+                return {"daily": 0, "weekly": 0, "monthly": 0, "total": 0}
+
+            now = datetime.datetime.utcnow()
+            day_cutoff = now - datetime.timedelta(days=1)
+            week_cutoff = now - datetime.timedelta(days=7)
+            month_cutoff = now - datetime.timedelta(days=30)
+
+            def _ts(doc):
+                t = doc.get("timestamp") or doc.get("createdAt")
+                if t is None:
+                    return None
+                if isinstance(t, datetime.datetime):
+                    return t
+                try:
+                    return datetime.datetime.fromisoformat(str(t).replace("Z", ""))
+                except Exception:
+                    return None
+
+            daily = weekly = monthly = total = 0
+            cursor = self._db["token_telemetry"].find(
+                {"$or": match_or},
+                {"totalTokens": 1, "timestamp": 1, "createdAt": 1}
+            )
+            for doc in cursor:
+                tok = int(doc.get("totalTokens") or 0)
+                total += tok
+                ts = _ts(doc)
+                if ts is None:
+                    continue
+                if ts >= month_cutoff:
+                    monthly += tok
+                if ts >= week_cutoff:
+                    weekly += tok
+                if ts >= day_cutoff:
+                    daily += tok
+
+            return {"daily": daily, "weekly": weekly, "monthly": monthly, "total": total}
         except Exception as e:
             logger.error(f"Failed to aggregate token stats: {e}")
             return {"daily": 0, "weekly": 0, "monthly": 0, "total": 0}

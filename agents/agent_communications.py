@@ -749,19 +749,31 @@ async def log_token_usage(user_id: str, user_email: str, prompt_tokens: int, com
         logger.warning(f"Failed to log token usage: {err}")
         return False
 
-async def get_user_token_stats(user_id: str) -> dict:
-    """Calculates daily, weekly, monthly, and overall token usage stats for a user."""
+async def get_user_token_stats(user_id: str, user_email: str = None) -> dict:
+    """Calculates daily, weekly, monthly, and overall token usage stats for a user.
+
+    Usage documents are matched by userId OR userEmail so a token write is still counted
+    when the writer recorded a different identifier than the one the widget queries with
+    (a uid/email mismatch was leaving the Daily Token Budget stuck at 0).
+    """
     from datetime import datetime, timedelta
     try:
         now = datetime.utcnow()
         today_start = (now.replace(hour=0, minute=0, second=0, microsecond=0)).isoformat() + "Z"
         seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
         thirty_days_ago = (now - timedelta(days=30)).isoformat() + "Z"
-        
+
+        or_clauses = []
+        if user_id:
+            or_clauses.append({"userId": user_id})
+        if user_email:
+            or_clauses.append({"userEmail": str(user_email).strip().lower()})
+        token_filter = {"$or": or_clauses} if or_clauses else {"userId": user_id}
+
         logs = await _run_mcp_tool("find", {
             "database": "fahem",
             "collection": "token_telemetry",
-            "filter": {"userId": user_id}
+            "filter": token_filter
         })
         
         docs = []

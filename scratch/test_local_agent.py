@@ -14,7 +14,7 @@ payload = {
 
 headers = {
     "Content-Type": "application/json",
-    "X-Verified-Principal": json.dumps({
+    "X-Verified-Principal": json.dumps({  # guard:allow-principal (local manual test harness only)
         "uid": "test_user_onboarding",
         "email": "test_onboarding@gmail.com",
         "role": "student",

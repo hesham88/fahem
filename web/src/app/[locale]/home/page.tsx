@@ -1127,8 +1127,16 @@ export default function Home() {
       if (realPages.length > 0 || isStaticBook || (loadFinished && loadedBookPages.length === 0)) {
         const allPages = getAllPages(selectedBookReader, loadedBookPages);
         if (allPages.length > 0) {
-          const targetPage = Math.min(Math.max(1, pendingNavigatePage), allPages.length);
-          console.log(`[Navigation-Race-Fix] Pages loaded/settled. Navigating to page: ${targetPage} (clamped from ${pendingNavigatePage})`);
+          // A cited [pN] refers to the page LABELLED N (its real page_number). Navigate by
+          // matching page_number first so a cover / front-matter offset no longer makes
+          // [p100] land on p99; fall back to the clamped positional index when there is no
+          // exact match (contiguous books are unaffected).
+          let targetPage = Math.min(Math.max(1, pendingNavigatePage), allPages.length);
+          const matchIdx = allPages.findIndex((p: any) => Number(p.page_number ?? p.pageNum) === Number(pendingNavigatePage));
+          if (matchIdx >= 0) {
+            targetPage = matchIdx + 1;
+          }
+          console.log(`[Navigation-Race-Fix] Pages settled. Cited page ${pendingNavigatePage} -> reader index ${targetPage}`);
           setReaderCurrentPage(targetPage);
           setPendingNavigatePage(null);
         }

@@ -318,6 +318,130 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         except Exception:
             pass
             
+    # Capture the user's real language BEFORE any bilingual context is appended, so the
+    # companion is pinned to the language the user actually wrote in. This fixes the
+    # English -> Arabic mid-conversation drift the user reported.
+    user_lang_directive = ""
+    try:
+        original_user_text = prompt_text or ""
+        arabic_chars = sum(1 for ch in original_user_text if "؀" <= ch <= "ۿ")
+        letter_chars = sum(1 for ch in original_user_text if ch.isalpha())
+        if letter_chars > 0 and (arabic_chars / letter_chars) > 0.30:
+            user_lang_directive = "\n\n[LANGUAGE DIRECTIVE: The user is writing in Arabic. Write your ENTIRE reply in Arabic. Do not switch to English.]"
+        elif letter_chars > 0:
+            user_lang_directive = "\n\n[LANGUAGE DIRECTIVE: The user is writing in English. Write your ENTIRE reply in English. Do not switch to Arabic unless the user explicitly asks you to.]"
+    except Exception:
+        user_lang_directive = ""
+
+    # Inject active book context from principal thread context if available
+    try:
+        from guardrails import verified_principal_ctx
+        principal = verified_principal_ctx.get() or {}
+        book_id = principal.get("book_id")
+        page = principal.get("page")
+        
+        if book_id:
+            book_title = None
+            book_title_ar = None
+            subject_id = None
+            subject_name = None
+            subject_name_ar = None
+            
+            # Connect to Mongo and query
+            try:
+                from pymongo import MongoClient
+                try:
+                    from tools import get_mongodb_uri
+                except ImportError:
+                    from agents.tools import get_mongodb_uri
+                uri = get_mongodb_uri()
+                if uri:
+                    client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+                    try:
+                        try:
+                            from agent import get_active_db
+                        except ImportError:
+                            from agents.agent import get_active_db
+                        mdb = get_active_db(client)
+                    except Exception:
+                        mdb = client["fahem"]
+                    book = mdb["books"].find_one({"_id": book_id})
+                    if book:
+                        book_title = book.get("title")
+                        book_title_ar = book.get("title_ar")
+                        subject_id = book.get("subject_id")
+                        if subject_id:
+                            subject = mdb["subjects"].find_one({"_id": subject_id})
+                            if subject:
+                                subject_name = subject.get("name")
+                                subject_name_ar = subject.get("name_ar")
+                    client.close()
+            except Exception as e:
+                logger.warning(f"Error querying active book from MongoDB inside before_agent_callback: {e}")
+                
+            # Try local fallback if not found in MongoDB
+            if not book_title:
+                try:
+                    try:
+                        from agent import load_local_db
+                    except ImportError:
+                        from agents.agent import load_local_db
+                    db = load_local_db()
+                    for b in db.get("books", []):
+                        if b.get("_id") == book_id:
+                            book_title = b.get("title")
+                            book_title_ar = b.get("title_ar")
+                            sub_id = b.get("subject_id")
+                            for s in db.get("subjects", []):
+                                if s.get("_id") == sub_id:
+                                    subject_name = s.get("name")
+                                    subject_name_ar = s.get("name_ar")
+                            break
+                except Exception as e:
+                    logger.warning(f"Error querying active book from local_db inside before_agent_callback: {e}")
+                    
+            # Build the context using ONLY the real resolved values. NEVER fabricate a
+            # title/subject when the lookup fails — a wrong guess silently cross-wires the
+            # user to the wrong book (e.g. defaulting to "Introduction to Python Programming"),
+            # which is precisely the defect this context injection exists to prevent.
+            title_en = book_title or book_id
+            title_ar = book_title_ar or book_title or book_id
+            subj_en = f" The associated subject is '{subject_name}'." if subject_name else ""
+            subj_ar_name = subject_name_ar or subject_name
+            subj_ar = f" المادة الدراسية المرتبطة هي '{subj_ar_name}'." if subj_ar_name else ""
+
+            # Construct explicit system context instructions
+            en_context = f"[SYSTEM CONTEXT: The user is currently reading the book '{title_en}' (ID: '{book_id}') on Page {page or 1}.{subj_en} Use this as your active context. If they ask about 'this book', 'from this book', 'the book', or similar, they are explicitly referring to this book. You MUST resolve any creation parameters (book_id and subject) accordingly using ID: '{book_id}' — never substitute a different book.]"
+            ar_context = f"[سياق النظام: يقرأ المستخدم حاليًا كتاب '{title_ar}' (المعرف: '{book_id}') في الصفحة {page or 1}.{subj_ar} استخدم هذا كسياق نشط لك. إذا سألوا عن 'هذا الكتاب' أو 'من هذا الكتاب' أو ما شابه، فهم يشيرون صراحةً إلى هذا الكتاب. يجب عليك حل أي معلمات إنشاء وفقًا لذلك باستخدام المعرف: '{book_id}'، ولا تستبدله بكتاب آخر مطلقًا.]"
+
+            context_injection = f"\n\n{en_context}\n{ar_context}"
+            prompt_text += context_injection
+            
+            # Save back to context
+            if hasattr(context, "user_content"):
+                if isinstance(context.user_content, str):
+                    context.user_content = prompt_text
+                elif hasattr(context.user_content, "parts") and context.user_content.parts:
+                    for p in context.user_content.parts:
+                        if hasattr(p, "text") and p.text:
+                            p.text = prompt_text
+    except Exception as e:
+        logger.warning(f"Failed to inject active book/page context: {e}")
+
+    # Apply the language directive captured above (always, independent of book context)
+    if user_lang_directive:
+        try:
+            prompt_text += user_lang_directive
+            if hasattr(context, "user_content"):
+                if isinstance(context.user_content, str):
+                    context.user_content = prompt_text
+                elif hasattr(context.user_content, "parts") and context.user_content.parts:
+                    for p in context.user_content.parts:
+                        if hasattr(p, "text") and p.text:
+                            p.text = prompt_text
+        except Exception as le:
+            logger.warning(f"Failed to inject language directive: {le}")
+
     agent_name = getattr(context, "agent_name", "UnknownAgent")
     user_id = getattr(context, "user_id", "UnknownUser")
     

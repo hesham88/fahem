@@ -189,7 +189,7 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     book_ids = [scope["book_id"]]
             
             if not book_ids:
-                if selected_book_ids is not None:
+                if selected_book_ids:
                     book_ids = selected_book_ids
             
             if not book_ids:
@@ -276,7 +276,7 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
                     book_ids = scoped_books
 
         # Fallback to verified_principal_ctx for local search if not specified
-        if book_ids is None:
+        if not book_ids:
             from guardrails import verified_principal_ctx
             principal = verified_principal_ctx.get()
             if principal and isinstance(principal, dict):
@@ -297,7 +297,7 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
             except Exception:
                 pass
 
-        if book_ids is not None:
+        if book_ids:
             pages = [p for p in pages if p.get("book_id") in book_ids]
 
         query_words = [w.lower() for w in query.split() if len(w) > 1]
@@ -378,7 +378,7 @@ async def library_tool(action: str, query: Optional[str] = None) -> Dict[str, An
                 if not is_public and not is_owner:
                     return False
                 # 2. Selected book IDs check
-                if selected_book_ids is not None:
+                if selected_book_ids:
                     b_id = str(book.get("_id"))
                     if b_id not in selected_book_ids:
                         return False
