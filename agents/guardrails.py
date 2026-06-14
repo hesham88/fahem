@@ -227,34 +227,51 @@ def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
             
         weekly_limit = token_policy.get("weeklyLimit", weekly_allocation_limit)
         monthly_limit = token_policy.get("monthlyLimit", monthly_allocation_limit)
-        
-        # 3. Compute consumed tokens from token_telemetry
+        # Daily defaults to ~1/7 of the weekly allocation; lifetime is off (0) unless configured.
+        daily_limit = token_policy.get("dailyLimit", config_doc.get("dailyAllocationLimit", max(1, int(weekly_limit) // 7)))
+        lifetime_limit = token_policy.get("lifetimeLimit", config_doc.get("lifetimeAllocationLimit", 0))
+
+        # 3. Compute consumed tokens from token_telemetry across daily/weekly/monthly/lifetime windows.
         now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat() + "Z"
         seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
         thirty_days_ago = (now - timedelta(days=30)).isoformat() + "Z"
-        
-        # Fetch token telemetry documents for this user
+
         telemetry_cursor = db["token_telemetry"].find({"userId": uid})
-        
+
+        daily_used = 0
         weekly_used = 0
         monthly_used = 0
-        
+        lifetime_used = 0
+
         for doc in telemetry_cursor:
             tt = int(doc.get("totalTokens", 0))
+            lifetime_used += tt
             ts = doc.get("timestamp") or doc.get("createdAt") or ""
+            # Normalise datetime objects to an ISO string so comparisons never raise
+            # (a raw datetime vs string compare previously threw and fail-closed-blocked users).
+            if isinstance(ts, datetime):
+                ts = ts.isoformat() + "Z"
+            ts = str(ts)
             if ts:
+                if ts >= today_start:
+                    daily_used += tt
                 if ts >= seven_days_ago:
                     weekly_used += tt
                 if ts >= thirty_days_ago:
                     monthly_used += tt
-                    
+
         client.close()
-        
-        if weekly_used >= weekly_limit:
+
+        if daily_limit and daily_used >= daily_limit:
+            return True, f"daily token allocation reached: used {daily_used}/{daily_limit} tokens."
+        if weekly_limit and weekly_used >= weekly_limit:
             return True, f"weekly token allocation reached: used {weekly_used}/{weekly_limit} tokens."
-        if monthly_used >= monthly_limit:
+        if monthly_limit and monthly_used >= monthly_limit:
             return True, f"monthly token allocation reached: used {monthly_used}/{monthly_limit} tokens."
-            
+        if lifetime_limit and lifetime_used >= lifetime_limit:
+            return True, f"lifetime token allocation reached: used {lifetime_used}/{lifetime_limit} tokens."
+
         return False, ""
         
     except Exception as err:
