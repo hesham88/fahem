@@ -391,7 +391,8 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                         {language === "ar" ? "لا توجد فصول دراسية مدخلة بعد" : "No chapters available yet"}
                       </div>
                     ) : (
-                      chapters.map((ch: any, cIdx: number) => {
+                      <div style={{ maxHeight: "55vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.6rem", paddingInlineEnd: "4px" }}>
+                      {chapters.map((ch: any, cIdx: number) => {
                         const chapterKey = `${book._id || bIdx}-${cIdx}`;
                         const isExpanded = expandedModule === chapterKey;
                         const chapterTitle = language === "ar" 
@@ -538,7 +539,8 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                             )}
                           </div>
                         );
-                      })
+                      })}
+                      </div>
                     )}
                   </div>
                 );
