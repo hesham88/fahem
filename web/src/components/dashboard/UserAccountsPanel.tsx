@@ -70,6 +70,7 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [policySuccess, setPolicySuccess] = useState<string | null>(null);
   const [overrideEnabled, setOverrideEnabled] = useState<boolean>(false);
+  const [overrideDailyLimit, setOverrideDailyLimit] = useState<number>(35714);
   const [overrideWeeklyLimit, setOverrideWeeklyLimit] = useState<number>(250000);
   const [overrideMonthlyLimit, setOverrideMonthlyLimit] = useState<number>(1000000);
   const [overrideReason, setOverrideReason] = useState<string>("");
@@ -105,11 +106,13 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
           setUsedLimits(data.used || { daily: 0, weekly: 0, monthly: 0, total: 0 });
           if (data.tokenPolicy) {
             setOverrideEnabled(!!data.tokenPolicy.enabled);
+            setOverrideDailyLimit(data.tokenPolicy.dailyLimit || 35714);
             setOverrideWeeklyLimit(data.tokenPolicy.weeklyLimit || 250000);
             setOverrideMonthlyLimit(data.tokenPolicy.monthlyLimit || 1000000);
             setOverrideReason(data.tokenPolicy.reason || "");
           } else {
             setOverrideEnabled(false);
+            setOverrideDailyLimit(35714);
             setOverrideWeeklyLimit(250000);
             setOverrideMonthlyLimit(1000000);
             setOverrideReason("");
@@ -138,6 +141,7 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
         : {
             userId: selectedUserForPolicy.userId,
             enabled: overrideEnabled,
+            dailyLimit: overrideDailyLimit,
             weeklyLimit: overrideWeeklyLimit,
             monthlyLimit: overrideMonthlyLimit,
             reason: overrideReason || "Admin custom override"
@@ -858,6 +862,23 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                   </div>
 
                   <div style={{ opacity: overrideEnabled ? 1 : 0.5, transition: "opacity 0.2s ease", pointerEvents: overrideEnabled ? "auto" : "none" }}>
+                    {/* Daily Slider */}
+                    <div style={{ marginBottom: "1.25rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>
+                        <span style={{ fontWeight: 600 }}>{language === "ar" ? "الحد اليومي المخصص" : "Override Daily Token Limit"}</span>
+                        <strong style={{ color: "var(--primary)", fontFamily: "monospace" }}>{overrideDailyLimit.toLocaleString()} tokens</strong>
+                      </div>
+                      <input
+                        type="range"
+                        min="5000"
+                        max="500000"
+                        step="5000"
+                        value={overrideDailyLimit}
+                        onChange={(e) => setOverrideDailyLimit(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "var(--primary)", cursor: "pointer" }}
+                      />
+                    </div>
+
                     {/* Weekly Slider */}
                     <div style={{ marginBottom: "1.25rem" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", fontSize: "0.8rem" }}>

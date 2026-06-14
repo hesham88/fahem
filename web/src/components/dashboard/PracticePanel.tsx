@@ -791,6 +791,18 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     };
   }, [speechRecognition]);
 
+  // Close the mic the moment the oral answer is submitted — never leave the connection open
+  // after the user has finished recording.
+  useEffect(() => {
+    if (practiceHasAnswered && speechRecognition) {
+      try {
+        speechRecognition.stop();
+      } catch (e) {}
+      setIsListening(false);
+      setInterimSpeechText("");
+    }
+  }, [practiceHasAnswered]);
+
   // Session aggregate statistics
   const [practiceSessionXpGained, setPracticeSessionXpGained] = useState<number>(0);
   const [practiceSessionCorrectAnswers, setPracticeSessionCorrectAnswers] = useState<number>(0);

@@ -3790,6 +3790,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
             else:
                 token_policy = {
                     "enabled": bool(payload.get("enabled", True)),
+                    "dailyLimit": int(payload.get("dailyLimit", 35714)),
                     "weeklyLimit": int(payload.get("weeklyLimit", 250000)),
                     "monthlyLimit": int(payload.get("monthlyLimit", 1000000)),
                     "reason": payload.get("reason", "admin override")

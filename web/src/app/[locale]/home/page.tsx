@@ -6596,12 +6596,25 @@ export default function Home() {
                         );
                       }
 
-                      // Real owner login: the only elevated badge is SUPERADMIN (no special powers in the sandbox).
-                      if (userProfile?.role === "super-admin") {
-                        return <span style={goldBadge}>⭐ SUPERADMIN</span>;
-                      }
-
-                      return null;
+                      // Real login: show the user's role badge for EVERY role (student/parent/
+                      // teacher/admin/superadmin), not just superadmin.
+                      const roleRaw = (userProfile?.role || "student").toLowerCase();
+                      const roleMap: Record<string, { label: string; labelAr: string; bg: string; color: string; emoji: string }> = {
+                        "super-admin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
+                        "superadmin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
+                        "admin": { label: "ADMIN", labelAr: "مشرف", bg: "linear-gradient(135deg, #c4b5fd, #a78bfa)", color: "#4c1d95", emoji: "🛡️" },
+                        "teacher": { label: "TEACHER", labelAr: "معلّم", bg: "linear-gradient(135deg, #99f6e4, #5eead4)", color: "#115e59", emoji: "📋" },
+                        "parent": { label: "PARENT", labelAr: "ولي أمر", bg: "linear-gradient(135deg, #fbcfe8, #f9a8d4)", color: "#831843", emoji: "👪" },
+                        "judge": { label: "JUDGE", labelAr: "محكّم", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⚖️" },
+                        "student": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
+                        "user": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
+                      };
+                      const rb = roleMap[roleRaw] || roleMap["student"];
+                      return (
+                        <span style={{ ...goldBadge, background: rb.bg, color: rb.color, boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>
+                          {rb.emoji} {language === "ar" ? rb.labelAr : rb.label}
+                        </span>
+                      );
                     })()}
                   </div>
                   <span className="sidebar-user-email" title={user.email || ""}>

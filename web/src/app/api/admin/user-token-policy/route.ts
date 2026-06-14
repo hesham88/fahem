@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { userId, enabled, weeklyLimit, monthlyLimit, reason, clearPolicy } = body;
+    const { userId, enabled, dailyLimit, weeklyLimit, monthlyLimit, reason, clearPolicy } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "userId is required" }), {
@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
 
     const tokenPolicy = clearPolicy ? null : {
       enabled: enabled !== undefined ? !!enabled : true,
+      dailyLimit: dailyLimit !== undefined ? Number(dailyLimit) : 35714,
       weeklyLimit: weeklyLimit !== undefined ? Number(weeklyLimit) : 250000,
       monthlyLimit: monthlyLimit !== undefined ? Number(monthlyLimit) : 1000000,
       reason: reason || "admin override"

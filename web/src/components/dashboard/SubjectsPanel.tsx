@@ -110,6 +110,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
   t,
 }) => {
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [modulesCollapsed, setModulesCollapsed] = useState<boolean>(false);
   const [curricula, setCurricula] = useState<any[]>([]);
   const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>("");
 
@@ -327,10 +328,15 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
             "--subject-color": activeSubjectColor,
           } as React.CSSProperties}
         >
-          <h3 style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800 }}>
-            {language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}
+          <h3
+            onClick={() => setModulesCollapsed((v) => !v)}
+            style={{ fontSize: "1.1rem", borderBottom: "1px dashed rgba(235, 220, 185, 0.4)", paddingBottom: "0.5rem", marginBottom: "1rem", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", userSelect: "none" }}
+            title={language === "ar" ? "طيّ/فتح" : "Collapse / expand"}
+          >
+            <span>{language === "ar" ? "تفاصيل الوحدات والدروس التفاعلية" : "Interactive Curriculum Modules"}</span>
+            <span style={{ fontSize: "0.9rem", transition: "transform 0.2s", transform: modulesCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▾</span>
           </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ display: modulesCollapsed ? "none" : "flex", flexDirection: "column", gap: "1rem" }}>
             {(() => {
               const subjectBooks = dynamicBooks ? dynamicBooks.filter((b: any) => b.subject_id === selectedSubjectId) : [];
               if (subjectBooks.length === 0) {

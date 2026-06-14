@@ -858,26 +858,8 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
           <span>{language === "ar" ? "الأمان والسياسات العامة" : "Security & Global Config"}</span>
         </button>
 
-        <button
-          onClick={() => setActiveSubTab("limits")}
-          style={{
-            padding: "0.75rem 1.5rem",
-            background: activeSubTab === "limits" ? "linear-gradient(135deg, var(--primary), var(--secondary))" : "transparent",
-            color: activeSubTab === "limits" ? "#fff" : "#64748b",
-            border: "none",
-            borderRadius: "8px",
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            transition: "all 0.3s ease",
-            boxShadow: activeSubTab === "limits" ? "var(--shadow-md)" : "none"
-          }}
-        >
-          <FiSliders />
-          <span>{language === "ar" ? "حدود وتجاوزات الطلاب" : "Student Limits & Overrides"}</span>
-        </button>
+        {/* FC6.25: "Student Limits & Overrides" sub-tab removed — it duplicated the working
+            "Custom User Limits & Token Overrides" panel in Users & Activity Trail. */}
 
         <button
           onClick={() => setActiveSubTab("reports")}

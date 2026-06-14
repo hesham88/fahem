@@ -121,7 +121,9 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const payload = await req.json();
-    const { name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+    const { name, name_ar, grade_level, category, icon_emoji: rawIconEmoji, emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+    // The Curriculum Studio form sends `emoji`; accept it as the icon so the subject icon saves.
+    const icon_emoji = rawIconEmoji || emoji;
 
     if (!name || !name_ar) {
       return new Response(JSON.stringify({ error: "Missing required fields: name, name_ar" }), {
@@ -238,7 +240,9 @@ export async function PUT(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const payload = await req.json();
-    const { id, name, name_ar, grade_level, category, icon_emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+    const { id, name, name_ar, grade_level, category, icon_emoji: rawIconEmoji, emoji, curriculum_id, color, core_book_ids, supporting_book_ids } = payload;
+    // The Curriculum Studio form sends `emoji`; accept it as the icon so the subject icon updates.
+    const icon_emoji = rawIconEmoji || emoji;
 
     if (!id || !name || !name_ar) {
       return new Response(JSON.stringify({ error: "Missing required fields: id, name, name_ar" }), {
