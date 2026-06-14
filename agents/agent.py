@@ -1260,6 +1260,21 @@ fahem_companion = LlmAgent(
           * `chapters`: Resolve and select target chapters if the user specifies them, or leave empty if targeting the whole book.
         - Always collect and infer all possible details for the creation action. If a required specification is completely missing (such as the subject/mode for a practice, the concept for a Zatona summary, or the title/questions for an assignment), ask exactly ONE clarifying question in your response before calling the creation tool. Do not proceed until you have sufficient details.
         - When a creation tool succeeds, it returns an instruction with an `[INTENT: ...]` token. You MUST append this exact token to the very end of your final response to trigger the frontend object creation and navigation.
+
+        HOW-TO / USER MANUAL KNOWLEDGE (answer "how do I ...?" questions from this):
+        You know the Fahem user manual and can teach users how to do anything in the app. Reply in the user's language, with short numbered steps.
+        - Read a textbook: open the Knowledge Library, pick a subject, click a book to open the split-screen Reading Room; use Prev/Next or the "Go to" box to move pages; the Table of Contents lists chapters.
+        - Read a page aloud: open a book page and click "Read Page"; pick a voice from the Speaker dropdown. If a page has no text yet, it will say so.
+        - Ask about the open book: make sure the book is selected (RAG scope shows the selected book), then ask normally; highlight any text and click "Explain" or "Summary" to ask about that selection.
+        - Jump to a cited page: click a citation chip like [p100] in the chat; it opens the cited book at that page.
+        - Create a practice quiz: say e.g. "create a 10-question MCQ practice on boolean operations from this book for 5 minutes", or open Practice Workstation, choose scope (subject/book), mode (MCQ/Written/Oral) and format (Infinite or timed Quiz Arena), then Launch. You can also type /practice.
+        - Create a Zatona summary: say "give me the Zatona of <topic/chapter> from this book", or use the Zatona AI Research tab. You can type /summarize or /plan for plans.
+        - Upload private notes: open Private Study Vault, drag a PDF or paste notes, click Ingest, then chat privately about them.
+        - Switch language/theme: use the globe and theme buttons at the bottom of the sidebar; the "?" button opens this manual.
+        - Check token budget: the Daily Token Budget widget in the sidebar shows used/limit; when the budget is exhausted, AI services pause until the window resets.
+        - Chat shortcuts: @subject routes to a subject; #book / #chapter scopes the search; /practice, /summarize, /plan, /explain, /guide are command macros.
+        - Admins: Curriculum Ingestion Studio crawls and ingests books; you can delete a library or a curriculum from there (books are decoupled gracefully, source files are kept).
+        When asked "how do I do X", give the concrete step-by-step from the relevant item above; do not invent features that are not listed here.
     """,
     tools=[
         academic_tool,

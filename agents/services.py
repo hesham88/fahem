@@ -2871,6 +2871,59 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 status_code=500
             )
 
+    @app.delete("/user/libraries")
+    async def delete_library_endpoint(request: fastapi.Request, id: str = None):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            lib_id = id or request.query_params.get("id")
+            if not lib_id:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Missing required parameter: id"},
+                    status_code=400
+                )
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+
+            if not db["libraries"].find_one({"_id": lib_id}):
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Library '{lib_id}' not found"},
+                    status_code=404
+                )
+
+            # Decouple gracefully: clear the library link on its curricula and books, but never
+            # delete the underlying textbook source files / book_pages.
+            decoupled_curricula = db["curricula"].update_many(
+                {"library_id": lib_id}, {"$set": {"library_id": None}}
+            ).modified_count
+            decoupled_books = db["books"].update_many(
+                {"library_id": lib_id}, {"$set": {"library_id": None}}
+            ).modified_count
+            db["libraries"].delete_one({"_id": lib_id})
+
+            return {
+                "success": True,
+                "deleted_library": lib_id,
+                "decoupled_curricula": decoupled_curricula,
+                "decoupled_books": decoupled_books
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to delete library: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
     @app.get("/user/curricula")
     async def get_curricula_endpoint(request: fastapi.Request, library_id: str = None):
         try:
@@ -3029,6 +3082,53 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"success": True, "curriculum": updated_curr}
         except Exception as err:
             logger.error(f"[services.py] Failed to patch curriculum: {err}", exc_info=True)
+            return fastapi.responses.JSONResponse(
+                content={"success": False, "error": str(err)},
+                status_code=500
+            )
+
+    @app.delete("/user/curricula/{id}")
+    async def delete_curricula_endpoint(id: str, request: fastapi.Request):
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+
+            principal = getattr(request.state, "principal", None)
+            if not principal or principal.get("role") not in ["admin", "super-admin", "judge"]:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "Forbidden: Administrative access required"},
+                    status_code=403
+                )
+
+            uri = get_mongodb_uri()
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            db = get_active_db(client)
+
+            if not db["curricula"].find_one({"_id": id}):
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": f"Curriculum with ID '{id}' not found"},
+                    status_code=404
+                )
+
+            # Collect the subjects under this curriculum so we can decouple their books before
+            # deleting the subjects. Source files / book_pages are never touched.
+            subj_ids = [s["_id"] for s in db["subjects"].find({"curriculum_id": id}, {"_id": 1})]
+            decoupled_books = 0
+            if subj_ids:
+                decoupled_books = db["books"].update_many(
+                    {"subject_id": {"$in": subj_ids}}, {"$set": {"subject_id": None}}
+                ).modified_count
+            deleted_subjects = db["subjects"].delete_many({"curriculum_id": id}).deleted_count
+            db["curricula"].delete_one({"_id": id})
+
+            return {
+                "success": True,
+                "deleted_curriculum": id,
+                "deleted_subjects": deleted_subjects,
+                "decoupled_books": decoupled_books
+            }
+        except Exception as err:
+            logger.error(f"[services.py] Failed to delete curriculum: {err}", exc_info=True)
             return fastapi.responses.JSONResponse(
                 content={"success": False, "error": str(err)},
                 status_code=500

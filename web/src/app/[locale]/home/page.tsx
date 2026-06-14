@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "../../../context/LanguageContext";
 import AdminSecurityDashboard from "../../../components/AdminSecurityDashboard";
 import CurriculumIngestionStudio from "../../../components/CurriculumIngestionStudio";
+import HelpManual from "../../../components/HelpManual";
 import { NotificationBell } from "../../../components/NotificationBell";
 import { UserAccountsPanel } from "../../../components/dashboard/UserAccountsPanel";
 import { LibraryPanel } from "../../../components/dashboard/LibraryPanel";
@@ -798,6 +799,7 @@ export default function Home() {
   const [customUploadedBooks, setCustomUploadedBooks] = useState<any[]>([]);
   const [readerCurrentPage, setReaderCurrentPage] = useState<number>(1);
   const [pendingNavigatePage, setPendingNavigatePage] = useState<number | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [translationLanguage, setTranslationLanguage] = useState<string>("Original");
   const [selectedText, setSelectedText] = useState<string>("");
   const [bubbleCoords, setBubbleCoords] = useState<{ x: number; y: number } | null>(null);
@@ -1859,22 +1861,6 @@ export default function Home() {
 
   // 5. Zatonas Spaces State
   const [activeZatonas, setActiveZatonas] = useState<any[]>([
-    {
-      id: "zatona_1",
-      nameEn: "Newtonian Motion Digest",
-      nameAr: "زتونة قوانين الحركة والميكانيكا الكلاسيكية",
-      zatonaPrompt: "Newton's laws of motion",
-      zatonaResult: `High-Yield AI Digest for [ Newton's laws of motion ]\n\n📌 Core Concept 1:\nNewton's laws formulate the baseline relation between mass and forces.\n\n📌 Core Concept 2 (Inertia):\nAn object remains at rest or in uniform motion unless acted upon by an external force.\n\n📌 Core Concept 3:\nForce equals mass times acceleration (F = ma), and action equals reaction.`,
-      zatonaResultAr: `ملخص مخصص للـ [ قوانين نيوتن للحركة ]\n\n📌 الخلاصة الأولى:\nتصف قوانين نيوتن الثلاثة العلاقة بين حركة الجسم والقوى المؤثرة عليه.\n\n📌 الخلاصة الثانية (قانون القصور الذاتي):\nالجسم الساكن يظل ساكناً والجسم المتحرك يظل متحركاً ما لم تؤثر عليه قوة خارجية.\n\n📌 الخلاصة الثالثة:\nالقوة تساوي الكتلة ضرب التسارع (F = ma)، ولكل فعل رد فعل مساوٍ له في المقدار ومضاد له في الاتجاه.`
-    },
-    {
-      id: "zatona_2",
-      nameEn: "Arabic Grammar Syntax Summary",
-      nameAr: "زتونة قواعد اللغة العربية وأقسام الكلام",
-      zatonaPrompt: "Arabic parts of speech",
-      zatonaResult: `High-Yield AI Digest for [ Arabic parts of speech ]\n\n📌 Core Concept 1:\nWords are classified into nouns, verbs, or particles. Nouns are independent of time, verbs are time-bound, particles have context-only meaning.`,
-      zatonaResultAr: `ملخص مخصص للـ [ أقسام الكلام في العربية ]\n\n📌 الخلاصة الأولى:\nتنقسم الكلمة لاسم وفعل وحرف. الاسم مستقل عن الزمن، والفعل مرتبط بزمن، والحرف لا يظهر معناه إلا مع غيره.`
-    }
   ]);
   const [selectedZatonaId, setSelectedZatonaId] = useState<string>("zatona_1");
   const currentZatona = activeZatonas.find(z => z.id === selectedZatonaId) || activeZatonas[0];
@@ -1932,6 +1918,11 @@ export default function Home() {
 
   // --- ACADEMIC SPACES CRUD & UI HELPERS ---
   const renderSpaceSelectorBar = (tab: "practice" | "plan" | "timetable" | "zatona") => {
+    // The "Active Academic Space" workstation bar is removed from Practice and Zatona.
+    // Use a boolean guard (not a direct `tab ===` return) so TypeScript does not narrow
+    // the `tab` union for the rest of the function below.
+    const hideSpaceBar: boolean = tab === "practice" || tab === "zatona";
+    if (hideSpaceBar) return null;
     let list: any[] = [];
     let selectedId = "";
     let setSelectedId: (id: string) => void = () => {};
@@ -6456,57 +6447,44 @@ export default function Home() {
         </div>
 
         {/* Sidebar Footer (Language + Profile + Sign Out) */}
-        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: "0.85rem", padding: "1.25rem", borderTop: "1px dashed var(--card-border)", background: "rgba(16, 107, 163, 0.01)" }}>
-          {/* Controls: Language + Premium Theme Toggle (W-5) */}
-          <div style={{ display: "flex", gap: "0.75rem", width: "100%", alignItems: "flex-end" }}>
-            {/* Language Swapper */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
-              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <FiGlobe /> <span>{language === "ar" ? "اللغة" : "Language"}</span>
-              </label>
-              <Dropdown
-                value={language}
-                onChange={(val) => setLanguage(val as any)}
-                options={[
-                  { value: "en", label: "English", labelAr: "English", icon: "🇺🇸" },
-                  { value: "ar", label: "العربية", labelAr: "العربية", icon: "🇪🇬" }
-                ]}
-                language={language}
-              />
-            </div>
+        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: "0.55rem", padding: "0.7rem 0.85rem", borderTop: "1px dashed var(--card-border)", background: "rgba(16, 107, 163, 0.01)" }}>
+          {/* Controls: compact Language globe + Theme + Help (?) */}
+          <div style={{ display: "flex", gap: "0.4rem", width: "100%", alignItems: "center" }}>
+            {/* Compact language toggle (globe + short code) */}
+            <button
+              onClick={() => setLanguage(language === "ar" ? "en" : "ar")}
+              type="button"
+              title={language === "ar" ? "تغيير اللغة" : "Change language"}
+              style={{ display: "flex", alignItems: "center", gap: "0.3rem", height: "34px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--primary)", cursor: "pointer", fontWeight: 800, fontSize: "0.8rem", outline: "none" }}
+            >
+              <FiGlobe style={{ fontSize: "1rem" }} />
+              <span>{language === "ar" ? "ع" : "EN"}</span>
+            </button>
 
-            {/* Premium Theme Switcher */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <span>{language === "ar" ? "المظهر" : "Theme"}</span>
-              </label>
-              <button
-                onClick={toggleTheme}
-                type="button"
-                className="theme-toggle-btn"
-                title={language === "ar" ? "تبديل المظهر" : "Toggle Theme"}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--card-border)",
-                  background: "var(--card-bg)",
-                  color: "var(--primary)",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  outline: "none"
-                }}
-              >
-                {isDarkMode ? (
-                  <FiSun style={{ fontSize: "1.05rem", color: "var(--accent-yellow)" }} />
-                ) : (
-                  <FiMoon style={{ fontSize: "1.05rem", color: "var(--primary)" }} />
-                )}
-              </button>
-            </div>
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              type="button"
+              className="theme-toggle-btn"
+              title={language === "ar" ? "تبديل المظهر" : "Toggle Theme"}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--primary)", cursor: "pointer", transition: "all 0.2s ease", outline: "none" }}
+            >
+              {isDarkMode ? (
+                <FiSun style={{ fontSize: "1.05rem", color: "var(--accent-yellow)" }} />
+              ) : (
+                <FiMoon style={{ fontSize: "1.05rem", color: "var(--primary)" }} />
+              )}
+            </button>
+
+            {/* Help / user manual ("?") */}
+            <button
+              onClick={() => setShowHelpModal(true)}
+              type="button"
+              title={language === "ar" ? "الدليل والأسئلة الشائعة" : "Help, user manual & FAQs"}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--primary)", cursor: "pointer", fontWeight: 900, fontSize: "1.05rem", outline: "none", marginInlineStart: "auto" }}
+            >
+              ?
+            </button>
           </div>
 
           {/* Profile Card & Token Telemetry */}
@@ -6951,6 +6929,7 @@ export default function Home() {
         </footer>
 
         {renderSpaceModal()}
+        {showHelpModal && <HelpManual language={language as "en" | "ar"} onClose={() => setShowHelpModal(false)} />}
 
 
       </main>
