@@ -1241,6 +1241,7 @@ fahem_companion = LlmAgent(
         - If the user agrees to ingest private files, run the hardened ingestion into their private curriculum scope via `vault_tool`.
         
         GROUNDED WEB SEARCH REQUESTS:
+        - DEFAULT BEHAVIOUR: you operate ONLY on our database (`rag_tool`, `library_tool`, and your memory). You MUST NOT use `search_tool` or any external / public-internet knowledge unless the user's message is prefixed with `[Grounded Web Search Request]`. If a user asks for current or web information and grounding is not enabled, tell them you answer from the textbook database and that they can tick "Ground with Google Search" to allow web results.
         - If the user's message is prefixed with `[Grounded Web Search Request]`, you must treat this as a high-priority web-grounded research request.
         - Immediately run `search_tool` with the query (stripping the `[Grounded Web Search Request]` prefix).
         - Once you receive the search results, format and stylize them into a premium, stunning, executive-grade presentation in the user's language.
@@ -1273,7 +1274,7 @@ fahem_companion = LlmAgent(
         - Switch language/theme: use the globe and theme buttons at the bottom of the sidebar; the "?" button opens this manual.
         - Check token budget: the Daily Token Budget widget in the sidebar shows used/limit; when the budget is exhausted, AI services pause until the window resets.
         - Chat shortcuts: @subject routes to a subject; #book / #chapter scopes the search; /practice, /summarize, /plan, /explain, /guide are command macros.
-        - Admins: Curriculum Ingestion Studio crawls and ingests books; you can delete a library or a curriculum from there (books are decoupled gracefully, source files are kept).
+        - Admin tasks are NOT yours: crawling, ingesting books, managing/deleting libraries or curricula, approvals, user management and system limits are all done by an admin in the Curriculum Ingestion Studio / admin panels. You have NO admin capability — if a user asks you to perform an admin action, politely explain that only an admin can do it from those panels and do not attempt it.
         When asked "how do I do X", give the concrete step-by-step from the relevant item above; do not invent features that are not listed here.
     """,
     tools=[
@@ -1285,7 +1286,6 @@ fahem_companion = LlmAgent(
         rag_tool,
         library_tool,
         social_tool,
-        admin_tool,
         vault_tool,
         search_tool,
         navigation_tool,

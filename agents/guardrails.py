@@ -47,6 +47,10 @@ def run_log_audit_task(category: str, agent: str, message: str, details: str = N
 # =================================----------------------------
 import contextvars
 verified_principal_ctx = contextvars.ContextVar("verified_principal_ctx", default=None)
+# True only when the user explicitly enabled "Ground with Google Search" for this turn
+# (the grounded endpoint prefixes the prompt with [Grounded Web Search Request]). When False,
+# the companion must stay strictly in-corpus (our database only).
+grounded_request_ctx = contextvars.ContextVar("grounded_request_ctx", default=False)
 
 ALLOWED_DATABASES = {"fahem", "fahem_sandbox"}
 
@@ -365,6 +369,13 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
         except Exception:
             pass
             
+    # Record whether the user enabled Google grounding this turn. Default OFF → the companion
+    # answers from our database only and the web-search tool is hard-gated (see before_tool_callback).
+    try:
+        grounded_request_ctx.set("[Grounded Web Search Request]" in (prompt_text or ""))
+    except Exception:
+        pass
+
     # Capture the user's real language BEFORE any bilingual context is appended, so the
     # companion is pinned to the language the user actually wrote in. This fixes the
     # English -> Arabic mid-conversation drift the user reported.
@@ -706,7 +717,18 @@ def before_tool_callback(*args, **kwargs) -> Optional[dict]:
         tool_args = {}
         
     logger.info(f"[AUDIT] Intercepted Tool call request: '{tool_name}' with args: {json.dumps(tool_args)}")
-    
+
+    # 0. Web-search hard gate: the companion only reaches the public internet when the user
+    # explicitly enabled "Ground with Google Search" this turn. Otherwise short-circuit the tool
+    # and force a database-only answer. This is the critical default-to-our-DB guarantee.
+    if tool_name == "search_tool" and not grounded_request_ctx.get():
+        logger.info("[SECURITY] search_tool blocked: Google grounding not enabled; redirecting to DB-only.")
+        return {
+            "status": "blocked",
+            "results": [],
+            "message": "Web search is disabled because the user has not enabled 'Ground with Google Search'. Answer using ONLY the textbook database via rag_tool/library_tool — do not use any external or public-internet knowledge."
+        }
+
     # 1. Enforce Administrative Lock: Never execute administrative/cluster operations starting with 'atlas-'
     if tool_name.startswith("atlas-"):
         logger.warning(f"[SECURITY] Administrative command '{tool_name}' execution blocked.")
