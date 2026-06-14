@@ -4852,22 +4852,54 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          if (file.size > dynamicMaxUploadSize * 1024 * 1024) {
-                            alert(language === "ar" 
-                              ? `خطأ: حجم الملف يتجاوز الحد الأقصى (${dynamicMaxUploadSize} ميجابايت) للمستندات الخاصة.` 
+                          const isDemoSandbox = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+
+                          if (isDemoSandbox) {
+                            // The sandbox permits exactly ONE small PDF upload; beyond that the visitor must sign in.
+                            const SANDBOX_MAX_MB = 2;
+                            const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+                            if (localStorage.getItem("demo_upload_used") === "true") {
+                              alert(language === "ar"
+                                ? "لقد استخدمت رفع المستند المتاح مرة واحدة في البيئة التجريبية. يرجى تسجيل الدخول لرفع المزيد من الملفات."
+                                : "You've used your single sandbox upload. Please sign in to upload more documents.");
+                              e.target.value = "";
+                              return;
+                            }
+                            if (!isPdf) {
+                              alert(language === "ar"
+                                ? "في البيئة التجريبية يُسمح برفع ملفات PDF فقط."
+                                : "Only PDF files can be uploaded in the demo sandbox.");
+                              e.target.value = "";
+                              return;
+                            }
+                            if (file.size > SANDBOX_MAX_MB * 1024 * 1024) {
+                              alert(language === "ar"
+                                ? `خطأ: في البيئة التجريبية الحد الأقصى لحجم الملف هو ${SANDBOX_MAX_MB} ميجابايت.`
+                                : `Error: In the demo sandbox the maximum file size is ${SANDBOX_MAX_MB}MB.`);
+                              e.target.value = "";
+                              return;
+                            }
+                          } else if (file.size > dynamicMaxUploadSize * 1024 * 1024) {
+                            alert(language === "ar"
+                              ? `خطأ: حجم الملف يتجاوز الحد الأقصى (${dynamicMaxUploadSize} ميجابايت) للمستندات الخاصة.`
                               : `Error: Study document exceeds the strict ${dynamicMaxUploadSize}MB upload limit.`);
                             e.target.value = "";
                             return;
                           }
                           const storagePath = "user_uploads/" + user?.uid + "/" + Date.now() + "_" + file.name;
                           const storageRef = ref(storage, storagePath);
-                          
+
                           setIsVerifying(true);
                           setVerifierLog([
                             language === "ar" ? "⏳ جاري رفع الملف إلى الخزنة السحابية الآمنة..." : "⏳ Uploading file to the secure cloud vault..."
                           ]);
 
                           uploadBytes(storageRef, file).then((snapshot) => {
+                            // Consume the single sandbox upload allowance once the upload succeeds.
+                            if (isDemoSandbox && typeof window !== "undefined") {
+                              localStorage.setItem("demo_upload_used", "true");
+                            }
                             getDownloadURL(snapshot.ref).then((downloadURL) => {
                               runVerifierAgent(file, storagePath, downloadURL);
                             });

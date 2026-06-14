@@ -6533,8 +6533,8 @@ export default function Home() {
                     <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
                       {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
                     </span>
-                    {userProfile?.isWhitelisted && (
-                      <span style={{
+                    {(() => {
+                      const goldBadge: React.CSSProperties = {
                         fontSize: "0.62rem",
                         fontWeight: 800,
                         color: "#b8860b",
@@ -6544,10 +6544,39 @@ export default function Home() {
                         boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)",
                         whiteSpace: "nowrap",
                         textShadow: "0 1px 0 rgba(255,255,255,0.4)"
-                      }}>
-                        ⭐ JUDGE
-                      </span>
-                    )}
+                      };
+                      const tierBadge: React.CSSProperties = {
+                        fontSize: "0.62rem",
+                        fontWeight: 800,
+                        color: "#1e3a8a",
+                        background: "linear-gradient(135deg, #bfdbfe, #93c5fd)",
+                        padding: "1px 6px",
+                        borderRadius: "6px",
+                        whiteSpace: "nowrap"
+                      };
+
+                      const isDemoSandbox = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+
+                      // Inside the sandbox: show the selected persona + the assigned tier (0/1) instead of a JUDGE badge.
+                      if (isDemoSandbox) {
+                        const persona = (typeof window !== "undefined" ? (sessionStorage.getItem("judge_selected_persona") || userProfile?.role || "student") : "student") as string;
+                        const tier = (typeof window !== "undefined" ? (localStorage.getItem("demo_tier") || "0") : "0");
+                        const personaLabel = persona.charAt(0).toUpperCase() + persona.slice(1);
+                        return (
+                          <>
+                            <span style={goldBadge}>{personaLabel}</span>
+                            <span style={tierBadge}>Tier-{tier}</span>
+                          </>
+                        );
+                      }
+
+                      // Real owner login: the only elevated badge is SUPERADMIN (no special powers in the sandbox).
+                      if (userProfile?.role === "super-admin") {
+                        return <span style={goldBadge}>⭐ SUPERADMIN</span>;
+                      }
+
+                      return null;
+                    })()}
                   </div>
                   <span className="sidebar-user-email" title={user.email || ""}>
                     {user.email}

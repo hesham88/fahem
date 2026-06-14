@@ -803,6 +803,10 @@ export default function LandingPage() {
                       localStorage.setItem("demo_auth_token", cleanToken);
                       localStorage.setItem("judge_bypass_email", trimmedEmail);
                       sessionStorage.setItem("judge_selected_persona", selectedPersona);
+                      // Persist the assigned sandbox tier (0/1) for the dashboard profile badge.
+                      localStorage.setItem("demo_tier", String(data.session?.tier ?? 0));
+                      // Each fresh sandbox session is granted a single document upload.
+                      localStorage.removeItem("demo_upload_used");
                       setIsDemo(true);
                       
                       setTimeout(() => {

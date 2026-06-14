@@ -21,17 +21,23 @@ export async function POST(req: NextRequest) {
     let uid = "demo_anon_" + Math.random().toString(36).substring(2, 10);
     let role: Role = chosenPersona;
 
+    // The platform owner / super-admin has NO elevated powers inside the sandbox:
+    // they simply join as a Tier-1 evaluator (same judge-tier templates), scoped to
+    // the sandbox database like any other demo session.
+    const isSuperadminEmail = (email || "").toLowerCase() === "hesham1988@gmail.com"; // guard:allow-literal
+
     if (authCtx) {
       // User is verified via Firebase auth
       isVerified = true;
       email = authCtx.email;
       uid = authCtx.uid;
-      
+
       const domain = email ? email.split("@")[1] : null;
       const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
+      const verifiedIsSuperadmin = (email || "").toLowerCase() === "hesham1988@gmail.com"; // guard:allow-literal
 
-      if (isJudgeDomain) {
-        tier = 1; // Tier-1 (verified domain)
+      if (isJudgeDomain || verifiedIsSuperadmin) {
+        tier = 1; // Tier-1 (verified judge domain or owner) — judge-tier templates, sandbox only
         role = "judge";
       } else {
         // Logged-in standard user gets Tier-0 but with their verified email
@@ -42,10 +48,16 @@ export async function POST(req: NextRequest) {
       // Best-effort check if typed email matches config.demoDomains (Tier-0 still, unverified!)
       const domain = email.split("@")[1];
       const isJudgeDomain = domain && config?.demoDomains?.includes(domain);
-      
-      // Spoofed/typed email gets Tier-0 anonymous-level capability
-      tier = 0;
-      role = chosenPersona;
+
+      if (isSuperadminEmail) {
+        // Owner email joins the sandbox as a Tier-1 judge evaluator (sandbox-scoped, no special powers)
+        tier = 1;
+        role = "judge";
+      } else {
+        // Spoofed/typed email gets Tier-0 anonymous-level capability
+        tier = 0;
+        role = chosenPersona;
+      }
     }
 
     if (config && config.evalSandboxEnabled === false) {
