@@ -14,7 +14,18 @@ self.addEventListener("push", function (event) {
     badge: "/brand/logo_compressed.png",
     data: { url: data.url || "/" },
   };
-  event.waitUntil(self.registration.showNotification(data.title || "Fahem", options));
+  // Show the OS notification AND notify any open tab so it can refresh its bell in
+  // real time. The postMessage also lets the E2E (CDP) test assert receipt.
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(data.title || "Fahem", options),
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) {
+        cs.forEach(function (c) {
+          c.postMessage({ type: "push", title: data.title || "Fahem", body: data.body || "", url: data.url || "/" });
+        });
+      }),
+    ])
+  );
 });
 
 self.addEventListener("notificationclick", function (event) {

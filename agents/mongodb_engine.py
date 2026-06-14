@@ -783,6 +783,11 @@ class MongoDBEngine:
         """Idempotently inserts or retrieves a user profile for the given user_id and email."""
         if self._db is None:
             raise RuntimeError("Database engine not connected.")
+
+        # Defense-in-depth: never create a user profile for a service-account identity
+        # (e.g. the App Hosting compute SA). Real identity is always a forwarded end-user.
+        if email and email.strip().lower().endswith("gserviceaccount.com"):
+            raise RuntimeError("Refusing to provision a profile for a service-account identity")
         
         # 1. Try to find by userId
         doc = self._db["users"].find_one({"userId": user_id})

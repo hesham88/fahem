@@ -223,26 +223,43 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         # Identity is strictly derived from the verified token
                         is_service_account = email.endswith("gserviceaccount.com")
                         passed_principal = principal if (principal and isinstance(principal, dict)) else {}
-                        passed_role = passed_principal.get("role") if passed_principal else "user"
-                        verified_role = passed_role if is_service_account else ("super-admin" if email == "hesham1988@gmail.com" else "user")
-                        # Only the real owner or service account can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
                         passed_db_target = passed_principal.get("db_target") if passed_principal else None
-                        db_target = passed_db_target if (email == "hesham1988@gmail.com" or is_service_account) and passed_db_target else "fahem_sandbox"
 
-                        # Trust verified service accounts to forward actual user identity (uid/email)
-                        verified_uid = passed_principal.get("uid") if is_service_account and passed_principal.get("uid") else id_info.get("sub", "unknown_gcp_uid")
-                        verified_email = passed_principal.get("email") if is_service_account and passed_principal.get("email") else email
+                        if is_service_account:
+                            # Service-account token (e.g. the App Hosting compute SA the Next.js proxy
+                            # uses). Identity MUST come from the forwarded end-user principal. NEVER adopt
+                            # the service account's OWN sub/email as a user — doing so let
+                            # 'firebaseapphostingcompute' take over real accounts (identity-takeover bug).
+                            verified_uid = passed_principal.get("uid")
+                            verified_email = passed_principal.get("email")
+                            verified_role = passed_principal.get("role") or "user"
+                            db_target = passed_db_target if passed_db_target else "fahem_sandbox"
+                        else:
+                            # A directly-verified end-user OIDC token.
+                            verified_uid = id_info.get("sub", "unknown_gcp_uid")
+                            verified_email = email
+                            verified_role = "super-admin" if email == "hesham1988@gmail.com" else "user"
+                            db_target = passed_db_target if (email == "hesham1988@gmail.com" and passed_db_target) else "fahem_sandbox"
 
-                        principal = {
-                            "uid": verified_uid,
-                            "email": verified_email,
-                            "role": verified_role,
-                            "db_target": db_target,
-                            "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
-                            "selected_text": passed_principal.get("selected_text"),
-                            "book_id": passed_principal.get("book_id"),
-                            "page": passed_principal.get("page")
-                        }
+                        # Hard guard: a service-account identity must NEVER be treated as a user.
+                        if verified_email and str(verified_email).endswith("gserviceaccount.com"):
+                            verified_uid = None
+                            verified_email = None
+
+                        if verified_uid and verified_email:
+                            principal = {
+                                "uid": verified_uid,
+                                "email": verified_email,
+                                "role": verified_role,
+                                "db_target": db_target,
+                                "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
+                                "selected_text": passed_principal.get("selected_text"),
+                                "book_id": passed_principal.get("book_id"),
+                                "page": passed_principal.get("page")
+                            }
+                        else:
+                            # Pure service-to-service call with no forwarded end-user → no user identity.
+                            principal = None
                     except Exception as err:
                         logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
                         if is_gcp:
