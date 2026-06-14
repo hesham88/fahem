@@ -423,7 +423,9 @@ export async function POST(req: NextRequest) {
                       // frontend action fires even if the model forgets to echo the [INTENT] token.
                       if (part.functionResponse || part.function_response) {
                         const fr = part.functionResponse || part.function_response;
-                        const resp = (fr && fr.response) || {};
+                        const raw = (fr && fr.response) || {};
+                        // ADK may pass the tool dict directly or wrapped as { result: {...} }.
+                        const resp = (raw && raw.action) ? raw : (raw && raw.result) ? raw.result : raw;
                         if (resp && resp.action && resp.target &&
                             (resp.type === "write" || resp.action === "navigate" || String(resp.action).startsWith("create_"))) {
                           capturedIntent = { type: resp.type || "write", action: resp.action, target: resp.target };
