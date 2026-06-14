@@ -196,11 +196,51 @@ def check_model_armor_py(prompt: str) -> tuple[bool, str]:
         return False, ""
     return False, ""
 
+# Per-session demo budgets (tokens). Strictly small so a demo can be tried but never costs much;
+# Tier-1 gets a little more than Tier-0. There is no weekly/monthly for demo — only this per-session cap.
+DEMO_SESSION_TOKEN_LIMITS = {0: 8000, 1: 20000}
+
+
+def _check_demo_session_budget(session_id: str, tier) -> tuple[bool, str]:
+    """Isolated per-demo-session token budget (keyed by sandbox_session_id, not the shared user)."""
+    try:
+        from pymongo import MongoClient
+        try:
+            tier_int = int(tier or 0)
+        except Exception:
+            tier_int = 0
+        limit = DEMO_SESSION_TOKEN_LIMITS.get(tier_int, DEMO_SESSION_TOKEN_LIMITS[0])
+        uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+        db = client["fahem_sandbox"]  # demo sessions live only in the sandbox
+        used = 0
+        for doc in db["token_telemetry"].find({"sandboxSessionId": session_id}, {"totalTokens": 1}):
+            used += int(doc.get("totalTokens", 0))
+        client.close()
+        if used >= limit:
+            return True, f"demo session token budget reached: used {used}/{limit} tokens. Sign out and start a fresh demo to continue."
+        return False, ""
+    except Exception as err:
+        logger.warning(f"Error checking demo session budget: {err}")
+        is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+        return (True, "Demo budget check failed (fail-closed).") if is_gcp else (False, "")
+
+
 def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
     """
     Checks if the user has exceeded their token credits.
     Returns (is_blocked, message).
     """
+    # Demo sessions are isolated to a small PER-SESSION budget (not the shared user pool, and not
+    # role-exempt) — every demo persona, including judge, is capped.
+    try:
+        _principal = verified_principal_ctx.get() or {}
+        _session_id = _principal.get("sandbox_session_id")
+        if _session_id:
+            return _check_demo_session_budget(_session_id, _principal.get("tier", 0))
+    except Exception as _e:
+        logger.warning(f"Demo-session detection failed in token check: {_e}")
+
     if role in ["admin", "super-admin", "superadmin", "judge"]:
         return False, ""
         

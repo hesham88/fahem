@@ -1143,7 +1143,16 @@ class MongoDBEngine:
                 type=run_type,
                 timestamp=now_str
             )
-            self._db["token_telemetry"].insert_one(telemetry.model_dump(exclude_none=True))
+            doc = telemetry.model_dump(exclude_none=True)
+            # Tag with the demo session id (if any) so per-session token budgets are isolated.
+            try:
+                from guardrails import verified_principal_ctx
+                _p = verified_principal_ctx.get() or {}
+                if _p.get("sandbox_session_id"):
+                    doc["sandboxSessionId"] = _p.get("sandbox_session_id")
+            except Exception:
+                pass
+            self._db["token_telemetry"].insert_one(doc)
             return True
         except Exception as e:
             logger.error(f"Failed to record token usage: {e}")

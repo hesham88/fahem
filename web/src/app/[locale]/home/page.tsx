@@ -4823,6 +4823,15 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
+      // For a demo session, archive + purge the session BEFORE clearing the token, so the next
+      // demo starts fresh and superadmin keeps the analysis copy in the sandbox archive.
+      if (typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && localStorage.getItem("demo_auth_token")) {
+        try {
+          await authedFetch("/api/demo/signout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        } catch (e) {
+          console.warn("demo signout archive failed (non-blocking):", e);
+        }
+      }
       if (typeof window !== "undefined") {
         localStorage.removeItem("app_mode");
         localStorage.removeItem("demo_auth_token");

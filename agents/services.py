@@ -255,7 +255,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
                                 "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
                                 "selected_text": passed_principal.get("selected_text"),
                                 "book_id": passed_principal.get("book_id"),
-                                "page": passed_principal.get("page")
+                                "page": passed_principal.get("page"),
+                                "sandbox_session_id": passed_principal.get("sandbox_session_id"),
+                                "tier": passed_principal.get("tier")
                             }
                         else:
                             # Pure service-to-service call with no forwarded end-user → no user identity.
@@ -3961,19 +3963,19 @@ def register_telemetry_route(app: fastapi.FastAPI):
             except Exception as db_err:
                 logger.warning(f"Failed to write demo session to fahem_sandbox: {db_err}")
             
-            # TTL Cleanup: auto-expire sessions older than 1 hour (3600s)
+            # Hard 24h max-session reaper: kill any demo session running longer than 24 hours.
             try:
-                cutoff = int(time.time()) - 3600
+                cutoff = int(time.time()) - 86400
                 client["fahem_sandbox"]["demo_sessions"].update_many(
                     {"status": "active", "started_at": {"$lt": cutoff}},
                     {"$set": {
-                        "status": "expired",
+                        "status": "killed",
                         "ended_at": int(time.time()),
-                        "kill_reason": "TTL expiration"
+                        "kill_reason": "24h max session reached"
                     }}
                 )
             except Exception as ttl_err:
-                logger.warning(f"Failed to run TTL cleanup in fahem_sandbox: {ttl_err}")
+                logger.warning(f"Failed to run 24h demo reaper in fahem_sandbox: {ttl_err}")
 
             # Admin notifications: a new demo started + a concurrency alert past 10 running.
             # Real admins live in production 'fahem', so notify there.
@@ -4008,6 +4010,99 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"success": True}
         except Exception as err:
             logger.error(f"[services.py] Failed to create demo session: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/admin/demo-reap")
+    async def reap_demo_sessions_endpoint():
+        """Hard-kill any demo session running longer than 24h. Safe to call on a schedule."""
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=5000)
+            cutoff = int(time.time()) - 86400
+            res = client["fahem_sandbox"]["demo_sessions"].update_many(
+                {"status": "active", "started_at": {"$lt": cutoff}},
+                {"$set": {"status": "killed", "ended_at": int(time.time()), "kill_reason": "24h max session reached"}}
+            )
+            client.close()
+            return {"success": True, "killed": res.modified_count}
+        except Exception as err:
+            logger.error(f"[services.py] demo reaper failed: {err}", exc_info=True)
+            return {"success": False, "error": str(err)}
+
+    @app.post("/demo/signout")
+    async def demo_signout_endpoint(request: fastapi.Request):
+        """On demo sign-out: archive the session's important data+metadata to a sandbox temp
+        collection (superadmin reference/analysis), then purge the per-session traces so the next
+        demo starts fresh. Sandbox-only."""
+        try:
+            from tools import get_mongodb_uri
+            from pymongo import MongoClient
+            import time
+            body = await request.json()
+            session_id = body.get("sandbox_session_id") or body.get("sandboxSessionId")
+            if not session_id:
+                principal = getattr(request.state, "principal", None) or {}
+                session_id = principal.get("sandbox_session_id")
+            if not session_id:
+                return fastapi.responses.JSONResponse(status_code=400, content={"success": False, "error": "Missing sandbox_session_id"})
+
+            client = MongoClient(get_mongodb_uri(), serverSelectionTimeoutMS=5000)
+            sdb = client["fahem_sandbox"]
+
+            session_doc = sdb["demo_sessions"].find_one({"sandbox_session_id": session_id}) or {}
+            demo_uid = session_doc.get("uid") or session_doc.get("userId")
+
+            # Token usage for THIS session, broken down by model and type.
+            usage_total = 0
+            by_model = {}
+            by_type = {}
+            for d in sdb["token_telemetry"].find({"sandboxSessionId": session_id}):
+                tt = int(d.get("totalTokens", 0))
+                usage_total += tt
+                by_model[d.get("model", "?")] = by_model.get(d.get("model", "?"), 0) + tt
+                by_type[d.get("type", "?")] = by_type.get(d.get("type", "?"), 0) + tt
+
+            # Companion chat (prompts/responses) + activities/errors for the demo user (best-effort).
+            chats = []
+            activities = []
+            if demo_uid:
+                for c in sdb["chat_sessions"].find({"userId": demo_uid}).limit(50):
+                    c.pop("_id", None)
+                    chats.append(c)
+                for a in sdb["user_activities"].find({"userId": demo_uid}).sort("timestamp", -1).limit(100):
+                    a.pop("_id", None)
+                    activities.append(a)
+
+            sdb["demo_session_archive"].replace_one(
+                {"_id": session_id},
+                {
+                    "_id": session_id,
+                    "sandbox_session_id": session_id,
+                    "email": session_doc.get("email"),
+                    "role": session_doc.get("role"),
+                    "tier": session_doc.get("tier"),
+                    "started_at": session_doc.get("started_at"),
+                    "ended_at": int(time.time()),
+                    "token_usage": {"total": usage_total, "byModel": by_model, "byType": by_type},
+                    "chat_history": chats,
+                    "activities": activities,
+                    "archivedAt": int(time.time() * 1000)
+                },
+                upsert=True
+            )
+
+            # Purge the per-session traces so no trace remains for the next session.
+            sdb["token_telemetry"].delete_many({"sandboxSessionId": session_id})
+            sdb["demo_sessions"].update_one(
+                {"sandbox_session_id": session_id},
+                {"$set": {"status": "ended", "ended_at": int(time.time()), "archived": True}}
+            )
+            client.close()
+            return {"success": True, "archived": session_id, "token_usage_total": usage_total}
+        except Exception as err:
+            logger.error(f"[services.py] demo signout archive/purge failed: {err}", exc_info=True)
             return {"success": False, "error": str(err)}
 
     @app.get("/admin/approve")

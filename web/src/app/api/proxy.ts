@@ -122,12 +122,16 @@ export async function proxyRequest(
 
     // Forward the authenticated end-user principal to the Python backend
     if (ctx) {
-      headers["X-Verified-Principal"] = JSON.stringify({ // guard:allow-principal
+      const principal: any = { // guard:allow-principal
         uid: ctx.uid,
         email: ctx.email,
         role: ctx.role,
         db_target: ctx.db_target || "fahem"
-      });
+      };
+      // Carry the demo session id + tier so the backend can isolate per-session token budgets.
+      if (ctx.sandbox_session_id) principal.sandbox_session_id = ctx.sandbox_session_id;
+      if (ctx.tier !== undefined) principal.tier = ctx.tier;
+      headers["X-Verified-Principal"] = JSON.stringify(principal);
     }
 
     const url = `${cloudRunUrl}${path}`;
