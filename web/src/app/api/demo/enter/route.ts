@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     const SANDBOX_PERSONA_USERS: Record<string, { uid: string; email: string }> = {
       student: { uid: "test_user_id_gemini_2026", email: "ziad.student@fahem.pro" }, // guard:allow-literal
       teacher: { uid: "test_teacher_id_gemini_2026", email: "tarek.teacher@fahem.pro" }, // guard:allow-literal
+      admin: { uid: "sandbox_admin_demo_2026", email: "rana.admin@fahem.pro" }, // guard:allow-literal
     };
     if (!authCtx) {
       const seeded = SANDBOX_PERSONA_USERS[chosenPersona] || SANDBOX_PERSONA_USERS.student;
