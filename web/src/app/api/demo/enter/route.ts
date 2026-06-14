@@ -60,6 +60,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Map the demo persona to a pre-seeded sandbox user so every evaluation session
+    // inherits realistic seeded history (practice, reading, insights) and token
+    // telemetry — this is what makes the Daily Token Budget and history panels show
+    // real numbers in the sandbox. Firebase-verified logins keep their real identity.
+    const SANDBOX_PERSONA_USERS: Record<string, { uid: string; email: string }> = {
+      student: { uid: "test_user_id_gemini_2026", email: "ziad.student@fahem.pro" }, // guard:allow-literal
+      teacher: { uid: "test_teacher_id_gemini_2026", email: "tarek.teacher@fahem.pro" }, // guard:allow-literal
+    };
+    if (!authCtx) {
+      const seeded = SANDBOX_PERSONA_USERS[chosenPersona] || SANDBOX_PERSONA_USERS.student;
+      uid = seeded.uid;
+      email = seeded.email;
+    }
+
     if (config && config.evalSandboxEnabled === false) {
       if (tier === 1) {
         return new Response(JSON.stringify({
