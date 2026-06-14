@@ -3821,8 +3821,10 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = get_active_db(client)
-            
+            # Demo sessions live ONLY in the sandbox — read them there regardless of the admin's
+            # own db_target (the owner's active DB is prod, where there are no demo sessions).
+            db = client["fahem_sandbox"]
+
             sessions = list(db["demo_sessions"].find({}).sort("started_at", -1).limit(100))
             client.close()
             
@@ -3844,8 +3846,9 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            db = get_active_db(client)
-            
+            # Demo sessions/actions are sandbox-only.
+            db = client["fahem_sandbox"]
+
             action = payload.get("action")
             sandbox_session_id = payload.get("sandbox_session_id")
             quota_value = payload.get("quota_value")
@@ -4115,51 +4118,40 @@ def register_telemetry_route(app: fastapi.FastAPI):
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
             
-            # Fetch users with role admin and all admins
-            users = list(db["users"].find({"role": "admin"}))
+            # Live source of truth: every admin / super-admin USER, plus any legacy admins-collection
+            # entry. No hardcoded candidates and no hardcoded filters — the console reflects real data
+            # only, so deleted users disappear and newly-onboarded admins appear.
+            users = list(db["users"].find({"role": {"$in": ["admin", "super-admin"]}}))
             admins = list(db["admins"].find({}))
             client.close()
-            
-            # Proactively filter out Anas Al-Sayed / admin.candidate@fahem.edu
-            admins = [adm for adm in admins if adm.get("email", "").lower().strip() != "admin.candidate@fahem.edu" and not (adm.get("name") and "anas" in adm.get("name").lower())]
-            users = [usr for usr in users if usr.get("email", "").lower().strip() != "admin.candidate@fahem.edu" and not (usr.get("name") and "anas" in usr.get("name").lower())]
 
             admin_map = {}
             for adm in admins:
-                email_key = adm.get("email", "").lower().strip()
+                email_key = (adm.get("email") or "").lower().strip()
                 if email_key:
                     admin_map[email_key] = {
                         "email": adm.get("email"),
                         "name": adm.get("name") or "Approved Admin",
-                        "role": "admin",
+                        "role": adm.get("role") or "admin",
                         "isApprovedAdmin": adm.get("isApprovedAdmin") == True,
                         "source": "admins_collection"
                     }
-                    
+
             for usr in users:
-                email_key = usr.get("email", "").lower().strip()
+                email_key = (usr.get("email") or "").lower().strip()
                 if email_key:
                     existing = admin_map.get(email_key)
+                    role = usr.get("role") or "admin"
                     admin_map[email_key] = {
                         "email": usr.get("email"),
                         "name": usr.get("name") or usr.get("username") or "Admin Candidate",
-                        "role": "admin",
-                        "isApprovedAdmin": usr.get("isApprovedAdmin") == True or (existing and existing.get("isApprovedAdmin") == True),
+                        "role": role,
+                        # Super-admins are inherently approved.
+                        "isApprovedAdmin": role == "super-admin" or usr.get("isApprovedAdmin") == True or (existing and existing.get("isApprovedAdmin") == True),
                         "source": "users_collection",
                         "userId": usr.get("userId")
                     }
-            
-            # Ensure Seba Freediving is always present as candidate
-            seba_email = "sebafreediving@gmail.com"
-            if seba_email not in admin_map:
-                admin_map[seba_email] = {
-                    "email": seba_email,
-                    "name": "Seba Freediving",
-                    "role": "admin",
-                    "isApprovedAdmin": False,
-                    "source": "admins_collection"
-                }
-            
+
             return {"success": True, "admins": list(admin_map.values())}
         except Exception as err:
             logger.error(f"[services.py] Failed to list admins: {err}", exc_info=True)
