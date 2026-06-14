@@ -17,6 +17,41 @@ def get_active_db(client):
     return client[db_target_var.get()]
 
 
+def notify_admins_of(db, ntf_type: str, title: str, title_ar: str, body: str, body_ar: str, payload: dict = None):
+    """Fan an admin notification out to every admin/super-admin in the given database.
+
+    Best-effort and never raises — notifications must not break the event that triggered
+    them. Operates on whatever DB the caller passes (so sandbox events notify sandbox
+    admins and production events notify production admins).
+    """
+    try:
+        import time
+        admins = db["users"].find({"role": {"$in": ["admin", "super-admin"]}}, {"userId": 1, "uid": 1})
+        ts = int(time.time() * 1000)
+        count = 0
+        for adm in admins:
+            uid = adm.get("userId") or adm.get("uid")
+            if not uid:
+                continue
+            db["notifications"].insert_one({
+                "_id": f"ntf_{ts}_{ntf_type}_{uid[:8]}_{count}",
+                "recipient_uid": uid,
+                "type": ntf_type,
+                "title": title,
+                "title_ar": title_ar,
+                "body": body,
+                "body_ar": body_ar,
+                "payload": payload or {},
+                "read": False,
+                "createdAt": ts
+            })
+            count += 1
+        return count
+    except Exception as err:
+        logger.warning(f"[notify_admins_of] Failed to fan out '{ntf_type}': {err}")
+        return 0
+
+
 # Helper to register route on a FastAPI app
 def register_telemetry_route(app: fastapi.FastAPI):
     # Check if the route is already registered to avoid duplication
@@ -612,7 +647,23 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     logger.info(f"[SEED] Purged mock users from production '{coll_name}': {res1.deleted_count} by email, {res2.deleted_count} by ID")
             except Exception as pe:
                 logger.error(f"[SEED] Error purging mock users from production: {pe}")
-            
+
+            # --- PURGE JUNK TEST BOOKS FROM SANDBOX (defense-in-depth) ---
+            # Dev/test tooling (scripts/reexec_dbox.py, scratch/test_polling.py) ingests
+            # throwaway books titled "Trigger-Test-*" / "Trigger-Test-Scratch-*" into the
+            # sandbox. Explicitly strip any such junk books and their pages so the catalog
+            # stays clean even if the collection-drop list below is ever changed.
+            try:
+                junk_title_regex = {"$regex": r"^(Trigger-Test|Scratch[- ]|Untitled Test)", "$options": "i"}
+                junk_books = list(db["books"].find({"title": junk_title_regex}, {"_id": 1}))
+                junk_ids = [b["_id"] for b in junk_books]
+                if junk_ids:
+                    db["book_pages"].delete_many({"book_id": {"$in": [str(x) for x in junk_ids]}})
+                    db["books"].delete_many({"_id": {"$in": junk_ids}})
+                    logger.info(f"[SEED] Purged {len(junk_ids)} junk test book(s) and their pages from sandbox")
+            except Exception as je:
+                logger.error(f"[SEED] Error purging junk test books from sandbox: {je}")
+
             # --- 0. DROP HISTORICAL COLLECTIONS TO PREVENT INDEX COLLISIONS ---
             collections_to_drop = [
                 "libraries", "curricula", "subjects", "books", "book_pages", 
@@ -1354,6 +1405,25 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     "grade": "General",
                     "isWhitelisted": True,
                     "banned": False
+                },
+                {
+                    # Dedicated sandbox admin persona (NOT the platform owner). The "admin"
+                    # demo persona maps to this user so the admin console is explored with a
+                    # clean, sandbox-scoped identity that never carries owner credentials.
+                    "userId": "sandbox_admin_demo_2026",
+                    "_id": "sandbox_admin_demo_2026",
+                    "name": "Rana Hassan (Sandbox Admin)",
+                    "username": "rana_admin",
+                    "email": "rana.admin@fahem.pro",
+                    "role": "admin",
+                    "userType": "admin",
+                    "school": "Fahem Sandbox",
+                    "avatar": "🛡️",
+                    "country": "EG",
+                    "grade": "General",
+                    "isWhitelisted": True,
+                    "banned": False,
+                    "tokenPolicy": { "weeklyLimit": 1000000, "usedTokens": 18000 }
                 }
             ]
             for usr in users_data:
@@ -1733,6 +1803,27 @@ def register_telemetry_route(app: fastapi.FastAPI):
             for _t in token_telemetry_data:
                 db["token_telemetry"].replace_one({"_id": _t["_id"]}, _t, upsert=True)
 
+            # Token telemetry + a login activity for the teacher and sandbox-admin personas
+            # so their Daily Token Budget and Insights panels are populated too (the demo
+            # persona mapping routes teacher -> tarek and admin -> the sandbox admin user).
+            _persona_extra = [
+                ("test_teacher_id_gemini_2026", "tarek.teacher@fahem.pro", "teacher"),
+                ("sandbox_admin_demo_2026", "rana.admin@fahem.pro", "admin"),
+            ]
+            for _puid, _pemail, _prole in _persona_extra:
+                for _i in range(8):
+                    db["token_telemetry"].replace_one(
+                        {"_id": f"tok_{_prole}_{_i}"},
+                        {"_id": f"tok_{_prole}_{_i}", "userId": _puid, "userEmail": _pemail,
+                         "promptTokens": 600 + _i * 40, "completionTokens": 300 + _i * 20, "totalTokens": 900 + _i * 60,
+                         "model": "gemini-3.1-flash-lite", "type": "chat", "timestamp": _iso(_i % 4, 9 + _i % 9)},
+                        upsert=True)
+                db["user_activities"].replace_one(
+                    {"_id": f"act_{_prole}_login"},
+                    {"_id": f"act_{_prole}_login", "userId": _puid, "userEmail": _pemail,
+                     "action": "session_login", "status": "success", "timestamp": _iso(0, 8),
+                     "details": {"role": _prole}}, upsert=True)
+
             # Audit logs → admin Activity Trail
             audit_logs_data = [
                 {"_id": "aud_seed_1", "category": "AUTH", "agent": "Auth Service", "message": "Student Ziad signed in", "details": "role=student", "timestamp": _iso(0, 8)},
@@ -2076,8 +2167,20 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 }},
                 upsert=True
             )
+
+            # Notify real (production) admins of the new crawler job.
+            try:
+                notify_admins_of(
+                    client["fahem"], "admin_crawler_job",
+                    "New crawler job started", "بدأت مهمة زحف جديدة",
+                    f"A crawl job started for {target_url}.", f"بدأت مهمة زحف للموقع {target_url}.",
+                    {"deep_link": "?tab=admin-ingestion", "job_id": job_id}
+                )
+            except Exception as _e:
+                logger.warning(f"Failed to notify admins of crawler job: {_e}")
+
             client.close()
-            
+
             import subprocess
             
             def run_crawler_background(j_id: str, u_str: str, depth: int, email: str):
@@ -3818,7 +3921,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 )
             except Exception as ttl_err:
                 logger.warning(f"Failed to run TTL cleanup in fahem_sandbox: {ttl_err}")
-                
+
+            # Admin notifications: a new demo started + a concurrency alert past 10 running.
+            # Real admins live in production 'fahem', so notify there.
+            try:
+                active_count = client["fahem_sandbox"]["demo_sessions"].count_documents({"status": "active"})
+                prod_db = client["fahem"]
+                persona = payload.get("role") or payload.get("persona") or "guest"
+                notify_admins_of(
+                    prod_db, "admin_new_demo",
+                    "New demo session started", "بدأت جلسة تجريبية جديدة",
+                    f"A new '{persona}' demo session started ({active_count} active).",
+                    f"بدأت جلسة تجريبية جديدة بدور '{persona}' ({active_count} نشطة).",
+                    {"deep_link": "?tab=admin", "active_count": active_count}
+                )
+                if active_count > 10:
+                    recent_overload = prod_db["notifications"].find_one({
+                        "type": "admin_demo_overload", "read": False,
+                        "createdAt": {"$gt": int(time.time() * 1000) - 3600000}
+                    })
+                    if not recent_overload:
+                        notify_admins_of(
+                            prod_db, "admin_demo_overload",
+                            "High demo load", "ضغط مرتفع على الجلسات التجريبية",
+                            f"More than 10 demo sessions are running concurrently ({active_count}).",
+                            f"يوجد أكثر من 10 جلسات تجريبية متزامنة حالياً ({active_count}).",
+                            {"deep_link": "?tab=admin", "active_count": active_count}
+                        )
+            except Exception as ntf_err:
+                logger.warning(f"Failed to send demo admin notifications: {ntf_err}")
+
             client.close()
             return {"success": True}
         except Exception as err:
@@ -4203,6 +4335,21 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
     def run_ingest_in_background(payload):
         import threading
+        # Notify real (production) admins that an ingestion job has started.
+        try:
+            from tools import get_mongodb_uri as _gmu
+            from pymongo import MongoClient as _MC
+            _c = _MC(_gmu(), serverSelectionTimeoutMS=4000)
+            _bt = payload.get("title") or payload.get("book_id") or "a book"
+            notify_admins_of(
+                _c["fahem"], "admin_ingestion_job",
+                "New ingestion job started", "بدأت مهمة استيعاب جديدة",
+                f"Ingestion started for '{_bt}'.", f"بدأ استيعاب الكتاب '{_bt}'.",
+                {"deep_link": "?tab=admin-ingestion"}
+            )
+            _c.close()
+        except Exception as _e:
+            logger.warning(f"Failed to notify admins of ingestion job: {_e}")
         def target():
             try:
                 import sys
@@ -5283,6 +5430,31 @@ def register_telemetry_route(app: fastapi.FastAPI):
             content = data.get("content", "")
             is_group = data.get("isGroup", False)
             success = await save_chat_message(sender_id, sender_name, recipient_id, content, is_group)
+            # Notify the recipient of a new private (direct) message.
+            if success and recipient_id and not is_group:
+                try:
+                    from tools import get_mongodb_uri as _gmu
+                    from pymongo import MongoClient as _MC
+                    import time as _t
+                    _c = _MC(_gmu(), serverSelectionTimeoutMS=4000)
+                    _db = get_active_db(_c)
+                    _snip = (content or "")[:80]
+                    _ts = int(_t.time() * 1000)
+                    _db["notifications"].insert_one({
+                        "_id": f"ntf_{_ts}_dm_{recipient_id[:8]}",
+                        "recipient_uid": recipient_id,
+                        "type": "private_message",
+                        "title": f"New message from {sender_name or 'someone'}",
+                        "title_ar": f"رسالة جديدة من {sender_name or 'مستخدم'}",
+                        "body": _snip,
+                        "body_ar": _snip,
+                        "payload": {"sender_id": sender_id, "deep_link": "?tab=social"},
+                        "read": False,
+                        "createdAt": _ts
+                    })
+                    _c.close()
+                except Exception as _e:
+                    logger.warning(f"Failed to notify recipient of private message: {_e}")
             return {"status": "success" if success else "error"}
         except Exception as err:
             logger.error(f"[services.py] Failed to save chat message: {err}", exc_info=True)

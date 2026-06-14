@@ -883,6 +883,32 @@ class MongoDBEngine:
             upsert=True
         )
         logger.info(f"[MongoDBEngine] Idempotently created default user profile for {user_id} ({email})")
+
+        # Notify admins of the new sign-up (with the user type). Best-effort — never block signup.
+        try:
+            import time as _t
+            _ts = int(_t.time() * 1000)
+            _i = 0
+            for _adm in self._db["users"].find({"role": {"$in": ["admin", "super-admin"]}}, {"userId": 1}):
+                _auid = _adm.get("userId")
+                if not _auid or _auid == user_id:
+                    continue
+                self._db["notifications"].insert_one({
+                    "_id": f"ntf_{_ts}_signup_{str(_auid)[:8]}_{_i}",
+                    "recipient_uid": _auid,
+                    "type": "admin_new_signup",
+                    "title": f"New {final_role} signed up",
+                    "title_ar": f"تسجيل مستخدم جديد ({final_role})",
+                    "body": f"{name or username} ({email}) joined as {final_role}.",
+                    "body_ar": f"انضم {name or username} ({email}) بصفة {final_role}.",
+                    "payload": {"new_user_id": user_id, "deep_link": "?tab=super-admin-users"},
+                    "read": False,
+                    "createdAt": _ts
+                })
+                _i += 1
+        except Exception as _e:
+            logger.warning(f"Failed to notify admins of new signup: {_e}")
+
         return validated
 
     async def delete_user_account(self, user_id: str, email: str) -> bool:

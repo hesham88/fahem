@@ -261,6 +261,36 @@ def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
                 if ts >= thirty_days_ago:
                     monthly_used += tt
 
+        # Token-threshold notifications: warn the user at >=80% and tell them when a
+        # budget is exhausted (and alert admins). Deduped to at most one per type / 12h.
+        try:
+            import time as _t
+            _windows = [("daily", daily_used, daily_limit), ("weekly", weekly_used, weekly_limit),
+                        ("monthly", monthly_used, monthly_limit), ("lifetime", lifetime_used, lifetime_limit)]
+            _worst, _worst_name = 0.0, ""
+            for _wn, _u, _l in _windows:
+                if _l and _l > 0 and (_u / _l) > _worst:
+                    _worst, _worst_name = _u / _l, _wn
+            _ntf_type = "token_exhausted" if _worst >= 1.0 else ("token_warning" if _worst >= 0.8 else None)
+            if _ntf_type and uid:
+                _now_ms = int(_t.time() * 1000)
+                if not db["notifications"].find_one({"recipient_uid": uid, "type": _ntf_type, "createdAt": {"$gt": _now_ms - 43200000}}):
+                    _pct = int(_worst * 100)
+                    if _ntf_type == "token_exhausted":
+                        _ttl, _ttl_ar = "AI budget exhausted", "نفدت ميزانية الذكاء الاصطناعي"
+                        _bdy = f"Your {_worst_name} token budget is used up — AI services are paused until it resets."
+                        _bdy_ar = f"نفدت ميزانية التوكن ({_worst_name}) — تم إيقاف خدمات الذكاء الاصطناعي حتى تتجدد."
+                    else:
+                        _ttl, _ttl_ar = "AI budget almost used up", "ميزانية الذكاء الاصطناعي على وشك النفاد"
+                        _bdy = f"You've used {_pct}% of your {_worst_name} token budget."
+                        _bdy_ar = f"لقد استخدمت {_pct}% من ميزانية التوكن ({_worst_name})."
+                    db["notifications"].insert_one({"_id": f"ntf_{_now_ms}_{_ntf_type}_{str(uid)[:8]}",
+                        "recipient_uid": uid, "type": _ntf_type, "title": _ttl, "title_ar": _ttl_ar,
+                        "body": _bdy, "body_ar": _bdy_ar, "payload": {"window": _worst_name, "percent": _pct},
+                        "read": False, "createdAt": _now_ms})
+        except Exception as _e:
+            logger.warning(f"Failed to send token-threshold notification: {_e}")
+
         client.close()
 
         if daily_limit and daily_used >= daily_limit:
