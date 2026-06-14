@@ -85,175 +85,200 @@ def register_telemetry_route(app: fastapi.FastAPI):
             if is_gcp or "fahemcluster" in get_mongodb_uri():
                 raise e
 
-    # Secure OIDC Bearer Token Verification Middleware for Cloud Run environment with Fail-Closed defaults
-    @app.middleware("http")
-    async def oidc_security_middleware(request: fastapi.Request, call_next):
-        PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha", "/sms/rate-limit", "/public/usernames"}
-        path = request.url.path
-        is_secured = path not in PUBLIC_PATHS and not any(path.startswith(p + "/") for p in PUBLIC_PATHS if p != "/")
-        
-        principal = None
-        
-        # Parse X-Verified-Principal header if present
-        verified_principal_header = request.headers.get("X-Verified-Principal")
-        if verified_principal_header:
-            try:
-                principal = json.loads(verified_principal_header)
-                logger.info(f"[PRINCIPAL] Parsed principal from X-Verified-Principal: {principal}")
-            except Exception as pe:
-                logger.warning(f"[PRINCIPAL] Failed to parse X-Verified-Principal: {pe}")
+    # Secure OIDC Bearer Token Verification implemented as a PURE ASGI middleware.
+    #
+    # IMPORTANT: this MUST be a pure ASGI middleware, not a @app.middleware("http")
+    # (Starlette BaseHTTPMiddleware). A BaseHTTPMiddleware runs the endpoint in a
+    # separate task and `call_next` returns as soon as the response *starts*; for a
+    # streaming response (the ADK /run_sse agent stream) the request-scoped
+    # contextvars set here would be reset in `finally` BEFORE the agent body
+    # actually runs, so db_target ("fahem_sandbox") was lost and the agent silently
+    # fell back to the default "fahem" (production) database. A pure ASGI middleware
+    # shares a single execution context with the endpoint for the entire streamed
+    # response, keeping db_target / principal in effect while the tools run.
+    class OidcSecurityMiddleware:
+        def __init__(self, asgi_app):
+            self.asgi_app = asgi_app
 
-        if is_secured:
-            is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
-            auth_header = request.headers.get("Authorization")
-            
-            # LOCAL_BYPASS_TOKEN_fahem_2026 is fully removed and purged!
-            
-            token = None
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header[7:]
-                
-            if token:
+        async def __call__(self, scope, receive, send):
+            if scope.get("type") != "http":
+                await self.asgi_app(scope, receive, send)
+                return
+
+            request = fastapi.Request(scope, receive=receive)
+
+            PUBLIC_PATHS = {"/healthz", "/health", "/", "/verify-recaptcha", "/sms/rate-limit", "/public/usernames"}
+            path = request.url.path
+            is_secured = path not in PUBLIC_PATHS and not any(path.startswith(p + "/") for p in PUBLIC_PATHS if p != "/")
+
+            principal = None
+
+            # Parse X-Verified-Principal header if present
+            verified_principal_header = request.headers.get("X-Verified-Principal")
+            if verified_principal_header:
                 try:
-                    from google.oauth2 import id_token
-                    from google.auth.transport import requests as auth_requests
-                    from google.auth import jwt
-                    
-                    # 1. Decode token payload without verification to inspect the audience dynamically
-                    payload = jwt.decode(token, verify=False)
-                    aud = payload.get("aud")
-                    
-                    # 2. Verify signature, expiry, and dynamic audience
-                    id_info = id_token.verify_oauth2_token(token, auth_requests.Request(), audience=aud)
-                    email = id_info.get("email")
-                    logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
-                    request.state.verified_email = email
-                    
-                    # Reject X-Verified-Principal spoofing on GCP Run, but trust verified GCP service accounts:
-                    # Identity is strictly derived from the verified token
-                    is_service_account = email.endswith("gserviceaccount.com")
-                    passed_principal = principal if (principal and isinstance(principal, dict)) else {}
-                    passed_role = passed_principal.get("role") if passed_principal else "user"
-                    verified_role = passed_role if is_service_account else ("super-admin" if email == "hesham1988@gmail.com" else "user")
-                    # Only the real owner or service account can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
-                    passed_db_target = passed_principal.get("db_target") if passed_principal else None
-                    db_target = passed_db_target if (email == "hesham1988@gmail.com" or is_service_account) and passed_db_target else "fahem_sandbox"
-                    
-                    # Trust verified service accounts to forward actual user identity (uid/email)
-                    verified_uid = passed_principal.get("uid") if is_service_account and passed_principal.get("uid") else id_info.get("sub", "unknown_gcp_uid")
-                    verified_email = passed_principal.get("email") if is_service_account and passed_principal.get("email") else email
-                    
-                    principal = {
-                        "uid": verified_uid,
-                        "email": verified_email,
-                        "role": verified_role,
-                        "db_target": db_target,
-                        "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
-                        "selected_text": passed_principal.get("selected_text"),
-                        "book_id": passed_principal.get("book_id"),
-                        "page": passed_principal.get("page")
-                    }
-                except Exception as err:
-                    logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
+                    principal = json.loads(verified_principal_header)
+                    logger.info(f"[PRINCIPAL] Parsed principal from X-Verified-Principal: {principal}")
+                except Exception as pe:
+                    logger.warning(f"[PRINCIPAL] Failed to parse X-Verified-Principal: {pe}")
+
+            if is_secured:
+                is_gcp = os.environ.get("K_SERVICE") is not None or os.environ.get("GOOGLE_CLOUD_PROJECT") is not None
+                auth_header = request.headers.get("Authorization")
+
+                # LOCAL_BYPASS_TOKEN_fahem_2026 is fully removed and purged!
+
+                token = None
+                if auth_header and auth_header.startswith("Bearer "):
+                    token = auth_header[7:]
+
+                if token:
+                    try:
+                        from google.oauth2 import id_token
+                        from google.auth.transport import requests as auth_requests
+                        from google.auth import jwt
+
+                        # 1. Decode token payload without verification to inspect the audience dynamically
+                        payload = jwt.decode(token, verify=False)
+                        aud = payload.get("aud")
+
+                        # 2. Verify signature, expiry, and dynamic audience
+                        id_info = id_token.verify_oauth2_token(token, auth_requests.Request(), audience=aud)
+                        email = id_info.get("email")
+                        logger.info(f"[OIDC VERIFIED] Request to {path} authenticated for: {email}")
+                        request.state.verified_email = email
+
+                        # Reject X-Verified-Principal spoofing on GCP Run, but trust verified GCP service accounts:
+                        # Identity is strictly derived from the verified token
+                        is_service_account = email.endswith("gserviceaccount.com")
+                        passed_principal = principal if (principal and isinstance(principal, dict)) else {}
+                        passed_role = passed_principal.get("role") if passed_principal else "user"
+                        verified_role = passed_role if is_service_account else ("super-admin" if email == "hesham1988@gmail.com" else "user")
+                        # Only the real owner or service account can choose a db_target, everyone else is unconditionally forced to 'fahem_sandbox'
+                        passed_db_target = passed_principal.get("db_target") if passed_principal else None
+                        db_target = passed_db_target if (email == "hesham1988@gmail.com" or is_service_account) and passed_db_target else "fahem_sandbox"
+
+                        # Trust verified service accounts to forward actual user identity (uid/email)
+                        verified_uid = passed_principal.get("uid") if is_service_account and passed_principal.get("uid") else id_info.get("sub", "unknown_gcp_uid")
+                        verified_email = passed_principal.get("email") if is_service_account and passed_principal.get("email") else email
+
+                        principal = {
+                            "uid": verified_uid,
+                            "email": verified_email,
+                            "role": verified_role,
+                            "db_target": db_target,
+                            "selected_book_ids": passed_principal.get("selected_book_ids") if isinstance(passed_principal.get("selected_book_ids"), list) else [],
+                            "selected_text": passed_principal.get("selected_text"),
+                            "book_id": passed_principal.get("book_id"),
+                            "page": passed_principal.get("page")
+                        }
+                    except Exception as err:
+                        logger.warning(f"[OIDC FAILED] Token verification failed for {path}: {err}")
+                        if is_gcp:
+                            response = fastapi.responses.JSONResponse(
+                                content={"status": "error", "error": f"Unauthorized: Invalid OIDC Token ({str(err)})"},
+                                status_code=401
+                            )
+                            await response(scope, receive, send)
+                            return
+                else:
                     if is_gcp:
-                        return fastapi.responses.JSONResponse(
-                            content={"status": "error", "error": f"Unauthorized: Invalid OIDC Token ({str(err)})"},
+                        logger.warning(f"[OIDC BLOCKED] Request to {path} blocked: No OIDC Bearer Token.")
+                        response = fastapi.responses.JSONResponse(
+                            content={"status": "error", "error": "Unauthorized: OIDC Bearer token required on Google Cloud Run"},
                             status_code=401
                         )
-            else:
-                if is_gcp:
-                    logger.warning(f"[OIDC BLOCKED] Request to {path} blocked: No OIDC Bearer Token.")
-                    return fastapi.responses.JSONResponse(
-                        content={"status": "error", "error": "Unauthorized: OIDC Bearer token required on Google Cloud Run"},
-                        status_code=401
-                    )
-                else:
-                    logger.info(f"[OIDC BYPASS] Local request to {path} permitted without OIDC token.")
-                    if not principal:
-                        principal = {
-                            "uid": "local_dev_uid",
-                            "email": "local_dev@fahem.app",
-                            "role": "super-admin"
-                        }
-        
-        # Propagate principal to request state and contextvar
-        request.state.principal = principal
-        if principal:
-            request.state.verified_email = principal.get("email")
-            
-        token_ctx = None
-        try:
-            from guardrails import verified_principal_ctx
-            if verified_principal_ctx is not None and principal:
-                token_ctx = verified_principal_ctx.set(principal)
-        except Exception as ctx_err:
-            logger.warning(f"Failed to import/set verified_principal_ctx: {ctx_err}")
+                        await response(scope, receive, send)
+                        return
+                    else:
+                        logger.info(f"[OIDC BYPASS] Local request to {path} permitted without OIDC token.")
+                        if not principal:
+                            principal = {
+                                "uid": "local_dev_uid",
+                                "email": "local_dev@fahem.app",
+                                "role": "super-admin"
+                            }
 
-        db_target_ctx = None
-        selected_book_ids_ctx = None
-        try:
-            db_target = "fahem"
-            selected_book_ids = []
-            if principal and isinstance(principal, dict):
-                db_target = principal.get("db_target") or "fahem"
-                selected_book_ids = principal.get("selected_book_ids") or []
-            
-            try:
-                from agents.mongodb_engine import db_target_var, selected_book_ids_var
-            except ImportError:
-                from mongodb_engine import db_target_var, selected_book_ids_var
-                
-            db_target_ctx = db_target_var.set(db_target)
-            selected_book_ids_ctx = selected_book_ids_var.set(selected_book_ids)
-            logger.info(f"[DB TARGET] ContextVar db_target set for request: {db_target}")
-            logger.info(f"[SELECTED BOOKS] ContextVar selected_book_ids set to: {selected_book_ids}")
-        except Exception as sb_err:
-            logger.warning(f"Failed to set context variables: {sb_err}")
+            # Propagate principal to request state and contextvar
+            request.state.principal = principal
+            if principal:
+                request.state.verified_email = principal.get("email")
 
-        # Idempotent user profile provisioning on first authenticated request (R22)
-        if principal and principal.get("uid") and principal.get("email"):
+            token_ctx = None
             try:
+                from guardrails import verified_principal_ctx
+                if verified_principal_ctx is not None and principal:
+                    token_ctx = verified_principal_ctx.set(principal)
+            except Exception as ctx_err:
+                logger.warning(f"Failed to import/set verified_principal_ctx: {ctx_err}")
+
+            db_target_ctx = None
+            selected_book_ids_ctx = None
+            try:
+                db_target = "fahem"
+                selected_book_ids = []
+                if principal and isinstance(principal, dict):
+                    db_target = principal.get("db_target") or "fahem"
+                    selected_book_ids = principal.get("selected_book_ids") or []
+
                 try:
-                    from agents.mongodb_engine import MongoDBEngine
+                    from agents.mongodb_engine import db_target_var, selected_book_ids_var
                 except ImportError:
-                    from mongodb_engine import MongoDBEngine
-                db_engine = MongoDBEngine()
-                if db_engine._client is not None:
-                    await db_engine.ensure_user_profile(
-                        user_id=principal.get("uid"),
-                        email=principal.get("email"),
-                        display_name=principal.get("displayName") or principal.get("name")
-                    )
-            except Exception as pe_err:
-                logger.warning(f"Failed to auto-provision user profile: {pe_err}")
+                    from mongodb_engine import db_target_var, selected_book_ids_var
 
-        try:
-            return await call_next(request)
-        finally:
-            if token_ctx is not None:
-                try:
-                    from guardrails import verified_principal_ctx
-                    verified_principal_ctx.reset(token_ctx)
-                except Exception:
-                    pass
-            if db_target_ctx is not None:
-                try:
-                    try:
-                        from agents.mongodb_engine import db_target_var
-                    except ImportError:
-                        from mongodb_engine import db_target_var
-                    db_target_var.reset(db_target_ctx)
-                except Exception:
-                    pass
-            if selected_book_ids_ctx is not None:
+                db_target_ctx = db_target_var.set(db_target)
+                selected_book_ids_ctx = selected_book_ids_var.set(selected_book_ids)
+                logger.info(f"[DB TARGET] ContextVar db_target set for request: {db_target}")
+                logger.info(f"[SELECTED BOOKS] ContextVar selected_book_ids set to: {selected_book_ids}")
+            except Exception as sb_err:
+                logger.warning(f"Failed to set context variables: {sb_err}")
+
+            # Idempotent user profile provisioning on first authenticated request (R22)
+            if principal and principal.get("uid") and principal.get("email"):
                 try:
                     try:
-                        from agents.mongodb_engine import selected_book_ids_var
+                        from agents.mongodb_engine import MongoDBEngine
                     except ImportError:
-                        from mongodb_engine import selected_book_ids_var
-                    selected_book_ids_var.reset(selected_book_ids_ctx)
-                except Exception:
-                    pass
+                        from mongodb_engine import MongoDBEngine
+                    db_engine = MongoDBEngine()
+                    if db_engine._client is not None:
+                        await db_engine.ensure_user_profile(
+                            user_id=principal.get("uid"),
+                            email=principal.get("email"),
+                            display_name=principal.get("displayName") or principal.get("name")
+                        )
+                except Exception as pe_err:
+                    logger.warning(f"Failed to auto-provision user profile: {pe_err}")
+
+            try:
+                await self.asgi_app(scope, receive, send)
+            finally:
+                if token_ctx is not None:
+                    try:
+                        from guardrails import verified_principal_ctx
+                        verified_principal_ctx.reset(token_ctx)
+                    except Exception:
+                        pass
+                if db_target_ctx is not None:
+                    try:
+                        try:
+                            from agents.mongodb_engine import db_target_var
+                        except ImportError:
+                            from mongodb_engine import db_target_var
+                        db_target_var.reset(db_target_ctx)
+                    except Exception:
+                        pass
+                if selected_book_ids_ctx is not None:
+                    try:
+                        try:
+                            from agents.mongodb_engine import selected_book_ids_var
+                        except ImportError:
+                            from mongodb_engine import selected_book_ids_var
+                        selected_book_ids_var.reset(selected_book_ids_ctx)
+                    except Exception:
+                        pass
+
+    app.add_middleware(OidcSecurityMiddleware)
 
 
     @app.get("/health")

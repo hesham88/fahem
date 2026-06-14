@@ -524,7 +524,7 @@ export async function POST(req: NextRequest) {
                   existingMessages = session.messages;
                 }
               } else {
-                const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET");
+                const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET", undefined, ctx);
                 if (res.ok) {
                   const data = await res.json();
                   if (data?.session?.messages) {
@@ -585,7 +585,7 @@ export async function POST(req: NextRequest) {
                   userEmail,
                   title,
                   messages: newMessages
-                });
+                }, ctx);
               }
             } catch (err) {
               console.warn("Failed to save session history:", err);
@@ -605,7 +605,7 @@ export async function POST(req: NextRequest) {
                 totalTokens,
                 model: process.env.GEMINI_MODEL || "gemini-3.1-flash-lite",
                 type: onboarding ? "onboarding_agent" : "standard_orchestrator"
-              });
+              }, ctx);
             } catch (err) {
               console.warn("Failed to log token telemetry:", err);
             }
@@ -618,7 +618,7 @@ export async function POST(req: NextRequest) {
                 action: onboarding ? "Onboarding Agent Query" : "Standard Agent Query",
                 status: "SUCCESS",
                 details: prompt.substring(0, 150)
-              });
+              }, ctx);
             } catch (err) {
               console.warn("Failed to log user activity:", err);
             }

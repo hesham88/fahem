@@ -2874,6 +2874,10 @@ User Question: ${queryText}`;
           msg.id === assistantMsgId ? { ...msg, activeAgent: undefined } : msg
         )
       );
+      // Notify the dashboard so the Daily Token Budget widget re-fetches usage after each turn.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("fahem_tokens_updated"));
+      }
     }
   };
 

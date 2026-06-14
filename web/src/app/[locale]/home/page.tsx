@@ -1251,6 +1251,19 @@ export default function Home() {
     };
   }, []);
 
+  // Refresh the Daily Token Budget widget whenever the companion finishes a turn.
+  useEffect(() => {
+    const handleTokensUpdated = () => {
+      if (user?.uid) {
+        fetchUserTokenStats(user.uid);
+      }
+    };
+    window.addEventListener("fahem_tokens_updated", handleTokensUpdated);
+    return () => {
+      window.removeEventListener("fahem_tokens_updated", handleTokensUpdated);
+    };
+  }, [user]);
+
   // Deep-linking: initial URL query load on app startup
   useEffect(() => {
     if (typeof window !== "undefined") {
