@@ -4889,6 +4889,10 @@ export default function Home() {
         localStorage.removeItem("judge_bypass_session");
         localStorage.removeItem("judge_bypass_email");
         sessionStorage.removeItem("judge_selected_persona");
+        // FC7.30: tell the floating companion (StickyChat) in-tab that demo mode ended so it tears
+        // down INSTANTLY (its demoMode syncs on this event) instead of lingering until a refresh.
+        window.dispatchEvent(new Event("fahem_demo_changed"));
+        window.dispatchEvent(new CustomEvent("fahem_chat_close"));
       }
       await signOut(auth);
       router.push(`/${language}`);
