@@ -49,7 +49,9 @@ interface SocialPanelProps {
   directorySearch: string;
   setDirectorySearch: (val: string) => void;
   handleToggleFriend: (friend: any) => void;
-  
+  // FC7.7: when true, the member directory + private chat are disabled (sandbox has no verified identity).
+  isDemoSandbox?: boolean;
+
   // Dynamic helpers passed from parent
   renderAvatar: (avatar: any, size: string) => React.ReactNode;
 }
@@ -75,6 +77,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
   directorySearch,
   setDirectorySearch,
   handleToggleFriend,
+  isDemoSandbox,
   renderAvatar,
 }) => {
   // Navigation Tabs
@@ -1302,7 +1305,18 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                   <span>{language === "ar" ? "دليل مستخدمي المنصة" : "Discover Members & Directory"}</span>
                 </h2>
 
+                {/* FC7.7: in the sandbox the directory + private chat are disabled — exposing real members
+                    or DMing them is unsafe without a verified identity. Show a notice instead. */}
+                {isDemoSandbox && (
+                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem", border: "1px dashed var(--card-border)", borderRadius: "var(--border-radius-sm)", lineHeight: 1.6 }}>
+                    🔒 {language === "ar"
+                      ? "دليل الأعضاء والمحادثات الخاصة معطّلة في البيئة التجريبية للحفاظ على الخصوصية. سجّل الدخول بحساب حقيقي للتواصل مع المجتمع."
+                      : "The member directory and private messaging are disabled in the demo sandbox to protect privacy. Sign in with a real account to connect with the community."}
+                  </div>
+                )}
+
                 {/* Search bar */}
+                {!isDemoSandbox && (
                 <div style={{ position: "relative", marginBottom: "1rem" }}>
                   <input
                     type="text"
@@ -1325,8 +1339,9 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                     }}
                   />
                 </div>
+                )}
 
-                {loadingAllUsers ? (
+                {!isDemoSandbox && (loadingAllUsers ? (
                   <div
                     style={{
                       display: "flex",
@@ -1464,7 +1479,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                         );
                       })}
                   </div>
-                )}
+                ))}
               </section>
             </div>
           </div>

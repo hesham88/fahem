@@ -2693,6 +2693,8 @@ export default function Home() {
   };
 
   const fetchChatMessages = async (recipientId: string) => {
+    // FC7.7: inter-user chat is disabled in the sandbox (unsafe without verified identity).
+    if (isDemoSandbox) return;
     if (!user) return;
     setChatLoading(true);
     try {
@@ -2709,6 +2711,13 @@ export default function Home() {
   };
 
   const sendChatMessage = async () => {
+    // FC7.7: inter-user messaging is disabled in the sandbox (unsafe without verified identity).
+    if (isDemoSandbox) {
+      alert(language === "ar"
+        ? "المحادثات بين المستخدمين معطّلة في البيئة التجريبية. سجّل الدخول بحساب حقيقي للتواصل."
+        : "User-to-user messaging is disabled in the demo sandbox. Sign in with a real account to chat.");
+      return;
+    }
     if (!user || !chatRecipient || !chatInput.trim()) return;
     const msgContent = chatInput.trim();
     setChatInput("");
@@ -2814,8 +2823,16 @@ export default function Home() {
   };
 
   const handleDeleteUserAccount = async () => {
+    // FC7.8: in the sandbox the GDPR "right to be forgotten" must NOT delete the shared demo user —
+    // show a demo notice and bail instead of performing any destructive action.
+    if (isDemoSandbox) {
+      alert(language === "ar"
+        ? "هذه بيئة تجريبية فقط — حذف الحساب معطّل هنا. يرجى تسجيل الدخول بحساب حقيقي لاستخدام كامل الميزات."
+        : "This is just a demo — account deletion is disabled in the sandbox. Sign in with a real account to use full features.");
+      return;
+    }
     if (!user || !user.email) return;
-    const confirmMsg = language === "ar" 
+    const confirmMsg = language === "ar"
       ? "تنبيه هام جداً: هل أنت متأكد تماماً من حذف حسابك بالكامل؟ سيؤدي هذا إلى مسح كافة بياناتك وسجلاتك ومحادثاتك نهائياً من قاعدة البيانات بلا رجعة وفقاً لمعايير GDPR."
       : "CRITICAL WARNING: Are you absolutely sure you want to delete your account? This will permanently wipe your profile, chat history, activity logs, and token telemetry from the database in compliance with GDPR. This action CANNOT be undone.";
     
@@ -6988,6 +7005,7 @@ export default function Home() {
             directorySearch={directorySearch}
             setDirectorySearch={setDirectorySearch}
             handleToggleFriend={handleToggleFriend}
+            isDemoSandbox={isDemoSandbox}
             renderAvatar={renderAvatar}
           />
         ) : activeTab === "settings" ? (

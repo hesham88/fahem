@@ -518,6 +518,21 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
     return text;
   };
 
+  // FC7.6: in the sandbox the Curriculum Studio is VIEW-ONLY (it reads sandbox data via the demo
+  // token's db_target). Any edit/mutation shows a demo notice instead of acting; real edits require a
+  // signed-in admin with approval. (The backend also rejects sandbox mutations — FC7.2/7.4 — this is
+  // the friendly client-side guard so the user gets a clear message rather than a silent 403.)
+  const isDemoSandbox = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+  const blockedInDemo = (): boolean => {
+    if (isDemoSandbox) {
+      alert(isAr
+        ? "هذه نسخة تجريبية — تعديل المناهج يتطلب تسجيل الدخول كمشرف معتمد. سجّل الدخول لاستخدام كامل الميزات."
+        : "This is just a demo — editing the curriculum requires a signed-in admin with approval. Sign in for full features.");
+      return true;
+    }
+    return false;
+  };
+
   const [activeTab, setActiveTab] = useState<"libraries" | "curricula_builder" | "ingest_console">("libraries");
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -967,6 +982,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Library
   const handleSaveLibrary = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockedInDemo()) return;
     
     let finalId = libForm._id?.trim();
     if (!finalId && libForm.name) {
@@ -1033,6 +1049,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Curriculum
   const handleSaveCurriculum = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockedInDemo()) return;
     if (!curForm.title || !curForm.title_ar || !selectedLibId) {
       triggerToast("Missing curriculum primary details", true);
       return;
@@ -1081,6 +1098,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleDeleteLibrary = async () => {
+    if (blockedInDemo()) return;
     if (!libForm._id) return;
     if (!confirm(isAr 
       ? `هل أنت متأكد من حذف هذه المكتبة (${libForm.name})؟ سيتم فصل الكتب التابعة لها ولكن لن يتم حذف ملفاتها.` 
@@ -1113,6 +1131,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleDeleteCurriculum = async () => {
+    if (blockedInDemo()) return;
     if (!selectedCurriculumId) return;
     if (!confirm(isAr 
       ? `هل أنت متأكد من حذف هذا المنهج؟ سيتم حذف المواد وفصل الكتب التابعة لها ولكن لن يتم حذف ملفاتها.` 
@@ -1147,6 +1166,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Subject
   const handleSaveSubject = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockedInDemo()) return;
     if (!subjForm.name || !subjForm.name_ar || !selectedCurriculumId) {
       triggerToast("Missing subject primary specifications", true);
       return;
@@ -1184,6 +1204,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   // Actions: Assign Book
   const handleAssignBook = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockedInDemo()) return;
     const targetSubjId = assignSubjId || selectedSubjectId;
     if (!assignBookId || !targetSubjId || !selectedCurriculumId) {
       triggerToast("Please select a book, target subject, and active curriculum", true);
@@ -1218,6 +1239,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   // Actions: Crawling & Ingesting
   const handleStartCrawling = async () => {
+    if (blockedInDemo()) return;
     if (!crawlUrl) return;
     setIsCrawling(true);
     setCrawlProgress(5);
@@ -1254,6 +1276,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleControlCrawlJob = async (jobId: string, action: "pause" | "resume" | "stop" | "kill") => {
+    if (blockedInDemo()) return;
     try {
       addTerminalLog(`[CRAWLER] Sending command ${action.toUpperCase()} to job ${jobId}...`);
       const res = await authedFetch("/api/admin/crawl", {
@@ -1309,6 +1332,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleBulkIngest = async () => {
+    if (blockedInDemo()) return;
     const selectedList = discoveredBooks.filter(b => selectedDiscovered[b.id]);
     const targetSubjectIds = Object.keys(selectedSubjectIds).filter(sid => !!selectedSubjectIds[sid]);
 
@@ -1368,6 +1392,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
 
   const handleDirectIngest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockedInDemo()) return;
     const targetSubjectIds = Object.keys(selectedSubjectIds).filter(sid => !!selectedSubjectIds[sid]);
 
     if (!manualIngestForm.title || !manualIngestForm.source_url) {
@@ -1425,6 +1450,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleTerminateJob = async (id: string) => {
+    if (blockedInDemo()) return;
     try {
       const res = await authedFetch(`/api/books/cancel?bookId=${id}`, { method: "POST" });
       if (res.ok) {
@@ -1439,6 +1465,7 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
   };
 
   const handleControlJob = async (bookId: string, jobId: string, action: "pause" | "resume" | "stop" | "kill") => {
+    if (blockedInDemo()) return;
     try {
       const res = await authedFetch('/api/books/control', {
         method: 'POST',
