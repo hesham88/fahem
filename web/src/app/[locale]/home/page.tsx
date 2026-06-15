@@ -1911,7 +1911,11 @@ export default function Home() {
 
 
   // 5. Zatonas Spaces State
+  // FC7.10: this MUST start with a default space. When it was empty, currentZatona was undefined,
+  // zatonaPrompt resolved to "" and setZatonaPrompt mapped over an empty array (a no-op) — so the
+  // Zatona "additional directions" textarea silently discarded every keystroke (looked uneditable).
   const [activeZatonas, setActiveZatonas] = useState<any[]>([
+    { id: "zatona_1", name: "Zatona 1", zatonaPrompt: "", zatonaResult: "", zatonaResultAr: "" }
   ]);
   const [selectedZatonaId, setSelectedZatonaId] = useState<string>("zatona_1");
   const currentZatona = activeZatonas.find(z => z.id === selectedZatonaId) || activeZatonas[0];

@@ -1011,32 +1011,56 @@ async def create_practice_tool(
 async def create_zatona_tool(
     concept: str,
     language: Optional[str] = None,
-    book_id: Optional[str] = None
+    book_id: Optional[str] = None,
+    subject: Optional[str] = None,
+    chapters: Optional[List[str]] = None,
+    custom_concepts: Optional[str] = None,
+    additional_directions: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Generates an instant, highly focused 'Zatona' summary core for a given academic concept.
+    """Generates an instant, highly focused 'Zatona' summary core. Covers the three Zatona scope
+    forms; pick ONE scope and fill its fields:
 
     Args:
-        concept: The key concept or topic to summarize (e.g. 'Photosynthesis', 'Linear Equations').
+        concept: The key concept/topic to summarize, OR the pasted excerpt for the Pasted-Text scope.
         language: Optional language preference ('en', 'ar').
-        book_id: Optional reference book entity ID to scope the summary to (resolve "this book"/"from
-            this book" to the active selected book's database _id).
+        book_id: SPECIFIC BOOK scope — the textbook's database _id (resolve "this book" to the active
+            selected book). When set, also pass `chapters` and `custom_concepts` as relevant.
+        subject: UMBRELLA SUBJECT scope — one of 'Math', 'Science', 'Arabic', 'General'. Use when the
+            user wants a whole-subject digest and did NOT name a specific book.
+        chapters: SPECIFIC BOOK scope — list of target chapter labels to focus on (multi-select).
+        custom_concepts: SPECIFIC BOOK scope — focus concepts/titles/tags (comma-separated).
+        additional_directions: Optional extra directions to steer the summary (any scope).
     """
-    logger.info(f"[TOOL] create_zatona_tool concept='{concept}' language='{language}' book_id='{book_id}'")
+    logger.info(f"[TOOL] create_zatona_tool concept='{concept}' book_id='{book_id}' subject='{subject}' chapters={chapters}")
 
-    if not concept:
+    if not concept and not custom_concepts and not book_id and not subject:
         return {
             "status": "error",
-            "message": "Concept is required.",
-            "instruction_to_model": "The concept specification is missing. Please ask the user ONE clear clarifying question to specify the concept they want to summarize."
+            "message": "A concept, subject, or book scope is required.",
+            "instruction_to_model": "The Zatona scope is missing. Please ask the user ONE clear clarifying question to specify the concept/subject/book they want to summarize."
         }
 
-    target_dict = {
-        "concept": concept
-    }
+    # ZatonaPanel reads: subject, bookId, chapters (selectedChapters), customConcepts (focus field),
+    # prompt (additional-directions / pasted-text). StickyChat derives scopeType from bookId/subject.
+    target_dict: Dict[str, Any] = {}
     if book_id:
+        # SPECIFIC BOOK: focus = custom_concepts (fallback to concept); prompt = additional directions.
         target_dict["bookId"] = book_id
         target_dict["scopeType"] = "book"
-    
+        if chapters:
+            target_dict["selectedChapters"] = chapters
+        target_dict["customConcepts"] = custom_concepts or concept or ""
+        target_dict["concept"] = additional_directions or ""
+    elif subject:
+        # UMBRELLA SUBJECT: prompt carries the topic + any extra directions.
+        target_dict["subject"] = subject
+        target_dict["scopeType"] = "subject"
+        target_dict["concept"] = additional_directions or concept or ""
+    else:
+        # PASTED TEXT: the concept IS the text to digest.
+        target_dict["scopeType"] = "text"
+        target_dict["concept"] = concept or ""
+
     intent_json = json.dumps({
         "type": "write",
         "action": "create_zatona",
@@ -1278,6 +1302,13 @@ fahem_companion = LlmAgent(
           * `format`: `"quiz"` for a timed/limited assessment arena, `"infinite"` for open-ended practice.
           * `question_count`: The number of questions when the user asks for a set quiz (e.g. 3/5/10/15/20).
           * `timer_seconds`: The per-quiz time limit in seconds if the user specifies one (e.g. "5 min" → 300, "30s blitz" → 30); use 0 for "no limit".
+        - For `create_zatona_tool`, pick exactly ONE scope and fill its fields:
+          * SPECIFIC BOOK (user names a book / "this book"): set `book_id` (resolved _id), `chapters` (the
+            target chapter labels they mention, multi-select), `custom_concepts` (the focus concept/title/tag,
+            e.g. `"if statements"`), and `additional_directions` for any extra guidance.
+          * UMBRELLA SUBJECT (whole subject, no specific book): set `subject` to one of Math/Science/Arabic/General
+            plus `additional_directions`.
+          * PASTED TEXT (user pasted an excerpt): put the excerpt in `concept`.
         - Always collect and infer all possible details for the creation action. If a required specification is completely missing (such as the subject/mode for a practice, the concept for a Zatona summary, or the title/questions for an assignment), ask exactly ONE clarifying question in your response before calling the creation tool. Do not proceed until you have sufficient details.
         - When a creation tool succeeds, it returns an instruction with an `[INTENT: ...]` token. You MUST append this exact token to the very end of your final response to trigger the frontend object creation and navigation.
 
