@@ -4232,11 +4232,19 @@ def register_telemetry_route(app: fastapi.FastAPI):
             db = get_active_db(client)
             
             is_approved = (action == "approve")
-            
+
+            # FC7.3b: approval must actually grant/revoke the admin ROLE, not just the flag. Before,
+            # only `isApprovedAdmin` flipped while `role` stayed whatever it was → an "approved" admin
+            # kept a non-admin role and never saw admin controls. Never touch a super-admin's role.
+            existing_admin = db["users"].find_one({"email": admin_email}, {"role": 1})
+            user_set = {"isApprovedAdmin": is_approved}
+            if (existing_admin or {}).get("role") != "super-admin":
+                user_set["role"] = "admin" if is_approved else "user"
+
             # Update users
             db["users"].update_one(
                 {"email": admin_email},
-                {"$set": {"isApprovedAdmin": is_approved}}
+                {"$set": user_set}
             )
             
             # Update or upsert admins
