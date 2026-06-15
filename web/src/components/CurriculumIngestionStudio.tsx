@@ -2567,7 +2567,8 @@ export default function CurriculumIngestionStudio({ language }: { language: stri
               padding: "1.5rem",
               marginBottom: "1.5rem"
             }}>
-              <h3 style={{ margin: "0 0 1.25rem 0", fontSize: "1.15rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+              <h3 style={{ margin: "0 0 1.25rem 0", fontSize: "1.15rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px", color: "var(--foreground)" }}>
+                {/* FC7.20: was inheriting a white font → invisible on the light card. Pin to theme foreground. */}
                 🎯 {t("target_destination")}
               </h3>
               <div className="gateway-filters-row" style={{

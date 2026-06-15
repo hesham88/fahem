@@ -722,7 +722,7 @@ const renderLegacyPageContent = (text: string, isAr: boolean): React.ReactNode =
               </thead>
               <tbody>
                 {dataRows.map((row, rIdx) => (
-                  <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
+                  <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "var(--card-bg)" : "rgba(16, 107, 163, 0.04)" }}>
                     {row.map((cell, cIdx) => (
                       <td key={cIdx} style={{ padding: "0.9rem 1.25rem", fontSize: "0.92rem", color: "var(--foreground)", fontWeight: 550 }}>
                         {parseInlineStyles(cell)}
@@ -1471,7 +1471,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 </thead>
                 <tbody>
                   {dataRows.map((row, rIdx) => (
-                    <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "#ffffff" : "rgba(16, 107, 163, 0.01)" }}>
+                    <tr key={rIdx} style={{ borderBottom: "1px solid rgba(16, 107, 163, 0.08)", background: rIdx % 2 === 0 ? "var(--card-bg)" : "rgba(16, 107, 163, 0.04)" }}>
                       {Array.isArray(row) && row.map((cell, cIdx) => (
                         <td key={cIdx} style={{ padding: "0.9rem 1.25rem", fontSize: "0.92rem", color: "var(--foreground)", fontWeight: 550 }}>
                           {parseInlineStyles(cell)}
@@ -1648,8 +1648,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     const isCurrentSelection = selectedAnswer === optLetter;
                     const isThisCorrectOption = optLetter === answer;
 
-                    let optBg = "#ffffff";
-                    let optBorder = "1px solid rgba(16, 107, 163, 0.12)";
+                    let optBg = "var(--card-bg)"; // FC7.18: was hardcoded #ffffff → glaring/unreadable in dark
+                    let optBorder = "1px solid var(--card-border)";
                     let optShadow = "0 2px 6px rgba(0,0,0,0.02)";
 
                     if (hasSelected) {
@@ -4413,7 +4413,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         window.dispatchEvent(customEvent);
                         setBubbleCoords(null);
                       }}
-                      style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
+                      style={{ background: "none", border: "none", color: "var(--background)", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
                     >
                       🧠 {language === "ar" ? "اشرح" : "Explain"}
                     </button>
@@ -4446,7 +4446,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         window.dispatchEvent(customEvent);
                         setBubbleCoords(null);
                       }}
-                      style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
+                      style={{ background: "none", border: "none", color: "var(--background)", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}
                     >
                       📝 {language === "ar" ? "لخص" : "Summarize"}
                     </button>
