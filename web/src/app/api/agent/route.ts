@@ -567,10 +567,17 @@ export async function POST(req: NextRequest) {
             ];
 
             const isNewSession = existingMessages.length === 0;
+            // Auto-name a new chat from what it is about (the first user message), stripping any
+            // bracketed system/context/intent markers so the title is clean. Never overwrite an
+            // existing title, so a user-chosen name is preserved.
+            const cleanPromptForTitle = (prompt || "")
+              .replace(/\[(?:Grounded Web Search Request|Context Reference|Page Content|SYSTEM[^\]]*|INTENT[^\]]*)\][^\n]*/gi, "")
+              .replace(/\s+/g, " ")
+              .trim();
             const title = onboarding
               ? "Onboarding Chat Session"
-              : isNewSession 
-                ? (prompt.length > 40 ? prompt.substring(0, 40) + "..." : prompt)
+              : isNewSession
+                ? (cleanPromptForTitle.length > 40 ? cleanPromptForTitle.substring(0, 40) + "..." : (cleanPromptForTitle || "New Chat"))
                 : undefined;
 
             // C. Save Chat Session
