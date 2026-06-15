@@ -1553,6 +1553,34 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             )}
           </div>
 
+          {/* FC7.13: surface the chosen practice specs (Scope / Mode / Session Format & Arena / Focus)
+              so the user sees exactly what was created — whether they set it or the companion did. */}
+          {(() => {
+            const modeLabel = practiceMode === "oral" ? (language === "ar" ? "شفهي" : "Oral")
+              : practiceMode === "text" ? (language === "ar" ? "كتابي" : "Written") : "MCQ";
+            const scopeBook = practiceScopeType === "book"
+              ? (dynamicBooks?.find((b: any) => (b._id || b.id) === practiceSelectedBookId)) : null;
+            const scopeLabel = scopeBook
+              ? (language === "ar" ? (scopeBook.titleAr || scopeBook.title || scopeBook.titleEn) : (scopeBook.titleEn || scopeBook.title || scopeBook.titleAr))
+              : (practiceSubject || (language === "ar" ? "عام" : "General"));
+            const chip = (icon: string, label: string, val: string) => (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.72rem", fontWeight: 700, padding: "4px 10px", borderRadius: "20px", background: "var(--surface-translucent)", border: "1px solid var(--card-border)", color: "var(--foreground)" }}>
+                <span style={{ opacity: 0.7 }}>{icon} {label}:</span> <strong style={{ color: "var(--primary)" }}>{val}</strong>
+              </span>
+            );
+            const formatVal = practiceSessionType === "quiz"
+              ? (language === "ar" ? `اختبار مؤقت (${practiceQuizQuestionsCount} أسئلة)` : `Quiz Arena (${practiceQuizQuestionsCount}Q)`)
+              : (language === "ar" ? "تدريب لا نهائي" : "Infinite");
+            return (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                {chip("📚", language === "ar" ? "النطاق" : "Scope", String(scopeLabel))}
+                {chip("🎯", language === "ar" ? "النمط" : "Mode", modeLabel)}
+                {chip(practiceSessionType === "quiz" ? "🏆" : "♾️", language === "ar" ? "الصيغة" : "Format", formatVal)}
+                {practiceCustomConcepts ? chip("🏷️", language === "ar" ? "التركيز" : "Focus", String(practiceCustomConcepts)) : null}
+              </div>
+            );
+          })()}
+
           {/* Main Challenge Card */}
           <div className="panel-card" style={{ padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
