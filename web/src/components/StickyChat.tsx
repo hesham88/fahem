@@ -1341,11 +1341,22 @@ export default function StickyChat() {
     return [];
   });
 
+  // FC7.19: keep id→title pairs for the active RAG scope so the balloon can name each book.
+  const [selectedBooks, setSelectedBooks] = useState<Array<{ id: string; title: string }>>([]);
+
   useEffect(() => {
     const syncSelectedBooks = () => {
       try {
         const stored = sessionStorage.getItem("fahem_selected_book_ids");
-        setSelectedBookIds(stored ? JSON.parse(stored) : []);
+        const ids: string[] = stored ? JSON.parse(stored) : [];
+        setSelectedBookIds(ids);
+        let titled: Array<{ id: string; title: string }> = [];
+        try {
+          const t = sessionStorage.getItem("fahem_selected_books");
+          if (t) titled = JSON.parse(t);
+        } catch { /* ignore */ }
+        // Keep only entries still in scope; fill any missing titles with a generic label.
+        setSelectedBooks(ids.map((id) => titled.find((b) => b.id === id) || { id, title: language === "ar" ? "كتاب محدد" : "Selected book" }));
       } catch (err) {
         console.error("Failed to sync fahem_selected_book_ids:", err);
       }
@@ -1455,8 +1466,14 @@ export default function StickyChat() {
         if (detail.bookId) {
           const bId = String(detail.bookId);
           setSelectedBookIds([bId]);
+          // FC7.19: capture the book title so the RAG-scope balloon can name it.
+          const bk = detail.book || {};
+          const bTitle = (language === "ar" ? (bk.titleAr || bk.title || bk.titleEn) : (bk.titleEn || bk.title || bk.titleAr))
+            || detail.titleEn || detail.titleAr || (language === "ar" ? "كتاب محدد" : "Selected book");
+          setSelectedBooks([{ id: bId, title: String(bTitle) }]);
           try {
             sessionStorage.setItem("fahem_selected_book_ids", JSON.stringify([bId]));
+            sessionStorage.setItem("fahem_selected_books", JSON.stringify([{ id: bId, title: String(bTitle) }]));
           } catch (err) {
             console.error("Failed to save selected book ids:", err);
           }
@@ -4060,73 +4077,42 @@ User Question: ${queryText}`;
             </div>
           )}
 
-          {/* Premium Active Scoping Badge */}
+          {/* FC7.19: Active RAG scope shown as named, dismissible balloons — one per book, each with a
+              quick deselect (×). Replaces the opaque "N selected books" count. */}
           {selectedBookIds.length > 0 && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              backgroundColor: "rgba(16, 107, 163, 0.05)",
-              border: "1px dashed rgba(16, 107, 163, 0.3)",
-              borderRadius: "14px",
-              padding: "0.5rem 0.8rem",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              color: "var(--primary)",
-              direction: dir,
-              animation: "fadeIn 0.25s ease-out",
-              width: "100%",
-              boxSizing: "border-box"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{
-                  display: "inline-block",
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  backgroundColor: "#106ba3",
-                  boxShadow: "0 0 8px #106ba3",
-                }}></span>
-                <span>
-                  {language === "ar" 
-                    ? `تحديد نطاق البحث نشط: ${selectedBookIds.length} من الكتب المحددة` 
-                    : `Active RAG Scoping: ${selectedBookIds.length} selected books`
-                  }
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem", width: "100%", boxSizing: "border-box", direction: dir, animation: "fadeIn 0.25s ease-out" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.72rem", fontWeight: 700, color: "var(--primary)" }}>
+                <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#106ba3", boxShadow: "0 0 8px #106ba3" }} />
+                {language === "ar" ? "نطاق البحث:" : "RAG scope:"}
+              </span>
+              {selectedBooks.map((b) => (
+                <span key={b.id} title={b.title} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", maxWidth: "200px", fontSize: "0.72rem", fontWeight: 600, color: "var(--primary)", background: "rgba(16,107,163,0.08)", border: "1px solid rgba(16,107,163,0.25)", borderRadius: "20px", padding: "3px 4px 3px 10px" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📚 {b.title}</span>
+                  <button
+                    type="button"
+                    title={language === "ar" ? "إزالة من النطاق" : "Deselect"}
+                    onClick={() => {
+                      const nextIds = selectedBookIds.filter((id) => id !== b.id);
+                      const nextBooks = selectedBooks.filter((x) => x.id !== b.id);
+                      setSelectedBookIds(nextIds);
+                      setSelectedBooks(nextBooks);
+                      try {
+                        if (nextIds.length > 0) {
+                          sessionStorage.setItem("fahem_selected_book_ids", JSON.stringify(nextIds));
+                          sessionStorage.setItem("fahem_selected_books", JSON.stringify(nextBooks));
+                        } else {
+                          sessionStorage.removeItem("fahem_selected_book_ids");
+                          sessionStorage.removeItem("fahem_selected_books");
+                        }
+                      } catch { /* ignore */ }
+                      window.dispatchEvent(new CustomEvent("fahemRAGScopeChanged"));
+                    }}
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "1.1rem", height: "1.1rem", borderRadius: "50%", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer", flexShrink: 0 }}
+                  >
+                    <FiX style={{ fontSize: "0.7rem" }} />
+                  </button>
                 </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedBookIds([]);
-                  sessionStorage.removeItem("fahem_selected_book_ids");
-                  window.dispatchEvent(new CustomEvent("fahemRAGScopeChanged"));
-                }}
-                style={{
-                  background: "rgba(239, 68, 68, 0.08)",
-                  border: "none",
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0.3rem",
-                  borderRadius: "50%",
-                  width: "1.6rem",
-                  height: "1.6rem",
-                  transition: "all 0.2s"
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
-                  e.currentTarget.style.transform = "scale(1.1)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.08)";
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-                title={language === "ar" ? "مسح التحديد" : "Clear scope"}
-              >
-                <FiX style={{ fontSize: "0.95rem" }} />
-              </button>
+              ))}
             </div>
           )}
 

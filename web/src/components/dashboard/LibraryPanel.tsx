@@ -4962,6 +4962,16 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     }
                     setSelectedBookIds(newSet);
                     sessionStorage.setItem("fahem_selected_book_ids", JSON.stringify(Array.from(newSet)));
+                    // FC7.19: persist id→title pairs so the companion's RAG-scope balloon can name each book.
+                    try {
+                      const pool = [...(dynamicBooks || []), ...(filtered || [])];
+                      const titled = Array.from(newSet).map((bid: string) => {
+                        const bk = pool.find((x: any) => (x._id || x.id) === bid) || (bid === item._id ? item : null);
+                        const tt = bk ? (language === "ar" ? (bk.titleAr || bk.title || bk.titleEn) : (bk.titleEn || bk.title || bk.titleAr)) : "";
+                        return { id: bid, title: String(tt || (language === "ar" ? "كتاب محدد" : "Selected book")) };
+                      });
+                      sessionStorage.setItem("fahem_selected_books", JSON.stringify(titled));
+                    } catch { /* ignore */ }
                     window.dispatchEvent(new CustomEvent("fahemRAGScopeChanged"));
                   };
 
