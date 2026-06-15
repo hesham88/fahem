@@ -1106,7 +1106,22 @@ async def create_assignment_tool(
         book_id: Optional reference book entity ID.
     """
     logger.info(f"[TOOL] create_assignment_tool group_id='{group_id}' title='{title}' count={len(questions) if questions else 0}")
-    
+
+    # FC7.26: deploying group assignments is restricted to teachers/admins. A student (or any
+    # non-privileged role) must NOT be able to have the companion create & broadcast an assignment.
+    try:
+        from guardrails import verified_principal_ctx
+        _principal = verified_principal_ctx.get() or {}
+    except Exception:
+        _principal = {}
+    _role = (_principal.get("role") or "").strip().lower()
+    if _role not in ["teacher", "admin", "super-admin"]:
+        return {
+            "status": "error",
+            "message": "Assignment deployment is restricted to teachers and admins.",
+            "instruction_to_model": "Politely explain that creating and deploying group assignments is only available to teachers and admins, so you cannot deploy one for this user. Do NOT append any [INTENT] token."
+        }
+
     errors = []
     if not group_id:
         errors.append("group_id is required")
