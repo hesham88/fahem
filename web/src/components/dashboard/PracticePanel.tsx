@@ -896,7 +896,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                 <select
                   value={practiceSubject}
                   onChange={(e) => setPracticeSubject(e.target.value)}
-                  style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700 }}
+                  style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700 }}
                 >
                   <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
                   <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
@@ -911,7 +911,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       setPracticeSelectedBookId(e.target.value);
                       setPracticeSelectedChapters([]);
                     }}
-                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700 }}
+                    style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700 }}
                   >
                     {dynamicBooks.length > 0 ? (
                       dynamicBooks.map((b: any) => (
@@ -960,7 +960,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                       style={{ cursor: "pointer" }}
                                     />
                                     <span>{chTitle}</span>
-                                    <span style={{ fontSize: "0.7rem", color: "rgba(0,0,0,0.4)" }}>
+                                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                                       ({language === "ar" ? `الصفحات: ${ch.start_page}-${ch.end_page}` : `Pages: ${ch.start_page}-${ch.end_page}`})
                                     </span>
                                   </label>
@@ -968,7 +968,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                               })}
                             </div>
                           ) : (
-                            <div style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.5)" }}>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                               {language === "ar" ? "لا توجد فصول مسجلة لهذا الكتاب، سيتم التدريب على الكتاب كاملاً." : "No structured chapters recorded. Full textbook will be targeted."}
                             </div>
                           )}
@@ -990,7 +990,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                 border: "1px solid var(--card-border)",
                                 fontSize: "0.8rem",
                                 outline: "none",
-                                background: "#ffffff"
+                                background: "var(--card-bg)"
                               }}
                             />
                           </div>
@@ -1221,7 +1221,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             >
               <div style={{ fontSize: "3rem" }}>🏆</div>
               <div style={{ textAlign: "center" }}>
-                <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 700, textTransform: "uppercase" }}>
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
                   {language === "ar" ? "المستوى الحالي" : "Tutor Class Level"}
                 </span>
                 <h2 style={{ fontSize: "2.25rem", margin: "0.25rem 0", color: "var(--primary)", fontWeight: 800 }}>
@@ -1231,7 +1231,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
               {/* XP Progress */}
               <div style={{ width: "100%" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", fontWeight: 800, color: "#6a7c88", marginBottom: "0.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                   <span>{practiceXP} / 100 XP</span>
                   <span>{language === "ar" ? "للمستوى التالي" : "Next Level"}</span>
                 </div>
@@ -1273,7 +1273,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                 <span>⏱️</span>
                 <span>{language === "ar" ? "سجل النشاط الفوري" : "Live Session Log"}</span>
               </h4>
-              <div style={{ fontSize: "0.8rem", color: "#6a7c88", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>{language === "ar" ? "النمط المفضل:" : "Favorite Mode:"}</span>
                   <strong style={{ color: "var(--foreground)" }}>{practiceMode.toUpperCase()}</strong>
@@ -1420,7 +1420,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                           {language === "ar" ? statusTextAr : statusTextEn}
                         </span>
                         {item.total > 0 && (
-                          <span style={{ fontSize: "0.55rem", color: "#6a7c88" }}>
+                          <span style={{ fontSize: "0.55rem", color: "var(--text-muted)" }}>
                             {item.correct}/{item.total} {language === "ar" ? "صحيحة" : "Correct"}
                           </span>
                         )}
@@ -1539,7 +1539,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           <div className="panel-card" style={{ padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
               <div>
-                <span style={{ fontSize: "0.8rem", color: "#6a7c88", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
                   {language === "ar" ? "الاستفسار / التحدي الحالي" : "Current AI Quest Objective"}
                 </span>
                 <h3 style={{ fontSize: "1.25rem", margin: "0.35rem 0 0 0", color: "var(--primary)", fontWeight: 800, lineHeight: "1.5", fontFamily: "var(--font-sans)" }}>
@@ -1687,7 +1687,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)" }}>
                         {language === "ar" ? "🎙️ منصة التسميع الشفوي والكتابة بالصوت" : "🎙️ AI Oral Recitation & Voice Dictation"}
                       </h4>
-                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.75rem", color: "#6a7c88" }}>
+                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {language === "ar"
                           ? "تحدث لإملاء إجابتك مباشرة، حيث يقوم النظام بتحويل صوتك لنص مكتوب في الحال."
                           : "Speak to dictate your answer. System transcribes your Egyptian Arabic or English speech to text live."}
@@ -1802,7 +1802,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                         <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4f6371" }}>
                           {language === "ar" ? "نص التسميع المكتوب:" : "Captured Transcript Output:"}
                         </span>
-                        <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                           {language === "ar" ? "(يمكنك التعديل اليدوي قبل التأكيد)" : "(Feel free to edit text if needed)"}
                         </span>
                       </div>
@@ -1891,7 +1891,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     padding: "6px 12px",
                     border: "1px solid var(--card-border)",
                     borderRadius: "6px",
-                    background: "#ffffff",
+                    background: "var(--card-bg)",
                     cursor: "pointer",
                     fontWeight: 700,
                     fontSize: "0.8rem",
@@ -1914,7 +1914,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     padding: "6px 12px",
                     border: "1px solid rgba(211, 47, 47, 0.2)",
                     borderRadius: "6px",
-                    background: "#ffffff",
+                    background: "var(--card-bg)",
                     color: "#d32f2f",
                     cursor: "pointer",
                     fontWeight: 700,
@@ -2208,7 +2208,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     </button>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6a7c88" }}>{language === "ar" ? "الخبرة المكتسبة" : "Reward"}</span>
+                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-muted)" }}>{language === "ar" ? "الخبرة المكتسبة" : "Reward"}</span>
                     <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--primary)" }}>
                       +{Math.round(practiceFeedback.xpGained * (1 + practiceStreak * 0.1))} XP
                     </div>
@@ -2236,7 +2236,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                           <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "var(--foreground)" }}>
                             {language === "ar" ? "لوحة التقييم الشفوي النطقي" : "Oral Performance Assessment Rubric"}
                           </h4>
-                          <p style={{ margin: 0, fontSize: "0.75rem", color: "#6a7c88" }}>
+                          <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--text-muted)" }}>
                             {language === "ar" ? "تحليل النطق والطلاقة ودقة المحتوى الفني" : "Detailed metrics of pronunciation, speech fluency and content accuracy"}
                           </p>
                         </div>
@@ -2265,7 +2265,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     {/* Overall Score Circle/Badge */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem", alignItems: "center" }} className="grid-cols-1">
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#6a7c88", textTransform: "uppercase" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>
                           {language === "ar" ? "التقييم العام" : "Overall Score"}
                         </span>
                         <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "#d4af37", margin: "0.25rem 0" }}>
@@ -2290,7 +2290,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             key={metric.key}
                             style={{
                               padding: "0.75rem",
-                              background: "#ffffff",
+                              background: "var(--card-bg)",
                               borderRadius: "8px",
                               border: "1px solid var(--card-border)",
                               display: "flex",
@@ -2380,7 +2380,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             <h2 style={{ fontSize: "2rem", margin: "0.5rem 0 0.25rem 0", fontWeight: 800, color: "var(--primary)" }}>
               {language === "ar" ? "الملخص الفني للأداء" : "Academic Quest Scoreboard"}
             </h2>
-            <p style={{ fontSize: "0.9rem", color: "#6a7c88", margin: 0 }}>
+            <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", margin: 0 }}>
               {language === "ar" ? "لقد أكملت جميع المتطلبات وأحرزت تقدماً ملحوظاً!" : "You have achieved your academic milestones!"}
             </p>
           </div>
@@ -2388,17 +2388,17 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           {/* Stats Breakdown Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", width: "100%", maxWidth: "450px", margin: "1rem 0" }}>
             <div style={{ padding: "1rem", background: "rgba(0,0,0,0.03)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{language === "ar" ? "إجمالي الخبرة" : "XP Gained"}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>{language === "ar" ? "إجمالي الخبرة" : "XP Gained"}</span>
               <h3 style={{ fontSize: "1.5rem", margin: "0.25rem 0 0 0", fontWeight: 800, color: "var(--primary)" }}>+{practiceSessionXpGained} XP</h3>
             </div>
             <div style={{ padding: "1rem", background: "rgba(0,0,0,0.03)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{language === "ar" ? "الدقة" : "Accuracy"}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>{language === "ar" ? "الدقة" : "Accuracy"}</span>
               <h3 style={{ fontSize: "1.5rem", margin: "0.25rem 0 0 0", fontWeight: 800, color: "#2e7d32" }}>
                 {practiceSessionTotalQuestions > 0 ? Math.round((practiceSessionCorrectAnswers / practiceSessionTotalQuestions) * 100) : 0}%
               </h3>
             </div>
             <div style={{ padding: "1rem", background: "rgba(0,0,0,0.03)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>{language === "ar" ? "الإجابات" : "Correct"}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>{language === "ar" ? "الإجابات" : "Correct"}</span>
               <h3 style={{ fontSize: "1.5rem", margin: "0.25rem 0 0 0", fontWeight: 800, color: "var(--foreground)" }}>
                 {practiceSessionCorrectAnswers} / {practiceSessionTotalQuestions}
               </h3>
@@ -2483,7 +2483,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                 padding: "10px 20px",
                 borderRadius: "6px",
                 border: "1px solid var(--card-border)",
-                background: "#ffffff",
+                background: "var(--card-bg)",
                 color: "var(--foreground)",
                 cursor: "pointer",
                 fontWeight: 800,
@@ -2499,7 +2499,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
       {/* 📜 Practice Sessions History & Audit Trail */}
       <div style={{
         marginTop: "2.5rem",
-        background: "rgba(255, 255, 255, 0.45)",
+        background: "var(--surface-translucent)",
         backdropFilter: "blur(12px)",
         borderRadius: "16px",
         padding: "2rem",
@@ -2518,7 +2518,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             <h3 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 800, color: "var(--foreground)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               📜 {language === "ar" ? "سجل غارات الممارسة وتحديات الأسئلة" : "Practice Sessions History & Challenges"}
             </h3>
-            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "rgba(0,0,0,0.5)" }}>
+            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
               {language === "ar" ? "شاهد أسئلتك وإجاباتك والتقييمات التفصيلية لكل تحدٍ قمت به" : "View your past questions, answers, and full evaluations with tutor-provided explanations"}
             </p>
           </div>
@@ -2552,7 +2552,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
             <h4 style={{ margin: "1rem 0 0.25rem 0", fontWeight: 700 }}>
               {language === "ar" ? "لا توجد غارات مسجلة بعد" : "No practice history recorded yet"}
             </h4>
-            <p style={{ margin: 0, fontSize: "0.85rem", color: "rgba(0,0,0,0.5)" }}>
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
               {language === "ar" ? "ابدأ غارة مراجعة نشطة في الأعلى وسجل إجابتك ليتم حفظ تقدمك هنا!" : "Launch an Active Recall Quest above and evaluate your response to start recording achievements here."}
             </p>
           </div>
@@ -2564,7 +2564,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
               const keyId = run._id || `run-${idx}`;
               return (
                 <div key={keyId} style={{
-                  background: "#ffffff",
+                  background: "var(--card-bg)",
                   borderRadius: "12px",
                   border: "1px solid " + (isCorrect ? "rgba(76, 175, 80, 0.15)" : "rgba(244, 67, 54, 0.15)"),
                   padding: "1.25rem",
@@ -2584,10 +2584,10 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                       }}>
                         {isCorrect ? (language === "ar" ? "صحيح" : "Correct") : (language === "ar" ? "يحتاج مراجعة" : "Incorrect")}
                       </span>
-                      <span style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.4)" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {details.mode ? `• Mode: ${details.mode.toUpperCase()}` : ""}
                       </span>
-                      <span style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.4)" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         • {new Date(run.createdAt || Date.now()).toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
@@ -2611,7 +2611,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                     padding: "8px 12px",
                     background: "rgba(0,0,0,0.02)",
                     borderRadius: "6px",
-                    color: "rgba(0,0,0,0.7)",
+                    color: "var(--foreground)",
                     borderLeft: "3px solid " + (isCorrect ? "#4caf50" : "#f44336"),
                     marginBottom: "0.75rem"
                   }}>
@@ -2654,7 +2654,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1rem", alignItems: "center" }} className="grid-cols-1">
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0.5rem", background: "rgba(0,0,0,0.015)", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.03)" }}>
-                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#6a7c88" }}>
+                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "var(--text-muted)" }}>
                             {language === "ar" ? "الدرجة الكلية" : "Overall"}
                           </span>
                           <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#d4af37" }}>
@@ -2674,7 +2674,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             { key: "accuracy", labelAr: "الدقة", labelEn: "Accuracy", val: details.rubric.accuracy, icon: "🎯", color: "#27ae60" },
                             { key: "structure", labelAr: "الصياغة", labelEn: "Structure", val: details.rubric.structure, icon: "🧱", color: "#9b59b6" },
                           ].map((metric) => (
-                            <div key={metric.key} style={{ padding: "0.4rem 0.5rem", background: "#ffffff", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.05)" }}>
+                            <div key={metric.key} style={{ padding: "0.4rem 0.5rem", background: "var(--card-bg)", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.05)" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.15rem" }}>
                                 <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4f6371" }}>
                                   {metric.icon} {language === "ar" ? metric.labelAr : metric.labelEn}
@@ -2755,7 +2755,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                         {details.explanation}
                       </div>
                       {details.feedback && (
-                        <div style={{ marginTop: "0.5rem", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "0.5rem", fontSize: "0.8rem", color: "rgba(0,0,0,0.6)" }}>
+                        <div style={{ marginTop: "0.5rem", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "0.5rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
                           💬 {details.feedback}
                         </div>
                       )}

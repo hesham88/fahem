@@ -221,7 +221,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                 }}>
                   {getLevelBadgeText()}
                 </span>
-                <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
                   • {isRtl ? `المستوى الأكاديمي ${activeLevel}` : `Academic Level ${activeLevel}`}
                 </span>
               </div>
@@ -230,7 +230,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
           {/* Core Gamification Stats */}
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <div style={{ textAlign: "center", background: "#ffffff", padding: "0.5rem 1.25rem", borderRadius: "12px", border: "1px solid var(--card-border)", boxShadow: "0 2px 5px rgba(0,0,0,0.02)" }}>
+            <div style={{ textAlign: "center", background: "var(--card-bg)", padding: "0.5rem 1.25rem", borderRadius: "12px", border: "1px solid var(--card-border)", boxShadow: "0 2px 5px rgba(0,0,0,0.02)" }}>
               <div style={{ fontSize: "1.3rem", color: "#e65100", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.25rem", fontWeight: 800 }}>
                 <FiZap style={{ fill: "#ff9100", stroke: "#e65100" }} /> {activeStreak}
               </div>
@@ -239,7 +239,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               </span>
             </div>
 
-            <div style={{ textAlign: "center", background: "#ffffff", padding: "0.5rem 1.25rem", borderRadius: "12px", border: "1px solid var(--card-border)", boxShadow: "0 2px 5px rgba(0,0,0,0.02)" }}>
+            <div style={{ textAlign: "center", background: "var(--card-bg)", padding: "0.5rem 1.25rem", borderRadius: "12px", border: "1px solid var(--card-border)", boxShadow: "0 2px 5px rgba(0,0,0,0.02)" }}>
               <div style={{ fontSize: "1.3rem", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.25rem", fontWeight: 800 }}>
                 🏆 {activeXp}
               </div>
@@ -252,7 +252,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
         {/* Level Progress Bar */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700, color: "#6a7c88" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)" }}>
             <span>{isRtl ? `المستوى ${activeLevel}` : `Level ${activeLevel}`}</span>
             <span>{activeXp} / {nextLevelXp} XP</span>
             <span>{isRtl ? `المستوى ${activeLevel + 1}` : `Level ${activeLevel + 1}`}</span>
@@ -293,7 +293,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                 <FiRefreshCw className="spinning-icon" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
               </div>
             ) : weakTopics.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "2rem", color: "#6a7c88" }}>
+              <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
                 <span style={{ fontSize: "2rem" }}>📊</span>
                 <p style={{ fontSize: "0.85rem", marginTop: "0.5rem" }}>
                   {isRtl 
@@ -310,7 +310,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                       padding: "0.85rem", 
                       borderRadius: "8px", 
                       border: "1px solid var(--card-border)", 
-                      background: "#ffffff",
+                      background: "var(--card-bg)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -363,7 +363,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                   <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--foreground)", fontWeight: 700 }}>
                     💡 {isRtl ? "توصية رفيق المذاكرة الذكي:" : "AI Learning Assistant Suggestion:"}
                   </p>
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#6a7c88", lineHeight: "1.4" }}>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: "1.4" }}>
                     {isRtl 
                       ? "نقوم برصد فجواتك المعرفية لنسلّط الضوء عليها. اضغط على الزر أدناه ليقوم الرفيق بجدولة خطة استرجاع فوري وسؤال تفاعلي دقيق حول نقاط ضعفك الحالية."
                       : "We found concept gaps in your performance. Click below to launch the Companion to generate an instant review blueprint and targeted practice for your weak areas."}
@@ -425,7 +425,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#6a7c88", display: "flex", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
                   <span>📉 {isRtl ? "الاختبارات الـ ٦ الأخيرة" : "Last 6 quizzes"}</span>
                   <span style={{ fontWeight: 700 }}>
                     {isRtl ? "متوسط الدقة العام:" : "Average Accuracy:"} {Math.round(scoresTrend.reduce((acc, curr) => acc + curr.score, 0) / scoresTrend.length)}%
@@ -445,7 +445,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               💎 {isRtl ? "عداد التوكينات والترشيد الذكي" : "Credit Meter & Token Allocations"}
             </h3>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", fontWeight: 700 }}>
-              <span style={{ color: "#6a7c88" }}>{isRtl ? "معدل استهلاك التوكن الأسبوعي" : "Weekly Token Resource Meter"}</span>
+              <span style={{ color: "var(--text-muted)" }}>{isRtl ? "معدل استهلاك التوكن الأسبوعي" : "Weekly Token Resource Meter"}</span>
               <span style={{ color: "var(--primary)" }}>{consumedClt} / {totalAllocatedClt} CLT</span>
             </div>
             <div style={{ height: "14px", width: "100%", background: "rgba(0,0,0,0.05)", borderRadius: "7px", overflow: "hidden", border: "1px solid var(--card-border)" }}>
@@ -478,7 +478,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                 <FiRefreshCw className="spinning-icon" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
               </div>
             ) : readingSessions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "2rem", color: "#6a7c88" }}>
+              <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
                 <span style={{ fontSize: "2rem" }}>📖</span>
                 <p style={{ fontSize: "0.85rem", marginTop: "0.5rem" }}>
                   {isRtl 
@@ -502,7 +502,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                         padding: "1rem", 
                         borderRadius: "10px", 
                         border: "1px solid var(--card-border)", 
-                        background: "#ffffff",
+                        background: "var(--card-bg)",
                         display: "flex",
                         flexDirection: "column",
                         gap: "0.75rem",
@@ -525,7 +525,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
                       {/* Visited / Max Page Progress Bar */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "#6a7c88" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)" }}>
                           <span>{isRtl ? "مؤشر التقدّم" : "Textbook Progress"}</span>
                           <span>{isRtl ? `أقصى صفحة وصلتها: ${session.max_page || session.last_page}` : `Max Pg Reached: ${session.max_page || session.last_page}`}</span>
                         </div>
@@ -541,12 +541,12 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                         borderRadius: "8px",
                         fontSize: "0.75rem"
                       }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-muted)" }}>
                           <FiClock />
                           <span>{isRtl ? `${minutes} دقيقة قراءة` : `${minutes} mins reading`}</span>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#6a7c88" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-muted)" }}>
                           🏆
                           <span>{isRtl ? `${session.tokens_spent || 0} توكن مستهلك` : `${session.tokens_spent || 0} CLT spent`}</span>
                         </div>
@@ -554,16 +554,16 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
                       {/* Detail interactive metrics */}
                       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                        <span title="Audio TTS plays" style={{ fontSize: "0.7rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span title="Audio TTS plays" style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "2px" }}>
                           🔊 {actions.audio || 0}
                         </span>
-                        <span title="Translations" style={{ fontSize: "0.7rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span title="Translations" style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "2px" }}>
                           🌐 {actions.translate || 0}
                         </span>
-                        <span title="AI explanations" style={{ fontSize: "0.7rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span title="AI explanations" style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "2px" }}>
                           💡 {actions.explain || 0}
                         </span>
-                        <span title="Questions answered" style={{ fontSize: "0.7rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span title="Questions answered" style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "2px" }}>
                           ❓ {actions.question || 0}
                         </span>
                       </div>
@@ -684,7 +684,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.25rem" }}>
               {language === "ar" ? `المستوى ${activeLevel}` : `Level ${activeLevel}`}
             </div>
-            <div style={{ fontSize: "0.8rem", color: "#6a7c88", marginBottom: "0.75rem" }}>
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
               🔥 {language === "ar" ? `سلسلة المذاكرة: ${activeStreak} أيام متتالية` : `Current Daily Streak: ${activeStreak} Days Active`}
             </div>
 
@@ -692,7 +692,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             <div style={{ width: "100%", height: "8px", background: "rgba(16, 107, 163, 0.08)", borderRadius: "10px", overflow: "hidden", marginBottom: "0.5rem" }}>
               <div style={{ width: `${xpProgressPercent}%`, height: "100%", background: "linear-gradient(90deg, var(--primary), var(--secondary))", borderRadius: "10px" }}></div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#6a7c88" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "var(--text-muted)" }}>
               <span>{activeXp.toLocaleString()} XP</span>
               <span>
                 {nextLevelXp.toLocaleString()} XP ({language === "ar" ? "المستوى التالي" : "Next Level"})
@@ -732,7 +732,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               </span>
               
               {isLoadingStats ? (
-                <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 600 }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>
                   {language === "ar" ? "جاري التحميل..." : "Loading stats..."}
                 </span>
               ) : tokenStats?.enabled === false ? (
@@ -798,7 +798,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                         <span style={{ color: "var(--foreground)" }}>
                           🌅 {language === "ar" ? "البصمة المعرفية اليومية" : "Daily Cognitive Footprint"}
                         </span>
-                        <span style={{ color: "#6a7c88" }}>
+                        <span style={{ color: "var(--text-muted)" }}>
                           {dailyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {dailyLimit.toLocaleString()} CLT</span>
                         </span>
                       </div>
@@ -834,7 +834,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                         <span style={{ color: "var(--foreground)" }}>
                           📅 {language === "ar" ? "الحصة المعرفية الأسبوعية" : "Weekly Cognitive Quota"}
                         </span>
-                        <span style={{ color: "#6a7c88" }}>
+                        <span style={{ color: "var(--text-muted)" }}>
                           {weeklyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {weeklyLimit.toLocaleString()} CLT</span>
                         </span>
                       </div>
@@ -872,7 +872,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                         <span style={{ color: "var(--foreground)" }}>
                           🌌 {language === "ar" ? "الحجم المعرفي الشهري الكلي" : "Monthly Cognitive Volume"}
                         </span>
-                        <span style={{ color: "#6a7c88" }}>
+                        <span style={{ color: "var(--text-muted)" }}>
                           {monthlyUsed.toLocaleString()} <span style={{ fontSize: "0.7rem", fontWeight: 500 }}>/ {monthlyLimit.toLocaleString()} CLT</span>
                         </span>
                       </div>
@@ -917,7 +917,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               style={{
                 padding: "1rem",
                 borderRadius: "14px",
-                background: "rgba(255,255,255,0.6)",
+                background: "var(--surface-translucent)",
                 border: "1px solid rgba(16, 107, 163, 0.06)",
                 display: "flex",
                 flexDirection: "column",
@@ -932,7 +932,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                   {language === "ar" ? "آمن" : "Low Risk"}
                 </span>
               </div>
-              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                 {language === "ar" ? "مفاهيم محددات المصفوفة ومعكوسها ممتازة." : "Mastered Singular Matrix inverse checks perfectly."}
               </span>
               <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
@@ -946,7 +946,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               style={{
                 padding: "1rem",
                 borderRadius: "14px",
-                background: "rgba(255,255,255,0.6)",
+                background: "var(--surface-translucent)",
                 border: "1px solid rgba(16, 107, 163, 0.06)",
                 display: "flex",
                 flexDirection: "column",
@@ -961,7 +961,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                   {language === "ar" ? "متوسط" : "Moderate Risk"}
                 </span>
               </div>
-              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                 {language === "ar" ? "فجوة بسيطة في فهم ثابت الاتزان للتفاعلات." : "Confusion spotted around chemical equilibrium rules."}
               </span>
               <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
@@ -975,7 +975,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               style={{
                 padding: "1rem",
                 borderRadius: "14px",
-                background: "rgba(255,255,255,0.6)",
+                background: "var(--surface-translucent)",
                 border: "1px solid rgba(16, 107, 163, 0.06)",
                 display: "flex",
                 flexDirection: "column",
@@ -990,7 +990,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                   {language === "ar" ? "مرتفع" : "High Risk"}
                 </span>
               </div>
-              <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                 {language === "ar" ? "صعوبة في تحديد مواضع إعراب جمع المذكر السالم." : "Issues parsed with complex verb modifiers rules."}
               </span>
               <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
@@ -1004,7 +1004,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
         {/* Swarm Real-Time Telemetry console */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "start" }}>
-          <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "#6a7c88", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span className="pulse-icon" style={{ fontSize: "0.6rem" }}>🟢</span>
             {language === "ar" ? "سجل تحليلات ومحاكاة السرب النشط (MongoDB Aggregate Pipe):" : "Active Swarm Network Telemetry Trace (MongoDB Aggregations):"}
           </span>

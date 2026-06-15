@@ -412,7 +412,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700, outline: "none" }}
+              style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700, outline: "none" }}
             >
               <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
               <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
@@ -429,7 +429,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                   setSelectedBookId(e.target.value);
                   setSelectedChapters([]);
                 }}
-                style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "#ffffff", fontWeight: 700, outline: "none" }}
+                style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700, outline: "none" }}
               >
                 {dynamicBooks.length > 0 ? (
                   dynamicBooks.map((b: any) => (
@@ -478,7 +478,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                                   style={{ cursor: "pointer", accentColor: "var(--primary)" }}
                                 />
                                 <span>{chTitle}</span>
-                                <span style={{ fontSize: "0.7rem", color: "rgba(0,0,0,0.4)" }}>
+                                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                                   ({language === "ar" ? `الصفحات: ${ch.start_page}-${ch.end_page}` : `Pages: ${ch.start_page}-${ch.end_page}`})
                                 </span>
                               </label>
@@ -486,7 +486,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                           })}
                         </div>
                       ) : (
-                        <div style={{ fontSize: "0.75rem", color: "rgba(0,0,0,0.5)" }}>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                           {language === "ar" ? "لا توجد فصول مسجلة لهذا الكتاب، سيتم تلخيص الكتاب كاملاً." : "No structured chapters recorded. Full textbook will be targeted."}
                         </div>
                       )}
@@ -508,7 +508,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                             border: "1px solid var(--card-border)",
                             fontSize: "0.8rem",
                             outline: "none",
-                            background: "#ffffff"
+                            background: "var(--card-bg)"
                           }}
                         />
                       </div>
@@ -572,7 +572,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
               padding: "1rem",
               borderRadius: "6px",
               border: "1px dashed var(--primary)",
-              background: "#ffffff",
+              background: "var(--card-bg)",
               overflowY: "auto",
               minHeight: "350px",
             }}
@@ -598,7 +598,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                 <span style={{ fontWeight: 700 }}>
                   {language === "ar" ? "جاري عصر واستخراج الزتونة..." : "Digesting textbook essence..."}
                 </span>
-                <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                   {language === "ar" ? "المحرك الذكي يقوم بتحليل المحتوى وتكثيفه" : "Smart engine is analyzing and condensing the content"}
                 </span>
               </div>
@@ -626,7 +626,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                   alignItems: "center",
                   height: "100%",
                   minHeight: "310px",
-                  color: "#6a7c88",
+                  color: "var(--text-muted)",
                   fontSize: "0.85rem",
                   gap: "0.5rem",
                   padding: "2rem",
@@ -657,7 +657,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
             <FiRefreshCw className="spinning-icon" style={{ fontSize: "1.5rem", color: "var(--primary)" }} />
           </div>
         ) : zatonaHistoryList.length === 0 ? (
-          <p style={{ fontSize: "0.85rem", color: "#6a7c88", margin: 0 }}>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>
             {language === "ar" ? "لا توجد ملخصات زتونة محفوظة حالياً." : "No previously squeezed summaries found."}
           </p>
         ) : (
@@ -677,7 +677,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                     padding: "1rem",
                     borderRadius: "8px",
                     border: "1px solid var(--card-border)",
-                    background: "#ffffff",
+                    background: "var(--card-bg)",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
@@ -691,13 +691,13 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                       <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary)", background: "rgba(16, 107, 163, 0.05)", padding: "2px 8px", borderRadius: "10px" }}>
                         {details.scopeType === "book" ? (language === "ar" ? "كتاب مدرسي" : "Book Digest") : (details.scopeType === "subject" ? (language === "ar" ? "مادة عامة" : "Subject Digest") : (language === "ar" ? "نص ملصق" : "Pasted Text"))}
                       </span>
-                      <span style={{ fontSize: "0.7rem", color: "#8fa0ac" }}>{formattedDate}</span>
+                      <span style={{ fontSize: "0.7rem", color: "var(--text-placeholder)" }}>{formattedDate}</span>
                     </div>
                     <h4 style={{ fontSize: "0.85rem", fontWeight: 700, margin: "0.25rem 0" }}>
                       {language === "ar" ? details.materialDescAr : details.materialDescEn}
                     </h4>
                     {details.prompt && (
-                      <p style={{ fontSize: "0.8rem", color: "#6a7c88", margin: 0, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         &quot;{details.prompt}&quot;
                       </p>
                     )}

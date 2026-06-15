@@ -942,7 +942,7 @@ const renderLegacyPageContent = (text: string, isAr: boolean): React.ReactNode =
             color: "var(--primary)",
             fontWeight: 700,
             padding: "0.6rem 1.25rem",
-            background: "#ffffff",
+            background: "var(--card-bg)",
             border: "1px dashed rgba(16, 107, 163, 0.25)",
             borderRadius: "10px",
             display: "inline-block",
@@ -1006,7 +1006,7 @@ const renderLegacyPageContent = (text: string, isAr: boolean): React.ReactNode =
           margin: "1.75rem auto",
           padding: "1.5rem",
           borderRadius: "14px",
-          background: "#ffffff",
+          background: "var(--card-bg)",
           border: "1px solid rgba(16, 107, 163, 0.15)",
           boxShadow: "0 8px 25px rgba(0, 0, 0, 0.03)",
           maxWidth: "92%",
@@ -1519,7 +1519,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 color: "var(--primary)",
                 fontWeight: 700,
                 padding: "0.6rem 1.25rem",
-                background: "#ffffff",
+                background: "var(--card-bg)",
                 border: "1px dashed rgba(16, 107, 163, 0.25)",
                 borderRadius: "10px",
                 display: "inline-block",
@@ -1771,7 +1771,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         borderRadius: "50%",
                         animation: "spin 0.8s linear infinite"
                       }}></span>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#6a7c88" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-muted)" }}>
                         {language === "ar" ? "جاري تقييم إجابتك..." : "Evaluating your answer..."}
                       </span>
                     </div>
@@ -3133,7 +3133,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   onClick={() => setSelectedBookReader(null)}
                   style={{
                     padding: "8px 16px", borderRadius: "20px", border: "1px solid var(--card-border)",
-                    background: "#ffffff", color: "var(--primary)", fontWeight: 700, fontSize: "0.85rem",
+                    background: "var(--card-bg)", color: "var(--primary)", fontWeight: 700, fontSize: "0.85rem",
                     cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "0.4rem"
                   }}
                   onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
@@ -3159,7 +3159,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "var(--foreground)" }}>
                       {language === "ar" ? (selectedBookReader.titleAr || selectedBookReader.title) : (selectedBookReader.titleEn || selectedBookReader.title)}
                     </h2>
-                    <p style={{ fontSize: "0.75rem", color: "#6a7c88", margin: 0 }}>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
                       {language === "ar" ? "جلسة دراسة تفاعلية نشطة مع رفيق فهم" : "Active chapter-linked study companion session"}
                     </p>
                   </div>
@@ -3296,7 +3296,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           border: "1px solid rgba(16, 107, 163, 0.15)",
                           fontSize: "0.8rem",
                           outline: "none",
-                          background: "#ffffff",
+                          background: "var(--card-bg)",
                           fontFamily: "var(--font-sans)",
                           width: "100%",
                           boxSizing: "border-box"
@@ -3319,7 +3319,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                           if (filteredPages.length === 0) {
                             return (
-                              <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
+                              <div style={{ textAlign: "center", padding: "2rem 0", color: "var(--text-muted)", fontSize: "0.85rem" }}>
                                 🔍 {language === "ar" ? "لا توجد نتائج مطابقة" : "No matching pages found"}
                               </div>
                             );
@@ -3422,7 +3422,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             border: "1px solid rgba(16, 107, 163, 0.15)",
                             fontSize: "0.8rem",
                             outline: "none",
-                            background: "#ffffff",
+                            background: "var(--card-bg)",
                             fontFamily: "var(--font-sans)",
                             flex: 1,
                             boxSizing: "border-box"
@@ -3480,7 +3480,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                           if (filteredChapters.length === 0) {
                             return (
-                              <div style={{ textAlign: "center", padding: "2rem 0", color: "#6a7c88", fontSize: "0.85rem" }}>
+                              <div style={{ textAlign: "center", padding: "2rem 0", color: "var(--text-muted)", fontSize: "0.85rem" }}>
                                 🔍 {language === "ar" ? "لا توجد موضوعات مطابقة" : "No matching chapters or topics found"}
                               </div>
                             );
@@ -3682,7 +3682,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                       return (
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>
                             🌐 {language === "ar" ? "اللغة:" : "Language:"}
                           </span>
                           <select
@@ -3789,7 +3789,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             {getPageNumbers().map((pageNum, idx) => {
                               if (pageNum === "...") {
                                 return (
-                                  <span key={`dots-${idx}`} style={{ padding: "0 4px", color: "#6a7c88", fontSize: "0.8rem", fontWeight: "bold" }}>
+                                  <span key={`dots-${idx}`} style={{ padding: "0 4px", color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: "bold" }}>
                                     ...
                                   </span>
                                 );
@@ -3831,7 +3831,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           </button>
 
                           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                            <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: "bold" }}>
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "bold" }}>
                               {language === "ar" ? "اذهب إلى:" : "Go to:"}
                             </span>
                             <input
@@ -3877,7 +3877,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   {loadingBookPages ? (
                     <div style={{ padding: "4rem", textAlign: "center" }}>
                       <div className="pulse-icon" style={{ fontSize: "2rem", marginBottom: "1rem" }}>📖</div>
-                      <p style={{ color: "#6a7c88", fontSize: "0.9rem" }}>
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                         {language === "ar" ? "جاري استرجاع وفهرسة صفحات الكتاب دراسياً..." : "Retrieving and indexing book pages..."}
                       </p>
                     </div>
@@ -3972,7 +3972,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           flexWrap: "wrap",
                           gap: "1rem",
                           fontSize: "0.9rem",
-                          color: "#6a7c88",
+                          color: "var(--text-muted)",
                           borderTop: "1px solid rgba(16, 107, 163, 0.08)",
                           borderBottom: "1px solid rgba(16, 107, 163, 0.08)",
                           padding: "0.75rem 0",
@@ -4174,7 +4174,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                                   {/* Custom Seek Bar progress bar slider */}
                                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: "160px" }}>
-                                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700, fontFamily: "monospace" }}>
+                                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, fontFamily: "monospace" }}>
                                       {(() => {
                                         const m = Math.floor(audioCurrentTime / 60);
                                         const s = Math.floor(audioCurrentTime % 60);
@@ -4204,7 +4204,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       }}
                                     />
 
-                                    <span style={{ fontSize: "0.75rem", color: "#6a7c88", fontWeight: 700, fontFamily: "monospace" }}>
+                                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, fontFamily: "monospace" }}>
                                       {(() => {
                                         const d = audioDuration || 0;
                                         const m = Math.floor(d / 60);
@@ -4228,7 +4228,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
                             <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6a7c88" }}>
+                                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>
                                   🎙️ {language === "ar" ? "المتحدث:" : "Speaker:"}
                                 </span>
                                 <select
@@ -4238,7 +4238,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                     padding: "4px 10px",
                                     borderRadius: "10px",
                                     border: "1px solid rgba(16, 107, 163, 0.15)",
-                                    background: "#ffffff",
+                                    background: "var(--card-bg)",
                                     fontSize: "0.75rem",
                                     fontWeight: 700,
                                     color: "var(--foreground)",
@@ -4324,7 +4324,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                   <div
                                     key={fIdx}
                                     style={{
-                                      background: "#ffffff",
+                                      background: "var(--card-bg)",
                                       border: "1px solid rgba(16, 107, 163, 0.08)",
                                       borderRadius: "12px",
                                       padding: "1rem",
@@ -4460,7 +4460,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   borderTop: "1px solid rgba(0,0,0,0.04)", paddingTop: "1rem", marginTop: "1rem"
                 }}>
-                  <span style={{ fontSize: "0.75rem", color: "#6a7c88" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                     {language === "ar" ? "اضغط واسحب لتحديد أي نص لمناقشته فوراً مع رفيق فهم" : "Highlight any text on the page to ask your companion"}
                   </span>
                   <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--primary)" }}>
@@ -4823,7 +4823,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
             {activeLibraryTab === "private" && (
               <div style={{
                 padding: "1.75rem", borderRadius: "20px",
-                background: "linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(212, 175, 55, 0.05))",
+                background: "linear-gradient(135deg, var(--surface-translucent), rgba(212, 175, 55, 0.05))",
                 border: "1px solid rgba(212, 175, 55, 0.15)", backdropFilter: "blur(12px)",
                 boxShadow: "0 8px 32px rgba(212, 175, 55, 0.03)"
               }}>
@@ -4832,7 +4832,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     <h3 style={{ fontSize: "1.25rem", fontWeight: 800, margin: 0, color: "var(--foreground)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                       🔒 {language === "ar" ? "خزنة دراستي الخاصة (تحميل آمن)" : "My Study Vault (Secure Ingestion)"}
                     </h3>
-                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "#6a7c88" }}>
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
                       {language === "ar" 
                         ? `قم بتحميل وثائقك وأبحاثك الشخصية لدراستها ومذاكرتها بشكل تفاعلي مع رفيق فهم (بحد أقصى ${dynamicMaxUploadSize} ميجابايت).`
                         : `Upload personal notes or guides to study interactively with your companion (strict ${dynamicMaxUploadSize}MB limit).`}
@@ -4926,10 +4926,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   alignItems: "center",
                   justifyContent: "center",
                   padding: "5rem 2rem",
-                  background: "rgba(255, 255, 255, 0.35)",
+                  background: "var(--surface-translucent)",
                   backdropFilter: "blur(12px)",
                   borderRadius: "24px",
-                  border: "1px dashed rgba(16, 107, 163, 0.15)",
+                  border: "1px dashed var(--card-border)",
                   textAlign: "center",
                   gap: "1rem"
                 }}>
@@ -4938,7 +4938,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                     <h4 style={{ margin: 0, fontWeight: 800, color: "var(--foreground)", fontSize: "1.2rem" }}>
                       {language === "ar" ? "لا توجد كتب دراسية متوفرة حالياً" : "No textbooks found"}
                     </h4>
-                    <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.85rem", color: "#6a7c88", maxWidth: "420px", lineHeight: "1.5" }}>
+                    <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.85rem", color: "var(--text-muted)", maxWidth: "420px", lineHeight: "1.5" }}>
                       {language === "ar" 
                         ? "لم نجد أي كتب مطابقة لبحثك في هذا التبويب. يمكنك تعديل خيارات التصفية أو رفع مستند جديد بخزنتك الخاصة!"
                         : "We couldn't find any textbooks matching your current filters. Try relaxing your filters or uploading a personal guide!"}
@@ -5142,7 +5142,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               🔗 {getSourceOrigin(item.source_url)}
                             </a>
                           ) : (
-                            <span style={{ fontSize: "0.75rem", color: "#6a7c88", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
                               🌐 {language === "ar" ? "مخزن محلي آمن" : "Local Verified Asset"}
                             </span>
                           )}
@@ -5222,7 +5222,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--foreground)", fontWeight: 800, fontSize: "1.3rem" }}>
                 {language === "ar" ? "فحص المواد الدراسية" : "Auditing Academic Asset"}
               </h3>
-              <p style={{ margin: 0, fontSize: "0.85rem", color: "#6a7c88" }}>
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
                 {language === "ar" ? "يقوم وكيل فهم الذكي بفحص الملف لضمان توافقه التعليمي..." : "Fahem Academic Verifier Agent is analyzing the file structure & context..."}
               </p>
             </div>
@@ -5248,7 +5248,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999
         }}>
           <div style={{
-            background: "#ffffff", border: "2px solid #ef4444",
+            background: "var(--card-bg)", border: "2px solid #ef4444",
             borderRadius: "24px", padding: "2.5rem", width: "90%", maxWidth: "550px",
             boxShadow: "0 0 24px rgba(239, 68, 68, 0.25)",
             display: "flex", flexDirection: "column", gap: "1.5rem", position: "relative"

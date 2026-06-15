@@ -40,6 +40,9 @@
   --sticky-chat-option-active-bg: #ffffff;
   --text-muted: #5a6e7c;
   --text-placeholder: #8a9ca8;
+  /* FC6.15: theme-aware surfaces so inline panel cards flip in dark instead of glaring white */
+  --surface-translucent: rgba(255, 255, 255, 0.6); /* translucent card on a panel */
+  --surface-subtle: rgba(15, 23, 42, 0.03);        /* faint inner fill / track */
 }
 
 /* High-Premium Light/Dark Theme Override (W-5) */
@@ -69,6 +72,9 @@ html.dark, :root.dark {
   --sticky-chat-option-active-bg: rgba(59, 130, 246, 0.35);
   --text-muted: #94a3b8;
   --text-placeholder: #cbd5e1;
+  /* FC6.15 dark surfaces */
+  --surface-translucent: rgba(30, 41, 59, 0.55);
+  --surface-subtle: rgba(255, 255, 255, 0.05);
 }
 
 /* RTL and Arabic Language Font Mapping */
@@ -1251,6 +1257,26 @@ body[dir="rtl"] .glass-nav-links {
   border-color: transparent;
   box-shadow: 0 8px 20px rgba(16, 107, 163, 0.25);
   transform: translateY(-3px) rotate(8deg);
+}
+
+/* FC6.15 dark-theme: footer nav buttons + social icons were authored light-only.
+   Make the un-hovered state readable, and replace the harsh bright-white hover with a
+   soft dark primary-tint (animation preserved) modeled on the social-icon hover. */
+html.dark .footer-nav-link, :root.dark .footer-nav-link {
+  color: var(--foreground);
+  background: var(--card-bg-glass-card);
+  border-color: var(--card-border);
+}
+html.dark .footer-nav-link:hover, :root.dark .footer-nav-link:hover {
+  color: var(--primary-hover);
+  background: rgba(59, 130, 246, 0.14); /* soft dark, not white */
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+html.dark .social-icon-link, :root.dark .social-icon-link {
+  color: var(--foreground);
+  background: var(--card-bg-glass-card);
+  border-color: var(--card-border);
 }
 
 /* Extra micro-animations for interactive design elements */
