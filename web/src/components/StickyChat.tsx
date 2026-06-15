@@ -36,7 +36,8 @@ import {
   FiCheck,
   FiCopy,
   FiThumbsUp,
-  FiThumbsDown
+  FiThumbsDown,
+  FiSquare
 } from "react-icons/fi";
 
 
@@ -587,6 +588,10 @@ export default function StickyChat() {
   const [isSending, setIsSending] = useState(false);
   const [useGrounded, setUseGrounded] = useState(false);
   const [activeAgent, setActiveAgent] = useState<string>("");
+  // FC6.23: interrupt + transparent status. abortRef holds the live /api/agent stream
+  // controller so the user can Stop it; statusTick rotates the human-readable status.
+  const abortRef = useRef<AbortController | null>(null);
+  const [statusTick, setStatusTick] = useState(0);
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
@@ -2535,6 +2540,40 @@ export default function StickyChat() {
     sendMessageRef.current = handleSendMessage;
   });
 
+  // FC6.23: gently rotate the transparent status while a stream is in flight so it never
+  // looks frozen; resets when idle. The phrase itself is still anchored to the live agent.
+  useEffect(() => {
+    if (!isSending) { setStatusTick(0); return; }
+    const id = setInterval(() => setStatusTick((t) => t + 1), 2200);
+    return () => clearInterval(id);
+  }, [isSending]);
+
+  // FC6.23: map the SSE [METADATA] ActiveAgent value to a human-readable, non-log status.
+  // When the agent is unknown/persistent, rotate generic phrases keyed off statusTick.
+  const friendlyAgentStatus = (agent: string | undefined, tick: number, lang: string): string => {
+    const a = (agent || "").toLowerCase();
+    const ar = lang === "ar";
+    if (a.includes("guardrail")) return ar ? "أتحقق من الأمان والنطاق…" : "Checking safety & scope…";
+    if (a.includes("retriev") || a.includes("rag") || a.includes("knowledge")) return ar ? "أقرأ كتابك الدراسي…" : "Reading your textbook…";
+    if (a.includes("search") || a.includes("google") || a.includes("ground")) return ar ? "أبحث في الويب…" : "Searching the web…";
+    if (a.includes("practice") || a.includes("quiz")) return ar ? "أُجهّز تمرينك…" : "Preparing your practice…";
+    if (a.includes("zatona") || a.includes("summar")) return ar ? "ألخّص المحتوى…" : "Distilling the content…";
+    if (a.includes("assignment")) return ar ? "أُنشئ المهمة…" : "Building the assignment…";
+    if (a.includes("compos") || a.includes("writer") || a.includes("final")) return ar ? "أصوغ الإجابة…" : "Composing your answer…";
+    const rotation = ar
+      ? ["أقرأ كتابك الدراسي…", "أستحضر الصفحات المناسبة…", "أصوغ الإجابة…"]
+      : ["Reading your textbook…", "Citing the right pages…", "Composing your answer…"];
+    return rotation[tick % rotation.length];
+  };
+
+  // FC6.23: abort the in-flight /api/agent stream when the user taps Stop.
+  const handleStopStream = () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      setSessionLogs((prev) => [...prev, "[System] Generation stopped by user."]);
+    }
+  };
+
   if (!user && !demoMode) return null; // Show after sign-in OR inside the Tier-0/Tier-1 demo sandbox
 
   async function handleSendMessage(textToSend?: string) {
@@ -2699,10 +2738,13 @@ User Question: ${queryText}`;
       setSessionLogs((prev) => [...prev, `[RAG Grounding] Grounded directly in textbook: "${title}" - Page ${bookContext.currentPage}`]);
     }
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const endpoint = useGrounded ? "/api/agent/grounded" : "/api/agent";
       const response = await authedFetch(endpoint, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
         },
@@ -2729,6 +2771,7 @@ User Question: ${queryText}`;
       let inFinalOutput = false;
 
       while (!done) {
+        if (controller.signal.aborted) { try { await reader.cancel(); } catch {} break; } // FC6.23: user Stop
         if (chatPacing === "pedagogical") {
           await new Promise((resolve) => setTimeout(resolve, 80));
         }
@@ -2853,20 +2896,45 @@ User Question: ${queryText}`;
         }
       }
 
-      setSessionLogs((prev) => [...prev, "[System] Streaming complete successfully."]);
-      await fetchSessions(); // Refresh list to catch updated or new chats
-      await fetchUserActivities(); // Refresh activities so suggestions reflect latest topics!
+      if (controller.signal.aborted) {
+        // FC6.23: user pressed Stop between reads — keep partial text, note it softly.
+        setSessionLogs((prev) => [...prev, "[System] Generation stopped."]);
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id !== assistantMsgId) return msg;
+            const stoppedNote = language === "ar" ? "⏹ تم الإيقاف." : "⏹ Stopped.";
+            return { ...msg, text: (msg.text && msg.text.trim()) ? msg.text : stoppedNote };
+          })
+        );
+      } else {
+        setSessionLogs((prev) => [...prev, "[System] Streaming complete successfully."]);
+        await fetchSessions(); // Refresh list to catch updated or new chats
+        await fetchUserActivities(); // Refresh activities so suggestions reflect latest topics!
+      }
     } catch (err: any) {
-      console.error("[sticky-chat] Stream retrieval failed:", err);
-      setSessionLogs((prev) => [...prev, `[Error] ${err.message}`]);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMsgId
-            ? { ...msg, text: `Sorry, an error occurred: ${err.message}` }
-            : msg
-        )
-      );
+      // FC6.23: a user-initiated Stop is not an error — keep any partial answer and note it softly.
+      if (err?.name === "AbortError" || controller.signal.aborted) {
+        setSessionLogs((prev) => [...prev, "[System] Generation stopped."]);
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id !== assistantMsgId) return msg;
+            const stoppedNote = language === "ar" ? "⏹ تم الإيقاف." : "⏹ Stopped.";
+            return { ...msg, text: (msg.text && msg.text.trim()) ? msg.text : stoppedNote };
+          })
+        );
+      } else {
+        console.error("[sticky-chat] Stream retrieval failed:", err);
+        setSessionLogs((prev) => [...prev, `[Error] ${err.message}`]);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId
+              ? { ...msg, text: `Sorry, an error occurred: ${err.message}` }
+              : msg
+          )
+        );
+      }
     } finally {
+      abortRef.current = null;
       setIsSending(false);
       setActiveAgent("");
       setMessages((prev) =>
@@ -3683,8 +3751,8 @@ User Question: ${queryText}`;
                     ) : (
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <span className="dot-typing"></span>
-                        <span style={{ fontSize: "0.8rem", color: "#6a7c88" }}>
-                          {ct("thinking_fetching")}
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", transition: "opacity 0.3s ease" }}>
+                          {friendlyAgentStatus(msg.activeAgent, statusTick, language)}
                         </span>
                       </div>
                     )}
@@ -3831,7 +3899,7 @@ User Question: ${queryText}`;
                   <>
                     <span>•</span>
                     <span style={{ color: "var(--accent-orange)", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.15rem" }}>
-                      <FiZap className="spinning-icon" /> {msg.activeAgent}
+                      <FiZap className="spinning-icon" /> {friendlyAgentStatus(msg.activeAgent, statusTick, language)}
                     </span>
                   </>
                 )}
@@ -4135,24 +4203,29 @@ User Question: ${queryText}`;
               }}
             />
             <button
-              type="submit"
-              disabled={isSending || !inputValue.trim()}
+              type={isSending ? "button" : "submit"}
+              onClick={isSending ? handleStopStream : undefined}
+              disabled={!isSending && !inputValue.trim()}
+              aria-label={isSending ? (language === "ar" ? "إيقاف التوليد" : "Stop generating") : (language === "ar" ? "إرسال" : "Send")}
+              title={isSending ? (language === "ar" ? "إيقاف" : "Stop") : undefined}
               style={{
                 width: "2.5rem",
                 height: "2.5rem",
                 borderRadius: "50%",
-                backgroundColor: isSending || !inputValue.trim() ? "var(--card-border)" : "var(--primary)",
-                color: isSending || !inputValue.trim() ? "var(--text-muted)" : "#ffffff",
+                backgroundColor: isSending ? "var(--secondary, #e74c3c)" : (!inputValue.trim() ? "var(--card-border)" : "var(--primary)"),
+                color: isSending ? "#ffffff" : (!inputValue.trim() ? "var(--text-muted)" : "#ffffff"),
                 border: "none",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                cursor: isSending || !inputValue.trim() ? "not-allowed" : "pointer",
-                boxShadow: isSending || !inputValue.trim() ? "none" : "0 4px 10px rgba(16, 107, 163, 0.15)",
+                cursor: isSending ? "pointer" : (!inputValue.trim() ? "not-allowed" : "pointer"),
+                boxShadow: isSending ? "0 4px 10px rgba(231, 76, 60, 0.25)" : (!inputValue.trim() ? "none" : "0 4px 10px rgba(16, 107, 163, 0.15)"),
                 transition: "all 0.2s"
               }}
             >
-              <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />
+              {isSending
+                ? <FiSquare style={{ fontSize: "0.9rem", fill: "currentColor" }} />
+                : <FiSend style={{ fontSize: "1rem", transform: dir === "rtl" ? "scaleX(-1)" : "none" }} />}
             </button>
           </div>
         </form>
