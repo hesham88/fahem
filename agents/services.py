@@ -339,22 +339,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         )
                         # FC7.2/7.3: the role is AUTHORITATIVE from the DB user doc — NEVER trust the
                         # role forwarded in X-Verified-Principal (that was a privilege-escalation hole).
-                        # Hard-pin super-admin to the single owner whitelist; demote any other stray
-                        # 'super-admin' doc to 'admin'. principal is shared with request.state and the
-                        # verified_principal_ctx, so mutating it in place updates every reader.
+                        # principal is shared with request.state and the verified_principal_ctx, so
+                        # mutating it in place updates every reader.
                         _email_l = (principal.get("email") or "").strip().lower()
-                        _db_role = (getattr(_profile, "role", None) or "user")
-                        if _email_l == "hesham1988@gmail.com":
-                            principal["role"] = "super-admin"
-                        elif _db_role == "super-admin":
-                            principal["role"] = "admin"
+                        _db_target = principal.get("db_target") or "fahem"
+                        if _db_target == "fahem_sandbox":
+                            # FC7.2 (corrected) / FC7.4: the sandbox grants NOBODY admin power — not even
+                            # the owner. Every sandbox identity is a non-privileged demo user, so admin/
+                            # write endpoints (which require admin/super-admin/judge) reject them. Tier is
+                            # by email domain ONLY: google/mongodb/devpost.com => Tier 1, else Tier 0.
+                            principal["role"] = "user"
+                            principal["tier"] = 1 if any(
+                                _email_l.endswith("@" + _d) for _d in ("google.com", "mongodb.com", "devpost.com")
+                            ) else 0
                         else:
-                            principal["role"] = _db_role
+                            # Production (fahem): DB-resolved role; super-admin hard-pinned to the single
+                            # owner whitelist; any other stray 'super-admin' doc demoted to 'admin'.
+                            _db_role = (getattr(_profile, "role", None) or "user")
+                            if _email_l == "hesham1988@gmail.com":
+                                principal["role"] = "super-admin"
+                            elif _db_role == "super-admin":
+                                principal["role"] = "admin"
+                            else:
+                                principal["role"] = _db_role
                 except Exception as pe_err:
                     logger.warning(f"Failed to auto-provision/resolve user profile: {pe_err}")
-                    # Fail CLOSED: if the DB role can't be confirmed, grant least privilege so a
-                    # failed lookup never leaves an elevated *forwarded* role in effect (owner exempt).
-                    if (principal.get("email") or "").strip().lower() != "hesham1988@gmail.com":
+                    # Fail CLOSED: grant least privilege so a failed lookup never leaves an elevated
+                    # *forwarded* role in effect. Only the prod owner is exempt (sandbox owner is NOT).
+                    _is_prod_owner = (principal.get("db_target") == "fahem"
+                                      and (principal.get("email") or "").strip().lower() == "hesham1988@gmail.com")
+                    if not _is_prod_owner:
                         principal["role"] = "user"
 
             try:
