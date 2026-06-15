@@ -4999,9 +4999,11 @@ export default function Home() {
 
 
 
-  const handleStartStudy = (book: any, pageNum: number = 1) => {
+  const handleStartStudy = (book: any, pageNum?: number) => {
     setSelectedBookReader(book);
-    setReaderCurrentPage(pageNum);
+    // FC6.13: the fabricated cover is page 0. Open on it when no specific page is requested;
+    // otherwise honour the requested real page_number (chapters/topics pass page_number directly).
+    setReaderCurrentPage((pageNum !== undefined && pageNum !== null) ? pageNum : (book?.coverUrl ? 0 : 1));
     setActiveTab("library"); // ensure we switch to the library tab where the reader panel is housed!
     const welcomeText = language === "ar" 
       ? `أهلاً بك يا بطل في مساحتك الدراسية التفاعلية الدافئة لكتاب "${book.titleAr || book.title}"! أنا رفيقك الدراسي الذكي وصديقك المقرب، متواجد هنا دائماً لأفكر وأحلل وأتعلم معك خطوة بخطوة 🌟. دعنا نجعل المذاكرة ممتعة وسهلة جداً! في أي وقت تحتاج توجيهي، استخدم الإشارات الذكية في الدردشة: اكتب @ لتحديد المادة، # لاختيار مرجع من الكتاب، أو / لتفعيل أحد الأوامر الدراسية السحرية مثل (/explain أو /summary) لمساعدتك فوراً. بمَ ترغب في أن نبدأ اليوم؟` 

@@ -2042,13 +2042,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (!selectedBookReader) return;
     const allPages = getAllPages(selectedBookReader, loadedBookPages);
     const hasCover = !!selectedBookReader.coverUrl;
-    const isCoverPage = hasCover && readerCurrentPage === 1;
+    const isCoverPage = hasCover && readerCurrentPage === 0; // FC6.13: cover is page 0
     if (isCoverPage) return;
-    
-    const activePage = hasCover 
-      ? (allPages[readerCurrentPage - 2] || allPages[0])
-      : (allPages[readerCurrentPage - 1] || allPages[0]);
-      
+
+    const activePage = allPages[readerCurrentPage - 1] || allPages[0];
+
     if (!activePage) return;
     const bookId = selectedBookReader._id || selectedBookReader.id;
     const pageNumber = activePage.page_number || activePage.pageNum || readerCurrentPage;
@@ -2755,13 +2753,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
       const allPages = getAllPages(selectedBookReader, loadedBookPages);
       const hasCover = !!selectedBookReader.coverUrl;
-      const totalPages = hasCover ? allPages.length + 1 : allPages.length;
+      const totalPages = allPages.length;          // FC6.13: cover is page 0, not counted
+      const minPage = hasCover ? 0 : 1;            // cover (0) reachable only when present
       const isAr = translationLanguage === "Original" ? (selectedBookReader.language === "ar") : (translationLanguage === "ar");
 
       if (e.key === "ArrowRight") {
         if (isAr) {
           // RTL: ArrowRight goes to Previous Page
-          if (readerCurrentPage > 1) {
+          if (readerCurrentPage > minPage) {
             setReaderCurrentPage(readerCurrentPage - 1);
           }
         } else {
@@ -2778,7 +2777,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           }
         } else {
           // LTR: ArrowLeft goes to Previous Page
-          if (readerCurrentPage > 1) {
+          if (readerCurrentPage > minPage) {
             setReaderCurrentPage(readerCurrentPage - 1);
           }
         }
@@ -2802,12 +2801,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     const touchEndX = e.changedTouches[0].clientX;
     const diffX = touchStartX.current - touchEndX;
     const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
+    const minPage = selectedBookReader?.coverUrl ? 0 : 1; // FC6.13: cover is page 0
 
     if (Math.abs(diffX) > 50) {
       if (diffX > 0) {
         // Swipe Left (forward in LTR, backward in RTL)
         if (isAr) {
-          if (readerCurrentPage > 1) setReaderCurrentPage(readerCurrentPage - 1);
+          if (readerCurrentPage > minPage) setReaderCurrentPage(readerCurrentPage - 1);
         } else {
           if (readerCurrentPage < totalPages) setReaderCurrentPage(readerCurrentPage + 1);
         }
@@ -2816,7 +2816,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         if (isAr) {
           if (readerCurrentPage < totalPages) setReaderCurrentPage(readerCurrentPage + 1);
         } else {
-          if (readerCurrentPage > 1) setReaderCurrentPage(readerCurrentPage - 1);
+          if (readerCurrentPage > minPage) setReaderCurrentPage(readerCurrentPage - 1);
         }
       }
     }
@@ -3100,15 +3100,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       {selectedBookReader ? (() => {
         const allPages = getAllPages(selectedBookReader, loadedBookPages);
         const hasCover = !!selectedBookReader.coverUrl;
-        const totalPagesCount = hasCover ? allPages.length + 1 : (allPages.length || 1);
-        const isCoverPage = hasCover && readerCurrentPage === 1;
+        const totalPagesCount = allPages.length || 1; // FC6.13: cover is page 0, not counted
+        const minPage = hasCover ? 0 : 1;
+        const isCoverPage = hasCover && readerCurrentPage === 0;
 
-        const activePage = isCoverPage 
-          ? null 
-          : (hasCover 
-              ? (allPages[readerCurrentPage - 2] || allPages[0])
-              : (allPages[readerCurrentPage - 1] || allPages[0])
-            ) || {
+        const activePage = isCoverPage
+          ? null
+          : (allPages[readerCurrentPage - 1] || allPages[0]) || {
               pageNum: 1,
               titleEn: "Untitled Section",
               titleAr: "قسم غير معنون",
@@ -3333,13 +3331,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               padding: "4px"
                             }}>
                               {filteredPages.map((p) => {
-                                const isActive = hasCover ? (p.pageNum + 1 === readerCurrentPage) : (p.pageNum === readerCurrentPage);
+                                const isActive = p.pageNum === readerCurrentPage; // FC6.13: cover is page 0
                                 const pTitle = translationLanguage === "ar" ? (p.titleAr || p.titleEn) : (p.titleEn || p.titleAr);
-                                
+
                                 return (
                                   <button
                                     key={p.pageNum}
-                                    onClick={() => setReaderCurrentPage(hasCover ? p.pageNum + 1 : p.pageNum)}
+                                    onClick={() => setReaderCurrentPage(p.pageNum)}
                                     title={`${pTitle} (${language === "ar" ? `صفحة ${p.pageNum}` : `Page ${p.pageNum}`})`}
                                     style={{
                                       display: "flex",
@@ -3432,7 +3430,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           onClick={() => {
                             setTocSearch("");
                             setExpandedChapters({});
-                            setReaderCurrentPage(1);
+                            setReaderCurrentPage(hasCover ? 0 : 1); // FC6.13: reset to cover (page 0)
                           }}
                           style={{
                             padding: "0.45rem 0.75rem",
@@ -3490,7 +3488,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
                             const chTitle = isAr ? ch.titleAr : ch.titleEn;
                             const isExpanded = searchQuery ? true : (expandedChapters[ch.id] !== false);
-                            const isChActive = ch.topics.some((top: any) => hasCover ? (top.pageNum + 1 === readerCurrentPage) : (top.pageNum === readerCurrentPage));
+                            const isChActive = ch.topics.some((top: any) => top.pageNum === readerCurrentPage); // FC6.13: cover is page 0
 
                             return (
                               <div key={ch.id} style={{
@@ -3509,7 +3507,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       }));
                                     }
                                     if (ch.topics && ch.topics.length > 0) {
-                                      setReaderCurrentPage(hasCover ? ch.topics[0].pageNum + 1 : ch.topics[0].pageNum);
+                                      setReaderCurrentPage(ch.topics[0].pageNum);
                                     }
                                   }}
                                   style={{
@@ -3559,13 +3557,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                     borderTop: "1px solid rgba(16, 107, 163, 0.04)"
                                   }}>
                                     {ch.topics.map((top: any) => {
-                                      const isTopActive = hasCover ? (top.pageNum + 1 === readerCurrentPage) : (top.pageNum === readerCurrentPage);
+                                      const isTopActive = top.pageNum === readerCurrentPage; // FC6.13: cover is page 0
                                       const topTitle = isAr ? top.titleAr : top.titleEn;
 
                                       return (
                                         <button
                                           key={top.id}
-                                          onClick={() => setReaderCurrentPage(hasCover ? top.pageNum + 1 : top.pageNum)}
+                                          onClick={() => setReaderCurrentPage(top.pageNum)}
                                           style={{
                                             display: "flex",
                                             justifyContent: "space-between",
@@ -3777,8 +3775,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       return (
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                           <button
-                            disabled={readerCurrentPage <= 1}
-                            onClick={() => setReaderCurrentPage(Math.max(1, readerCurrentPage - 1))}
+                            disabled={readerCurrentPage <= minPage}
+                            onClick={() => setReaderCurrentPage(Math.max(minPage, readerCurrentPage - 1))}
                             className="btn btn-secondary"
                             style={{ padding: "6px 12px", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
                           >
@@ -4007,7 +4005,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         </p>
 
                         <button
-                          onClick={() => setReaderCurrentPage(2)}
+                          onClick={() => setReaderCurrentPage(1)}
                           style={{
                             padding: "12px 28px",
                             borderRadius: "30px",
