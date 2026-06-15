@@ -6580,7 +6580,9 @@ export default function Home() {
               title={language === "ar" ? "سلسلة الأيام المتتالية" : "Day streak"}
               style={{ display: "flex", alignItems: "center", gap: "0.25rem", height: "34px", padding: "0 9px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "#ea580c", fontWeight: 800, fontSize: "0.8rem" }}
             >
-              🔥 {navStreak}
+              {/* FC7 XP fix: use the SAME gamification source as Insights (activeStreak from the profile)
+                  so the nav matches the achievements page instead of the divergent activity-log count. */}
+              🔥 {activeStreak}
             </div>
 
             {/* Help / user manual ("?") */}
@@ -6691,13 +6693,16 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* XP + Level meter (one row, above the token usage) */}
+              {/* XP + Level meter (one row, above the token usage).
+                  FC7 XP fix: bind to the SAME gamification source as the Insights/Achievements page
+                  (activeLevel/activeXp/xpProgressPercent/nextLevelXp from the profile) so the nav level,
+                  bar and XP total match the achievements page instead of the divergent activity-log %100. */}
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "8px 12px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,107,163,0.06))", border: "1px solid rgba(99,102,241,0.2)", fontSize: "0.72rem" }}>
-                <span style={{ fontWeight: 900, color: "var(--primary)", whiteSpace: "nowrap" }}>⭐ {language === "ar" ? "مستوى" : "Lvl"} {navLevel}</span>
+                <span style={{ fontWeight: 900, color: "var(--primary)", whiteSpace: "nowrap" }}>⭐ {language === "ar" ? "مستوى" : "Lvl"} {activeLevel}</span>
                 <div style={{ flex: 1, height: "7px", background: "rgba(16,107,163,0.12)", borderRadius: "10px", overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, Math.max(0, navXp))}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #106ba3)", borderRadius: "10px", transition: "width 0.5s" }} />
+                  <div style={{ width: `${Math.min(100, Math.max(0, xpProgressPercent))}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #106ba3)", borderRadius: "10px", transition: "width 0.5s" }} />
                 </div>
-                <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--foreground)", whiteSpace: "nowrap" }}>{navXp}/100 XP</span>
+                <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--foreground)", whiteSpace: "nowrap" }}>{activeXp}/{nextLevelXp} XP</span>
               </div>
 
               {/* Token-Usage Indicator (W-9 / OR-16 Quick-Snap) */}
