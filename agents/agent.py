@@ -977,7 +977,10 @@ async def create_practice_tool(
         "bookId": book_id or "",
         "selectedChapters": chapters or [],
         "customConcepts": custom_concepts or "",
-        "mode": mode
+        "mode": mode,
+        # FC7.12: carry the session format/arena so the workstation honors it (e.g. timed Quiz Arena
+        # vs Infinite practice) instead of always defaulting to infinite.
+        "format": format or "infinite"
     }
     
     intent_json = json.dumps({
