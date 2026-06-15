@@ -775,9 +775,44 @@ export default function LandingPage() {
               </div>
               
               {/* EXPLORE DEMO SANDBOX panel */}
-              <form 
+              {/* FC7.22: a signed-in user must NOT enter the sandbox from the landing page — they must
+                  sign out first (the sandbox is a separate, identity-less demo). Show a sign-out prompt. */}
+              {user ? (
+                <div
+                  style={{
+                    width: "100%",
+                    background: isDarkMode ? "rgba(30, 41, 59, 0.4)" : "linear-gradient(135deg, rgba(255, 215, 0, 0.07), rgba(249, 115, 22, 0.05))",
+                    border: "1px solid rgba(218, 165, 32, 0.4)",
+                    borderRadius: "20px",
+                    padding: "1.5rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
+                    backdropFilter: "blur(12px)",
+                    textAlign: "start"
+                  }}
+                >
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDarkMode ? "#fbbf24" : "#b8860b" }}>
+                    ⭐ {language === "ar" ? "البيئة التجريبية" : "EXPLORE DEMO SANDBOX"}
+                  </span>
+                  <p style={{ fontSize: "0.78rem", color: isDarkMode ? "#cbd5e1" : "#475569", margin: 0, lineHeight: 1.5 }}>
+                    {language === "ar"
+                      ? "أنت مسجّل الدخول بحساب حقيقي. لاستكشاف البيئة التجريبية المجهولة، يرجى تسجيل الخروج أولًا."
+                      : "You're signed in with a real account. To explore the anonymous demo sandbox, please sign out first."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    style={{ padding: "0.6rem 1rem", borderRadius: "10px", border: "none", background: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#5c4033", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", width: "100%" }}
+                  >
+                    {language === "ar" ? "تسجيل الخروج للمتابعة" : "Sign out to continue"}
+                  </button>
+                </div>
+              ) : (
+              <form
                 onSubmit={async (e) => {
                   e.preventDefault();
+                  if (user) { setBypassActive(false); return; } // FC7.22: never enter sandbox while signed in
                   try {
                     setBypassActive(true);
                     setErrorMsg("");
@@ -845,44 +880,14 @@ export default function LandingPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: "0.75rem", color: isDarkMode ? "#cbd5e1" : "#475569", margin: 0, lineHeight: 1.45, opacity: 0.9 }}>
-                  {language === "ar" 
-                    ? "اختر دورك التجريبي وأدخل بريدًا إلكترونيًا اختياريًا لاستكشاف فاهم بأمان."
-                    : "Select your evaluation role and provide an optional email to explore."
+                  {language === "ar"
+                    ? "أدخل بريدًا إلكترونيًا اختياريًا واستكشف فاهم بأمان. اكتشف الأدوار المختلفة عبر إنشاء حساب وإتمام التهيئة."
+                    : "Provide an optional email and explore Fahem safely. Discover the different roles by signing up and completing onboarding."
                   }
                 </p>
 
-                {/* Persona Selector Dropdown */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                  <label htmlFor="persona-select" style={{ fontSize: "0.7rem", fontWeight: 700, color: isDarkMode ? "#fbbf24" : "#854d0e" }}>
-                    {language === "ar" ? "الدور / الشخصية" : "CHOOSE PERSONA"}
-                  </label>
-                  <select
-                    id="persona-select"
-                    value={selectedPersona}
-                    onChange={(e) => setSelectedPersona(e.target.value as any)}
-                    style={{
-                      padding: "0.5rem",
-                      borderRadius: "10px",
-                      border: "1px solid rgba(218, 165, 32, 0.4)",
-                      background: isDarkMode ? "#1e293b" : "rgba(255, 255, 255, 0.95)",
-                      fontSize: "0.85rem",
-                      color: "var(--foreground)",
-                      outline: "none",
-                      cursor: "pointer",
-                      width: "100%"
-                    }}
-                  >
-                    <option value="student">
-                      {language === "ar" ? "طالب (مساعد أكاديمي)" : "Student Persona"}
-                    </option>
-                    <option value="teacher">
-                      {language === "ar" ? "معلم (أدوات المدرسين)" : "Teacher Persona"}
-                    </option>
-                    <option value="admin">
-                      {language === "ar" ? "مدير (لوحة التحكم)" : "Admin Preview Persona"}
-                    </option>
-                  </select>
-                </div>
+                {/* FC7.24: persona dropdown removed — the sandbox showcases a single demo experience;
+                    users discover personas (student/teacher/parent/admin) through the onboarding flow. */}
 
                 {/* Optional Email Input */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
@@ -936,6 +941,7 @@ export default function LandingPage() {
                   }
                 </button>
               </form>
+              )}
 
               {/* Support Fahem's Servers boxes */}
               <div style={{ width: "100%" }}>
