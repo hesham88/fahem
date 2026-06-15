@@ -115,10 +115,23 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   const updateReportStatus = async (reportId: string, status: string) => {
     try {
+      // Triaging or resolving requires an admin comment that is saved for audit.
+      let adminComment = "";
+      if (status === "triaged" || status === "resolved") {
+        adminComment = (window.prompt(
+          language === "ar"
+            ? "أضف تعليق المشرف لهذا الإجراء (مطلوب للتدقيق):"
+            : "Add an admin comment for this action (required for audit):"
+        ) || "").trim();
+        if (!adminComment) {
+          alert(language === "ar" ? "التعليق مطلوب عند المراجعة أو الحل." : "A comment is required when triaging or resolving.");
+          return;
+        }
+      }
       const response = await authedFetch("/api/admin/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportId, status })
+        body: JSON.stringify({ reportId, status, adminComment })
       });
       const data = await response.json();
       if (response.ok && data.success) {

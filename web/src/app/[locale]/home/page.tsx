@@ -775,6 +775,10 @@ export default function Home() {
   const dailyLimit = totalAllocatedClt;
   const tokenProgressPercent = dailyLimit > 0 ? (dailyUsed / dailyLimit) * 100 : 0;
   const remainingClt = dailyLimit - dailyUsed;
+  // Real nav-bar gamification meters (computed from the activity log in fetchSpaceHistory).
+  const [navXp, setNavXp] = useState<number>(0);
+  const [navLevel, setNavLevel] = useState<number>(1);
+  const [navStreak, setNavStreak] = useState<number>(0);
   const [placesResults, setPlacesResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [selectedPlaceForBranch, setSelectedPlaceForBranch] = useState<any | null>(null);
@@ -1715,6 +1719,25 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];
+
+        // Compute real XP / level / day-streak for the nav meters from the activity log.
+        try {
+          const totalXp = activities
+            .filter((a: any) => a.action === "practice_session")
+            .reduce((s: number, a: any) => s + (Number(a.details?.xpGained) || 0), 0);
+          setNavXp(totalXp % 100);
+          setNavLevel(Math.floor(totalXp / 100) + 1);
+          const days = new Set<string>();
+          activities.forEach((a: any) => { if (a.timestamp) days.add(new Date(a.timestamp).toISOString().slice(0, 10)); });
+          const countStreakFrom = (start: Date): number => {
+            let n = 0; const d = new Date(start);
+            while (days.has(d.toISOString().slice(0, 10))) { n++; d.setDate(d.getDate() - 1); }
+            return n;
+          };
+          let streak = countStreakFrom(new Date());
+          if (streak === 0) { const y = new Date(); y.setDate(y.getDate() - 1); streak = countStreakFrom(y); }
+          setNavStreak(streak);
+        } catch (e) { /* non-fatal */ }
         const loadedHistory = activities
           .filter((act: any) => act.action === "space_history" || act.action === "practice_session")
           .map((act: any) => {
@@ -6515,6 +6538,14 @@ export default function Home() {
               )}
             </button>
 
+            {/* Day streak (next to globe / theme / help) */}
+            <div
+              title={language === "ar" ? "سلسلة الأيام المتتالية" : "Day streak"}
+              style={{ display: "flex", alignItems: "center", gap: "0.25rem", height: "34px", padding: "0 9px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "#ea580c", fontWeight: 800, fontSize: "0.8rem" }}
+            >
+              🔥 {navStreak}
+            </div>
+
             {/* Help / user manual ("?") */}
             <button
               onClick={() => setShowHelpModal(true)}
@@ -6623,9 +6654,18 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* XP + Level meter (one row, above the token usage) */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "8px 12px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,107,163,0.06))", border: "1px solid rgba(99,102,241,0.2)", fontSize: "0.72rem" }}>
+                <span style={{ fontWeight: 900, color: "var(--primary)", whiteSpace: "nowrap" }}>⭐ {language === "ar" ? "مستوى" : "Lvl"} {navLevel}</span>
+                <div style={{ flex: 1, height: "7px", background: "rgba(16,107,163,0.12)", borderRadius: "10px", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, navXp))}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #106ba3)", borderRadius: "10px", transition: "width 0.5s" }} />
+                </div>
+                <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--foreground)", whiteSpace: "nowrap" }}>{navXp}/100 XP</span>
+              </div>
+
               {/* Token-Usage Indicator (W-9 / OR-16 Quick-Snap) */}
-              <div style={{ 
-                padding: "12px 14px", 
+              <div style={{
+                padding: "12px 14px",
                 background: "linear-gradient(135deg, rgba(16, 107, 163, 0.08), rgba(99, 102, 241, 0.06))", 
                 borderRadius: "14px", 
                 border: "1px solid rgba(16, 107, 163, 0.22)",

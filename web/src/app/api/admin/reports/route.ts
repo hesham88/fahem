@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { reportId, status } = body;
+    const { reportId, status, adminComment } = body;
 
     if (!reportId || !status) {
       return new Response(JSON.stringify({ error: "reportId and status are required" }), {
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Production: update in MongoDB via proxy
-    return await proxyRequest("/admin/reports", "POST", { reportId, status }, ctx);
+    return await proxyRequest("/admin/reports", "POST", { reportId, status, adminComment }, ctx);
 
   } catch (err: any) {
     console.error("[admin-reports-api] POST failed:", err);

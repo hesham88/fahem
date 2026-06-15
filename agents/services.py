@@ -3675,17 +3675,39 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     content={"success": False, "error": "invalid status value"},
                     status_code=400
                 )
-                
+
+            # An admin comment is required when triaging or resolving — saved for audit.
+            admin_comment = (payload.get("adminComment") or "").strip()
+            if status in ["triaged", "resolved"] and not admin_comment:
+                return fastapi.responses.JSONResponse(
+                    content={"success": False, "error": "An admin comment is required when triaging or resolving a report."},
+                    status_code=400
+                )
+
             from tools import get_mongodb_uri
             from pymongo import MongoClient
-            
+            import datetime
+
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
-            
+
+            now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+            audit_entry = {
+                "status": status,
+                "comment": admin_comment,
+                "by": principal.get("email"),
+                "by_uid": principal.get("uid"),
+                "at": now_iso
+            }
+            set_fields = {"status": status}
+            if admin_comment:
+                set_fields["adminComment"] = admin_comment
+                set_fields["resolvedBy"] = principal.get("email")
+                set_fields["resolvedAt"] = now_iso
             result = db["reports"].update_one(
                 {"_id": report_id},
-                {"$set": {"status": status}}
+                {"$set": set_fields, "$push": {"audit_trail": audit_entry}}
             )
             
             if result.matched_count == 0:
@@ -4251,10 +4273,14 @@ def register_telemetry_route(app: fastapi.FastAPI):
             from pymongo import MongoClient
             
             data = await request.json()
+            principal = getattr(request.state, "principal", None) or {}
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
-            
+
+            # Snapshot the current config so we can record a before->after change history.
+            before_config = db["config"].find_one({}) or {}
+
             # Prepare update fields
             update_fields = {}
             if "isTokenControlActive" in data:
@@ -4273,7 +4299,25 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 update_fields["demoDomains"] = [str(x).strip().lower() for x in data["demoDomains"] if x]
                 
             db["config"].update_one({}, {"$set": update_fields}, upsert=True)
-            
+
+            # Audit: record the system-limit / config change history (before -> after, who, when).
+            try:
+                import datetime
+                changes = {}
+                for k, v in update_fields.items():
+                    old = before_config.get(k)
+                    if old != v:
+                        changes[k] = {"from": old, "to": v}
+                if changes:
+                    db["config_history"].insert_one({
+                        "changes": changes,
+                        "changed_by": principal.get("email"),
+                        "changed_by_uid": principal.get("uid"),
+                        "changed_at": datetime.datetime.utcnow().isoformat() + "Z"
+                    })
+            except Exception as he:
+                logger.warning(f"Failed to record config change history: {he}")
+
             # Fetch latest
             config_doc = db["config"].find_one({})
             if "_id" in config_doc:
