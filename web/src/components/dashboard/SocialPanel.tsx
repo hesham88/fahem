@@ -568,9 +568,16 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
           setSelectedGroupId(finalGroupId);
         }
 
+        // FC7.26: the agent sometimes passes a subject NAME (e.g. "Computer Programming") as subject_id,
+        // which can't match the subject dropdown (it expects an id). Drop a name-like value (contains
+        // whitespace / not an id) so the book anchor (book_id) is used instead — the assignment still
+        // anchors correctly. A real id-looking subject_id is kept.
+        const looksLikeId = (v: any) => typeof v === "string" && v.length > 0 && !/\s/.test(v);
+        const cleanSubjectId = looksLikeId(subject_id) ? subject_id : undefined;
+
         if (title) setAsgTitle(title);
         if (title_ar) setAsgTitleAr(title_ar);
-        if (subject_id) setAsgSubjectId(subject_id);
+        if (cleanSubjectId) setAsgSubjectId(cleanSubjectId); else if (book_id) setAsgSubjectId("");
         if (book_id) setAsgBookId(book_id);
         if (timer_seconds) setAsgTimerSeconds(timer_seconds);
 
@@ -596,7 +603,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
             group_id: finalGroupId,
             title,
             title_ar,
-            subject_id: subject_id || undefined,
+            subject_id: cleanSubjectId,
             book_id: book_id || undefined,
             timer_seconds,
             questions: mappedQuestions

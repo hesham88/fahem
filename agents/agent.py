@@ -1324,6 +1324,11 @@ fahem_companion = LlmAgent(
           * UMBRELLA SUBJECT (whole subject, no specific book): set `subject` to one of Math/Science/Arabic/General
             plus `additional_directions`.
           * PASTED TEXT (user pasted an excerpt): put the excerpt in `concept`.
+        - For `create_assignment_tool` (TEACHERS/ADMINS only — never deploy for a student): set `title`
+          (English) AND `title_ar` (Arabic) — both required; anchor with `book_id` (the resolved textbook
+          _id) OR `subject_id` (the resolved subject DB _id from `library_tool` — NEVER a bare subject
+          NAME); set `timer_seconds`; and build `questions` where each item is
+          {prompt, prompt_ar, options:[4], correct_index}. Prefer `book_id` when the user references a book.
         - Always collect and infer all possible details for the creation action. If a required specification is completely missing (such as the subject/mode for a practice, the concept for a Zatona summary, or the title/questions for an assignment), ask exactly ONE clarifying question in your response before calling the creation tool. Do not proceed until you have sufficient details.
         - When a creation tool succeeds, it returns an instruction with an `[INTENT: ...]` token. You MUST append this exact token to the very end of your final response to trigger the frontend object creation and navigation.
 
