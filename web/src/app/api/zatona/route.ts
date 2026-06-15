@@ -86,8 +86,22 @@ You MUST respond with a JSON object strictly matching this schema:
       }
     }
 
-    const data = JSON.parse(responseText.trim());
-    return new Response(JSON.stringify({ success: true, report: data.report }), {
+    // Be resilient to the model's output shape: prefer the JSON { report } field, but fall back to
+    // the raw markdown (code fences stripped) so a non-JSON reply still yields a usable Zatona.
+    let report = "";
+    try {
+      const parsed = JSON.parse(responseText.trim());
+      report = parsed.report || parsed.text || parsed.summary || "";
+    } catch {
+      report = "";
+    }
+    if (!report) {
+      report = responseText.trim().replace(/^```(?:json|markdown)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    }
+    if (!report) {
+      return new Response(JSON.stringify({ error: "Empty Zatona report from model" }), { status: 500 });
+    }
+    return new Response(JSON.stringify({ success: true, report }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

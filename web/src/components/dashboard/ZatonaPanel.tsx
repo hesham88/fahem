@@ -125,6 +125,18 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   /**
    * Triggers the server endpoint to digest and summarize the user-provided textbook topic or textbook scope.
    */
+  const handleExportZatonaPdf = () => {
+    const node = document.getElementById("zatona-result-content");
+    if (!node) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const dir = language === "ar" ? "rtl" : "ltr";
+    win.document.write(`<!DOCTYPE html><html dir="${dir}"><head><meta charset="utf-8"><title>Fahem — Zatona Summary</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:28px;line-height:1.7;color:#111}h1,h2,h3{color:#106ba3}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;text-align:start}code{background:#f3f4f6;padding:2px 5px;border-radius:4px;font-family:monospace}blockquote{border-inline-start:4px solid #106ba3;margin:0;padding-inline-start:12px;color:#374151}</style></head><body>${node.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { try { win.print(); } catch (e) {} }, 350);
+  };
+
   const handleDigestEssence = useCallback(async (overrideParams?: {
     scopeType?: "text" | "subject" | "book";
     subject?: string;
@@ -591,8 +603,19 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                 </span>
               </div>
             ) : localResult ? (
-              <div style={{ fontSize: "0.85rem", lineHeight: "1.6", fontFamily: "var(--font-sans)" }}>
-                {renderPremiumContent(localResult)}
+              <div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+                  <button
+                    type="button"
+                    onClick={handleExportZatonaPdf}
+                    style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", fontWeight: 700, padding: "6px 12px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--primary)", cursor: "pointer" }}
+                  >
+                    📄 {language === "ar" ? "تصدير PDF" : "Export PDF"}
+                  </button>
+                </div>
+                <div id="zatona-result-content" style={{ fontSize: "0.85rem", lineHeight: "1.6", fontFamily: "var(--font-sans)" }}>
+                  {renderPremiumContent(localResult)}
+                </div>
               </div>
             ) : (
               <div
