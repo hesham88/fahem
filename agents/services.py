@@ -332,13 +332,30 @@ def register_telemetry_route(app: fastapi.FastAPI):
                         from mongodb_engine import MongoDBEngine
                     db_engine = MongoDBEngine()
                     if db_engine._client is not None:
-                        await db_engine.ensure_user_profile(
+                        _profile = await db_engine.ensure_user_profile(
                             user_id=principal.get("uid"),
                             email=principal.get("email"),
                             display_name=principal.get("displayName") or principal.get("name")
                         )
+                        # FC7.2/7.3: the role is AUTHORITATIVE from the DB user doc — NEVER trust the
+                        # role forwarded in X-Verified-Principal (that was a privilege-escalation hole).
+                        # Hard-pin super-admin to the single owner whitelist; demote any other stray
+                        # 'super-admin' doc to 'admin'. principal is shared with request.state and the
+                        # verified_principal_ctx, so mutating it in place updates every reader.
+                        _email_l = (principal.get("email") or "").strip().lower()
+                        _db_role = (getattr(_profile, "role", None) or "user")
+                        if _email_l == "hesham1988@gmail.com":
+                            principal["role"] = "super-admin"
+                        elif _db_role == "super-admin":
+                            principal["role"] = "admin"
+                        else:
+                            principal["role"] = _db_role
                 except Exception as pe_err:
-                    logger.warning(f"Failed to auto-provision user profile: {pe_err}")
+                    logger.warning(f"Failed to auto-provision/resolve user profile: {pe_err}")
+                    # Fail CLOSED: if the DB role can't be confirmed, grant least privilege so a
+                    # failed lookup never leaves an elevated *forwarded* role in effect (owner exempt).
+                    if (principal.get("email") or "").strip().lower() != "hesham1988@gmail.com":
+                        principal["role"] = "user"
 
             try:
                 await self.asgi_app(scope, receive, send)
