@@ -809,7 +809,11 @@ export default function Home() {
   const [isDemoSandbox, setIsDemoSandbox] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsDemoSandbox(localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token"));
+      const inDemo = localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+      setIsDemoSandbox(inDemo);
+      // FC7.15: notify the companion (StickyChat) in-tab so it surfaces immediately on sandbox entry
+      // without a manual refresh ("storage" events don't fire in the tab that wrote localStorage).
+      if (inDemo) window.dispatchEvent(new Event("fahem_demo_changed"));
     }
   }, []);
 

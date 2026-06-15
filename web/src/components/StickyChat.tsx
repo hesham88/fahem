@@ -554,8 +554,15 @@ export default function StickyChat() {
     };
 
     syncDemo();
+    // FC7.15: the "storage" event does NOT fire in the SAME tab that wrote localStorage, so entering
+    // the sandbox in-tab never re-ran syncDemo → the companion stayed hidden until a manual refresh.
+    // Also listen for an in-tab custom event the home page fires once it detects demo mode.
     window.addEventListener("storage", syncDemo);
-    return () => window.removeEventListener("storage", syncDemo);
+    window.addEventListener("fahem_demo_changed", syncDemo);
+    return () => {
+      window.removeEventListener("storage", syncDemo);
+      window.removeEventListener("fahem_demo_changed", syncDemo);
+    };
   }, []);
 
   // Load initial isOpen state from sessionStorage after mount to avoid Next.js SSR hydration mismatch
@@ -1431,8 +1438,11 @@ export default function StickyChat() {
       if (detail && detail.text) {
         setIsOpen(true);
         setLayoutMode("side");
-        setUseGrounded(true); // Auto-enable grounding for selection explain/summary (OR-25)
-        
+        // FC7.16: do NOT force Google-search grounding for explain/summary. `useGrounded` routes to
+        // /api/agent/grounded (external web) and must stay OFF unless the user ticks "Ground with
+        // Google Search". Explain/summary is still grounded in the BOOK via the selected_text/book_id/
+        // page context set below (DB RAG on /api/agent) — that is the correct default.
+
         // Ensure active page/book context is set for grounding with normalized selection fields
         const bookContextObj = {
           ...detail,
