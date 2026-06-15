@@ -6377,6 +6377,77 @@ export default function Home() {
 
 
 
+          {/* FC7.27: user-tracking cards (profile + XP/level + streak) relocated to the TOP of the
+              side panel. Language/theme/token-usage/sign-out remain in the bottom sidebar-footer. */}
+          {user && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", width: "100%" }}>
+              <div
+                className="sidebar-user-card"
+                onClick={() => {
+                  const targetUsername = userProfile?.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
+                  router.push(`/${language}/profile/${targetUsername}`);
+                }}
+                style={{ cursor: "pointer", transition: "all 0.2s", margin: 0, width: "100%" }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <div className="sidebar-user-avatar-wrapper" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {userProfile?.avatar ? (
+                    renderAvatar(userProfile.avatar, "1.5rem")
+                  ) : user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || "User"} className="sidebar-user-avatar" />
+                  ) : (
+                    <div className="sidebar-user-avatar" style={{ background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem" }}>
+                      {user.email ? user.email[0].toUpperCase() : "U"}
+                    </div>
+                  )}
+                </div>
+                <div className="sidebar-user-info">
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
+                      {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
+                    </span>
+                    {(() => {
+                      const goldBadge: React.CSSProperties = { fontSize: "0.62rem", fontWeight: 800, color: "#b8860b", background: "linear-gradient(135deg, #ffd700, #ffa500)", padding: "1px 6px", borderRadius: "6px", boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)", whiteSpace: "nowrap", textShadow: "0 1px 0 rgba(255,255,255,0.4)" };
+                      const tierBadge: React.CSSProperties = { fontSize: "0.62rem", fontWeight: 800, color: "#1e3a8a", background: "linear-gradient(135deg, #bfdbfe, #93c5fd)", padding: "1px 6px", borderRadius: "6px", whiteSpace: "nowrap" };
+                      const isDemoSandbox = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
+                      if (isDemoSandbox) {
+                        const persona = (typeof window !== "undefined" ? (sessionStorage.getItem("judge_selected_persona") || userProfile?.role || "student") : "student") as string;
+                        const tier = (typeof window !== "undefined" ? (localStorage.getItem("demo_tier") || "0") : "0");
+                        const personaLabel = persona.charAt(0).toUpperCase() + persona.slice(1);
+                        return (<><span style={goldBadge}>{personaLabel}</span><span style={tierBadge}>Tier-{tier}</span></>);
+                      }
+                      const roleRaw = (userProfile?.role || "student").toLowerCase();
+                      const roleMap: Record<string, { label: string; labelAr: string; bg: string; color: string; emoji: string }> = {
+                        "super-admin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
+                        "superadmin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
+                        "admin": { label: "ADMIN", labelAr: "مشرف", bg: "linear-gradient(135deg, #c4b5fd, #a78bfa)", color: "#4c1d95", emoji: "🛡️" },
+                        "teacher": { label: "TEACHER", labelAr: "معلّم", bg: "linear-gradient(135deg, #99f6e4, #5eead4)", color: "#115e59", emoji: "📋" },
+                        "parent": { label: "PARENT", labelAr: "ولي أمر", bg: "linear-gradient(135deg, #fbcfe8, #f9a8d4)", color: "#831843", emoji: "👪" },
+                        "judge": { label: "JUDGE", labelAr: "محكّم", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⚖️" },
+                        "student": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
+                        "user": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
+                      };
+                      const rb = roleMap[roleRaw] || roleMap["student"];
+                      return (<span style={{ ...goldBadge, background: rb.bg, color: rb.color, boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>{rb.emoji} {language === "ar" ? rb.labelAr : rb.label}</span>);
+                    })()}
+                  </div>
+                  <span className="sidebar-user-email" title={user.email || ""}>{user.email}</span>
+                </div>
+              </div>
+
+              {/* XP + Level meter + day-streak (bound to the gamification source — FC7.28) */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "8px 12px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,107,163,0.06))", border: "1px solid rgba(99,102,241,0.2)", fontSize: "0.72rem" }}>
+                <span style={{ fontWeight: 900, color: "var(--primary)", whiteSpace: "nowrap" }}>⭐ {language === "ar" ? "مستوى" : "Lvl"} {activeLevel}</span>
+                <div style={{ flex: 1, height: "7px", background: "rgba(16,107,163,0.12)", borderRadius: "10px", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, xpProgressPercent))}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #106ba3)", borderRadius: "10px", transition: "width 0.5s" }} />
+                </div>
+                <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--foreground)", whiteSpace: "nowrap" }}>{activeXp}/{nextLevelXp} XP</span>
+                <span title={language === "ar" ? "سلسلة الأيام المتتالية" : "Day streak"} style={{ display: "flex", alignItems: "center", gap: "0.2rem", color: "#ea580c", fontWeight: 800, whiteSpace: "nowrap" }}>🔥 {activeStreak}</span>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Items (Toolkit & Admin) */}
           <nav className="sidebar-nav custom-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: "4px" }}>
             {(isAdmin || isDemoSandbox) && (
@@ -6575,15 +6646,7 @@ export default function Home() {
               )}
             </button>
 
-            {/* Day streak (next to globe / theme / help) */}
-            <div
-              title={language === "ar" ? "سلسلة الأيام المتتالية" : "Day streak"}
-              style={{ display: "flex", alignItems: "center", gap: "0.25rem", height: "34px", padding: "0 9px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "#ea580c", fontWeight: 800, fontSize: "0.8rem" }}
-            >
-              {/* FC7 XP fix: use the SAME gamification source as Insights (activeStreak from the profile)
-                  so the nav matches the achievements page instead of the divergent activity-log count. */}
-              🔥 {activeStreak}
-            </div>
+            {/* FC7.27: day-streak moved to the top tracking block with the XP/level meter. */}
 
             {/* Help / user manual ("?") */}
             <button
@@ -6599,112 +6662,8 @@ export default function Home() {
           {/* Profile Card & Token Telemetry */}
           {user && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", width: "100%" }}>
-              <div 
-                className="sidebar-user-card" 
-                onClick={() => {
-                  const targetUsername = userProfile?.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
-                  router.push(`/${language}/profile/${targetUsername}`);
-                }}
-                style={{ cursor: "pointer", transition: "all 0.2s", margin: 0, width: "100%" }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(16, 107, 163, 0.05)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <div className="sidebar-user-avatar-wrapper" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {userProfile?.avatar ? (
-                    renderAvatar(userProfile.avatar, "1.5rem")
-                  ) : user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || "User"} className="sidebar-user-avatar" />
-                  ) : (
-                    <div className="sidebar-user-avatar" style={{ background: "var(--primary)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem" }}>
-                      {user.email ? user.email[0].toUpperCase() : "U"}
-                    </div>
-                  )}
-                </div>
-                <div className="sidebar-user-info">
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <span className="sidebar-user-name" title={userProfile?.name || user.displayName || user.email || ""}>
-                      {userProfile?.name || user.displayName || (user.email ? user.email.split("@")[0] : "User")}
-                    </span>
-                    {(() => {
-                      const goldBadge: React.CSSProperties = {
-                        fontSize: "0.62rem",
-                        fontWeight: 800,
-                        color: "#b8860b",
-                        background: "linear-gradient(135deg, #ffd700, #ffa500)",
-                        padding: "1px 6px",
-                        borderRadius: "6px",
-                        boxShadow: "0 0 5px rgba(255, 215, 0, 0.4)",
-                        whiteSpace: "nowrap",
-                        textShadow: "0 1px 0 rgba(255,255,255,0.4)"
-                      };
-                      const tierBadge: React.CSSProperties = {
-                        fontSize: "0.62rem",
-                        fontWeight: 800,
-                        color: "#1e3a8a",
-                        background: "linear-gradient(135deg, #bfdbfe, #93c5fd)",
-                        padding: "1px 6px",
-                        borderRadius: "6px",
-                        whiteSpace: "nowrap"
-                      };
-
-                      const isDemoSandbox = typeof window !== "undefined" && localStorage.getItem("app_mode") === "demo" && !!localStorage.getItem("demo_auth_token");
-
-                      // Inside the sandbox: show the selected persona + the assigned tier (0/1) instead of a JUDGE badge.
-                      if (isDemoSandbox) {
-                        const persona = (typeof window !== "undefined" ? (sessionStorage.getItem("judge_selected_persona") || userProfile?.role || "student") : "student") as string;
-                        const tier = (typeof window !== "undefined" ? (localStorage.getItem("demo_tier") || "0") : "0");
-                        const personaLabel = persona.charAt(0).toUpperCase() + persona.slice(1);
-                        return (
-                          <>
-                            <span style={goldBadge}>{personaLabel}</span>
-                            <span style={tierBadge}>Tier-{tier}</span>
-                          </>
-                        );
-                      }
-
-                      // Real login: show the user's role badge for EVERY role (student/parent/
-                      // teacher/admin/superadmin), not just superadmin.
-                      const roleRaw = (userProfile?.role || "student").toLowerCase();
-                      const roleMap: Record<string, { label: string; labelAr: string; bg: string; color: string; emoji: string }> = {
-                        "super-admin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
-                        "superadmin": { label: "SUPERADMIN", labelAr: "مشرف عام", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⭐" },
-                        "admin": { label: "ADMIN", labelAr: "مشرف", bg: "linear-gradient(135deg, #c4b5fd, #a78bfa)", color: "#4c1d95", emoji: "🛡️" },
-                        "teacher": { label: "TEACHER", labelAr: "معلّم", bg: "linear-gradient(135deg, #99f6e4, #5eead4)", color: "#115e59", emoji: "📋" },
-                        "parent": { label: "PARENT", labelAr: "ولي أمر", bg: "linear-gradient(135deg, #fbcfe8, #f9a8d4)", color: "#831843", emoji: "👪" },
-                        "judge": { label: "JUDGE", labelAr: "محكّم", bg: "linear-gradient(135deg, #ffd700, #ffa500)", color: "#7c2d12", emoji: "⚖️" },
-                        "student": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
-                        "user": { label: "STUDENT", labelAr: "طالب", bg: "linear-gradient(135deg, #bfdbfe, #93c5fd)", color: "#1e3a8a", emoji: "🎓" },
-                      };
-                      const rb = roleMap[roleRaw] || roleMap["student"];
-                      return (
-                        <span style={{ ...goldBadge, background: rb.bg, color: rb.color, boxShadow: "0 1px 3px rgba(0,0,0,0.18)" }}>
-                          {rb.emoji} {language === "ar" ? rb.labelAr : rb.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  <span className="sidebar-user-email" title={user.email || ""}>
-                    {user.email}
-                  </span>
-                </div>
-              </div>
-
-              {/* XP + Level meter (one row, above the token usage).
-                  FC7 XP fix: bind to the SAME gamification source as the Insights/Achievements page
-                  (activeLevel/activeXp/xpProgressPercent/nextLevelXp from the profile) so the nav level,
-                  bar and XP total match the achievements page instead of the divergent activity-log %100. */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "8px 12px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,107,163,0.06))", border: "1px solid rgba(99,102,241,0.2)", fontSize: "0.72rem" }}>
-                <span style={{ fontWeight: 900, color: "var(--primary)", whiteSpace: "nowrap" }}>⭐ {language === "ar" ? "مستوى" : "Lvl"} {activeLevel}</span>
-                <div style={{ flex: 1, height: "7px", background: "rgba(16,107,163,0.12)", borderRadius: "10px", overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, Math.max(0, xpProgressPercent))}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #106ba3)", borderRadius: "10px", transition: "width 0.5s" }} />
-                </div>
-                <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--foreground)", whiteSpace: "nowrap" }}>{activeXp}/{nextLevelXp} XP</span>
-              </div>
-
+              {/* FC7.27: profile + XP/level + streak cards relocated to the TOP of the side panel;
+                  only the token-usage meter (and sign-out below) remain in the bottom footer. */}
               {/* Token-Usage Indicator (W-9 / OR-16 Quick-Snap) */}
               <div style={{
                 padding: "12px 14px",
