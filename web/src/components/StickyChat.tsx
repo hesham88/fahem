@@ -590,7 +590,33 @@ export default function StickyChat() {
       sessionStorage.setItem("fahem_companion_is_open", isOpen ? "true" : "false");
     }
   }, [isOpen]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // FC7.31: persist the companion chat across the locale route change. Switching the UI language does a
+  // router.push to /{lang}/… which remounts everything; restoring messages from sessionStorage keeps the
+  // conversation alive (only the interface + the companion's NEXT response language change).
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("fahem_companion_messages");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((m: any) => ({ ...m, timestamp: m.timestamp ? new Date(m.timestamp) : new Date() }));
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    return [];
+  });
+
+  // Persist the chat (lightweight) so it survives a language-switch remount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (messages.length > 0 && !(messages.length === 1 && messages[0]?.id === "welcome")) {
+        sessionStorage.setItem("fahem_companion_messages", JSON.stringify(messages));
+      }
+    } catch { /* ignore */ }
+  }, [messages]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [useGrounded, setUseGrounded] = useState(false);
@@ -1317,7 +1343,20 @@ export default function StickyChat() {
   // Saved Chats States
   const [sessions, setSessions] = useState<any[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  // FC7.31: persist the active session id too so the server-side conversation continues after a
+  // language-switch remount (not just the visible history).
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try { return sessionStorage.getItem("fahem_companion_session_id") || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (currentSessionId) sessionStorage.setItem("fahem_companion_session_id", currentSessionId);
+    } catch { /* ignore */ }
+  }, [currentSessionId]);
   const [showHistory, setShowHistory] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string>("");
   const [editingTitle, setEditingTitle] = useState<string>("");

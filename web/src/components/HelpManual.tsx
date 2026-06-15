@@ -14,7 +14,9 @@ type Lang = "en" | "ar";
 interface Section {
   id: string;
   title: { en: string; ar: string };
-  body: React.ReactNode;
+  // FC7.31: bodies are bilingual so an Arabic (RTL) UI renders the Arabic manual,
+  // not the English content. Render isAr ? body.ar : body.en.
+  body: { en: React.ReactNode; ar: React.ReactNode };
 }
 
 const C = {
@@ -77,7 +79,8 @@ const SECTIONS: Section[] = [
   {
     id: "what",
     title: { en: "1 · What is Fahem?", ar: "١ · ما هو فهم؟" },
-    body: (
+    body: {
+      en: (
       <>
         <P><b>Fahem</b> (Arabic for &quot;Comprehending&quot;) is a secure, localized curriculum AI study assistant tailored strictly to official school textbooks — an interactive study partner for students, a diagnostic helper for parents, and an ingestion &amp; management studio for administrators.</P>
         <H>Core features</H>
@@ -88,12 +91,26 @@ const SECTIONS: Section[] = [
           <li><b>Dual-language</b> — English &amp; Arabic layouts mirror automatically (LTR / RTL).</li>
         </UL>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <P><b>فهم</b> مساعد دراسي ذكي آمن ومُوطّن، مُصمّم حصريًا حول الكتب المدرسية الرسمية — رفيق دراسة تفاعلي للطلاب، وأداة تشخيص لأولياء الأمور، واستوديو لاستيعاب المناهج وإدارتها للمشرفين.</P>
+        <H>الميزات الأساسية</H>
+        <UL>
+          <li><b>غرفة القراءة التفاعلية</b> — اقرأ كتابك المدرسي على جهة، وتحدّث مع رفيقك الذكي على الجهة الأخرى.</li>
+          <li><b>استشهادات بروابط مباشرة</b> — يستشهد الذكاء الاصطناعي بالصفحة بدقّة، مثل <Cmd>[math_grade10:p42]</Cmd>؛ انقر عليها لينتقل العارض إلى تلك الصفحة.</li>
+          <li><b>سرب من الوكلاء المتخصّصين</b> — معلّمون ومُعدّو اختبارات ومُخطّطون ومُلخّصون يعملون معًا.</li>
+          <li><b>لغتان</b> — تنعكس تخطيطات الإنجليزية والعربية تلقائيًا (يسار-يمين / يمين-يسار).</li>
+        </UL>
+      </>
+      ),
+    },
   },
   {
     id: "sandbox",
     title: { en: "2 · Quick-Look Sandbox", ar: "٢ · الوضع التجريبي" },
-    body: (
+    body: {
+      en: (
       <>
         <P>Before signing in, anyone can use <b>Sandbox Mode</b> for a safe &quot;quick look&quot;. It runs on an isolated side-by-side database and never touches production.</P>
         <UL>
@@ -101,12 +118,23 @@ const SECTIONS: Section[] = [
           <li><b>Automatic clean-up (TTL)</b> — sandbox sessions and test history are swept away automatically after your visit.</li>
         </UL>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <P>قبل تسجيل الدخول، يمكن لأي شخص استخدام <b>الوضع التجريبي</b> لإلقاء «نظرة سريعة» آمنة. يعمل على قاعدة بيانات معزولة جنبًا إلى جنب ولا يمسّ بيئة الإنتاج أبدًا.</P>
+        <UL>
+          <li><b>بلا تكلفة أو مخاطرة</b> — جرّب عمليات البحث والاختبارات والملخّصات دون إنفاق رصيد حقيقي أو تغيير سجلات الطلاب.</li>
+          <li><b>تنظيف تلقائي (TTL)</b> — تُحذف جلسات الوضع التجريبي وسجل الاختبارات تلقائيًا بعد انتهاء زيارتك.</li>
+        </UL>
+      </>
+      ),
+    },
   },
   {
     id: "student",
     title: { en: "3 · Student workflows", ar: "٣ · رحلة الطالب" },
-    body: (
+    body: {
+      en: (
       <>
         <H>Onboarding</H>
         <P>A friendly conversational sign-up collects your name, age, country, grade and school, then a unique username &amp; avatar (checked live).</P>
@@ -126,12 +154,35 @@ const SECTIONS: Section[] = [
         <H>Private Study Vault</H>
         <P>Upload your own PDFs/notes in <b>Private Study Vault</b>, click <b>Ingest</b>, then chat privately about them — no one else can see your uploads.</P>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <H>الانضمام والإعداد</H>
+        <P>تسجيل حواري ودود يجمع اسمك وعمرك وبلدك وصفّك ومدرستك، ثم اسم مستخدم وصورة رمزية فريدين (يُتحقَّق منهما مباشرةً).</P>
+        <Callout kind="important">إذا كان رقم هاتفك مُوثَّقًا بالفعل، تُتخطّى خطوة الرسائل القصيرة تلقائيًا وتنتقل مباشرةً إلى لوحة التحكم.</Callout>
+        <H>القراءة والمحادثة جنبًا إلى جنب</H>
+        <UL>
+          <li>افتح كتابًا مدرسيًا ← تُفتح غرفة القراءة بشاشة مقسومة.</li>
+          <li>ظلِّل جملة صعبة، ثم انقر <b>اشرح</b> أو <b>لخّص</b> — يُرسَل التحديد إلى المحادثة مع سياق صفحته.</li>
+          <li>انقر أي استشهاد مثل <Cmd>[book_intro_python:p14]</Cmd> لينتقل العارض إلى تلك الصفحة.</li>
+          <li>اضغط <b>اقرأ الصفحة</b> لسماع الصفحة بصوتٍ عالٍ بأصوات فاخرة.</li>
+        </UL>
+        <H>التدريب والاستذكار</H>
+        <P>اكتب <Cmd>/practice</Cmd> أو افتح <b>منصة التدريب</b>. اختر النطاق (مادة أو كتاب)، والنمط (اختيار من متعدد / كتابي / شفهي)، والصيغة (لا نهائي أو حلبة الاختبار، مؤقّتة). يُحدِّث التقييم مستوى صعوبتك مباشرةً.</P>
+        <Callout kind="warning">يمنع الاستذكار الكتابي النسخ واللصق للحفاظ على نزاهة التدريب — اللصق مُعطَّل في صندوق الإجابة.</Callout>
+        <H>بطاقات زتونة الملخِّصة</H>
+        <P>اطلب «أعطني زتونة الفصل الرابع» للحصول على بطاقات دراسية فائقة التكثيف، ونقاط مختصرة، وخرائط مفاهيم.</P>
+        <H>خزنة الدراسة الخاصة</H>
+        <P>ارفع ملفات PDF أو ملاحظاتك الخاصة في <b>خزنة الدراسة الخاصة</b>، وانقر <b>استوعب</b>، ثم تحدّث عنها بخصوصية — لا يستطيع أحد غيرك رؤية ما رفعته.</P>
+      </>
+      ),
+    },
   },
   {
     id: "shortcuts",
     title: { en: "4 · Commands & shortcuts", ar: "٤ · الأوامر والاختصارات" },
-    body: (
+    body: {
+      en: (
       <>
         <UL>
           <li><Cmd>@subject</Cmd> — route a question to a subject, e.g. <Cmd>@math</Cmd>.</li>
@@ -148,12 +199,32 @@ const SECTIONS: Section[] = [
         <Code>/practice generate a 5-question MCQ quiz on #chapter-2</Code>
         <Code>عايز الزتونة لدرس التمثيل الضوئي في جدول مقارنة مبسط مع أهم المصطلحات.</Code>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <UL>
+          <li><Cmd>@subject</Cmd> — وجِّه سؤالًا إلى مادة، مثل <Cmd>@math</Cmd>.</li>
+          <li><Cmd>#book</Cmd> / <Cmd>#chapter</Cmd> — حدِّد نطاق البحث في كتاب أو فصل بعينه.</li>
+          <li><Cmd>/practice</Cmd> — ابدأ اختبارًا في الموضوع الحالي.</li>
+          <li><Cmd>/summarize</Cmd> — لخِّص الصفحة الحالية.</li>
+          <li><Cmd>/plan</Cmd> — اطلب جدول مذاكرة.</li>
+          <li><Cmd>/explain</Cmd> — شرح تفاعلي سريع لمصطلح.</li>
+          <li><Cmd>/guide</Cmd> — درس إرشادي خطوة بخطوة.</li>
+        </UL>
+        <H>أمثلة على الطلبات</H>
+        <Code>@math اشرح كيف نحل المعادلات التربيعية باستخدام القانون العام</Code>
+        <Code>#book_intro_python #chapter-3 ما الفرق بين list comprehension وحلقة for؟</Code>
+        <Code>/practice أنشئ اختبار اختيار من متعدد من ٥ أسئلة على #chapter-2</Code>
+        <Code>عايز الزتونة لدرس التمثيل الضوئي في جدول مقارنة مبسط مع أهم المصطلحات.</Code>
+      </>
+      ),
+    },
   },
   {
     id: "parent",
     title: { en: "5 · Parent workflows", ar: "٥ · رحلة ولي الأمر" },
-    body: (
+    body: {
+      en: (
       <>
         <UL>
           <li><b>Link your child</b> — enter their username/email; once they approve, accounts link.</li>
@@ -163,12 +234,25 @@ const SECTIONS: Section[] = [
         </UL>
         <Code>How is my child doing in @math? Which topics did they make the most errors on this week?</Code>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <UL>
+          <li><b>اربط حساب طفلك</b> — أدخل اسم المستخدم أو البريد الإلكتروني؛ بمجرد موافقته يُربَط الحسابان.</li>
+          <li><b>حدِّد الحصص</b> — حدود رصيد أسبوعية أو شهرية للتحكم في الاستخدام.</li>
+          <li><b>لوحة الرؤى</b> — متوسطات المواد، وساعات النشاط الأسبوعية، والمفاهيم الخاطئة المتكررة وبيانات الاستجابة، مع نصائح داعمة من الذكاء الاصطناعي.</li>
+          <li><b>منتديات المجتمع</b> — تعاوَن مع أولياء أمور ومعلّمين آخرين.</li>
+        </UL>
+        <Code>كيف مستوى ابني في @math؟ وفي أي موضوعات ارتكب أكثر الأخطاء هذا الأسبوع؟</Code>
+      </>
+      ),
+    },
   },
   {
     id: "admin",
     title: { en: "6 · Admin workflows", ar: "٦ · رحلة المشرف" },
-    body: (
+    body: {
+      en: (
       <>
         <H>Web-crawling the catalog</H>
         <P>In <b>Curriculum Ingestion Studio</b>, enter a curriculum domain and <b>Start Crawl</b>. The crawler adapts (OpenStax API or generic BFS), auto-classifies titles into curriculum slots.</P>
@@ -184,12 +268,31 @@ const SECTIONS: Section[] = [
         <H>Cost control</H>
         <P>Toggle credit limits, set weekly/monthly token caps per student or group, and run the sandbox-only Emergency Purge to clean test data (production is never touched).</P>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <H>زحف الويب لبناء الفهرس</H>
+        <P>في <b>استوديو استيعاب المناهج</b>، أدخِل نطاق منهج ثم اضغط <b>ابدأ الزحف</b>. يتكيّف الزاحف (واجهة OpenStax أو زحف عام بطريقة BFS)، ويصنّف العناوين تلقائيًا في خانات المنهج.</P>
+        <H>خط الاستيعاب ذو المراحل الخمس</H>
+        <UL>
+          <li><b>الجالب</b> — تنزيل ملف PDF، والتحقق من سلامته، واستخراج جدول المحتويات.</li>
+          <li><b>التعرّف على التخطيط (OCR)</b> — الصفحات ← صور ← هيكلة عبر Gemini Vision (شبكات، معادلات، جداول).</li>
+          <li><b>الترجمة</b> — ترجمة متزامنة للكتل بالإنجليزية والعربية مع الحفاظ على التخطيط.</li>
+          <li><b>التجميع والغلاف</b> — تجميع الصفحات في فصول، وتوليد الأغلفة، وبناء الخرائط الذهنية.</li>
+          <li><b>التضمين</b> — متجهات بأبعاد ٣٠٧٢ تُحفظ في MongoDB Atlas.</li>
+        </UL>
+        <Callout kind="tip">استدعاءات التضمين محاطة ببدائل احتياطية كي يستمر الخط في العمل حتى لو انتهت مهلة أحد الاستدعاءات.</Callout>
+        <H>التحكم في التكلفة</H>
+        <P>فعِّل حدود الرصيد، واضبط أسقف رموز أسبوعية/شهرية لكل طالب أو مجموعة، وشغِّل التطهير الطارئ (في الوضع التجريبي فقط) لتنظيف بيانات الاختبار (بيئة الإنتاج لا تُمسّ أبدًا).</P>
+      </>
+      ),
+    },
   },
   {
     id: "swarm",
     title: { en: "7 · The AI specialist swarm", ar: "٧ · فريق الوكلاء الذكي" },
-    body: (
+    body: {
+      en: (
       <>
         <P>Fahem runs a Swarm Architecture on Google ADK — micro-scoped agents collaborate:</P>
         <UL>
@@ -203,12 +306,29 @@ const SECTIONS: Section[] = [
           <li><b>Guardrails</b> — privacy &amp; safety firewall, sandbox isolation, fail-closed quotas.</li>
         </UL>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <P>يعمل فهم بمعمارية «السرب» على Google ADK — حيث تتعاون وكلاء دقيقة التخصص:</P>
+        <UL>
+          <li><b>منسّق الرفيق</b> — الذاكرة، والتحقق من الحصص، وتوجيه النوايا، وتحليل الرموز.</li>
+          <li><b>وكيل الإعداد</b> — يرشدك في تجهيز الملف الشخصي.</li>
+          <li><b>المعلّم الأكاديمي</b> — شروحات من الكتاب المدرسي مع استشهادات (وكلاء فرعية: الاستناد / التنميق / الحارس).</li>
+          <li><b>وكيل الاختبارات</b> — توليد وتصحيح أسئلة متوازٍ عبر عدة فصول.</li>
+          <li><b>وكيل التخطيط</b> — خرائط مذاكرة يومًا بيوم.</li>
+          <li><b>وكيل الرؤى</b> — تجميع إحصائي للتقدّم.</li>
+          <li><b>وكيل الزتونة</b> — بطاقات ملخّصة فائقة التكثيف.</li>
+          <li><b>الحواجز الواقية</b> — جدار حماية للخصوصية والأمان، وعزل الوضع التجريبي، وحصص تُغلَق عند الفشل.</li>
+        </UL>
+      </>
+      ),
+    },
   },
   {
     id: "faq",
     title: { en: "8 · FAQ", ar: "٨ · الأسئلة الشائعة" },
-    body: (
+    body: {
+      en: (
       <>
         <H>The companion says it doesn&apos;t know my book?</H>
         <P>Make sure the book is selected (RAG scope shows &quot;1 selected book&quot;) and finished ingesting. Open it from the Library so the active-book context is attached to your messages.</P>
@@ -219,7 +339,20 @@ const SECTIONS: Section[] = [
         <H>How do I ask the companion how to do something?</H>
         <P>Just ask in plain language, e.g. &quot;How do I create a 10-question quiz from this book?&quot; — the companion knows this manual and will walk you through it.</P>
       </>
-    ),
+      ),
+      ar: (
+      <>
+        <H>الرفيق يقول إنه لا يعرف كتابي؟</H>
+        <P>تأكّد من اختيار الكتاب (يُظهر نطاق RAG «كتاب واحد مُختار») ومن اكتمال استيعابه. افتحه من المكتبة كي يُرفَق سياق الكتاب النشط برسائلك.</P>
+        <H>ميزانية الرموز اليومية تظهر صفرًا؟</H>
+        <P>يُحسب الاستخدام لكل حساب عبر نوافذ يومية/أسبوعية/شهرية. إن سجّلت دخولك للتو، فستُملأ بعد أول استدعاءاتك للذكاء الاصطناعي. وعند نفاد الميزانية تتوقف خدمات الذكاء الاصطناعي مؤقتًا حتى تتجدد النافذة.</P>
+        <H>استشهاد لم يصل إلى الصفحة الصحيحة؟</H>
+        <P>تنتقل الاستشهادات حسب رقم الصفحة الحقيقي؛ وإن عدّ الكتاب غلافه صفحةً رقم ١ فقد يختلف العنوان عن الفهرس بمقدار واحد — استخدم صندوق الصفحة للانتقال بدقّة.</P>
+        <H>كيف أسأل الرفيق عن كيفية القيام بأمر ما؟</H>
+        <P>اسأل بلغةٍ بسيطة، مثل «كيف أنشئ اختبارًا من ١٠ أسئلة من هذا الكتاب؟» — يعرف الرفيق هذا الدليل وسيرشدك خطوة بخطوة.</P>
+      </>
+      ),
+    },
   },
 ];
 
@@ -320,7 +453,7 @@ export default function HelpManual({ language, onClose }: { language: Lang; onCl
             <h3 style={{ marginTop: 0, fontSize: "1.25rem", fontWeight: 900, color: C.fg }}>
               {isAr ? current.title.ar : current.title.en}
             </h3>
-            {current.body}
+            {isAr ? current.body.ar : current.body.en}
           </div>
         </div>
       </div>
