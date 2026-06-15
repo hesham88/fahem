@@ -945,17 +945,21 @@ async def create_practice_tool(
     book_id: Optional[str] = None,
     chapters: Optional[List[str]] = None,
     custom_concepts: Optional[str] = None,
-    format: Optional[str] = None
+    format: Optional[str] = None,
+    question_count: Optional[int] = None,
+    timer_seconds: Optional[int] = None
 ) -> Dict[str, Any]:
     """Creates an interactive personalized recall & practice session.
-    
+
     Args:
         subject: The academic subject name (e.g. 'Mathematics', 'Biology').
         mode: The practice session mode (e.g. 'mcq', 'flashcard', 'summary').
         book_id: Optional reference book entity ID.
         chapters: Optional list of chapter names or identifiers to practice on.
         custom_concepts: Optional comma-separated or text describing specific focus concepts.
-        format: Optional format specification.
+        format: Optional format specification ('infinite' or 'quiz').
+        question_count: Optional number of questions for a quiz (e.g. 3, 5, 10, 15, 20).
+        timer_seconds: Optional per-quiz timer in seconds (e.g. 30, 60, 120, 300, 600); 0 = No Limit.
     """
     logger.info(f"[TOOL] create_practice_tool subject='{subject}' mode='{mode}' book_id='{book_id}' chapters={chapters}")
     
@@ -980,7 +984,10 @@ async def create_practice_tool(
         "mode": mode,
         # FC7.12: carry the session format/arena so the workstation honors it (e.g. timed Quiz Arena
         # vs Infinite practice) instead of always defaulting to infinite.
-        "format": format or "infinite"
+        "format": format or "infinite",
+        # FC7.12b: question count + per-quiz timer (0 = No Limit). None => the panel keeps its default.
+        "questionCount": question_count,
+        "durationSeconds": timer_seconds
     }
     
     intent_json = json.dumps({
@@ -1268,6 +1275,9 @@ fahem_companion = LlmAgent(
           * `book_id`: The exact resolved database entity ID of the textbook (e.g., `"book_introduction_to_python_programming_1780535737559"`).
           * `custom_concepts`: The focus concepts requested by the user (e.g., `"boolean operations"`).
           * `chapters`: Resolve and select target chapters if the user specifies them, or leave empty if targeting the whole book.
+          * `format`: `"quiz"` for a timed/limited assessment arena, `"infinite"` for open-ended practice.
+          * `question_count`: The number of questions when the user asks for a set quiz (e.g. 3/5/10/15/20).
+          * `timer_seconds`: The per-quiz time limit in seconds if the user specifies one (e.g. "5 min" → 300, "30s blitz" → 30); use 0 for "no limit".
         - Always collect and infer all possible details for the creation action. If a required specification is completely missing (such as the subject/mode for a practice, the concept for a Zatona summary, or the title/questions for an assignment), ask exactly ONE clarifying question in your response before calling the creation tool. Do not proceed until you have sufficient details.
         - When a creation tool succeeds, it returns an instruction with an `[INTENT: ...]` token. You MUST append this exact token to the very end of your final response to trigger the frontend object creation and navigation.
 

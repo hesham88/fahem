@@ -988,6 +988,9 @@ export default function StickyChat() {
             const subject = target?.subject || "General";
             const mode = target?.mode || "mcq";
             const format = target?.format || "infinite";
+            // FC7.12b: forward question count + per-quiz timer when the companion set them.
+            const questionCount = target?.questionCount;
+            const durationSeconds = target?.durationSeconds;
 
             setTimeout(() => {
               window.dispatchEvent(new CustomEvent("fahemFillAndLaunchPractice", {
@@ -998,7 +1001,9 @@ export default function StickyChat() {
                   customConcepts,
                   subject,
                   mode,
-                  format
+                  format,
+                  questionCount,
+                  durationSeconds
                 }
               }));
             }, 300);

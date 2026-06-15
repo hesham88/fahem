@@ -323,6 +323,8 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     subject?: string;
     mode?: "mcq" | "text" | "oral";
     format?: "infinite" | "quiz";
+    questionCount?: number;
+    durationSeconds?: number;
   }) => {
     setPracticeLoading(true);
     setPracticeFeedback(null);
@@ -344,7 +346,19 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     const finalMode = overrideParams?.mode ?? practiceMode;
     const finalFormat = overrideParams?.format ?? practiceSessionType;
 
-    setPracticeQuizTimeLeft(practiceQuizDurationLimit);
+    // FC7.12b: apply companion-provided question count + per-quiz timer (0 = No Limit). Use the
+    // override directly for the initial countdown to avoid setState latency on auto-launch.
+    if (overrideParams?.questionCount !== undefined && overrideParams.questionCount !== null && !isNaN(Number(overrideParams.questionCount))) {
+      setPracticeQuizQuestionsCount(Math.max(1, Number(overrideParams.questionCount)));
+    }
+    const finalDuration = (overrideParams?.durationSeconds !== undefined && overrideParams.durationSeconds !== null && !isNaN(Number(overrideParams.durationSeconds)))
+      ? Number(overrideParams.durationSeconds)
+      : practiceQuizDurationLimit;
+    if (overrideParams?.durationSeconds !== undefined && overrideParams.durationSeconds !== null && !isNaN(Number(overrideParams.durationSeconds))) {
+      setPracticeQuizDurationLimit(finalDuration);
+    }
+
+    setPracticeQuizTimeLeft(finalDuration);
 
     try {
       const targetSubject =
@@ -455,7 +469,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           customConcepts,
           subject,
           mode,
-          format
+          format,
+          questionCount,
+          durationSeconds
         } = customEvent.detail;
 
         if (scopeType) setPracticeScopeType(scopeType);
@@ -474,7 +490,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           customConcepts,
           subject,
           mode,
-          format
+          format,
+          questionCount,
+          durationSeconds
         });
       }
     };
