@@ -4426,13 +4426,16 @@ export default function Home() {
   useEffect(() => {
     if (!loadingUser && !loadingProfile) {
       const adminTabs = ["admin", "super-admin-users", "admin-ingestion"];
-      // In the demo sandbox the admin tabs are open to everyone (read-only); only redirect
-      // away when the user is neither an admin nor in the sandbox.
-      if (!isAdmin && !isDemoSandbox && adminTabs.includes(activeTab)) {
+      // FC7.4: Admin Panel + Users & Activity Trail are fully banned in the sandbox for everyone —
+      // redirect away even if the tab is forced. Curriculum Studio (admin-ingestion) stays (FC7.6).
+      const sandboxBannedTabs = ["admin", "super-admin-users"];
+      if (isDemoSandbox && sandboxBannedTabs.includes(activeTab)) {
+        setActiveTab("library");
+      } else if (!isAdmin && !isDemoSandbox && adminTabs.includes(activeTab)) {
         setActiveTab("library");
       }
     }
-  }, [isAdmin, activeTab, loadingUser, loadingProfile]);
+  }, [isAdmin, isDemoSandbox, activeTab, loadingUser, loadingProfile]);
 
   // Auto scroll terminal to the bottom when new logs arrive
   useEffect(() => {
@@ -6356,25 +6359,32 @@ export default function Home() {
                 <div className="sidebar-nav-header">
                   {language === "ar" ? "لوحات التحكم والتحليل" : "ADMIN CONTROLS"}
                 </div>
-                <button
-                  onClick={() => setActiveTab("admin")}
-                  className={`sidebar-nav-btn ${activeTab === "admin" ? "active" : ""}`}
-                  type="button"
-                >
-                  <FiShield />
-                  <span>{t("nav_admin")}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("super-admin-users");
-                    fetchAllUsersList();
-                  }}
-                  className={`sidebar-nav-btn ${activeTab === "super-admin-users" ? "active" : ""}`}
-                  type="button"
-                >
-                  <FiUserCheck />
-                  <span>{language === "ar" ? "إدارة الأعضاء والنشاط" : "Users & Activity Trail"}</span>
-                </button>
+                {/* FC7.4: Admin Panel + Users & Activity Trail are FULLY banned in the sandbox for
+                    everyone (no sandbox identity is ever admin). Only real prod admins see them.
+                    Curriculum Studio stays visible in the sandbox (read-only sandbox data — FC7.6). */}
+                {isAdmin && !isDemoSandbox && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab("admin")}
+                      className={`sidebar-nav-btn ${activeTab === "admin" ? "active" : ""}`}
+                      type="button"
+                    >
+                      <FiShield />
+                      <span>{t("nav_admin")}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab("super-admin-users");
+                        fetchAllUsersList();
+                      }}
+                      className={`sidebar-nav-btn ${activeTab === "super-admin-users" ? "active" : ""}`}
+                      type="button"
+                    >
+                      <FiUserCheck />
+                      <span>{language === "ar" ? "إدارة الأعضاء والنشاط" : "Users & Activity Trail"}</span>
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setActiveTab("admin-ingestion")}
                   className={`sidebar-nav-btn ${activeTab === "admin-ingestion" ? "active" : ""}`}

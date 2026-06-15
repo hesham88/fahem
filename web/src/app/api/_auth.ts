@@ -152,16 +152,20 @@ export async function verifyDemoToken(token: string): Promise<AuthCtx | null> {
       return null;
     }
 
-    // Allow demo tokens to bypass strict evalSandboxEnabled block for public Tier-0 or when capacity limits are active.
+    // FC7.5: a disabled sandbox is disabled for EVERYONE. Reject ALL demo tokens (every tier,
+    // including already-issued sessions) so flipping the switch off immediately locks the sandbox.
     const config = await getDBConfig();
     if (config && config.evalSandboxEnabled === false) {
-      if (payload.role !== "admin" && payload.role !== "super-admin") {
-        const tokenTier = payload.tier !== undefined ? Number(payload.tier) : 0;
-        if (tokenTier !== 0) {
-          return null; // Reject live verified Tier-1 tokens! But bypass/allow for public Tier-0 (payload.tier === 0).
-        }
-      }
+      return null;
     }
+
+    // FC7.4 (corrected model): a sandbox/demo identity is NEVER privileged. Clamp any
+    // admin/super-admin/judge persona down to a non-privileged role so requireAdmin /
+    // requireSuperadmin / requireJudge all reject demo tokens at the API layer (defense-in-depth
+    // mirroring the backend db_target=='fahem_sandbox' role clamp). Tier (budget) is unaffected.
+    const PRIVILEGED_DEMO_ROLES = new Set(["admin", "super-admin", "judge"]);
+    const safeDemoRole: Role = PRIVILEGED_DEMO_ROLES.has(payload.role) ? "user" : (payload.role as Role);
+    payload.role = safeDemoRole;
 
     // Check if this session has been killed or ended by an admin
     if (payload.sandbox_session_id) {

@@ -75,22 +75,20 @@ export async function POST(req: NextRequest) {
       email = seeded.email;
     }
 
+    // FC7.5: when the sandbox is disabled it must be disabled for EVERYONE (all tiers, owner
+    // included). The previous logic only blocked Tier-1 and silently let Tier-0 in under a
+    // "low-capacity" notice — that is why "disabled" sandboxes were still usable.
     if (config && config.evalSandboxEnabled === false) {
-      if (tier === 1) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: "Evaluation sandbox is currently disabled"
-        }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
+      return new Response(JSON.stringify({
+        success: false,
+        error: "The evaluation sandbox is currently disabled. Please check back later."
+      }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    // If evalSandboxEnabled is false, we ignore it for Tier-0 (anonymous) access and instead treat it as a budget/capacity message.
-    const capacityNotice = (!config || !config.evalSandboxEnabled)
-      ? "Demo Sandbox is currently running under low-capacity mode (daily budget ceiling reached). Enjoy exploring!"
-      : null;
+    const capacityNotice = null;
 
     // Prepare demo token payload
     const sandboxSessionId = "sb_sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
