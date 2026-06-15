@@ -848,13 +848,12 @@ class MongoDBEngine:
             username = f"{base_username[:20]}{suffix}"
             suffix += 1
 
-        # Determine role
+        # Determine role. FC7.1: the ONLY super-admin is hesham1988@gmail.com. No other email
+        # (previously contact@fahem.pro) may be auto-granted super-admin — that was a privilege hole.
         final_role = role
         if not final_role:
             email_lower = email.strip().lower()
             if email_lower == "hesham1988@gmail.com":
-                final_role = "super-admin"
-            elif email_lower == "contact@fahem.pro":
                 final_role = "super-admin"
             else:
                 final_role = "user"
