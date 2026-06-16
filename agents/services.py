@@ -4753,6 +4753,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
 
     def run_ingest_in_background(payload):
         import threading
+        # D-INGEST-TRIGGER: synchronous entry log (request context) — proves the trigger is REACHED on prod.
+        # The daemon-thread's own logs were absent in Cloud Logging, so we couldn't tell whether the trigger
+        # was never called or the thread died. This line removes that ambiguity for the next ingestion.
+        try:
+            logger.info(f"[Ingestion Trigger] run_ingest_in_background ENTERED for book_id={payload.get('book_id')} title={payload.get('title')}")
+        except Exception:
+            pass
         # Notify real (production) admins that an ingestion job has started.
         try:
             from tools import get_mongodb_uri as _gmu
@@ -4830,9 +4837,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     pass
                 logger.error(f"[Ingestion Background Error] {thread_err}", exc_info=True)
 
-        t = threading.Thread(target=target)
-        t.daemon = True
-        t.start()
+        try:
+            t = threading.Thread(target=target, name=f"ingest-{payload.get('book_id')}")
+            t.daemon = True
+            t.start()
+            logger.info(f"[Ingestion Trigger] background thread STARTED for book_id={payload.get('book_id')}")
+        except Exception as _te:
+            logger.error(f"[Ingestion Trigger] FAILED to start ingestion thread for {payload.get('book_id')}: {_te}", exc_info=True)
 
     @app.get("/user/books/jobs")
     async def get_books_jobs_endpoint(request: fastapi.Request):
