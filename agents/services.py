@@ -4760,6 +4760,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.info(f"[Ingestion Trigger] run_ingest_in_background ENTERED for book_id={payload.get('book_id')} title={payload.get('title')}")
         except Exception:
             pass
+        # FC8.5: stamp the active db_target into the payload so the worker (which runs with
+        # no request context) writes to the correct database (fahem vs fahem_sandbox).
+        try:
+            from mongodb_engine import db_target_var
+            payload.setdefault("db_target", db_target_var.get())
+        except Exception:
+            payload.setdefault("db_target", "fahem")
         # Notify real (production) admins that an ingestion job has started.
         try:
             from tools import get_mongodb_uri as _gmu
@@ -4836,6 +4843,20 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 except Exception:
                     pass
                 logger.error(f"[Ingestion Background Error] {thread_err}", exc_info=True)
+
+        # FC8.5: the durable path dispatches to a dedicated Cloud Run Job that survives API
+        # instance churn (deploys/health restarts/scale events) — the root cause of the
+        # frozen accounting jobs. On Cloud Run (K_SERVICE set) try the Job first; the
+        # in-process thread below remains the local/dev path and a fail-safe fallback so a
+        # dispatch error never silently drops an ingestion.
+        if os.environ.get("K_SERVICE"):
+            try:
+                from ingestion_v2.job_trigger import trigger_ingest_job
+                if trigger_ingest_job(payload):
+                    return
+                logger.error("[Ingestion Trigger] Cloud Run Job dispatch failed — falling back to in-process thread")
+            except Exception as _je:
+                logger.error(f"[Ingestion Trigger] Cloud Run Job dispatch unavailable ({_je}) — falling back to in-process thread")
 
         try:
             t = threading.Thread(target=target, name=f"ingest-{payload.get('book_id')}")

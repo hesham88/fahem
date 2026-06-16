@@ -45,6 +45,31 @@ jobs:
             --min-instances=1 \
             --set-secrets="GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest"
           # D-INGEST-TRIGGER: --min-instances=1 (with --no-cpu-throttling) keeps a warm instance so the
-          # post-response background ingestion thread isn't killed by scale-to-zero. The durable end-state
-          # is an external queue/worker (Cloud Tasks/Pub-Sub → a Cloud Run Job), tracked in the bible.
+          # post-response background ingestion thread isn't killed by scale-to-zero. The durable path
+          # (FC8.5, below) dispatches ingestion to a dedicated Cloud Run Job; the warm instance now only
+          # covers the local/fallback thread.
+
+      - name: Deploy Ingestion Worker (Cloud Run Job)
+        run: |
+          # FC8.5: dedicated worker that runs job_fetch.py to completion independently of the API
+          # service lifecycle (survives deploys/health restarts/scale events — the root cause of the
+          # frozen accounting jobs). Same source image; entrypoint overridden to the ingestion script.
+          # A long task-timeout covers large books (~45 min for ~1000 pages); 1 retry recovers a
+          # transient infra failure. The payload is supplied per-execution via INGEST_PAYLOAD.
+          gcloud run jobs deploy fahem-ingest-worker \
+            --source agents \
+            --region us-east4 \
+            --vpc-connector fahem-connector \
+            --vpc-egress private-ranges-only \
+            --memory 4Gi \
+            --task-timeout 3600 \
+            --max-retries 1 \
+            --command python \
+            --args ingestion_v2/job_fetch.py \
+            --set-secrets="GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest"
+          # The API service runs as the default compute SA; allow it to trigger job executions.
+          gcloud run jobs add-iam-policy-binding fahem-ingest-worker \
+            --region us-east4 \
+            --member="serviceAccount:1061555578804-compute@developer.gserviceaccount.com" \
+            --role="roles/run.invoker"
 

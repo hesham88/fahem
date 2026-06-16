@@ -55,11 +55,26 @@ def download_file_progressive(url, output_path, job_id, is_local, logs, metadata
     add_log("Textbook PDF binary download finished successfully.", progress_val=20)
 
 def main():
+    # FC8.5: the durable ingestion path runs this script as a dedicated Cloud Run Job,
+    # which cannot pipe stdin — the payload arrives via the INGEST_PAYLOAD env override.
+    # Fall back to stdin for the legacy in-process subprocess path (local/dev).
     try:
-        payload = json.loads(sys.stdin.read())
+        raw = os.environ.get("INGEST_PAYLOAD")
+        payload = json.loads(raw) if raw else json.loads(sys.stdin.read())
     except Exception as e:
-        print(f"Error parsing stdin JSON: {e}", file=sys.stderr)
+        print(f"Error parsing ingestion payload: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # A Job execution has no request context, so db_target_var would default to prod
+    # ("fahem"). Pin it from the payload so a sandbox ingest writes to fahem_sandbox.
+    try:
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if parent_dir not in sys.path:
+            sys.path.append(parent_dir)
+        from mongodb_engine import db_target_var
+        db_target_var.set(payload.get("db_target") or "fahem")
+    except Exception as _e:
+        print(f"[job_fetch] could not pin db_target (defaulting to fahem): {_e}", file=sys.stderr)
 
     book_id = payload.get("book_id")
     subject_id = payload.get("subject_id", "subj_user_uploads")
