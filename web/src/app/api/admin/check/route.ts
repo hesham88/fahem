@@ -15,8 +15,12 @@ export async function GET(req: NextRequest) {
 
     const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
     const isSuperadmin = ctx.role === "super-admin";
+    // FC7.33: an APPROVED teacher (the resolver clamps an unapproved one to "user") may use ONLY the
+    // Curriculum Studio admin tab — never Admin Panel or Users & Activity Trail. The frontend gates
+    // Curriculum Studio on (isAdmin || isTeacher) and the other two tabs on isAdmin alone.
+    const isTeacher = ctx.role === "teacher";
 
-    return new Response(JSON.stringify({ isAdmin, isSuperadmin, email: ctx.email, role: ctx.role }), {
+    return new Response(JSON.stringify({ isAdmin, isSuperadmin, isTeacher, email: ctx.email, role: ctx.role }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

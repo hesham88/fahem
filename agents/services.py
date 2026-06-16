@@ -360,15 +360,17 @@ def register_telemetry_route(app: fastapi.FastAPI):
                                 principal["role"] = "super-admin"
                             elif _db_role == "super-admin":
                                 principal["role"] = "admin"
-                            elif _db_role == "teacher" and (
-                                getattr(_profile, "teacherPending", False) is True
-                                or getattr(_profile, "isApprovedTeacher", None) is False
-                            ):
-                                # FC7.29: a teacher requires admin/super-admin approval, just like an admin.
-                                # A newly-onboarded teacher is PENDING (teacherPending / isApprovedTeacher==False)
-                                # and resolves to 'user' — no teacher powers (assignment POST etc. 403) until
-                                # /admin/approve grants it. Legacy teachers (neither flag set) are grandfathered
-                                # in as approved so this never demotes an existing teacher.
+                            elif _db_role == "admin" and getattr(_profile, "isApprovedAdmin", None) is not True:
+                                # FC7.32 (CRITICAL): an admin is privileged ONLY when explicitly approved by a
+                                # super-admin (isApprovedAdmin==True, set by /admin/approve). FAIL-CLOSED: any
+                                # other admin doc (onboarded-but-pending, or never approved) resolves to 'user'
+                                # so /api/admin/check returns false and the admin tabs stay hidden. The owner
+                                # super-admin is exempt above; real admins re-approve via the console.
+                                principal["role"] = "user"
+                            elif _db_role == "teacher" and getattr(_profile, "isApprovedTeacher", None) is not True:
+                                # FC7.29/FC7.33: a teacher is privileged ONLY when explicitly approved
+                                # (isApprovedTeacher==True). FAIL-CLOSED — an unapproved teacher resolves to
+                                # 'user' (no assignment-post powers, no Curriculum Studio) until approved.
                                 principal["role"] = "user"
                             else:
                                 principal["role"] = _db_role
@@ -3499,11 +3501,24 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 query["$or"].append({"email": normalized_email})
                 
             user = db["users"].find_one(query)
-            
+
             role = "user"
             if user and user.get("role"):
                 role = user.get("role")
-                
+
+            # FC7.32/FC7.29 (CRITICAL): this endpoint feeds the frontend `/api/admin/check` (which gates the
+            # admin tabs purely on role). It MUST apply the same approval clamp as the request middleware, or
+            # an unapproved admin/teacher would still resolve to admin/teacher here and see the admin tabs.
+            # A pending admin/teacher (adminPending/teacherPending OR isApproved*==False) resolves to 'user'
+            # until a super-admin approves. Legacy admins/teachers (neither flag set) are grandfathered.
+            if user:
+                # FAIL-CLOSED (same posture as the request middleware): admin/teacher are privileged ONLY
+                # when explicitly approved. The owner super-admin is handled upstream in the FE resolver.
+                if role == "admin" and user.get("isApprovedAdmin") is not True:
+                    role = "user"
+                elif role == "teacher" and user.get("isApprovedTeacher") is not True:
+                    role = "user"
+
             return {"success": True, "role": role}
         except Exception as err:
             logger.error(f"[services.py] Failed to resolve role: {err}", exc_info=True)
@@ -5675,6 +5690,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
             if not user_id:
                 return {"status": "error", "error": "userId is required"}
             success = await save_user_profile(user_id, profile_data)
+
+            # FC7.33: when a user onboards as admin/teacher they are saved PENDING (adminPending/
+            # teacherPending). Notify the super-admins so the approval request actually arrives (the owner
+            # reported it never did). Fire once per pending user (guarded by approvalRequestNotified).
+            if success:
+                try:
+                    _r = str((profile_data or {}).get("role") or "").strip().lower()
+                    _t = str((profile_data or {}).get("userType") or "").strip().lower()
+                    if _r in ("admin", "teacher") or _t in ("admin", "teacher"):
+                        from tools import get_mongodb_uri as _gmu
+                        from pymongo import MongoClient as _MC
+                        _c = _MC(_gmu(), serverSelectionTimeoutMS=4000)
+                        _db = get_active_db(_c)
+                        _u = _db["users"].find_one({"userId": user_id}) or {}
+                        _pending = _u.get("adminPending") is True or _u.get("teacherPending") is True
+                        if _pending and _u.get("approvalRequestNotified") is not True:
+                            _kind = "admin" if (_u.get("adminPending") is True) else "teacher"
+                            _name = _u.get("name") or _u.get("username") or _u.get("email") or user_id
+                            notify_admins_of(
+                                _db, "role_approval_request",
+                                "Approval needed: new " + _kind, "مطلوب موافقة: " + ("مشرف" if _kind == "admin" else "معلّم") + " جديد",
+                                f"{_name} signed up as {_kind} and is awaiting your approval.",
+                                f"{_name} سجّل كـ{('مشرف' if _kind == 'admin' else 'معلّم')} وبانتظار موافقتك.",
+                                {"deep_link": "?tab=admin", "email": _u.get("email"), "role": _kind}
+                            )
+                            _db["users"].update_one({"userId": user_id}, {"$set": {"approvalRequestNotified": True}})
+                        _c.close()
+                except Exception as _ne:
+                    logger.warning(f"[services.py] role-approval notify failed (non-blocking): {_ne}")
+
             return {"status": "success" if success else "error"}
         except Exception as err:
             logger.error(f"[services.py] Failed to save user profile: {err}", exc_info=True)

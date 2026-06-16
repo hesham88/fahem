@@ -676,6 +676,9 @@ export default function Home() {
   
   // Superadmin status
   const [isAdmin, setIsAdmin] = useState(false);
+  // FC7.33: an APPROVED teacher may use ONLY the Curriculum Studio admin tab (never Admin Panel or
+  // Users & Activity Trail). Tracked separately from isAdmin so the tabs can be split.
+  const [isTeacher, setIsTeacher] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("library");
 
   // User Profile & Onboarding states
@@ -4446,8 +4449,8 @@ export default function Home() {
         if (currentUser.email && !isDemoModeActiveAfter) {
           authedFetch(`/api/admin/check`)
             .then((res) => res.json())
-            .then((data) => setIsAdmin(data.isAdmin))
-            .catch(() => setIsAdmin(false));
+            .then((data) => { setIsAdmin(data.isAdmin); setIsTeacher(!!data.isTeacher); })
+            .catch(() => { setIsAdmin(false); setIsTeacher(false); });
         }
       }
       setLoadingUser(false);
@@ -4458,17 +4461,21 @@ export default function Home() {
   // Enforce superadmin-only tab restrictions
   useEffect(() => {
     if (!loadingUser && !loadingProfile) {
-      const adminTabs = ["admin", "super-admin-users", "admin-ingestion"];
+      // FC7.33: Admin Panel + Users & Activity Trail are admin/super-admin ONLY. Curriculum Studio is
+      // open to admins AND approved teachers. Redirect away from any tab the resolved role can't use.
+      const adminOnlyTabs = ["admin", "super-admin-users"];
+      const curriculumTab = "admin-ingestion";
       // FC7.4: Admin Panel + Users & Activity Trail are fully banned in the sandbox for everyone —
       // redirect away even if the tab is forced. Curriculum Studio (admin-ingestion) stays (FC7.6).
-      const sandboxBannedTabs = ["admin", "super-admin-users"];
-      if (isDemoSandbox && sandboxBannedTabs.includes(activeTab)) {
+      if (isDemoSandbox && adminOnlyTabs.includes(activeTab)) {
         setActiveTab("library");
-      } else if (!isAdmin && !isDemoSandbox && adminTabs.includes(activeTab)) {
+      } else if (!isDemoSandbox && adminOnlyTabs.includes(activeTab) && !isAdmin) {
+        setActiveTab("library");
+      } else if (!isDemoSandbox && activeTab === curriculumTab && !isAdmin && !isTeacher) {
         setActiveTab("library");
       }
     }
-  }, [isAdmin, isDemoSandbox, activeTab, loadingUser, loadingProfile]);
+  }, [isAdmin, isTeacher, isDemoSandbox, activeTab, loadingUser, loadingProfile]);
 
   // Auto scroll terminal to the bottom when new logs arrive
   useEffect(() => {
@@ -6465,7 +6472,7 @@ export default function Home() {
 
           {/* Navigation Items (Toolkit & Admin) */}
           <nav className="sidebar-nav custom-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: "4px" }}>
-            {(isAdmin || isDemoSandbox) && (
+            {(isAdmin || isTeacher || isDemoSandbox) && (
               <>
                 <div className="sidebar-nav-header">
                   {language === "ar" ? "لوحات التحكم والتحليل" : "ADMIN CONTROLS"}
