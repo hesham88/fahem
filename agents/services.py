@@ -88,6 +88,80 @@ def send_web_push(db, recipient_uid: str, title: str, body: str, url: str = None
         logger.warning(f"[send_web_push] Failed for {recipient_uid}: {err}")
 
 
+# Demo per-tier token caps (FC7.38). Cumulative per sandbox session — NO reset; once spent the demo
+# session is hard-stopped from all AI (FC7.34). Overridable via config demoTier0Cap / demoTier1Cap.
+DEMO_TIER0_CAP = 35000
+DEMO_TIER1_CAP = 60000
+
+
+def token_budget_blocked(principal: dict):
+    """FC7.34: return (blocked, reason, info) for the given verified principal BEFORE an AI run.
+
+    - Demo (db_target=='fahem_sandbox'): usage is the CUMULATIVE sum for the sandbox session (no reset).
+      The cap is the per-tier demo cap (Tier 0 = 35k, Tier 1 = 60k). Fail-CLOSED — the anonymous demo is
+      the cost/abuse vector, so an exhausted session is blocked from every AI action.
+    - Prod (authenticated): usage is summed over rolling DAILY / WEEKLY / MONTHLY windows (a natural reset
+      as the window moves). Limits come from a per-user override (users.dailyLimit/weeklyLimit/monthlyLimit
+      or tokenPolicy.*) else the global config. Over ANY window => blocked.
+    Never raises — callers decide the fail posture on exception.
+    """
+    import datetime as _dt
+    from tools import get_cached_mongodb_client
+    if not principal or not isinstance(principal, dict):
+        return (False, None, {})
+    db_target = principal.get("db_target") or "fahem"
+    client = get_cached_mongodb_client()
+
+    def _sum_tokens(coll, q):
+        total = 0
+        cur = coll.aggregate([{"$match": q}, {"$group": {"_id": None, "t": {"$sum": "$totalTokens"}}}])
+        for d in cur:
+            total = int(d.get("t", 0) or 0)
+        return total
+
+    # ---- Demo sandbox: cumulative per-session, hard cap by tier ----
+    if db_target == "fahem_sandbox":
+        sid = principal.get("sandbox_session_id")
+        if not sid:
+            return (False, None, {})  # nothing to meter against
+        sdb = client["fahem_sandbox"]
+        cfg = sdb["config"].find_one({}) or client["fahem"]["config"].find_one({}) or {}
+        tier = int(principal.get("tier", 0) or 0)
+        cap = int(cfg.get("demoTier1Cap", DEMO_TIER1_CAP)) if tier >= 1 else int(cfg.get("demoTier0Cap", DEMO_TIER0_CAP))
+        used = _sum_tokens(sdb["token_telemetry"], {"sandboxSessionId": sid})
+        if cap > 0 and used >= cap:
+            return (True, f"Demo token budget exhausted ({used:,}/{cap:,}). This sandbox session can no longer use AI services.", {"used": used, "cap": cap, "scope": "demo_session"})
+        return (False, None, {"used": used, "cap": cap, "scope": "demo_session"})
+
+    # ---- Production: rolling daily/weekly/monthly windows with per-user override ----
+    uid = principal.get("uid")
+    if not uid:
+        return (False, None, {})
+    pdb = client["fahem"]
+    if not bool((pdb["config"].find_one({}) or {}).get("isTokenControlActive", True)):
+        return (False, None, {"scope": "prod", "enforced": False})
+    cfg = pdb["config"].find_one({}) or {}
+    user = pdb["users"].find_one({"userId": uid}, {"dailyLimit": 1, "weeklyLimit": 1, "monthlyLimit": 1, "tokenPolicy": 1}) or {}
+    tp = user.get("tokenPolicy") or {}
+    daily_limit = int(user.get("dailyLimit") or tp.get("dailyLimit") or cfg.get("dailyAllocationLimit", 50000))
+    weekly_limit = int(user.get("weeklyLimit") or tp.get("weeklyLimit") or cfg.get("weeklyAllocationLimit", 250000))
+    monthly_limit = int(user.get("monthlyLimit") or tp.get("monthlyLimit") or cfg.get("monthlyAllocationLimit", 1000000))
+    now = _dt.datetime.utcnow()
+    tele = pdb["token_telemetry"]
+    windows = [
+        ("daily", daily_limit, now - _dt.timedelta(days=1)),
+        ("weekly", weekly_limit, now - _dt.timedelta(days=7)),
+        ("monthly", monthly_limit, now - _dt.timedelta(days=30)),
+    ]
+    for name, limit, since in windows:
+        if limit <= 0:
+            continue
+        used = _sum_tokens(tele, {"userId": uid, "createdAt": {"$gte": since}})
+        if used >= limit:
+            return (True, f"Your {name} token budget is exhausted ({used:,}/{limit:,}). AI services pause until the {name} window resets.", {"used": used, "limit": limit, "window": name, "scope": "prod"})
+    return (False, None, {"scope": "prod"})
+
+
 # Helper to register route on a FastAPI app
 def register_telemetry_route(app: fastapi.FastAPI):
     # Check if the route is already registered to avoid duplication
@@ -293,6 +367,28 @@ def register_telemetry_route(app: fastapi.FastAPI):
             request.state.principal = principal
             if principal:
                 request.state.verified_email = principal.get("email")
+
+            # FC7.34: enforce the token budget on the expensive AI run paths BEFORE the LLM executes, so an
+            # exhausted user/demo session cannot keep spending. Demo is fail-CLOSED (the anonymous cost
+            # vector); authenticated prod fails OPEN on a check error so an enforcement bug never locks real
+            # users out. Only POST runs are metered (reads/streamed GETs are free).
+            AI_RUN_PATHS = ("/run_sse", "/chat/message", "/audio/tts")
+            if principal and request.method == "POST" and any(path.startswith(p) for p in AI_RUN_PATHS):
+                try:
+                    _blocked, _reason, _info = token_budget_blocked(principal)
+                    if _blocked:
+                        logger.info(f"[budget] BLOCKED {path} for {principal.get('email') or principal.get('uid')}: {_info}")
+                        return await fastapi.responses.JSONResponse(
+                            status_code=429,
+                            content={"error": _reason, "code": "token_budget_exhausted", "info": _info},
+                        )(scope, receive, send)
+                except Exception as _be:
+                    logger.warning(f"[budget] enforcement check error on {path}: {_be}")
+                    if (principal.get("db_target") == "fahem_sandbox"):
+                        return await fastapi.responses.JSONResponse(
+                            status_code=429,
+                            content={"error": "Demo token check failed; AI paused for this session.", "code": "token_budget_exhausted"},
+                        )(scope, receive, send)
 
             token_ctx = None
             try:
@@ -3914,10 +4010,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 if sid:
                     usage_by_session[sid] = usage_by_session.get(sid, 0) + int(d.get("totalTokens", 0) or 0)
 
-            # Global per-session demo token cap (config-driven; 0/absent = no cap). Surfaced so the
-            # monitor can display + (future) edit it; enforcement is tracked separately under FC7.21.
+            # FC7.38: per-tier demo caps (Tier0=35k / Tier1=60k, config-adjustable) are the ENFORCED limit
+            # (token_budget_blocked). Surface them so the monitor shows real used / enforced cap.
             cfg = client["fahem"]["config"].find_one({}) or {}
-            global_demo_cap = int(cfg.get("demoSessionTokenCap", 0) or 0)
+            tier0_cap = int(cfg.get("demoTier0Cap", DEMO_TIER0_CAP))
+            tier1_cap = int(cfg.get("demoTier1Cap", DEMO_TIER1_CAP))
             client.close()
 
             for sess in sessions:
@@ -3925,10 +4022,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
                     sess["_id"] = str(sess["_id"])
                 sid = sess.get("sandbox_session_id")
                 sess["tokensUsed"] = usage_by_session.get(sid, 0)
-                # Effective per-session limit: explicit override on the session, else the global cap.
-                sess["tokenLimit"] = int(sess.get("tokenLimit", 0) or 0) or global_demo_cap
+                # Effective enforced limit = this session's tier cap (explicit per-session override wins).
+                _tier = int(sess.get("tier", 0) or 0)
+                sess["tokenLimit"] = int(sess.get("tokenLimit", 0) or 0) or (tier1_cap if _tier >= 1 else tier0_cap)
 
-            return {"success": True, "sessions": sessions, "globalDemoTokenCap": global_demo_cap}
+            return {"success": True, "sessions": sessions, "demoTier0Cap": tier0_cap, "demoTier1Cap": tier1_cap}
         except Exception as err:
             logger.error(f"[services.py] Failed to get demo sessions: {err}", exc_info=True)
             return {"success": False, "error": str(err)}
@@ -4416,6 +4514,14 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 update_fields["weeklyAllocationLimit"] = int(data["weeklyAllocationLimit"])
             if "monthlyAllocationLimit" in data:
                 update_fields["monthlyAllocationLimit"] = int(data["monthlyAllocationLimit"])
+            # FC7.34: a daily window cap so the daily widget/enforcement has a configurable limit.
+            if "dailyAllocationLimit" in data:
+                update_fields["dailyAllocationLimit"] = int(data["dailyAllocationLimit"])
+            # FC7.38: super-admin-adjustable demo per-tier caps (defaults Tier0=35k / Tier1=60k).
+            if "demoTier0Cap" in data:
+                update_fields["demoTier0Cap"] = int(data["demoTier0Cap"])
+            if "demoTier1Cap" in data:
+                update_fields["demoTier1Cap"] = int(data["demoTier1Cap"])
             if "maxUploadSize" in data:
                 update_fields["maxUploadSize"] = int(data["maxUploadSize"])
             if "evalSandboxEnabled" in data:

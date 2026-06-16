@@ -1191,26 +1191,49 @@ async def usage_tool(action: str = "get", target_uid: Optional[str] = None) -> D
             else:
                 logger.warning(f"[PRIVACY] Non-admin '{asker_uid}' requested other user usage. Forcing self-context.")
                 effective_uid = asker_uid
-                
-        # Aggregate mock telemetry stats based on user type
-        db = load_local_db()
-        config = db.get("config", {})
-        weekly_limit = config.get("weeklyAllocationLimit", 250000)
-        monthly_limit = config.get("monthlyAllocationLimit", 1000000)
-        
+
+        # FC7.34/FC7.38: report REAL token usage (was hardcoded mock numbers). Demo sessions report their
+        # cumulative session usage vs the tier cap; prod users report rolling daily/weekly/monthly windows.
+        import datetime as _dt
+        from tools import get_cached_mongodb_client
+        client = get_cached_mongodb_client()
+        db_target = (principal.get("db_target") if principal else None) or "fahem"
+
+        def _sum(coll, q):
+            for d in coll.aggregate([{"$match": q}, {"$group": {"_id": None, "t": {"$sum": "$totalTokens"}}}]):
+                return int(d.get("t", 0) or 0)
+            return 0
+
+        if db_target == "fahem_sandbox":
+            sdb = client["fahem_sandbox"]
+            cfg = sdb["config"].find_one({}) or client["fahem"]["config"].find_one({}) or {}
+            sid = principal.get("sandbox_session_id") if principal else None
+            tier = int((principal or {}).get("tier", 0) or 0)
+            cap = int(cfg.get("demoTier1Cap", 60000)) if tier >= 1 else int(cfg.get("demoTier0Cap", 35000))
+            used = _sum(sdb["token_telemetry"], {"sandboxSessionId": sid}) if sid else 0
+            return {
+                "status": "success", "userId": effective_uid, "scope": "demo_session",
+                "used": {"session": used}, "limit": {"session": cap},
+                "remaining": max(0, cap - used), "enabled": True
+            }
+
+        pdb = client["fahem"]
+        cfg = pdb["config"].find_one({}) or {}
+        user = pdb["users"].find_one({"userId": effective_uid}, {"dailyLimit": 1, "weeklyLimit": 1, "monthlyLimit": 1, "tokenPolicy": 1}) or {}
+        tp = user.get("tokenPolicy") or {}
+        daily_limit = int(user.get("dailyLimit") or tp.get("dailyLimit") or cfg.get("dailyAllocationLimit", 50000))
+        weekly_limit = int(user.get("weeklyLimit") or tp.get("weeklyLimit") or cfg.get("weeklyAllocationLimit", 250000))
+        monthly_limit = int(user.get("monthlyLimit") or tp.get("monthlyLimit") or cfg.get("monthlyAllocationLimit", 1000000))
+        now = _dt.datetime.utcnow()
+        tele = pdb["token_telemetry"]
+        used_daily = _sum(tele, {"userId": effective_uid, "createdAt": {"$gte": now - _dt.timedelta(days=1)}})
+        used_weekly = _sum(tele, {"userId": effective_uid, "createdAt": {"$gte": now - _dt.timedelta(days=7)}})
+        used_monthly = _sum(tele, {"userId": effective_uid, "createdAt": {"$gte": now - _dt.timedelta(days=30)}})
         return {
-            "status": "success",
-            "userId": effective_uid,
-            "used": {
-                "daily": 4500,
-                "weekly": 18500,
-                "monthly": 92000
-            },
-            "limit": {
-                "weekly": weekly_limit,
-                "monthly": monthly_limit
-            },
-            "enabled": config.get("isTokenControlActive", True)
+            "status": "success", "userId": effective_uid, "scope": "prod",
+            "used": {"daily": used_daily, "weekly": used_weekly, "monthly": used_monthly},
+            "limit": {"daily": daily_limit, "weekly": weekly_limit, "monthly": monthly_limit},
+            "enabled": bool(cfg.get("isTokenControlActive", True))
         }
     except Exception as e:
         logger.error(f"Error in usage_tool: {e}")
