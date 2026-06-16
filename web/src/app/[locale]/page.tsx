@@ -842,6 +842,11 @@ export default function LandingPage() {
                       localStorage.setItem("demo_tier", String(data.session?.tier ?? 0));
                       // Each fresh sandbox session is granted a single document upload.
                       localStorage.removeItem("demo_upload_used");
+                      // FC7.23: each fresh sandbox session starts with a CLEAN companion chat — clear the
+                      // FC7.31 persistence so a new demo visitor never inherits the previous session's chat.
+                      sessionStorage.removeItem("fahem_companion_messages");
+                      sessionStorage.removeItem("fahem_companion_session_id");
+                      sessionStorage.removeItem("fahem_companion_is_open");
                       setIsDemo(true);
                       
                       setTimeout(() => {
