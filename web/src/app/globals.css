@@ -3921,6 +3921,13 @@ body[dir="rtl"] .glass-nav-dropdown-menu.show-mobile-dropdown {
     display: none !important;
   }
 
+  /* FC6.14: the reading room (TOC sidebar 280px + content) must STACK on small screens — a fixed 280px
+     rail next to content is unusable at <=768px. Collapse to a single column so the TOC sits above the
+     page content and both are full-width. Overrides the inline grid-template-columns. */
+  .reader-split-panels {
+    grid-template-columns: 1fr !important;
+  }
+
   .glass-nav-dropdown-menu {
     width: 290px !important;
     left: auto !important;
