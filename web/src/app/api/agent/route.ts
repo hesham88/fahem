@@ -539,6 +539,7 @@ export async function POST(req: NextRequest) {
           if (userId && userEmail) {
             // A. Fetch existing session messages
             let existingMessages: any[] = [];
+            let existingTitle = ""; // FC7.39: so we can (re)name a session still stuck on a placeholder.
             try {
               if (isLocalEnv()) {
                 const db = getLocalDb();
@@ -546,6 +547,7 @@ export async function POST(req: NextRequest) {
                 if (session?.messages) {
                   existingMessages = session.messages;
                 }
+                if (session?.title) existingTitle = session.title;
               } else {
                 const res = await proxyRequest(`/user/chat-session/detail?sessionId=${activeSessionId}`, "GET", undefined, ctx);
                 if (res.ok) {
@@ -553,6 +555,7 @@ export async function POST(req: NextRequest) {
                   if (data?.session?.messages) {
                     existingMessages = data.session.messages;
                   }
+                  if (data?.session?.title) existingTitle = data.session.title;
                 }
               }
             } catch (err) {
@@ -567,18 +570,22 @@ export async function POST(req: NextRequest) {
             ];
 
             const isNewSession = existingMessages.length === 0;
-            // Auto-name a new chat from what it is about (the first user message), stripping any
-            // bracketed system/context/intent markers so the title is clean. Never overwrite an
-            // existing title, so a user-chosen name is preserved.
+            // FC7.39: auto-name a chat from what it's ABOUT (the first user message), stripping bracketed
+            // system/context/intent markers. We name it not only on the very first message but whenever the
+            // session is still on a placeholder title ("Untitled Chat"/"New Chat"/empty) — many sessions were
+            // created with a placeholder and never renamed. A real user-chosen title is always preserved.
             const cleanPromptForTitle = (prompt || "")
               .replace(/\[(?:Grounded Web Search Request|Context Reference|Page Content|SYSTEM[^\]]*|INTENT[^\]]*)\][^\n]*/gi, "")
               .replace(/\s+/g, " ")
               .trim();
+            const PLACEHOLDER_TITLES = ["", "untitled chat", "new chat", "محادثة جديدة"];
+            const needsTitle = isNewSession || PLACEHOLDER_TITLES.includes((existingTitle || "").trim().toLowerCase());
+            const derivedTitle = cleanPromptForTitle.length > 40
+              ? cleanPromptForTitle.substring(0, 40) + "..."
+              : (cleanPromptForTitle || "New Chat");
             const title = onboarding
               ? "Onboarding Chat Session"
-              : isNewSession
-                ? (cleanPromptForTitle.length > 40 ? cleanPromptForTitle.substring(0, 40) + "..." : (cleanPromptForTitle || "New Chat"))
-                : undefined;
+              : (needsTitle && cleanPromptForTitle ? derivedTitle : undefined);
 
             // C. Save Chat Session
             try {
