@@ -1249,7 +1249,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                             {renderAvatar(friend.avatar, "1.5rem")}
                             <div style={{ display: "flex", flexDirection: "column" }}>
                               <strong style={{ fontSize: "0.9rem", color: "var(--foreground)" }}>{friend.name}</strong>
-                              <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{friend.email}</span>
+                              <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{friend.email || (friend.username ? `@${friend.username}` : "")}</span>
                             </div>
                           </div>
                           <div style={{ display: "flex", gap: "0.4rem" }}>
@@ -1438,7 +1438,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({
                                       : language === "ar" ? "مشرف" : "Admin"}
                                   </span>
                                 </div>
-                                <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{dirUser.email}</span>
+                                <span style={{ fontSize: "0.7rem", color: "#6a7c88" }}>{dirUser.email || (dirUser.username ? `@${dirUser.username}` : "")}</span>
                               </div>
                             </div>
 

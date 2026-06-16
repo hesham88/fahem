@@ -2658,7 +2658,10 @@ export default function Home() {
   const fetchAllUsersList = async () => {
     setLoadingAllUsers(true);
     try {
-      const res = await authedFetch("/api/user/list");
+      // FC8: the social directory is open to every authenticated member (not just
+      // admins). /api/user/directory returns a PII-free member list for non-admins
+      // and the full record for admins — so normal users now see the directory.
+      const res = await authedFetch("/api/user/directory");
       if (res.ok) {
         const data = await res.json();
         setAllUsers(data.users || []);

@@ -362,7 +362,9 @@ export default function UserProfilePage() {
         setTargetProfile(data.profile || null);
       }
       
-      const listRes = await authedFetch("/api/user/list");
+      // FC8: use the member directory (open to all authed members) instead of the
+      // admin-only /api/user/list, so the friend circle resolves for normal users too.
+      const listRes = await authedFetch("/api/user/directory");
       if (listRes.ok) {
         const listData = await listRes.json();
         setAllUsersList(listData.users || []);
@@ -663,7 +665,12 @@ export default function UserProfilePage() {
                 </div>
 
                 <p style={{ color: "#6a7c88", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-                  <FiMail style={{ color: "#106ba3" }} /> {targetProfile.email}
+                  {/* FC8: public viewers don't receive the email — fall back to the @username handle. */}
+                  {targetProfile.email ? (
+                    <><FiMail style={{ color: "#106ba3" }} /> {targetProfile.email}</>
+                  ) : targetProfile.username ? (
+                    <><FiUser style={{ color: "#106ba3" }} /> @{targetProfile.username}</>
+                  ) : null}
                 </p>
 
                 {/* Additional profile metadata items */}

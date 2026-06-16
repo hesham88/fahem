@@ -684,7 +684,14 @@ class MongoDBEngine:
                 doc = self._db["users"].find_one({"email": email.strip()})
                 
         if not doc and username:
-            doc = self._db["users"].find_one({"username_clean": username.strip().lower()})
+            # FC8: match username_clean OR the raw username (case-insensitive) — older /
+            # collision-damaged docs (FC7.43) may lack username_clean.
+            uc = username.strip().lower()
+            doc = self._db["users"].find_one({"$or": [
+                {"username_clean": uc},
+                {"username": username.strip()},
+                {"username": uc},
+            ]})
             if not doc:
                 doc = self._db["users"].find_one({"userId": username})
             if not doc:

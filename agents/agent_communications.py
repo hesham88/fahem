@@ -942,8 +942,15 @@ async def get_user_profile(user_id: str = None, username: str = None, email: str
         elif email:
             filt["email"] = email.strip().lower()
         elif username:
+            # FC8: match the normalized username_clean OR the raw username (case-insensitive).
+            # Older / collision-damaged docs (FC7.43) may carry `username` without `username_clean`,
+            # so a username_clean-only filter returned "not found" for them.
             username_clean = username.strip().lower()
-            filt = {"username_clean": username_clean}
+            filt = {"$or": [
+                {"username_clean": username_clean},
+                {"username": username.strip()},
+                {"username": username_clean},
+            ]}
         else:
             return {}
 

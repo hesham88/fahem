@@ -31,6 +31,7 @@ import time
 import base64
 import urllib.request
 import urllib.error
+import urllib.parse
 import socket
 
 # Monkeypatch socket.getaddrinfo to bypass slow DNS lookup in local CLI sandbox
@@ -762,6 +763,62 @@ def verify_agent_create():
     return False, f"/api/assignments POST returned unexpected status {st_asg} for the demo teacher: {resp_asg[:140]}"
 
 
+def verify_d_directory():
+    # D-DIRECTORY (FC8): the member directory + public profiles must be visible to a
+    # NON-admin authenticated member. Previously /api/user/list was admin-only and
+    # /api/user/profile hard-403'd any non-self/non-admin lookup, so normal users saw an
+    # empty directory and "User profile not found" on every member. The sandbox clamps
+    # every persona to `user`, so a demo session is exactly the non-admin principal that
+    # used to be locked out — an ideal, ungameable gate.
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, err
+
+    # (1) Directory must be reachable by a non-admin (200), not 403.
+    st, body = _req("/api/user/directory", token=tok)
+    if st == 403:
+        return False, "/api/user/directory returned 403 for a non-admin member — directory still admin-gated (FC8 not deployed)"
+    if st != 200:
+        return False, f"/api/user/directory returned {st} (expected 200): {body[:140]}"
+    try:
+        data = json.loads(body)
+        users = data.get("users") or []
+    except Exception as e:
+        return False, f"could not parse /api/user/directory response: {e}"
+    if not isinstance(users, list):
+        return False, "/api/user/directory did not return a users array"
+
+    # PII must be stripped from the public directory projection.
+    leak = next((u for u in users if isinstance(u, dict) and (u.get("phoneNumber") or u.get("parentEmail"))), None)
+    if leak is not None:
+        return False, "directory leaked PII (phoneNumber/parentEmail) to a non-admin member — public projection not applied"
+
+    # (2) A non-admin must be able to VIEW a member's public profile (200, not 403/404).
+    self_uid = decode_demo_token(tok).get("uid")
+    target = next((u for u in users if isinstance(u, dict) and u.get("userId") and u.get("userId") != self_uid), None)
+    if target is None:
+        # No other member in this (isolated sandbox) directory — the directory gate above
+        # is still proven; profile-of-another is then owner-eyeball on prod.
+        return True, f"directory open to non-admin member ({len(users)} member(s), PII stripped); no other member in the sandbox to view (profile-of-another is owner-eyeball)"
+
+    ident = target.get("username") or target.get("userId")
+    key = "username" if target.get("username") else "userId"
+    st2, body2 = _req(f"/api/user/profile?{key}={urllib.parse.quote(str(ident))}", token=tok)
+    if st2 == 403:
+        return False, f"/api/user/profile?{key}={ident} returned 403 for a non-admin viewer — public profile still blocked (FC8 not deployed)"
+    if st2 != 200:
+        return False, f"/api/user/profile?{key}={ident} returned {st2} (expected 200): {body2[:140]}"
+    try:
+        prof = (json.loads(body2) or {}).get("profile") or {}
+    except Exception as e:
+        return False, f"could not parse public profile response: {e}"
+    if not prof.get("userId"):
+        return False, f"public profile for '{ident}' came back empty — lookup failed"
+    if prof.get("phoneNumber") or prof.get("parentEmail"):
+        return False, f"public profile for '{ident}' leaked PII (phoneNumber/parentEmail) to a non-admin viewer"
+    return True, f"non-admin member can list the directory ({len(users)} members) and view '{ident}' public profile (PII stripped) — FC8 holds"
+
+
 REEXEC = {
     "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
     "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
@@ -773,8 +830,9 @@ REEXEC = {
     "D-AGENT-CREATE": verify_agent_create,
     "D-ZATONA": verify_zatona,
     "D-INGEST-TRIGGER": verify_d_ingest_trigger,
+    "D-DIRECTORY": verify_d_directory,
 }
-FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL"]
+FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL", "D-DIRECTORY"]
 SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA", "D-INGEST-TRIGGER"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
 
 

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { proxyRequest } from "../../proxy";
 import { verifyAuth } from "../../_auth";
 import { isLocalEnv, getLocalDb, saveLocalDb } from "../../localDbHelper";
+import { toPublicProfile } from "../publicProjection";
 
 export const dynamic = "force-dynamic";
 
@@ -25,30 +26,28 @@ export async function GET(req: NextRequest) {
       userId = ctx.uid;
     }
 
-    // IDOR Protection: Standard users can only fetch their own profile.
-    const isSelf = 
+    // FC8 — Public profiles are viewable by any authenticated member (the directory
+    // links to them to add friends / DM). The owner and admins receive the FULL
+    // record; everyone else receives a PII-free public projection (no email / phone /
+    // parent email / internal bookkeeping). Previously this endpoint hard-403'd every
+    // non-self, non-admin lookup, so normal users always saw "User profile not found".
+    const isSelf =
       (userId && userId === ctx.uid) ||
       (email && email.toLowerCase().trim() === ctx.email?.toLowerCase().trim());
-    
-    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
 
-    if (!isSelf && !isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to view this profile" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const isAdmin = ctx.role === "admin" || ctx.role === "super-admin";
+    const privileged = !!(isSelf || isAdmin);
 
     if (isLocalEnv()) {
       const db = getLocalDb();
       const userList = db.users || [];
-      const user = userList.find(u => 
+      const user = userList.find(u =>
         (userId && u.userId === userId) ||
         (username && (u.username === username || (u.email && u.email.split("@")[0].toLowerCase() === username.toLowerCase()))) ||
         (email && u.email?.toLowerCase() === email.toLowerCase())
       );
       if (user) {
-        return new Response(JSON.stringify({ success: true, profile: user }), {
+        return new Response(JSON.stringify({ success: true, profile: privileged ? user : toPublicProfile(user) }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -64,7 +63,20 @@ export async function GET(req: NextRequest) {
     if (username) params.append("username", username);
     if (email) params.append("email", email);
 
-    return await proxyRequest(`/user/profile?${params.toString()}`, "GET", undefined, ctx);
+    const res = await proxyRequest(`/user/profile?${params.toString()}`, "GET", undefined, ctx);
+    if (privileged || !res.ok) return res;
+
+    // Non-privileged viewer: sanitize the backend record down to public fields.
+    try {
+      const data = await res.json();
+      const profile = data && data.profile ? toPublicProfile(data.profile) : data.profile;
+      return new Response(JSON.stringify({ ...data, profile }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch {
+      return res;
+    }
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
