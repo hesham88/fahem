@@ -66,7 +66,11 @@ jobs:
             --max-retries 1 \
             --command python \
             --args ingestion_v2/job_fetch.py \
+            --set-env-vars="FORCE_MONGO=true" \
             --set-secrets="GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest"
+          # FORCE_MONGO=true: a Cloud Run Job does not set K_SERVICE, so force MongoDB writes ON
+          # (belt-and-suspenders with the CLOUD_RUN_JOB detection in utils.is_mongodb_enabled) — the
+          # worker must never fall back to the local-JSON/offline path and silently skip DB persistence.
           # The API service runs as the default compute SA; allow it to trigger job executions.
           gcloud run jobs add-iam-policy-binding fahem-ingest-worker \
             --region us-east4 \

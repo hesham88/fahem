@@ -68,7 +68,10 @@ def is_mongodb_enabled():
     if _MONGO_DISABLED is not None:
         return not _MONGO_DISABLED
     
-    is_cloud_run = bool(os.environ.get("K_SERVICE"))
+    # FC8.5: Cloud Run *Services* set K_SERVICE, but Cloud Run *Jobs* (the ingestion worker)
+    # set CLOUD_RUN_JOB instead — without this the Job mistook the private Atlas URI for a
+    # local dev URI and bypassed MongoDB, so the pipeline "succeeded" while persisting nothing.
+    is_cloud_run = bool(os.environ.get("K_SERVICE") or os.environ.get("CLOUD_RUN_JOB"))
     if is_cloud_run or os.environ.get("FORCE_MONGO") == "true":
         # In Cloud Run, MongoDB is mandatory. We should never fall back to local JSON database.
         _MONGO_DISABLED = False
