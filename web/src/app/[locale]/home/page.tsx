@@ -760,16 +760,28 @@ export default function Home() {
   const [settingsStatusText, setSettingsStatusText] = useState("");
   const [realTokenStats, setRealTokenStats] = useState<any>(null);
 
-  // Gamification telemetry metrics
+  // Real nav-bar gamification meters (computed PER-USER from the activity log in fetchSpaceHistory).
+  const [navXp, setNavXp] = useState<number>(0);
+  const [navLevel, setNavLevel] = useState<number>(1);
+  const [navStreak, setNavStreak] = useState<number>(0);
+  // FC7.37: the real per-user TOTAL XP (not the within-level remainder), used so the XP/streak meters
+  // reflect each user's own progress instead of a shared hardcoded default.
+  const [navTotalXp, setNavTotalXp] = useState<number>(0);
+
+  // Gamification telemetry metrics. FC7.37: bind to EACH user's own data — a persisted profile xp/streak
+  // when meaningfully set (>0), else the real per-user activity-log total (navTotalXp/navStreak). The old
+  // `|| 150` / `|| 3` hardcoded fallbacks made every user without those fields show identical numbers.
+  const resolvedXp = (typeof userProfile?.xp === "number" && userProfile.xp > 0) ? userProfile.xp : navTotalXp;
+  const resolvedStreak = (typeof userProfile?.streak === "number" && userProfile.streak > 0) ? userProfile.streak : navStreak;
   const getLevelBadgeText = () => {
-    const xp = userProfile?.xp || 150;
+    const xp = resolvedXp;
     if (xp > 5000) return language === "ar" ? "🥇 عبقري فاهم" : "🥇 Fahem Sage";
     if (xp > 2000) return language === "ar" ? "🥈 باحث متميز" : "🥈 Elite Scholar";
     return language === "ar" ? "🥉 طالب واعد" : "🥉 Bright Spark";
   };
-  const activeXp = userProfile?.xp || 150;
+  const activeXp = resolvedXp;
   const activeLevel = Math.floor(activeXp / 1000) + 1;
-  const activeStreak = userProfile?.streak || 3;
+  const activeStreak = resolvedStreak;
   const nextLevelXp = activeLevel * 1000;
   const xpProgressPercent = (activeXp % 1000) / 10;
   const consumedClt = realTokenStats?.used?.daily ?? 0;
@@ -778,10 +790,6 @@ export default function Home() {
   const dailyLimit = totalAllocatedClt;
   const tokenProgressPercent = dailyLimit > 0 ? (dailyUsed / dailyLimit) * 100 : 0;
   const remainingClt = dailyLimit - dailyUsed;
-  // Real nav-bar gamification meters (computed from the activity log in fetchSpaceHistory).
-  const [navXp, setNavXp] = useState<number>(0);
-  const [navLevel, setNavLevel] = useState<number>(1);
-  const [navStreak, setNavStreak] = useState<number>(0);
   const [placesResults, setPlacesResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [selectedPlaceForBranch, setSelectedPlaceForBranch] = useState<any | null>(null);
@@ -1732,6 +1740,7 @@ export default function Home() {
           const totalXp = activities
             .filter((a: any) => a.action === "practice_session")
             .reduce((s: number, a: any) => s + (Number(a.details?.xpGained) || 0), 0);
+          setNavTotalXp(totalXp); // FC7.37: real per-user total XP
           setNavXp(totalXp % 100);
           setNavLevel(Math.floor(totalXp / 100) + 1);
           const days = new Set<string>();
