@@ -79,6 +79,10 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
 
   // Global Config & System Switch State
   const [globalConfig, setGlobalConfig] = useState<any>(null);
+  // FC7.21c: editable demo per-tier token caps + daily allocation (enforced by token_budget_blocked).
+  const [capTier0, setCapTier0] = useState<number>(35000);
+  const [capTier1, setCapTier1] = useState<number>(60000);
+  const [capDaily, setCapDaily] = useState<number>(50000);
   const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
   const [configMessage, setConfigMessage] = useState<string | null>(null);
 
@@ -180,6 +184,10 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
         const data = await response.json();
         if (data.success && data.config) {
           setGlobalConfig(data.config);
+          // FC7.21c: seed the cap editors from live config (defaults match token_budget_blocked).
+          setCapTier0(Number(data.config.demoTier0Cap) || 35000);
+          setCapTier1(Number(data.config.demoTier1Cap) || 60000);
+          setCapDaily(Number(data.config.dailyAllocationLimit) || 50000);
         }
       }
     } catch (err) {
@@ -1007,11 +1015,45 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                     {globalConfig.evalSandboxEnabled ? <FiToggleRight /> : <FiToggleLeft />}
                   </button>
                   <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>
-                    {globalConfig.evalSandboxEnabled 
+                    {globalConfig.evalSandboxEnabled
                       ? (language === "ar" ? "نشط ومتاح ✅" : "Active & Accessible ✅")
                       : (language === "ar" ? "معطل تماماً 🛑" : "Disabled / Locked 🛑")
                     }
                   </span>
+                </div>
+              )}
+              {/* FC7.21c: super-admin-editable demo token caps + daily allocation (enforced fail-closed for
+                  demo by token_budget_blocked). */}
+              {globalConfig && (
+                <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px dashed rgba(235,220,185,0.4)" }}>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 800, marginBottom: "0.6rem", color: "var(--foreground)" }}>
+                    {language === "ar" ? "حدود رموز البيئة التجريبية (لكل جلسة)" : "Demo token caps (per session)"}
+                  </div>
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+                    {[
+                      { label: language === "ar" ? "الفئة 0" : "Tier 0", val: capTier0, set: setCapTier0 },
+                      { label: language === "ar" ? "الفئة 1" : "Tier 1", val: capTier1, set: setCapTier1 },
+                      { label: language === "ar" ? "الحد اليومي (الإنتاج)" : "Daily (prod)", val: capDaily, set: setCapDaily },
+                    ].map((f, i) => (
+                      <label key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                        {f.label}
+                        <input
+                          type="number"
+                          value={f.val}
+                          min={0}
+                          onChange={(e) => f.set(Number(e.target.value))}
+                          style={{ width: "120px", padding: "6px 8px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--foreground)", fontFamily: "monospace", fontWeight: 700 }}
+                        />
+                      </label>
+                    ))}
+                    <button
+                      onClick={() => handleSaveGlobalConfig({ demoTier0Cap: capTier0, demoTier1Cap: capTier1, dailyAllocationLimit: capDaily })}
+                      disabled={isSavingConfig}
+                      style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, var(--primary), var(--secondary))", color: "#fff", fontWeight: 800, fontSize: "0.8rem", cursor: "pointer" }}
+                    >
+                      {language === "ar" ? "حفظ الحدود" : "Save caps"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

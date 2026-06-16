@@ -5879,6 +5879,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 success = await add_friend(user_id, friend_id)
             else:
                 success = await remove_friend(user_id, friend_id)
+
+            # FC7.40: notify the target of a new friend request/connection (mirrors the DM notification on
+            # /chat/message). Best-effort — never blocks the friend action.
+            if success and action == "add":
+                try:
+                    from tools import get_mongodb_uri as _gmu
+                    from pymongo import MongoClient as _MC
+                    import time as _t
+                    _c = _MC(_gmu(), serverSelectionTimeoutMS=4000)
+                    _db = get_active_db(_c)
+                    _sender = _db["users"].find_one({"userId": user_id}, {"name": 1, "username": 1}) or {}
+                    _sname = _sender.get("name") or _sender.get("username") or "Someone"
+                    _ts = int(_t.time() * 1000)
+                    _db["notifications"].insert_one({
+                        "_id": f"ntf_{_ts}_friend_{friend_id[:8]}",
+                        "recipient_uid": friend_id,
+                        "type": "friend_request",
+                        "title": f"{_sname} sent you a friend request",
+                        "title_ar": f"أرسل {_sname} طلب صداقة",
+                        "body": f"{_sname} wants to connect with you on Fahem.",
+                        "body_ar": f"يريد {_sname} التواصل معك على فاهم.",
+                        "payload": {"sender_id": user_id, "deep_link": "?tab=social"},
+                        "read": False,
+                        "createdAt": _ts
+                    })
+                    send_web_push(_db, friend_id, f"{_sname} sent you a friend request", "", "?tab=social")
+                    _c.close()
+                except Exception as _e:
+                    logger.warning(f"Failed to notify of friend request: {_e}")
+
             return {"status": "success" if success else "error"}
         except Exception as err:
             logger.error(f"[services.py] Failed to manage friend: {err}", exc_info=True)
