@@ -759,6 +759,30 @@ class MongoDBEngine:
             flat_profile["email"] = str(flat_profile.get("email", "")).strip().lower()
             flat_profile["updatedAt"] = now_str
 
+            # FC7.3b (CRITICAL): the completion save was FAILING for nearly every new user, so the
+            # onboarding-chosen role/name/username never persisted and the user kept the default doc
+            # (role reset to student/user, username "freed", admin tabs never appeared). Two stacked
+            # defects, both fixed here:
+            #  (1) createdAt conflict — callers spread the loaded profile (incl. createdAt/_id) into the
+            #      save body; with createdAt in $set AND $setOnInsert, Mongo rejected the whole write.
+            #      Strip server-managed fields so $setOnInsert owns createdAt (mirrors ensure_user_profile).
+            for _sys in ("createdAt", "_id"):
+                flat_profile.pop(_sys, None)
+            #  (2) UserProfileSchema validation error — int-typed fields (childrenCount /
+            #      childrenInSchoolCount) received "" from every NON-parent onboarding, raising a pydantic
+            #      ValidationError (a ValueError → it was re-raised before the MCP fallback = hard failure).
+            #      Coerce blank/invalid numerics to a valid int, dropping what can't be coerced.
+            for _numf in ("childrenCount", "childrenInSchoolCount", "age"):
+                if _numf in flat_profile:
+                    _v = flat_profile[_numf]
+                    if isinstance(_v, bool) or _v is None or (isinstance(_v, str) and not _v.strip()):
+                        flat_profile.pop(_numf, None)
+                    elif isinstance(_v, str):
+                        try:
+                            flat_profile[_numf] = int(float(_v.strip()))
+                        except (ValueError, TypeError):
+                            flat_profile.pop(_numf, None)
+
             # FC7.29: onboarding as a teacher must NOT auto-grant teacher powers — it needs admin/
             # super-admin approval (same gate as admins). When a save sets role/userType "teacher" and the
             # user is not ALREADY an approved teacher, mark them pending so the role resolver clamps them to
@@ -776,7 +800,9 @@ class MongoDBEngine:
             # Validate input against the strict schema!
             validated = UserProfileSchema(**flat_profile)
             dumped_data = validated.model_dump(by_alias=True, exclude_none=True)
-            
+            # FC7.3b: never let createdAt live in $set — $setOnInsert owns it (avoids the path conflict).
+            dumped_data.pop("createdAt", None)
+
             # Run atomic pymongo upsert
             self._db["users"].update_one(
                 {"userId": user_id},

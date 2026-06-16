@@ -3807,11 +3807,19 @@ export default function Home() {
                 allowMessages: true,
                 showActivity: true
               },
-              // Additional role-specific fields
+              // Additional role-specific fields. FC7.3b: childrenCount is an int field server-side —
+              // sending "" (every non-parent) raised a schema ValidationError that failed the whole save.
               parentEmail: onboardingParentEmail || "",
-              childrenCount: onboardingChildrenCount || "",
-              childrenInSchool: onboardingChildrenInSchool || ""
+              childrenCount: parseInt(onboardingChildrenCount) || 0,
+              childrenInSchoolCount: parseInt(onboardingChildrenInSchool) || 0
             };
+
+            // FC7.3b: never POST server-managed fields back — `createdAt` in the body collides with the
+            // upsert's $setOnInsert(createdAt) and failed the save, so the onboarding-chosen role/username
+            // never persisted (role reset to default, username "freed", admin tabs missing).
+            delete (finalProfile as any).createdAt;
+            delete (finalProfile as any)._id;
+            delete (finalProfile as any).updatedAt;
 
             const res = await authedFetch("/api/user/profile", {
               method: "POST",

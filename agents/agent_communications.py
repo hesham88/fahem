@@ -1085,7 +1085,11 @@ async def save_user_profile(user_id: str, data: dict) -> bool:
         filt = {"userId": user_id}
         update_data = {**data, "userId": user_id, "updatedAt": now_str}
         update_data.pop("_id", None)  # Clean mongo internal field
-        
+        # FC7.3b: callers spread the loaded profile (incl. createdAt) into `data`; with createdAt in both
+        # $set and $setOnInsert, MCP update-many failed ("Updating the path 'createdAt' would create a
+        # conflict") → the profile save was lost and onboarding data never persisted. $setOnInsert owns it.
+        update_data.pop("createdAt", None)
+
         update_doc = {
             "$set": update_data,
             "$setOnInsert": {"createdAt": now_str}
