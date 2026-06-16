@@ -1144,6 +1144,7 @@ const compilePageTextForTts = (blocks: any[], lang: string, i18n?: any): string 
   const texts: string[] = [];
   blocks.forEach(b => {
     const type = b.type;
+    const before = texts.length;
     if (type === "heading" || type === "paragraph") {
       const txt = getProp(b, "text");
       if (txt) texts.push(txt);
@@ -1183,13 +1184,26 @@ const compilePageTextForTts = (blocks: any[], lang: string, i18n?: any): string 
         options.forEach(opt => texts.push(opt));
       }
     } else if (type === "callout" || type === "example") {
+      // FC7.17: boxed blocks (callout/example) carry their prose in text/content/body — not just a
+      // label/title. Reading only the label dropped the box's real content, and on a page LED by such a
+      // box the compiled text could come out empty → "no readable text" (looked like broken audio).
       const label = getProp(b, "label");
       const title = getProp(b, "title");
-      if (label || title) texts.push(`${label ? label + " " : ""}${title || ""}`);
+      const body = getProp(b, "text") || getProp(b, "content") || getProp(b, "body");
+      const head = `${label ? label + " " : ""}${title || ""}`.trim();
+      if (head || body) texts.push(`${head ? head + ": " : ""}${body || ""}`.trim());
     } else if (type === "step") {
       const label = getProp(b, "label");
       const text = getProp(b, "text");
       if (label || text) texts.push(`${label ? label + ": " : ""}${text || ""}`);
+    }
+    // FC7.17: generic fallback — if a block type we don't explicitly handle (or one that matched but
+    // produced nothing, e.g. a boxed container whose body lives in content/body/caption) contributed no
+    // text, pull any plain text-ish property so no VISIBLE block is silently skipped from the audio.
+    if (texts.length === before) {
+      const fallback = getProp(b, "text") || getProp(b, "content") || getProp(b, "body")
+        || getProp(b, "caption") || getProp(b, "title") || getProp(b, "term") || getProp(b, "prompt");
+      if (fallback && typeof fallback === "string") texts.push(fallback);
     }
   });
 
