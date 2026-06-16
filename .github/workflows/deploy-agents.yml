@@ -54,15 +54,17 @@ jobs:
           # FC8.5: dedicated worker that runs job_fetch.py to completion independently of the API
           # service lifecycle (survives deploys/health restarts/scale events — the root cause of the
           # frozen accounting jobs). Same source image; entrypoint overridden to the ingestion script.
-          # A long task-timeout covers large books (~45 min for ~1000 pages); 1 retry recovers a
-          # transient infra failure. The payload is supplied per-execution via INGEST_PAYLOAD.
+          # task-timeout 21600 (6h): a ~1000-page book runs every page through all 5 stages
+          # (fetch/struct/translate/assemble/embed) with per-page Gemini calls and takes well over
+          # an hour — the initial 3600s cap terminated+retried large books in a loop. 1 retry still
+          # recovers a transient infra failure. The payload is supplied per-execution via INGEST_PAYLOAD.
           gcloud run jobs deploy fahem-ingest-worker \
             --source agents \
             --region us-east4 \
             --vpc-connector fahem-connector \
             --vpc-egress private-ranges-only \
             --memory 4Gi \
-            --task-timeout 3600 \
+            --task-timeout 21600 \
             --max-retries 1 \
             --command python \
             --args ingestion_v2/job_fetch.py \
