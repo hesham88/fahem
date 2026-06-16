@@ -200,9 +200,11 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
       <section 
         className="panel-card" 
         style={{ 
-          padding: "3rem 2rem", 
+          padding: "3rem 2rem",
           textAlign: "center",
-          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(247, 243, 230, 0.5))",
+          // FC7.25: tokenized so the "Coming Soon" card flips with the theme (was a fixed near-white
+          // gradient island — in dark mode it stayed bright and its theme-aware text turned invisible).
+          background: "linear-gradient(135deg, var(--surface-translucent), var(--surface-subtle))",
           backdropFilter: "blur(12px)",
           border: "1px solid rgba(212, 175, 55, 0.25)",
           borderRadius: "var(--border-radius-lg)",
@@ -256,10 +258,10 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
           }}>
             {language === "ar" ? "قريباً: مخطط الدراسة الذكي بالذكاء الاصطناعي" : "Coming Soon: Intelligent AI Study Planner"}
           </h3>
-          <p style={{ 
-            fontSize: "0.95rem", 
-            color: "#5c6e7a", 
-            margin: 0, 
+          <p style={{
+            fontSize: "0.95rem",
+            color: "var(--text-muted)", // FC7.25: was hardcoded #5c6e7a (low contrast in dark)
+            margin: 0,
             lineHeight: "1.7",
             fontWeight: 500
           }}>
@@ -287,11 +289,13 @@ export const StudyPlanPanel: React.FC<StudyPlanPanelProps> = ({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              background: "#ffffff",
+              // FC7.25: was hardcoded #ffffff — in dark mode the white chip + var(--foreground) (light)
+              // text was invisible. Tokenized so the chip + its label contrast in both themes.
+              background: "var(--card-bg)",
               padding: "0.5rem 1rem",
               borderRadius: "50px",
               boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-              border: "1px solid rgba(16, 107, 163, 0.05)",
+              border: "1px solid var(--card-border)",
               fontSize: "0.85rem",
               fontWeight: 700,
               color: "var(--foreground)"
