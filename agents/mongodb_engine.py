@@ -747,12 +747,27 @@ class MongoDBEngine:
             flat_profile = {**data, "userId": user_id}
             flat_profile.pop("_id", None)
             
-            # Check username uniqueness first
+            # Check username uniqueness. FC7.43 (CRITICAL): a collision must NOT abort the entire profile
+            # save — that raised, the /user/profile POST returned an error, and the onboarding-chosen ROLE
+            # (and everything else) was lost, so the user reverted to the default 'student' with no persisted
+            # username (hence no working profile URL). Two real users had both picked "h88". Instead of
+            # throwing, KEEP the user's role/data and auto-suffix the username to a unique variant so the save
+            # always succeeds; the user can rename later. Their OWN existing doc is excluded (not a collision).
             username = str(flat_profile.get("username", "")).strip()
             if username:
-                is_avail = await self.check_username_availability(username, exclude_user_id=user_id)
-                if not is_avail:
-                    raise ValueError(f"Username '{username}' is already taken by another user.")
+                if not await self.check_username_availability(username, exclude_user_id=user_id):
+                    base = (re.sub(r'[^a-zA-Z0-9_]', '', username)[:20]) or ("user_" + str(user_id)[:6])
+                    suffix = 2
+                    candidate = f"{base}_{suffix}"
+                    while not await self.check_username_availability(candidate, exclude_user_id=user_id):
+                        suffix += 1
+                        candidate = f"{base}_{suffix}"
+                        if suffix > 9999:
+                            candidate = f"user_{str(user_id)[:8]}"
+                            break
+                    logger.warning(f"[MongoDBEngine] Username '{username}' taken — auto-assigned unique '{candidate}' for {user_id} (FC7.43, role preserved)")
+                    username = candidate
+                    flat_profile["username"] = username
             
             # Set system fields
             flat_profile["username_clean"] = username.lower()
