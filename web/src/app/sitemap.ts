@@ -1,6 +1,9 @@
 import { MetadataRoute } from "next";
 
-const LOCALES = ["en", "ar", "es", "fr", "de", "zh", "it"];
+// FC7.41 (SEO): only the locales the app actually serves. Listing es/fr/de/zh/it made Google crawl
+// /de, /fr, /es … which 404 / resolve to an alternate canonical (Search Console "not indexed") — the
+// sitemap (and the hreflang in [locale]/layout.tsx) must advertise ONLY real, indexable URLs.
+const LOCALES = ["en", "ar"];
 const BASE_URL = "https://fahem.pro";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

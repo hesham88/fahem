@@ -108,15 +108,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       },
     },
     alternates: {
+      // FC7.41 (SEO): a self-referencing canonical (non-www https via metadataBase) + hreflang for ONLY
+      // the supported locales (en/ar). Advertising es/fr/de/it/zh sent Google to non-existent pages
+      // (Search Console "Not found (404)" / "Alternate page with proper canonical tag").
       canonical: `/${locale}`,
       languages: {
         ar: "/ar",
         en: "/en",
-        es: "/es",
-        fr: "/fr",
-        de: "/de",
-        it: "/it",
-        zh: "/zh",
         "x-default": "/en",
       },
     },
@@ -180,24 +178,47 @@ export default async function LocaleLayout({
 
   const activeDescription = translations[locale]?.description || translations.en.description;
 
+  // FC7.42: a @graph with an Organization that carries an absolute, crawlable `logo` is what Google uses
+  // to surface a site logo in search results. WebSite + WebApplication round out the entities.
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": locale === "ar" ? "فاهم" : "Fahem",
-    "url": `https://fahem.pro/${locale}`,
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "All",
-    "description": activeDescription,
-    "creator": {
-      "@type": "Organization",
-      "name": "Fahem Team",
-      "url": "https://github.com/hesham88/fahem"
-    },
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://fahem.pro/#organization",
+        "name": locale === "ar" ? "فاهم" : "Fahem",
+        "url": "https://fahem.pro",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://fahem.pro/brand/logo_highres.png",
+          "contentUrl": "https://fahem.pro/brand/logo_highres.png",
+          "caption": "Fahem"
+        },
+        "image": "https://fahem.pro/brand/logo_highres.png",
+        "sameAs": [
+          "https://www.facebook.com/", "https://www.instagram.com/", "https://x.com/"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://fahem.pro/#website",
+        "name": locale === "ar" ? "فاهم" : "Fahem",
+        "url": "https://fahem.pro",
+        "publisher": { "@id": "https://fahem.pro/#organization" },
+        "inLanguage": locale === "ar" ? "ar" : "en"
+      },
+      {
+        "@type": "WebApplication",
+        "name": locale === "ar" ? "فاهم" : "Fahem",
+        "url": `https://fahem.pro/${locale}`,
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "All",
+        "description": activeDescription,
+        "image": "https://fahem.pro/brand/logo_highres.png",
+        "publisher": { "@id": "https://fahem.pro/#organization" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    ]
   };
 
   return (

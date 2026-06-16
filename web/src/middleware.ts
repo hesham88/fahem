@@ -24,6 +24,15 @@ export function middleware(request: NextRequest) {
 
   if (pathnameHasLocale) return;
 
+  // FC7.41 (SEO): a bare 2-letter first segment that isn't a supported locale (e.g. /de, /fr, /es —
+  // previously advertised in the sitemap/hreflang) is an UNSUPPORTED locale. Redirect it straight to the
+  // default-locale homepage instead of prepending /en (which produced /en/de → a 404). No real app page
+  // is a 2-letter segment, so this only catches stray locale codes. 308 = permanent.
+  const firstSegment = pathname.split("/")[1] || "";
+  if (/^[a-z]{2}$/i.test(firstSegment) && !locales.includes(firstSegment.toLowerCase())) {
+    return NextResponse.redirect(new URL(`/${defaultLocale}`, request.url), 308);
+  }
+
   // Determine the target locale from cookie or Accept-Language header
   let locale = defaultLocale;
   const cookieLocale = request.cookies.get("fahem_language")?.value;
