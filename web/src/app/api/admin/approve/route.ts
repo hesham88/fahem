@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { adminEmail, action } = body;
+    // FC7.29: `targetRole` selects the role the approval grants ("admin" default, or "teacher").
+    const { adminEmail, action, targetRole } = body;
 
     if (!adminEmail || !action) {
       return new Response(JSON.stringify({ error: "Missing required parameters: adminEmail, action" }), {
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Production: Proxy to GCP Agent
-    const proxyRes = await proxyRequest("/admin/approve", "POST", { adminEmail, action }, ctx);
+    const proxyRes = await proxyRequest("/admin/approve", "POST", { adminEmail, action, targetRole }, ctx);
     return proxyRes;
 
   } catch (err: any) {

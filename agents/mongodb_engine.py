@@ -758,6 +758,20 @@ class MongoDBEngine:
             flat_profile["username_clean"] = username.lower()
             flat_profile["email"] = str(flat_profile.get("email", "")).strip().lower()
             flat_profile["updatedAt"] = now_str
+
+            # FC7.29: onboarding as a teacher must NOT auto-grant teacher powers — it needs admin/
+            # super-admin approval (same gate as admins). When a save sets role/userType "teacher" and the
+            # user is not ALREADY an approved teacher, mark them pending so the role resolver clamps them to
+            # 'user' until /admin/approve grants the teacher role. Existing approved teachers are untouched.
+            _incoming_role = str(flat_profile.get("role") or "").strip().lower()
+            _incoming_type = str(flat_profile.get("userType") or "").strip().lower()
+            if _incoming_role == "teacher" or _incoming_type == "teacher":
+                _existing = self._db["users"].find_one(
+                    {"userId": user_id}, {"isApprovedTeacher": 1}
+                ) or {}
+                if _existing.get("isApprovedTeacher") is not True and flat_profile.get("isApprovedTeacher") is not True:
+                    flat_profile["isApprovedTeacher"] = False
+                    flat_profile["teacherPending"] = True
             
             # Validate input against the strict schema!
             validated = UserProfileSchema(**flat_profile)

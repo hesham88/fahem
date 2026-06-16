@@ -297,6 +297,8 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
 
   // --- Admin Approval & Curriculum Ingestion States ---
   const [admins, setAdmins] = useState<any[]>([]);
+  // FC7.29: teacher candidates share the same approval console (same admin/super-admin gate as admins).
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [userEmail, setUserEmail] = useState<string>(email || "");
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
@@ -408,6 +410,10 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
         if (data.success && Array.isArray(data.admins)) {
           setAdmins(data.admins);
         }
+        // FC7.29: pending/approved teacher candidates (backward-compatible — older API omits this).
+        if (data.success && Array.isArray(data.teachers)) {
+          setTeachers(data.teachers);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch admin list:", err);
@@ -436,12 +442,13 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
     }
   };
 
-  const handleToggleAdminApproval = async (adminEmail: string, currentApproved: boolean) => {
+  const handleToggleAdminApproval = async (adminEmail: string, currentApproved: boolean, targetRole: "admin" | "teacher" = "admin") => {
     if (!userEmail) return;
     setAdminActionError(null);
     setAdminActionSuccess(null);
 
     const action = currentApproved ? "revoke" : "approve";
+    const isTeacher = targetRole === "teacher";
 
     try {
       const res = await authedFetch("/api/admin/approve", {
@@ -449,16 +456,20 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adminEmail,
-          action
+          action,
+          targetRole
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
+        const roleLabel = isTeacher
+          ? (language === "ar" ? "المعلّم" : "teacher")
+          : (language === "ar" ? "المشرف" : "admin");
         setAdminActionSuccess(
           language === "ar"
-            ? `تمت ${action === "approve" ? "الموافقة على" : "إلغاء موافقة"} المشرف ${adminEmail} بنجاح`
-            : `Successfully ${action === "approve" ? "approved" : "revoked"} admin ${adminEmail}`
+            ? `تمت ${action === "approve" ? "الموافقة على" : "إلغاء موافقة"} ${roleLabel} ${adminEmail} بنجاح`
+            : `Successfully ${action === "approve" ? "approved" : "revoked"} ${roleLabel} ${adminEmail}`
         );
         fetchAdmins();
         setTimeout(() => setAdminActionSuccess(null), 4000);
@@ -1047,6 +1058,81 @@ export default function AdminSecurityDashboard({ language, email }: { language: 
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* FC7.29: Teacher approval — teachers require the same admin/super-admin gate as admins. */}
+        {teachers.length > 0 && (
+          <div style={{ marginTop: "1.5rem" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--foreground)", marginBottom: "0.4rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <FiCheckCircle style={{ color: "var(--primary)" }} />
+              {language === "ar" ? "اعتماد المعلّمين" : "Teacher Approvals"}
+            </h3>
+            <p style={{ color: "#4f6371", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+              {language === "ar"
+                ? "المعلّمون الجدد قيد الانتظار حتى يعتمدهم مشرف. لا يملك المعلّم صلاحيات النشر (كالواجبات) قبل الاعتماد."
+                : "New teachers are pending until an admin approves them. A teacher has no posting powers (e.g. assignments) until approved."}
+            </p>
+            <div style={{ overflowX: "auto", background: "rgba(255,255,255,0.4)", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", textAlign: "start" }}>
+                <thead>
+                  <tr style={{ background: "rgba(0,0,0,0.03)", borderBottom: "1px solid var(--card-border)" }}>
+                    <th style={{ padding: "0.75rem 1rem", fontWeight: 700 }}>{language === "ar" ? "المعلّم" : "Teacher Candidate"}</th>
+                    <th style={{ padding: "0.75rem 1rem", fontWeight: 700 }}>{language === "ar" ? "الحالة" : "Status"}</th>
+                    <th style={{ padding: "0.75rem 1rem", fontWeight: 700, textAlign: "center" }}>{language === "ar" ? "العمليات" : "Actions"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teachers.map((t, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid var(--card-border)", transition: "background 0.2s" }} className="user-breakdown-row">
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontWeight: 600, color: "#1e293b" }}>{t.name}</span>
+                          <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{t.email}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        {t.isApproved ? (
+                          <span style={{ background: "rgba(39, 174, 96, 0.12)", color: "var(--accent-green)", padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <FiCheck style={{ fontSize: "0.85rem" }} />
+                            {language === "ar" ? "معتمَد" : "Approved"}
+                          </span>
+                        ) : (
+                          <span style={{ background: "rgba(243, 156, 18, 0.12)", color: "var(--accent-orange)", padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <FiX style={{ fontSize: "0.85rem" }} />
+                            {language === "ar" ? "قيد الانتظار" : "Pending Approval"}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem", textAlign: "center" }}>
+                        <button
+                          onClick={() => handleToggleAdminApproval(t.email, t.isApproved, "teacher")}
+                          style={{
+                            background: t.isApproved ? "rgba(211, 47, 47, 0.08)" : "rgba(16, 107, 163, 0.08)",
+                            color: t.isApproved ? "#d32f2f" : "var(--primary)",
+                            border: `1px solid ${t.isApproved ? "rgba(211, 47, 47, 0.15)" : "rgba(16, 107, 163, 0.15)"}`,
+                            borderRadius: "6px", padding: "4px 12px", fontSize: "0.75rem", fontWeight: 700,
+                            cursor: "pointer", transition: "all 0.2s", display: "inline-flex", alignItems: "center", gap: "4px"
+                          }}
+                        >
+                          {t.isApproved ? (
+                            <>
+                              <FiX />
+                              {language === "ar" ? "إلغاء الاعتماد" : "Revoke"}
+                            </>
+                          ) : (
+                            <>
+                              <FiCheck />
+                              {language === "ar" ? "اعتماد كمعلّم" : "Approve Teacher"}
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>

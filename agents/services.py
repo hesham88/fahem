@@ -360,6 +360,16 @@ def register_telemetry_route(app: fastapi.FastAPI):
                                 principal["role"] = "super-admin"
                             elif _db_role == "super-admin":
                                 principal["role"] = "admin"
+                            elif _db_role == "teacher" and (
+                                getattr(_profile, "teacherPending", False) is True
+                                or getattr(_profile, "isApprovedTeacher", None) is False
+                            ):
+                                # FC7.29: a teacher requires admin/super-admin approval, just like an admin.
+                                # A newly-onboarded teacher is PENDING (teacherPending / isApprovedTeacher==False)
+                                # and resolves to 'user' — no teacher powers (assignment POST etc. 403) until
+                                # /admin/approve grants it. Legacy teachers (neither flag set) are grandfathered
+                                # in as approved so this never demotes an existing teacher.
+                                principal["role"] = "user"
                             else:
                                 principal["role"] = _db_role
                 except Exception as pe_err:
@@ -4174,8 +4184,12 @@ def register_telemetry_route(app: fastapi.FastAPI):
             
             # Live source of truth: every admin / super-admin USER, plus any legacy admins-collection
             # entry. No hardcoded candidates and no hardcoded filters — the console reflects real data
-            # only, so deleted users disappear and newly-onboarded admins appear.
+            # only, so deleted users disappear and newly-onboarded admins appear. FC7.29: teacher
+            # candidates (role 'teacher' OR pending) are surfaced too so admins can approve them.
             users = list(db["users"].find({"role": {"$in": ["admin", "super-admin"]}}))
+            teachers = list(db["users"].find(
+                {"$or": [{"role": "teacher"}, {"teacherPending": True}, {"isApprovedTeacher": {"$exists": True}}]}
+            ))
             admins = list(db["admins"].find({}))
             client.close()
 
@@ -4183,11 +4197,13 @@ def register_telemetry_route(app: fastapi.FastAPI):
             for adm in admins:
                 email_key = (adm.get("email") or "").lower().strip()
                 if email_key:
+                    _approved = adm.get("isApprovedAdmin") == True
                     admin_map[email_key] = {
                         "email": adm.get("email"),
                         "name": adm.get("name") or "Approved Admin",
                         "role": adm.get("role") or "admin",
-                        "isApprovedAdmin": adm.get("isApprovedAdmin") == True,
+                        "isApprovedAdmin": _approved,
+                        "isApproved": _approved,
                         "source": "admins_collection"
                     }
 
@@ -4196,17 +4212,36 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 if email_key:
                     existing = admin_map.get(email_key)
                     role = usr.get("role") or "admin"
+                    _approved = role == "super-admin" or usr.get("isApprovedAdmin") == True or (existing and existing.get("isApprovedAdmin") == True)
                     admin_map[email_key] = {
                         "email": usr.get("email"),
                         "name": usr.get("name") or usr.get("username") or "Admin Candidate",
                         "role": role,
                         # Super-admins are inherently approved.
-                        "isApprovedAdmin": role == "super-admin" or usr.get("isApprovedAdmin") == True or (existing and existing.get("isApprovedAdmin") == True),
+                        "isApprovedAdmin": _approved,
+                        "isApproved": _approved,
                         "source": "users_collection",
                         "userId": usr.get("userId")
                     }
 
-            return {"success": True, "admins": list(admin_map.values())}
+            # FC7.29: teacher candidates go in a parallel list so the console can render a teacher section.
+            teacher_map = {}
+            for usr in teachers:
+                email_key = (usr.get("email") or "").lower().strip()
+                if not email_key or email_key in admin_map:
+                    continue  # an admin/super-admin is not a teacher candidate
+                _approved_t = usr.get("isApprovedTeacher") == True
+                teacher_map[email_key] = {
+                    "email": usr.get("email"),
+                    "name": usr.get("name") or usr.get("username") or "Teacher Candidate",
+                    "role": "teacher",
+                    "isApproved": _approved_t,
+                    "isApprovedTeacher": _approved_t,
+                    "source": "users_collection",
+                    "userId": usr.get("userId")
+                }
+
+            return {"success": True, "admins": list(admin_map.values()), "teachers": list(teacher_map.values())}
         except Exception as err:
             logger.error(f"[services.py] Failed to list admins: {err}", exc_info=True)
             return {"success": False, "error": str(err)}
@@ -4220,25 +4255,46 @@ def register_telemetry_route(app: fastapi.FastAPI):
             data = await request.json()
             admin_email = data.get("adminEmail", "").lower().strip()
             action = data.get("action", "")
-            
+            # FC7.29: the same approval console now gates teachers too. `targetRole` selects which role the
+            # approval grants/revokes (default 'admin' for backward compatibility with the admin console).
+            target_role = str(data.get("targetRole") or "admin").strip().lower()
+
             if not admin_email or not action:
                 return fastapi.responses.JSONResponse(
                     content={"error": "Missing required fields"},
                     status_code=400
                 )
-                
+
             uri = get_mongodb_uri()
             client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             db = get_active_db(client)
-            
+
             is_approved = (action == "approve")
+
+            existing_doc = db["users"].find_one({"email": admin_email}, {"role": 1})
+            existing_role = (existing_doc or {}).get("role")
+
+            if target_role == "teacher":
+                # FC7.29: grant/revoke the TEACHER role. Approve => role 'teacher' + isApprovedTeacher true +
+                # clear the pending flag (resolver now grants teacher powers). Revoke => back to 'user'.
+                # Never touch a super-admin/admin via the teacher path.
+                if existing_role in ("super-admin", "admin"):
+                    client.close()
+                    return fastapi.responses.JSONResponse(
+                        content={"error": f"Refusing to alter a {existing_role} via the teacher-approval path"},
+                        status_code=400,
+                    )
+                user_set = {"isApprovedTeacher": is_approved, "teacherPending": not is_approved}
+                user_set["role"] = "teacher" if is_approved else "user"
+                db["users"].update_one({"email": admin_email}, {"$set": user_set})
+                client.close()
+                return {"success": True, "message": f"Successfully {action}d teacher {admin_email}"}
 
             # FC7.3b: approval must actually grant/revoke the admin ROLE, not just the flag. Before,
             # only `isApprovedAdmin` flipped while `role` stayed whatever it was → an "approved" admin
             # kept a non-admin role and never saw admin controls. Never touch a super-admin's role.
-            existing_admin = db["users"].find_one({"email": admin_email}, {"role": 1})
             user_set = {"isApprovedAdmin": is_approved}
-            if (existing_admin or {}).get("role") != "super-admin":
+            if existing_role != "super-admin":
                 user_set["role"] = "admin" if is_approved else "user"
 
             # Update users
@@ -4246,7 +4302,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 {"email": admin_email},
                 {"$set": user_set}
             )
-            
+
             # Update or upsert admins
             db["admins"].update_one(
                 {"email": admin_email},
@@ -4257,7 +4313,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                 }},
                 upsert=True
             )
-            
+
             client.close()
             return {"success": True, "message": f"Successfully {action}d admin {admin_email}"}
         except Exception as err:
