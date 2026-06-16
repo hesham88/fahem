@@ -3685,6 +3685,33 @@ export default function Home() {
         nextStep = "username";
       } else if (activeStep === "username") {
         const usernameVal = trimmedMsg.replace(/^@/, "").trim();
+        // FC7.43: hard-block a taken username HERE so the user picks another (no auto-suffix, no silent
+        // collision at completion that would lose their role). Stay on the username step until it's free.
+        let usernameTaken = false;
+        try {
+          const chk = await authedFetch(`/api/user/username/check?username=${encodeURIComponent(usernameVal)}`);
+          if (chk.ok) {
+            const cd = await chk.json();
+            if (cd && cd.available === false) usernameTaken = true;
+          }
+        } catch { /* network hiccup — let it through; the completion save re-prompts as a backstop */ }
+        if (usernameTaken) {
+          const takenMsg = language === "ar"
+            ? `اسم المستخدم «${usernameVal}» مأخوذ بالفعل. من فضلك اختر اسمًا آخر.`
+            : `The username "${usernameVal}" is already taken. Please choose a different one.`;
+          setOnboardingMessages(prev => {
+            const copy = [...prev];
+            if (copy.length > 0 && copy[copy.length - 1].sender === "fahem" && copy[copy.length - 1].text === "") {
+              copy[copy.length - 1] = { sender: "fahem", text: takenMsg };
+            } else {
+              copy.push({ sender: "fahem", text: takenMsg });
+            }
+            return copy;
+          });
+          currentOnboardingStepRef.current = "username";
+          setCurrentOnboardingStep("username");
+          return; // stay on the username step (finally clears the loading flag)
+        }
         setOnboardingUsername(usernameVal);
         if (roleVal === "admin") {
           nextStep = "avatar";
@@ -3844,6 +3871,18 @@ export default function Home() {
 
             if (res.ok) {
               const data = await res.json();
+              // FC7.43 backstop: if a race made the chosen username unavailable at save time, the backend
+              // returns a USERNAME_TAKEN error (HTTP 200, status:error). Route the user back to the username
+              // step WITHOUT completing onboarding or losing their other answers — they pick a new name.
+              if (data && data.status === "error" && /username_taken/i.test(String(data.error || ""))) {
+                setOnboardingStatusText("");
+                currentOnboardingStepRef.current = "username";
+                setCurrentOnboardingStep("username");
+                setOnboardingMessages(prev => [...prev, { sender: "fahem", text: language === "ar"
+                  ? "اسم المستخدم الذي اخترته أصبح مأخوذًا للتو. من فضلك اختر اسمًا آخر لإكمال التسجيل."
+                  : "The username you chose was just taken. Please pick another one to finish signing up." }]);
+                return; // do NOT mark onboarding complete; finally clears loadingProfile
+              }
               setUserProfile({
                 ...finalProfile,
                 ...(data.profile || {})
