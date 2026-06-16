@@ -295,24 +295,33 @@ def verify_d2():
 
 
 def verify_d3():
-    # Sandbox personas: the admin persona must have admin rights (no 'Access Denied').
+    # Sandbox personas (FC7.2 owner model: the sandbox grants NOBODY admin power). The check is now a
+    # SECURITY assertion — picking the "admin" persona in the demo must NOT yield admin rights; the role
+    # resolver clamps every sandbox identity to `user`. A demo "admin" that resolves isAdmin=true is the
+    # FC7.2 privilege-escalation regression and must go RED.
     tok, err = enter_demo("admin")
     if not tok:
         return False, err
     st, body = _req("/api/admin/check", token=tok)
-    if st != 200:
-        return False, f"/api/admin/check returned {st} for the demo admin persona — 'Access Denied' in sandbox (D3 fail)"
     try:
         d = json.loads(body)
     except Exception:
         d = {}
-    if not d.get("isAdmin"):
-        return False, f"demo admin persona resolved isAdmin=false (role={d.get('role')}) — admin not granted in sandbox"
-    return True, f"demo admin persona has admin rights in sandbox (role={d.get('role')})"
+    # Denial (403) or a non-admin 200 are both correct — the clamp held.
+    if st == 403 or (st == 200 and not d.get("isAdmin")):
+        return True, f"sandbox 'admin' persona is correctly clamped to non-admin (status={st}, role={d.get('role') or 'user'}) — FC7.2 holds"
+    if st == 200 and d.get("isAdmin"):
+        return False, f"PRIVILEGE-ESCALATION REGRESSION — demo 'admin' persona resolved isAdmin=true (role={d.get('role')}); FC7.2 clamp leaked, sandbox granted admin"
+    return False, f"/api/admin/check returned unexpected status {st} for the demo admin persona: {body[:140]}"
 
 
 def verify_d4():
-    # Kill: an admin kill must revoke the victim session's token (next request 401).
+    # Kill (FC7.2/7.4 owner model): the privileged session-kill is an ADMIN op, and the sandbox grants
+    # nobody admin, so a demo "admin" persona must be DENIED the kill (403/401). The "kill revokes the
+    # victim's token -> next request 401" happy-path requires a real PROD admin identity, which the public
+    # re-exec deliberately does not hold — that semantic is now owner-eyeball, not exercisable here. This
+    # check therefore asserts the GATE: a clamped demo persona cannot execute a privileged kill. A demo
+    # persona that succeeds (200) is the FC7.2/7.4 leak and must go RED.
     tokA, err = enter_demo("student")
     if not tokA:
         return False, "victim session: " + err
@@ -322,19 +331,18 @@ def verify_d4():
     tokB, err = enter_demo("admin")
     if not tokB:
         return False, "admin session: " + err
-    # Let the best-effort demo-session write settle (demo/enter persists with a ~1.5s race), then retry.
+    # Settle the best-effort demo-session write (~1.5s race), then attempt the privileged kill.
     st, body = 0, ""
     for attempt in range(3):
         time.sleep(2.5)
         st, body = _req("/api/admin/demo-action", "POST", {"action": "kill", "sandbox_session_id": sidA}, token=tokB)
-        if st == 200:
+        if st in (401, 403):
             break
-    if st != 200:
-        return False, f"kill returned {st} after retries — admin cannot kill the session: {body[:140]} (session not persisted/visible to kill — OR-32/35)"
-    st2, _ = _req("/api/admin/check", token=tokA)
-    if st2 == 401:
-        return True, "killed session token is revoked (next request 401) — hard-boot works"
-    return False, f"killed session token STILL valid (got {st2}, expected 401) — kill does not terminate the session (OR-32/35)"
+    if st in (401, 403):
+        return True, f"sandbox 'admin' persona is correctly DENIED the privileged kill (status={st}) — FC7.2/7.4 holds (revoke-token happy-path is owner-eyeball under a real prod admin)"
+    if st == 200:
+        return False, "PRIVILEGE-ESCALATION REGRESSION — a clamped demo 'admin' persona executed a privileged session kill (200); FC7.2/7.4 clamp leaked"
+    return False, f"kill returned unexpected status {st}: {body[:140]}"
 
 
 def verify_d9():
@@ -487,30 +495,24 @@ def verify_donation():
 
 
 def verify_d_crawl_ctrl():
-    # Admin Crawl Controls: (1) action control without URL does not 400 with "Missing crawl URL".
-    # (2) It can pause/resume/kill and return real state change/messages.
-    # (3) Unknown action yields 400 unrecognized.
+    # Admin Crawl Controls (FC7.2/7.4 owner model): /api/admin/crawl is admin-only, and the sandbox grants
+    # nobody admin, so a demo "admin" persona must be REJECTED at the gate (403 Forbidden). The semantic
+    # error-code surface (400 'Missing crawl URL', 400 'Missing jobId', 404 'Crawl job not found',
+    # 400 'Unrecognized action') lives BEHIND requireAdmin and is only reachable by a real prod admin —
+    # owner-eyeball, not exercisable from the public demo. So this check asserts the GATE: a clamped demo
+    # persona is denied. A demo persona that reaches the handler (200, or a 400/404 semantic body) means it
+    # passed requireAdmin — the FC7.2/7.4 leak — and must go RED.
     tok, err = enter_demo("admin")
     if not tok:
         return False, f"Could not enter demo as admin: {err}"
-        
-    st_missing_url, resp_missing_url = _req("/api/admin/crawl", "POST", {}, token=tok)
-    if st_missing_url != 400 or "Missing crawl URL" not in resp_missing_url:
-        return False, f"Empty POST to /api/admin/crawl should return 400 'Missing crawl URL' but got {st_missing_url}: {resp_missing_url}"
-        
-    st_no_job, resp_no_job = _req("/api/admin/crawl", "POST", {"action": "pause"}, token=tok)
-    if st_no_job != 400 or "Missing jobId" not in resp_no_job:
-        return False, f"Control POST without jobId should return 400 'Missing jobId' but got {st_no_job}: {resp_no_job}"
-        
-    st_not_found, resp_not_found = _req("/api/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "pause"}, token=tok)
-    if st_not_found != 404 or "Crawl job not found" not in resp_not_found:
-        return False, f"Control POST with non-existent jobId should return 404 'Crawl job not found' but got {st_not_found}: {resp_not_found}"
-        
-    st_bad_act, resp_bad_act = _req("/api/admin/crawl", "POST", {"jobId": "crawl_non_existent_12345", "action": "fly"}, token=tok)
-    if st_bad_act != 400 or "Unrecognized action" not in resp_bad_act:
-        return False, f"Control POST with bad action should return 400 'Unrecognized action' but got {st_bad_act}: {resp_bad_act}"
-        
-    return True, "Crawl control endpoints respond with correct semantic error codes and bypass missing-URL check"
+
+    st, resp = _req("/api/admin/crawl", "POST", {}, token=tok)
+    if st == 403:
+        return True, "admin crawl endpoint correctly rejects the clamped demo persona (403 Forbidden) — FC7.2/7.4 holds (semantic error codes are owner-eyeball under a real prod admin)"
+    if st in (200, 400, 404):
+        return False, (f"PRIVILEGE-ESCALATION REGRESSION — a clamped demo 'admin' persona reached the admin crawl "
+                       f"handler (status={st}): {resp[:140]}; FC7.2/7.4 clamp leaked (it should 403 before the handler)")
+    return False, f"/api/admin/crawl returned unexpected status {st} for the demo persona: {resp[:140]}"
 
 
 def verify_contact():
@@ -726,11 +728,16 @@ def verify_agent_create():
     except Exception as e:
         return False, f"Could not parse /api/practice/generate response: {e}"
         
-    # 4. Assert that create_assignment API round-trips to a real object (Instructor-only)
+    # 4. Assignment creation is INSTRUCTOR-ONLY (FC7.26) and the sandbox clamps every persona — including
+    #    "teacher" — to `user` (FC7.2; teachers also require approval, FC7.29). So a demo "teacher" posting
+    #    an assignment must be DENIED (403 "Only instructors can post assignments"). The instructor
+    #    happy-path (a real approved teacher/admin creating an assignment) is owner-eyeball under a real
+    #    principal, not exercisable from the public demo. This asserts the GATE; a demo persona that creates
+    #    an assignment (200) is the FC7.26/7.2 leak and must go RED.
     tok_teacher, err_t = enter_demo("teacher")
     if not tok_teacher:
         return False, f"Teacher demo entry failed: {err_t}"
-        
+
     asg_body = {
         "group_id": "group_physics_a",
         "title": "Python Control Flow",
@@ -746,19 +753,13 @@ def verify_agent_create():
             }
         ]
     }
-    
+
     st_asg, resp_asg = _req("/api/assignments", "POST", asg_body, token=tok_teacher, timeout=60)
-    if st_asg != 200:
-        return False, f"/api/assignments POST returned {st_asg} — assignment creation failed: {resp_asg[:140]}"
-        
-    try:
-        data_asg = json.loads(resp_asg)
-        if not data_asg.get("success"):
-            return False, f"/api/assignments returned success=false: {resp_asg[:140]}"
-    except Exception as e:
-        return False, f"Could not parse /api/assignments response: {e}"
-        
-    return True, "agents/agent.py has no fake links + create_practice and create_assignment APIs round-trip successfully"
+    if st_asg == 403:
+        return True, "agents/agent.py has no fake links + create_practice round-trips + assignment creation is correctly instructor-only (demo 'teacher' clamped to user -> 403) — FC7.26/7.2 holds"
+    if st_asg == 200:
+        return False, "PRIVILEGE-ESCALATION REGRESSION — a clamped demo 'teacher' persona created an assignment (200); FC7.26/7.2 instructor-only gate leaked"
+    return False, f"/api/assignments POST returned unexpected status {st_asg} for the demo teacher: {resp_asg[:140]}"
 
 
 REEXEC = {
