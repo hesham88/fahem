@@ -3890,13 +3890,30 @@ def register_telemetry_route(app: fastapi.FastAPI):
             db = client["fahem_sandbox"]
 
             sessions = list(db["demo_sessions"].find({}).sort("started_at", -1).limit(100))
+
+            # FC7.21: enrich each session with its live token usage so the monitor shows real numbers
+            # (it was previously blank). Aggregate token_telemetry per sandbox_session_id in one pass.
+            usage_by_session = {}
+            for d in db["token_telemetry"].find({}, {"sandboxSessionId": 1, "totalTokens": 1}):
+                sid = d.get("sandboxSessionId")
+                if sid:
+                    usage_by_session[sid] = usage_by_session.get(sid, 0) + int(d.get("totalTokens", 0) or 0)
+
+            # Global per-session demo token cap (config-driven; 0/absent = no cap). Surfaced so the
+            # monitor can display + (future) edit it; enforcement is tracked separately under FC7.21.
+            cfg = client["fahem"]["config"].find_one({}) or {}
+            global_demo_cap = int(cfg.get("demoSessionTokenCap", 0) or 0)
             client.close()
-            
+
             for sess in sessions:
                 if "_id" in sess:
                     sess["_id"] = str(sess["_id"])
-                    
-            return {"success": True, "sessions": sessions}
+                sid = sess.get("sandbox_session_id")
+                sess["tokensUsed"] = usage_by_session.get(sid, 0)
+                # Effective per-session limit: explicit override on the session, else the global cap.
+                sess["tokenLimit"] = int(sess.get("tokenLimit", 0) or 0) or global_demo_cap
+
+            return {"success": True, "sessions": sessions, "globalDemoTokenCap": global_demo_cap}
         except Exception as err:
             logger.error(f"[services.py] Failed to get demo sessions: {err}", exc_info=True)
             return {"success": False, "error": str(err)}

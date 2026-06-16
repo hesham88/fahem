@@ -1107,8 +1107,13 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                           </div>
                         ) : (
                           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                            <span style={{ fontFamily: "monospace", fontWeight: 700 }}>
-                              {sess.token_budget?.toLocaleString() || "250k"} tokens
+                            {/* FC7.21: show live USED tokens vs the per-session limit (was budget-only). */}
+                            <span style={{ fontFamily: "monospace", fontWeight: 700 }} title="Used / Limit">
+                              {(sess.tokensUsed || 0).toLocaleString()}
+                              {" / "}
+                              {(sess.token_budget || sess.tokenLimit)
+                                ? (sess.token_budget || sess.tokenLimit).toLocaleString()
+                                : "250k"}
                             </span>
                             {sess.status === "active" && (
                               <button
