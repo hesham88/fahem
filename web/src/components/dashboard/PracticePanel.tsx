@@ -2123,9 +2123,16 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                             // exact chapter/concept the user actually practiced.
                             const focus = (practiceCustomConcepts || "").trim();
                             const chapters = Array.isArray(practiceSelectedChapters) ? practiceSelectedChapters.filter(Boolean) : [];
+                            // FC9.15: the generator now returns the specific concept it tested (topic)
+                            // and the source chapter of the grounding pages — so even whole-book
+                            // practice is tagged with the REAL chapter/topic.
+                            const genTopic = (practiceCurrentQuestion?.topic || "").toString().trim();
+                            const genChapter = (practiceCurrentQuestion?.sourceChapter || "").toString().trim();
                             const heuristic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
                             const concept = focus
                               || (chapters.length ? chapters.join(", ") : "")
+                              || genTopic
+                              || genChapter
                               || (heuristic && heuristic !== "General Knowledge" && heuristic !== "General Practice" ? heuristic : "")
                               || bookTitle
                               || targetSubject;
@@ -2158,6 +2165,8 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                   scopeType: practiceScopeType,
                                   concept,
                                   subtopic: concept,
+                                  topic: genTopic || null,
+                                  sourceChapter: genChapter || null,
                                   chapters,
                                   focus: focus || null,
                                   feedback: data.feedback,

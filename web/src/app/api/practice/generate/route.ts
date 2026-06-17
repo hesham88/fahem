@@ -57,8 +57,19 @@ export async function POST(req: NextRequest) {
       return pages.slice(0, maxPages);
     };
 
+    // FC9.15: capture the source chapter of the grounding pages so the practice record can be
+    // tagged with the REAL chapter/topic even when the user practices the whole book.
+    const pageChapter = (p: any) => String(p.chapterTitleEn || p.chapter_title_en || p.chapterTitle || p.chapter_title || p.chapter || "").trim();
+    const deriveChapter = (pages: any[]): string => {
+      const counts: Record<string, number> = {};
+      pages.forEach((p) => { const c = pageChapter(p); if (c) counts[c] = (counts[c] || 0) + 1; });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      return top ? top[0] : "";
+    };
+
     // 1. Resolve grounding context from real book pages if bookId is provided
     let contextText = "";
+    let sourceChapter = "";
     if (bookId) {
       if (isLocalEnv()) {
         const db = getLocalDb();
@@ -67,6 +78,7 @@ export async function POST(req: NextRequest) {
         const selectedPages = selectRelevantPages(bookPages, 3);
         if (selectedPages.length > 0) {
           contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${getPageContent(p, resolvedLanguage)}`).join("\n\n");
+          sourceChapter = deriveChapter(selectedPages);
         }
       } else {
         // Production: fetch the book pages via the proxy, then ground on focus-relevant pages.
@@ -77,6 +89,7 @@ export async function POST(req: NextRequest) {
             if (data && data.pages && data.pages.length > 0) {
               const selectedPages = selectRelevantPages(data.pages, 3);
               contextText = selectedPages.map((p: any) => `[Page ${p.page_number}]:\n${getPageContent(p, resolvedLanguage)}`).join("\n\n");
+              sourceChapter = deriveChapter(selectedPages);
             }
           }
         } catch (err) {
@@ -135,6 +148,7 @@ You MUST respond with a JSON object strictly matching this schema:
   "question": "The challenge / question text",
   "options": ["Option A", "Option B", "Option C", "Option D"], // Only for mcq mode, otherwise empty array []
   "correctOption": "The exact string matching the correct option", // Only for mcq mode, otherwise empty string ""
+  "topic": "A short (2-5 word) label of the SPECIFIC concept/topic this question tests",
   "hint": "A gamified, helpful hint or clue"
 }
 `;
@@ -210,7 +224,8 @@ You MUST respond with a JSON object strictly matching this schema:
     }
 
     const questionData = JSON.parse(responseText.trim());
-    return new Response(JSON.stringify({ success: true, ...questionData }), {
+    // FC9.15: surface the source chapter so the practice record / analytics can pinpoint the topic.
+    return new Response(JSON.stringify({ success: true, sourceChapter, ...questionData }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
