@@ -307,7 +307,12 @@ class MongoDBEngine:
                 
                 # 4. User Activities
                 self._db["user_activities"].create_index("userId", background=True)
-                
+                # FC9.16: the hot reads sort by timestamp desc (per-user history + global audit).
+                # Without these the sort is an in-memory SORT stage (and the global one a full
+                # collection scan that risks the 32MB sort cap as the collection grows).
+                self._db["user_activities"].create_index([("userId", 1), ("timestamp", -1)], background=True)
+                self._db["user_activities"].create_index([("timestamp", -1)], background=True)
+
                 # 5. Token Telemetry
                 self._db["token_telemetry"].create_index("userId", background=True)
                 self._db["token_telemetry"].create_index([("userId", 1), ("timestamp", 1)], background=True)
@@ -1056,33 +1061,56 @@ class MongoDBEngine:
             logger.error(f"Failed to log user activity: {e}")
             return False
 
+    @staticmethod
+    def _coerce_activity(doc: dict) -> "UserActivitySchema":
+        """FC9.14: build a UserActivitySchema resiliently. A single legacy/malformed doc
+        (e.g. missing the required userEmail/action/status) must NOT make the whole history
+        return empty — that was the 'all my data + points disappeared' regression. We coerce
+        the required string fields to safe defaults so every real activity is preserved."""
+        safe = dict(doc)
+        safe.pop("_id", None)
+        safe["userId"] = str(safe.get("userId") or "")
+        safe["userEmail"] = str(safe.get("userEmail") or "")
+        safe["action"] = str(safe.get("action") or "unknown")
+        safe["status"] = str(safe.get("status") or "unknown")
+        if safe.get("timestamp") is not None:
+            safe["timestamp"] = str(safe.get("timestamp"))
+        return UserActivitySchema(**safe)
+
     async def get_user_activities(self, user_id: str) -> List[UserActivitySchema]:
         """Retrieves history of user actions sorted chronologically."""
         if self._db is None:
             return []
+        activities = []
         try:
-            activities = []
-            for doc in self._db["user_activities"].find({"userId": user_id}).sort("timestamp", -1).limit(100):
-                doc.pop("_id", None)
-                activities.append(UserActivitySchema(**doc))
-            return activities
+            cursor = self._db["user_activities"].find({"userId": user_id}).sort("timestamp", -1).limit(100)
         except Exception as e:
-            logger.error(f"Failed to fetch user activities: {e}")
+            logger.error(f"Failed to query user activities: {e}")
             return []
+        for doc in cursor:
+            # FC9.14: per-doc resilience — one bad doc can no longer wipe the entire list.
+            try:
+                activities.append(self._coerce_activity(doc))
+            except Exception as e:
+                logger.warning(f"Skipping unparseable user_activity doc {doc.get('_id')}: {e}")
+        return activities
 
     async def get_all_activities(self) -> List[UserActivitySchema]:
         """Retrieves up to 200 recent activities globally (for Superadmins)."""
         if self._db is None:
             return []
+        activities = []
         try:
-            activities = []
-            for doc in self._db["user_activities"].find({}).sort("timestamp", -1).limit(200):
-                doc.pop("_id", None)
-                activities.append(UserActivitySchema(**doc))
-            return activities
+            cursor = self._db["user_activities"].find({}).sort("timestamp", -1).limit(200)
         except Exception as e:
-            logger.error(f"Failed to fetch all activities: {e}")
+            logger.error(f"Failed to query all activities: {e}")
             return []
+        for doc in cursor:
+            try:
+                activities.append(self._coerce_activity(doc))
+            except Exception as e:
+                logger.warning(f"Skipping unparseable user_activity doc {doc.get('_id')}: {e}")
+        return activities
 
     async def save_chat_session(self, session_id: str, user_id: str, user_email: str, title: str, messages: List[dict]) -> bool:
         """Saves an entire chat session sequence using atomic serialization schemas."""

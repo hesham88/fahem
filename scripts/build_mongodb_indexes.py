@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, DESCENDING
 
 # Ensure we can import from agents folder
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -64,7 +64,13 @@ def build_indexes():
         print("\n--- 4. Tuning 'user_activities' Collection Indexes ---")
         act_idx = db["user_activities"].create_index([("userId", ASCENDING)], name="idx_activities_userId")
         print(f"Created index on 'user_activities': {act_idx}")
-        
+        # FC9.16: the hot reads sort by timestamp desc (per-user history + global audit). Without
+        # these the sort is an in-memory SORT (global one a full scan risking the 32MB sort cap).
+        act_idx2 = db["user_activities"].create_index([("userId", ASCENDING), ("timestamp", DESCENDING)], name="idx_activities_userId_ts")
+        print(f"Created compound index on 'user_activities': {act_idx2}")
+        act_idx3 = db["user_activities"].create_index([("timestamp", DESCENDING)], name="idx_activities_ts")
+        print(f"Created timestamp index on 'user_activities': {act_idx3}")
+
         print("\n--- 5. Tuning 'token_telemetry' Collection Indexes ---")
         telemetry_idx = db["token_telemetry"].create_index([("userId", ASCENDING)], name="idx_telemetry_userId")
         print(f"Created index on 'token_telemetry': {telemetry_idx}")
