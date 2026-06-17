@@ -93,7 +93,8 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
     if (!user?.uid) return;
     setHistoryLoading(true);
     try {
-      const res = await authedFetch("/api/activity");
+      // FC9.14: filter to zatona actions so high-volume agent-query logs don't crowd the window.
+      const res = await authedFetch("/api/activity?action=zatona_session,zatona,summary,summary_session&limit=200");
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];
