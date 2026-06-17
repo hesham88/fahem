@@ -141,15 +141,19 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           computedTopics.sort((a, b) => a.accuracy - b.accuracy);
           setWeakTopics(computedTopics);
 
-          // Extract scores over time
-          const trend = practiceRuns.map((run: any) => {
+          // Extract scores over time — FC9.15: label each bar by SESSION (#n) + the real concept
+          // + date/time, so the trend isn't an indistinguishable row of same-day bars.
+          const trend = practiceRuns.slice(0, 6).reverse().map((run: any, i: number) => {
             const details = run.details || {};
+            const ts = run.timestamp || run.createdAt || Date.now();
             return {
-              date: new Date(run.timestamp).toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", { month: "short", day: "numeric" }),
-              score: details.score !== undefined ? details.score : (details.correct ? Math.round((details.correct / (details.total || 5)) * 100) : 75),
-              topic: details.topic || details.chapter || "Quiz"
+              session: i + 1,
+              date: new Date(ts).toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", { month: "short", day: "numeric" }),
+              time: new Date(ts).toLocaleTimeString(language === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+              score: typeof details.score === "number" ? details.score : (details.isCorrect || details.correct ? 100 : 0),
+              concept: details.concept || details.subtopic || details.subject || details.bookTitle || (language === "ar" ? "تدريب" : "Practice")
             };
-          }).slice(0, 6).reverse(); // Keep last 6 runs
+          });
           setScoresTrend(trend);
         }
       }
@@ -411,21 +415,32 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", height: "120px", padding: "10px 0", borderBottom: "2px solid var(--card-border)" }}>
                   {scoresTrend.map((run, idx) => (
-                    <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, gap: "0.5rem" }}>
-                      <div style={{ fontSize: "0.75rem", fontWeight: 800, color: run.score >= 80 ? "#2e7d32" : run.score >= 50 ? "#ef6c00" : "#c62828" }}>
+                    <div
+                      key={idx}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, gap: "0.4rem" }}
+                      title={`${isRtl ? "الجلسة" : "Session"} #${run.session} • ${run.concept} • ${run.date} ${run.time || ""} • ${run.score}%`}
+                    >
+                      <div style={{ fontSize: "0.7rem", fontWeight: 800, color: run.score >= 80 ? "#2e7d32" : run.score >= 50 ? "#ef6c00" : "#c62828" }}>
                         {run.score}%
                       </div>
-                      <div 
-                        style={{ 
-                          width: "16px", 
-                          height: `${run.score}px`, 
+                      <div
+                        style={{
+                          width: "16px",
+                          height: `${run.score}px`,
                           maxHeight: "80px",
-                          background: run.score >= 80 ? "linear-gradient(to top, #2e7d32, #81c784)" : run.score >= 50 ? "linear-gradient(to top, #ef6c00, #ffb74d)" : "linear-gradient(to top, #c62828, #e57373)", 
+                          background: run.score >= 80 ? "linear-gradient(to top, #2e7d32, #81c784)" : run.score >= 50 ? "linear-gradient(to top, #ef6c00, #ffb74d)" : "linear-gradient(to top, #c62828, #e57373)",
                           borderRadius: "4px 4px 0 0",
                           transition: "height 0.4s ease-out"
-                        }} 
+                        }}
                       />
-                      <span style={{ fontSize: "0.65rem", color: "#8fa0ac", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>
+                      {/* FC9.15: identify the session — number + concept + date, not just the day */}
+                      <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "var(--primary)" }}>
+                        #{run.session}
+                      </span>
+                      <span style={{ fontSize: "0.58rem", color: "#8fa0ac", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "60px", textAlign: "center" }} title={run.concept}>
+                        {run.concept}
+                      </span>
+                      <span style={{ fontSize: "0.55rem", color: "#b0bcc5", whiteSpace: "nowrap" }}>
                         {run.date}
                       </span>
                     </div>
