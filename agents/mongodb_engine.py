@@ -268,7 +268,16 @@ class MongoDBEngine:
         # Initialize Direct MongoClient Connection
         try:
             from pymongo import MongoClient
-            self._client = MongoClient(self.uri, serverSelectionTimeoutMS=5000)
+            # FC9.16 P3: fail fast on a transient Atlas blip (5s stalls felt like the app hanging)
+            # and reuse a warm connection pool across the singleton engine for lower read latency.
+            self._client = MongoClient(
+                self.uri,
+                serverSelectionTimeoutMS=3000,
+                connectTimeoutMS=3000,
+                socketTimeoutMS=20000,
+                maxPoolSize=100,
+                retryWrites=True,
+            )
             logger.info(f"[MongoDBEngine] Successfully connected direct MongoClient client. Dynamic targeting active.")
             
             # Run startup auto-healing collection initializations and index tuning
