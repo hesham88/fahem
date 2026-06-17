@@ -2209,7 +2209,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     // richest available chapter source: the reader's own chapters if they have topics, else the
     // matching dynamicBooks entry's chapters (same book, full structure), else whatever we have.
     const readerId = (selectedBookReader as any)?._id || (selectedBookReader as any)?.id;
-    const richBook: any = (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId);
+    const readerTitle = ((selectedBookReader as any)?.title || (selectedBookReader as any)?.titleEn || "").toString().trim().toLowerCase();
+    const richBook: any =
+      (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId)
+      || (readerTitle ? (dynamicBooks || []).find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null);
     const sourceChapters: any[] =
       (selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
         ? selectedBookReader.chapters

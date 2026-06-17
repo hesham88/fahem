@@ -1,6 +1,7 @@
 # Settings for the underlying Cloud Run service
 runConfig:
-  minInstances: 0
+  # FC9.16: keep one warm instance to remove the ~4.5s cold-start latency on data retrievals.
+  minInstances: 1
   maxInstances: 5
   cpu: 1
   memory: 512Mi
