@@ -2210,16 +2210,34 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
     if (hasChaptersWithTopics && selectedBookReader?.chapters) {
       return selectedBookReader.chapters.map((ch: any, idx: number) => {
+        let topics = (ch.topics || []).map((top: any, tIdx: number) => ({
+          id: `top-${idx}-${tIdx}`,
+          titleEn: top.titleEn || top.title || `Topic ${tIdx + 1}`,
+          titleAr: top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`,
+          pageNum: top.pageNum || top.page_number || top.pageNumber || 1
+        }));
+        // FC9.12: some chapters arrive with NO topics (e.g. this book's "Section N"). Rather than
+        // render an empty expandable box (the broken-looking fold), backfill their sub-pages from
+        // the page list by chapter title so they fold to real pages.
+        if (topics.length === 0) {
+          const chTitleEn = ch.titleEn || ch.title || "";
+          topics = allPages
+            .filter((p: any) => (p.chapterTitleEn || "") === chTitleEn && chTitleEn)
+            .map((p: any) => ({
+              id: `top-${idx}-${p.pageNum}`,
+              titleEn: p.titleEn || `Page ${p.pageNum}`,
+              titleAr: p.titleAr || `صفحة ${p.pageNum}`,
+              pageNum: p.pageNum
+            }));
+        }
+        // A landing page for chapters that still have no sub-topics (header navigates directly).
+        const chPage = ch.pageNum || ch.page_number || ch.pageNumber || ch.startPage || (topics[0] ? topics[0].pageNum : null);
         return {
           id: `ch-${idx}`,
           titleEn: ch.titleEn || ch.title || `Chapter ${idx + 1}`,
           titleAr: ch.titleAr || ch.title_ar || ch.title || `الفصل ${idx + 1}`,
-          topics: (ch.topics || []).map((top: any, tIdx: number) => ({
-            id: `top-${idx}-${tIdx}`,
-            titleEn: top.titleEn || top.title || `Topic ${tIdx + 1}`,
-            titleAr: top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`,
-            pageNum: top.pageNum || top.page_number || top.pageNumber || 1
-          }))
+          pageNum: chPage,
+          topics
         };
       });
     }
@@ -3527,15 +3545,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           return filteredChapters.map((ch, chIdx) => {
                             const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
                             const chTitle = isAr ? ch.titleAr : ch.titleEn;
-                            const isChActive = ch.topics.some((top: any) => top.pageNum === readerCurrentPage); // FC6.13: cover is page 0
-                            // FC9.12: fold mechanics — default CLOSED except the first chapter and the
-                            // one holding the current page; an explicit user toggle (key present) always
-                            // wins; during search everything is forced open. The chevron reads the same
-                            // boolean as the body, and the Clear button (resets the map) restores this
-                            // seeded state instead of flipping everything open.
-                            const isExpanded = searchQuery
-                              ? true
-                              : (ch.id in expandedChapters ? expandedChapters[ch.id] : (chIdx === 0 || isChActive));
+                            const hasTopics = !!(ch.topics && ch.topics.length > 0);
+                            const isChActive = hasTopics
+                              ? ch.topics.some((top: any) => top.pageNum === readerCurrentPage)
+                              : (ch.pageNum != null && ch.pageNum === readerCurrentPage); // FC6.13: cover is page 0
+                            // FC9.12: fold mechanics — only chapters WITH sub-topics fold (default
+                            // CLOSED except the first chapter and the one holding the current page; an
+                            // explicit user toggle wins; search forces open). Chapters with NO topics
+                            // are NOT expandable — their header navigates directly to the chapter page,
+                            // so we never render an empty expandable box (the broken-looking fold).
+                            const isExpanded = !hasTopics
+                              ? false
+                              : (searchQuery
+                                  ? true
+                                  : (ch.id in expandedChapters ? expandedChapters[ch.id] : (chIdx === 0 || isChActive)));
 
                             return (
                               <div key={ch.id} style={{
@@ -3543,18 +3566,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                 border: "1px solid rgba(16, 107, 163, 0.08)",
                                 background: isChActive ? "var(--glow-color-custom)" : "var(--card-bg-glass-card)",
                                 overflow: "hidden",
+                                flexShrink: 0,
                                 transition: "all 0.25s ease"
                               }}>
                                 <button
                                   onClick={() => {
-                                    // FC9.11: separate fold from navigation. Clicking a chapter
-                                    // header toggles its fold; it only jumps to the chapter's
-                                    // first page when EXPANDING (collapsing no longer yanks the
-                                    // reader to that chapter — the old behavior felt broken).
+                                    // FC9.12: chapters without sub-topics navigate straight to their page.
+                                    if (!hasTopics) {
+                                      if (ch.pageNum != null) setReaderCurrentPage(ch.pageNum);
+                                      return;
+                                    }
+                                    // With topics: clicking toggles the fold; jump to the first page
+                                    // only when EXPANDING (collapsing must not yank the reader away).
                                     if (searchQuery) {
-                                      if (ch.topics && ch.topics.length > 0) {
-                                        setReaderCurrentPage(ch.topics[0].pageNum);
-                                      }
+                                      setReaderCurrentPage(ch.topics[0].pageNum);
                                       return;
                                     }
                                     const willExpand = !isExpanded;
@@ -3562,7 +3587,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       ...prev,
                                       [ch.id]: willExpand
                                     }));
-                                    if (willExpand && ch.topics && ch.topics.length > 0) {
+                                    if (willExpand) {
                                       setReaderCurrentPage(ch.topics[0].pageNum);
                                     }
                                   }}
@@ -3592,7 +3617,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       {chTitle}
                                     </span>
                                   </div>
-                                  {!searchQuery && (
+                                  {!searchQuery && hasTopics && (
                                     <span style={{
                                       fontSize: "0.65rem",
                                       color: "var(--primary)",
