@@ -2117,11 +2117,15 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                               ? (bookObj?.subject || bookObj?.subjectName || "General")
                               : practiceSubject;
                             const bookTitle = bookObj ? (bookObj.title || bookObj.titleEn || bookObj.title_en || bookObj.name_en || bookObj.name || "") : "";
-                            // FC9.15: a MEANINGFUL aggregation key (never the old "General Knowledge"):
-                            // explicit focus concept > a non-generic heuristic > the book title > subject.
+                            // FC9.15: a MEANINGFUL aggregation key (never the old "General Knowledge").
+                            // Priority: explicit focus concept > the selected chapter(s) > a non-generic
+                            // heuristic > book title > subject — so the heatmap/insights pinpoint the
+                            // exact chapter/concept the user actually practiced.
                             const focus = (practiceCustomConcepts || "").trim();
+                            const chapters = Array.isArray(practiceSelectedChapters) ? practiceSelectedChapters.filter(Boolean) : [];
                             const heuristic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
                             const concept = focus
+                              || (chapters.length ? chapters.join(", ") : "")
                               || (heuristic && heuristic !== "General Knowledge" && heuristic !== "General Practice" ? heuristic : "")
                               || bookTitle
                               || targetSubject;
@@ -2154,6 +2158,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                   scopeType: practiceScopeType,
                                   concept,
                                   subtopic: concept,
+                                  chapters,
                                   focus: focus || null,
                                   feedback: data.feedback,
                                   explanation: data.correctExplanation || "",
