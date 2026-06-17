@@ -312,6 +312,9 @@ class MongoDBEngine:
                 # collection scan that risks the 32MB sort cap as the collection grows).
                 self._db["user_activities"].create_index([("userId", 1), ("timestamp", -1)], background=True)
                 self._db["user_activities"].create_index([("timestamp", -1)], background=True)
+                # FC9.14: serves the action-filtered history read (practice/zatona) so high-volume
+                # agent-query logs can't crowd the window — index-covered userId+action+sort.
+                self._db["user_activities"].create_index([("userId", 1), ("action", 1), ("timestamp", -1)], background=True)
 
                 # 5. Token Telemetry
                 self._db["token_telemetry"].create_index("userId", background=True)
@@ -1077,13 +1080,21 @@ class MongoDBEngine:
             safe["timestamp"] = str(safe.get("timestamp"))
         return UserActivitySchema(**safe)
 
-    async def get_user_activities(self, user_id: str) -> List[UserActivitySchema]:
-        """Retrieves history of user actions sorted chronologically."""
+    async def get_user_activities(self, user_id: str, actions: Optional[List[str]] = None, limit: int = 100) -> List[UserActivitySchema]:
+        """Retrieves history of user actions sorted chronologically.
+
+        FC9.14: an optional `actions` filter is critical — without it the 100-doc window is
+        flooded by high-volume logs (e.g. 'Standard Agent Query' from every companion turn),
+        which crowds out practice_session/zatona docs so Practice History reads empty and the XP
+        sum collapses to 0. A filtered read returns the most recent N docs OF THOSE actions."""
         if self._db is None:
             return []
+        query: dict = {"userId": user_id}
+        if actions:
+            query["action"] = {"$in": list(actions)}
         activities = []
         try:
-            cursor = self._db["user_activities"].find({"userId": user_id}).sort("timestamp", -1).limit(100)
+            cursor = self._db["user_activities"].find(query).sort("timestamp", -1).limit(max(1, int(limit)))
         except Exception as e:
             logger.error(f"Failed to query user activities: {e}")
             return []

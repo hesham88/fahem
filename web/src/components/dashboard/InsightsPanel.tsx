@@ -90,7 +90,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         }
 
         // 2. Fetch user activities (for weak topics / test history)
-        const activityRes = await fetchFn("/api/activity");
+        // FC9.14: only the learning actions — agent-query logs must not crowd out practice/zatona.
+        const activityRes = await fetchFn("/api/activity?action=practice_session,practice_attempt,question_checked,zatona_session,zatona,summary&limit=200");
         if (activityRes && activityRes.ok) {
           const activityData = await activityRes.json();
           if (activityData && activityData.activities) {

@@ -1731,7 +1731,11 @@ export default function Home() {
   const fetchSpaceHistory = async (userId: string) => {
     if (!userId) return;
     try {
-      const res = await authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}`);
+      // FC9.14: request only the learning + space-history actions (with a generous limit so the
+      // cumulative XP total is accurate). Previously the unfiltered read was flooded by
+      // high-volume "Standard Agent Query" logs, which crowded practice_session out of the window
+      // → nav XP/points read 0 and the Academic Spaces audit log looked empty ("data disappeared").
+      const res = await authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}&action=practice_session,practice_attempt,space_history,zatona_session,zatona,summary&limit=500`);
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];

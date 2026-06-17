@@ -159,7 +159,10 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     if (!user?.uid) return;
     setHistoryLoading(true);
     try {
-      const res = await authedFetch("/api/activity");
+      // FC9.14: request ONLY the learning actions — otherwise high-volume "Standard Agent Query"
+      // logs flood the 100-doc window and crowd out practice/zatona, so history reads empty and
+      // the XP sum collapses to 0 (the reported "data + points disappeared").
+      const res = await authedFetch("/api/activity?action=practice_session,practice_attempt,zatona_session,zatona,summary,summary_session&limit=200");
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];

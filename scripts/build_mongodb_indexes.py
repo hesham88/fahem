@@ -70,6 +70,10 @@ def build_indexes():
         print(f"Created compound index on 'user_activities': {act_idx2}")
         act_idx3 = db["user_activities"].create_index([("timestamp", DESCENDING)], name="idx_activities_ts")
         print(f"Created timestamp index on 'user_activities': {act_idx3}")
+        # FC9.14: serves the action-filtered history read (practice/zatona) so high-volume
+        # agent-query logs can't crowd the window.
+        act_idx4 = db["user_activities"].create_index([("userId", ASCENDING), ("action", ASCENDING), ("timestamp", DESCENDING)], name="idx_activities_userId_action_ts")
+        print(f"Created userId+action+ts index on 'user_activities': {act_idx4}")
 
         print("\n--- 5. Tuning 'token_telemetry' Collection Indexes ---")
         telemetry_idx = db["token_telemetry"].create_index([("userId", ASCENDING)], name="idx_telemetry_userId")

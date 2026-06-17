@@ -33,17 +33,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // FC9.14: optional action filter so practice/zatona history isn't crowded out of the
+    // window by high-volume agent-query logs.
+    const action = searchParams.get("action");
+
     if (isLocalEnv()) {
       const db = getLocalDb();
       const activities = (db as any).user_activities || [];
-      const userActivities = activities.filter((act: any) => act.userId === userId);
+      const actionSet = action ? new Set(action.split(",").map((a) => a.trim()).filter(Boolean)) : null;
+      const userActivities = activities.filter(
+        (act: any) => act.userId === userId && (!actionSet || actionSet.has(act.action))
+      );
       return new Response(JSON.stringify({ activities: userActivities }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    return await proxyRequest(`/user/activity?userId=${encodeURIComponent(userId)}`, "GET", undefined, ctx);
+    let path = `/user/activity?userId=${encodeURIComponent(userId)}`;
+    if (action) path += `&action=${encodeURIComponent(action)}`;
+    return await proxyRequest(path, "GET", undefined, ctx);
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

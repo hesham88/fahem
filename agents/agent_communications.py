@@ -475,22 +475,28 @@ async def log_user_activity(user_id: str, user_email: str, action: str, status: 
         logger.warning(f"Failed to log user activity: {err}")
         return False
 
-async def get_user_activities(user_id: str) -> list:
-    """Fetches up to 100 recent activities for a specific user."""
+async def get_user_activities(user_id: str, actions: list = None, limit: int = 100) -> list:
+    """Fetches recent activities for a specific user, optionally filtered by action.
+
+    FC9.14: the `actions` filter lets the dashboard read practice/zatona history without it
+    being crowded out of the window by high-volume agent-query logs."""
     if db_engine and db_engine._db is not None:
         try:
-            activities = await db_engine.get_user_activities(user_id)
+            activities = await db_engine.get_user_activities(user_id, actions=actions, limit=limit)
             return [a.model_dump(by_alias=True) for a in activities]
         except Exception as e:
             logger.warning(f"Direct get_user_activities failed: {e}; falling back to MCP.")
     try:
+        _filter = {"userId": user_id}
+        if actions:
+            _filter["action"] = {"$in": list(actions)}
         res = await _run_mcp_tool("find", {
             "database": "fahem",
             "collection": "user_activities",
-            "filter": {"userId": user_id},
+            "filter": _filter,
             "options": {
                 "sort": {"timestamp": -1},
-                "limit": 100
+                "limit": limit
             }
         })
         if isinstance(res, list):

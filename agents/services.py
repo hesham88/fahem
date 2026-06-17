@@ -2606,13 +2606,16 @@ def register_telemetry_route(app: fastapi.FastAPI):
             return {"status": "error", "error": str(err)}
 
     @app.get("/user/activity")
-    async def get_user_activity(userId: str):
+    async def get_user_activity(userId: str, action: str = None, limit: int = 100):
         try:
             agents_dir = os.path.dirname(os.path.abspath(__file__))
             if agents_dir not in sys.path:
                 sys.path.insert(0, agents_dir)
             from agent_communications import get_user_activities
-            activities = await get_user_activities(userId)
+            # FC9.14: optional comma-separated action filter so practice/zatona history isn't
+            # crowded out of the window by high-volume agent-query logs.
+            actions = [a.strip() for a in action.split(",") if a.strip()] if action else None
+            activities = await get_user_activities(userId, actions=actions, limit=limit)
             return {"activities": activities}
         except Exception as err:
             logger.error(f"[services.py] Failed to retrieve user activities: {err}", exc_info=True)
