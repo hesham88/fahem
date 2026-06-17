@@ -3331,9 +3331,13 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             const cAr = (p.contentAr || "").toLowerCase();
                             const chEn = (p.chapterTitleEn || "").toLowerCase();
                             const chAr = (p.chapterTitleAr || "").toLowerCase();
-                            // FC9.11: also search rendered math/LaTeX formulas so queries like
-                            // "vector" / "latex" that appear in formula strings are found.
-                            const fStr = ((p.formulas || []) as any[]).join(" ").toLowerCase();
+                            // FC9.12: search rendered math/LaTeX too. The latex lives INSIDE the
+                            // page blocks (compilePageTextForTts extracts the `latex` prop), not just
+                            // the often-empty page-level `formulas` array — so "vector"/"latex"/a
+                            // formula token is now matched whether it sits in prose or a formula.
+                            const fStr = search
+                              ? `${((p.formulas || []) as any[]).join(" ")} ${compilePageTextForTts(p.blocks || [], language)}`.toLowerCase()
+                              : "";
                             return tEn.includes(search) || tAr.includes(search) || cEn.includes(search) || cAr.includes(search) || chEn.includes(search) || chAr.includes(search) || fStr.includes(search);
                           });
 
@@ -3369,9 +3373,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                                       aspectRatio: "3 / 4",
                                       borderRadius: "6px",
                                       border: isActive ? "2px solid var(--primary)" : "1px solid rgba(16, 107, 163, 0.15)",
-                                      background: isActive 
-                                        ? "linear-gradient(135deg, rgba(16, 107, 163, 0.12), rgba(212, 175, 55, 0.05))" 
-                                        : "#ffffff",
+                                      background: isActive
+                                        ? "linear-gradient(135deg, rgba(16, 107, 163, 0.12), rgba(212, 175, 55, 0.05))"
+                                        : "var(--card-bg)",
                                       cursor: "pointer",
                                       transition: "all 0.2s ease",
                                       boxSizing: "border-box",
@@ -3482,14 +3486,14 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           const chapters = buildTOC();
                           const searchQuery = tocSearch.trim().toLowerCase();
 
-                          // FC9.11: search page CONTENT too — not just chapter/topic titles —
-                          // so queries like "vector" or "latex" that live in the body text of a
-                          // page surface their chapter/topic. The whole book's pages are already
-                          // loaded in `loadedBookPages`, so we can map pageNum -> content once.
+                          // FC9.12: search page CONTENT too — not just chapter/topic titles — incl.
+                          // the LaTeX inside page blocks (compilePageTextForTts), so "vector"/"latex"
+                          // /a formula token surfaces its chapter/topic. Pages are already loaded in
+                          // `loadedBookPages`, so we map pageNum -> full search text once per query.
                           const pageContentMap: Record<number, string> = {};
                           if (searchQuery) {
                             getAllPages(selectedBookReader!, loadedBookPages).forEach((p: any) => {
-                              pageContentMap[p.pageNum] = `${p.contentEn || ""} ${p.contentAr || ""} ${(p.formulas || []).join(" ")}`.toLowerCase();
+                              pageContentMap[p.pageNum] = `${p.contentEn || ""} ${p.contentAr || ""} ${(p.formulas || []).join(" ")} ${compilePageTextForTts(p.blocks || [], language)}`.toLowerCase();
                             });
                           }
 
@@ -3520,11 +3524,18 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             );
                           }
 
-                          return filteredChapters.map((ch) => {
+                          return filteredChapters.map((ch, chIdx) => {
                             const isAr = translationLanguage === "Original" ? (selectedBookReader?.language === "ar") : (translationLanguage === "ar");
                             const chTitle = isAr ? ch.titleAr : ch.titleEn;
-                            const isExpanded = searchQuery ? true : (expandedChapters[ch.id] !== false);
                             const isChActive = ch.topics.some((top: any) => top.pageNum === readerCurrentPage); // FC6.13: cover is page 0
+                            // FC9.12: fold mechanics — default CLOSED except the first chapter and the
+                            // one holding the current page; an explicit user toggle (key present) always
+                            // wins; during search everything is forced open. The chevron reads the same
+                            // boolean as the body, and the Clear button (resets the map) restores this
+                            // seeded state instead of flipping everything open.
+                            const isExpanded = searchQuery
+                              ? true
+                              : (ch.id in expandedChapters ? expandedChapters[ch.id] : (chIdx === 0 || isChActive));
 
                             return (
                               <div key={ch.id} style={{
