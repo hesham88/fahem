@@ -327,7 +327,10 @@ class MongoDBEngine:
                 # FC9.14: dedicated email-keyed learning history + persistent stats.
                 self._db["practice_history"].create_index([("userEmail", 1), ("createdAt", -1)], background=True)
                 self._db["zatona_history"].create_index([("userEmail", 1), ("createdAt", -1)], background=True)
+                self._db["user_experience"].create_index([("userEmail", 1), ("createdAt", -1)], background=True)
                 self._db["user_stats"].create_index("userEmail", unique=True, background=True)
+                # user_activities is now a thin reference index — also queryable by email.
+                self._db["user_activities"].create_index([("userEmail", 1), ("timestamp", -1)], background=True)
 
                 # 5. Token Telemetry
                 self._db["token_telemetry"].create_index("userId", background=True)
@@ -1187,6 +1190,26 @@ class MongoDBEngine:
         except Exception as e:
             logger.error(f"[user_stats] bump failed for {email}: {e}")
 
+    def _write_activity_ref(self, email: str, user_id: str, action: str, ref_collection: str, ref_id: str, summary: str, when_iso: str):
+        """FC9.14 architecture: `user_activities` is a THIN reference index — the full record +
+        metadata live in the dedicated collection (practice_history / zatona_history /
+        user_experience). Each save drops one lightweight pointer here so a single feed can list
+        everything without bloating, and the heavy data is fetched from the related collection."""
+        if self._db is None:
+            return
+        try:
+            self._db["user_activities"].insert_one({
+                "userEmail": email,
+                "userId": user_id or "",
+                "action": action,
+                "status": "ref",
+                "ref": {"collection": ref_collection, "id": str(ref_id)},
+                "summary": (summary or "")[:280],
+                "timestamp": when_iso,
+            })
+        except Exception as e:
+            logger.error(f"[user_activities] ref write failed for {email}: {e}")
+
     async def save_practice_record(self, user_email: str, user_id: str, record: dict) -> bool:
         if self._db is None:
             return False
@@ -1199,8 +1222,11 @@ class MongoDBEngine:
         if not doc.get("createdAt"):
             doc["createdAt"] = datetime.datetime.utcnow().isoformat() + "Z"
         try:
-            self._db["practice_history"].insert_one(doc)
+            res = self._db["practice_history"].insert_one(doc)
             self._bump_user_stats(email, int(doc.get("xpGained") or 0), doc["createdAt"])
+            d = doc.get("details") or {}
+            self._write_activity_ref(email, user_id, "practice_session", "practice_history",
+                                     res.inserted_id, d.get("question") or d.get("concept") or "Practice session", doc["createdAt"])
             return True
         except Exception as e:
             logger.error(f"[practice_history] save failed for {email}: {e}")
@@ -1231,9 +1257,11 @@ class MongoDBEngine:
         if not doc.get("createdAt"):
             doc["createdAt"] = datetime.datetime.utcnow().isoformat() + "Z"
         try:
-            self._db["zatona_history"].insert_one(doc)
+            res = self._db["zatona_history"].insert_one(doc)
             # zatona engagement also earns XP / keeps the streak alive
             self._bump_user_stats(email, int(doc.get("xpGained") or 0), doc["createdAt"])
+            self._write_activity_ref(email, user_id, "zatona_session", "zatona_history",
+                                     res.inserted_id, doc.get("prompt") or doc.get("subject") or "Zatona summary", doc["createdAt"])
             return True
         except Exception as e:
             logger.error(f"[zatona_history] save failed for {email}: {e}")
@@ -1250,6 +1278,41 @@ class MongoDBEngine:
                 out.append(d)
         except Exception as e:
             logger.error(f"[zatona_history] read failed for {email}: {e}")
+        return out
+
+    async def save_experience_record(self, user_email: str, user_id: str, record: dict) -> bool:
+        """user_experience = the academic-space activity/audit feed (full entries, email-keyed),
+        with a thin reference dropped in user_activities."""
+        if self._db is None:
+            return False
+        email = self._norm_email(user_email)
+        if not email:
+            return False
+        doc = dict(record or {})
+        doc["userEmail"] = email
+        doc["userId"] = user_id or ""
+        if not doc.get("createdAt"):
+            doc["createdAt"] = datetime.datetime.utcnow().isoformat() + "Z"
+        try:
+            res = self._db["user_experience"].insert_one(doc)
+            self._write_activity_ref(email, user_id, doc.get("action") or "experience", "user_experience",
+                                     res.inserted_id, doc.get("actionEn") or doc.get("summary") or "Activity", doc["createdAt"])
+            return True
+        except Exception as e:
+            logger.error(f"[user_experience] save failed for {email}: {e}")
+            return False
+
+    async def get_experience_history(self, user_email: str, limit: int = 200) -> List[dict]:
+        if self._db is None:
+            return []
+        email = self._norm_email(user_email)
+        out = []
+        try:
+            for d in self._db["user_experience"].find({"userEmail": email}).sort("createdAt", -1).limit(max(1, int(limit))):
+                d["_id"] = str(d.get("_id"))
+                out.append(d)
+        except Exception as e:
+            logger.error(f"[user_experience] read failed for {email}: {e}")
         return out
 
     async def get_user_stats(self, user_email: str) -> dict:

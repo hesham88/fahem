@@ -2685,6 +2685,27 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] get user-stats failed: {err}", exc_info=True)
             return {"stats": {}, "error": str(err)}
 
+    @app.post("/user/experience")
+    async def post_experience(request: fastapi.Request):
+        try:
+            data = await request.json()
+            ok = await _hist_engine().save_experience_record(
+                data.get("userEmail", ""), data.get("userId", ""), data.get("record") or {}
+            )
+            return {"status": "success" if ok else "error"}
+        except Exception as err:
+            logger.error(f"[services.py] save experience failed: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    @app.get("/user/experience")
+    async def get_experience(userEmail: str, limit: int = 200):
+        try:
+            records = await _hist_engine().get_experience_history(userEmail, limit=limit)
+            return {"records": records}
+        except Exception as err:
+            logger.error(f"[services.py] get experience failed: {err}", exc_info=True)
+            return {"records": [], "error": str(err)}
+
     @app.post("/user/chat-session")
     async def post_chat_session(request: fastapi.Request):
         try:
@@ -4190,6 +4211,7 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             # (this whole block targets fahem_sandbox) so demo stays ephemeral.
                             ("practice_history", [{"userId": uid}, {"userEmail": email}]),
                             ("zatona_history", [{"userId": uid}, {"userEmail": email}]),
+                            ("user_experience", [{"userId": uid}, {"userEmail": email}]),
                             ("user_stats", [{"userEmail": email}]),
                             ("notifications", [{"recipient_uid": uid}, {"userId": uid}])
                         ]

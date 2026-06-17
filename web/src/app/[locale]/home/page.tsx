@@ -1716,15 +1716,13 @@ export default function Home() {
       ...prev
     ]);
     if (user) {
-      authedFetch("/api/activity", {
+      // FC9.14: persist the audit/activity entry to the dedicated user_experience collection
+      // (email-keyed; a thin reference is kept in user_activities by the backend).
+      authedFetch("/api/experience", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "space_history",
-          status: "success",
-          details: { actionEn, actionAr }
-        })
-      }).catch(err => console.error("Error saving space history activity:", err));
+        body: JSON.stringify({ action: "space_history", status: "success", actionEn, actionAr })
+      }).catch(err => console.error("Error saving space history:", err));
     }
   };
 
@@ -1734,9 +1732,10 @@ export default function Home() {
       // FC9.14: XP + streak come from the persistent, EMAIL-keyed user_stats (never reset by
       // crowding or uid fragmentation). The audit log still reads space_history from the activity
       // log. Both fetched in parallel.
+      // FC9.14: stats from persistent user_stats; the audit feed from the dedicated user_experience.
       const [statsRes, res] = await Promise.all([
         authedFetch(`/api/user/stats`),
-        authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}&action=space_history&limit=300`),
+        authedFetch(`/api/experience?limit=300`),
       ]);
       try {
         if (statsRes.ok) {
@@ -1749,28 +1748,12 @@ export default function Home() {
       } catch (e) { /* non-fatal */ }
       if (res.ok) {
         const data = await res.json();
-        const activities = data.activities || [];
-
-        const loadedHistory = activities
-          .filter((act: any) => act.action === "space_history" || act.action === "practice_session")
-          .map((act: any) => {
-            if (act.action === "space_history") {
-              return {
-                actionEn: act.details?.actionEn || (typeof act.details === "string" ? act.details : ""),
-                actionAr: act.details?.actionAr || (typeof act.details === "string" ? act.details : ""),
-                timestamp: new Date(act.timestamp)
-              };
-            } else { // practice_session
-              const details = act.details || {};
-              const isCorrect = act.status === "correct" || details.isCorrect === true;
-              const xp = details.xpGained || 0;
-              return {
-                actionEn: `Answered Quest Challenge: ${isCorrect ? "Correct (+" + xp + " XP)" : "Incorrect"}`,
-                actionAr: `أجاب على تحدي الممارسة بشكل ${isCorrect ? "صحيح (+" + xp + " XP)" : "خاطئ"}`,
-                timestamp: new Date(act.timestamp)
-              };
-            }
-          });
+        const records = data.records || [];
+        const loadedHistory = records.map((act: any) => ({
+          actionEn: act.actionEn || act.details?.actionEn || (typeof act.details === "string" ? act.details : "") || act.summary || "",
+          actionAr: act.actionAr || act.details?.actionAr || (typeof act.details === "string" ? act.details : "") || act.summary || "",
+          timestamp: new Date(act.createdAt || act.timestamp || Date.now())
+        }));
         if (loadedHistory.length > 0) {
           setSpaceHistory(loadedHistory);
         }
