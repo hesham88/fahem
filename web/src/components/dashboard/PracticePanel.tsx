@@ -255,10 +255,22 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
       const d = act.details || {};
       const givenSubject = d.subject || "General";
-      // FC9.13: resolve the node by the most specific real anchor available —
-      // subtopic → topic → chapter — before falling back to a heuristic from the question.
-      let node = d.subtopic || d.topic || d.chapter;
+      // FC9.13/9.15: resolve the node by the most specific real anchor available —
+      // subtopic/concept → topic → chapter — before falling back to a heuristic from the question.
+      let node = d.subtopic || d.concept || d.topic || d.chapter;
       if (!node) node = determineSubtopic(d.question || "", givenSubject);
+
+      // FC9.15: map the activity onto an EXISTING seeded topic cell when the concept matches it
+      // (case-insensitive equals or substring either way), so practice/zatona lights up the real
+      // book topic instead of spawning a parallel bucket. Only fall back to a new node otherwise.
+      if (!registry[node]) {
+        const nl = String(node).toLowerCase().trim();
+        const match = Object.keys(registry).find((k) => {
+          const kl = k.toLowerCase().trim();
+          return kl === nl || (nl.length >= 4 && (kl.includes(nl) || nl.includes(kl)));
+        });
+        if (match) node = match;
+      }
 
       // Practice has an explicit correctness; zatona counts as engagement, and as "correct"
       // only when it carries a positive comprehension/score signal.
@@ -2100,15 +2112,28 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
 
                           // Save to persistent database
                           if (user) {
+                            const bookObj: any = dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId);
                             const targetSubject = practiceScopeType === "book"
-                              ? dynamicBooks.find((b: any) => (b._id || b.id) === practiceSelectedBookId)?.subject || "General"
+                              ? (bookObj?.subject || bookObj?.subjectName || "General")
                               : practiceSubject;
-                            const subtopic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
+                            const bookTitle = bookObj ? (bookObj.title || bookObj.titleEn || bookObj.title_en || bookObj.name_en || bookObj.name || "") : "";
+                            // FC9.15: a MEANINGFUL aggregation key (never the old "General Knowledge"):
+                            // explicit focus concept > a non-generic heuristic > the book title > subject.
+                            const focus = (practiceCustomConcepts || "").trim();
+                            const heuristic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
+                            const concept = focus
+                              || (heuristic && heuristic !== "General Knowledge" && heuristic !== "General Practice" ? heuristic : "")
+                              || bookTitle
+                              || targetSubject;
+                            // Real numeric score (rubric score if graded, else 100/0) → real trend.
+                            const score = (data.rubric && typeof data.rubric.score === "number")
+                              ? Math.round(data.rubric.score)
+                              : (data.isCorrect ? 100 : 0);
 
-                            // FC9.14: persist to the dedicated, email-keyed practice_history
-                            // collection (survives uid changes, never crowded/reset). The record
-                            // keeps the action/status/details shape the history + heatmap render,
-                            // plus a top-level xpGained the backend folds into persistent XP/streak.
+                            // FC9.14/9.15: persist to the dedicated, email-keyed practice_history with
+                            // FULL trackable metadata (subject/book/concept + the exact question the AI
+                            // asked, what the user wrote, and the AI's evaluation) and a meaningful
+                            // aggregation key + real score so the analytics are insightful.
                             authedFetch("/api/practice-history", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
@@ -2121,9 +2146,15 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                   mode: practiceMode,
                                   userAnswer: answerStr,
                                   isCorrect: data.isCorrect,
+                                  score,
                                   xpGained: computedXp,
                                   subject: targetSubject,
-                                  subtopic: subtopic,
+                                  bookId: practiceSelectedBookId || null,
+                                  bookTitle,
+                                  scopeType: practiceScopeType,
+                                  concept,
+                                  subtopic: concept,
+                                  focus: focus || null,
                                   feedback: data.feedback,
                                   explanation: data.correctExplanation || "",
                                   rubric: data.rubric || null

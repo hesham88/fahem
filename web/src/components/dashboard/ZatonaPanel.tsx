@@ -223,10 +223,14 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
                 scopeType: finalScopeType,
                 subject: finalSubject,
                 bookId: finalBookId,
+                bookTitle: materialDescEn,
                 chapters: finalChapters,
                 concepts: finalCustomConcepts,
-                prompt: finalPrompt,
-                result: data.report,
+                // FC9.15: meaningful aggregation key for the heatmap/insights (focus > chapter > subject).
+                concept: (finalCustomConcepts || "").trim() || (Array.isArray(finalChapters) && finalChapters.length ? finalChapters.join(", ") : "") || finalSubject,
+                subtopic: (finalCustomConcepts || "").trim() || (Array.isArray(finalChapters) && finalChapters.length ? finalChapters.join(", ") : "") || finalSubject,
+                prompt: finalPrompt,          // what the user requested
+                result: data.report,          // what the AI produced (full presentation)
                 materialDescEn,
                 materialDescAr,
                 timestamp: new Date().toISOString()
