@@ -315,6 +315,10 @@ class MongoDBEngine:
                 # FC9.14: serves the action-filtered history read (practice/zatona) so high-volume
                 # agent-query logs can't crowd the window — index-covered userId+action+sort.
                 self._db["user_activities"].create_index([("userId", 1), ("action", 1), ("timestamp", -1)], background=True)
+                # FC9.14: dedicated email-keyed learning history + persistent stats.
+                self._db["practice_history"].create_index([("userEmail", 1), ("createdAt", -1)], background=True)
+                self._db["zatona_history"].create_index([("userEmail", 1), ("createdAt", -1)], background=True)
+                self._db["user_stats"].create_index("userEmail", unique=True, background=True)
 
                 # 5. Token Telemetry
                 self._db["token_telemetry"].create_index("userId", background=True)
@@ -1122,6 +1126,142 @@ class MongoDBEngine:
             except Exception as e:
                 logger.warning(f"Skipping unparseable user_activity doc {doc.get('_id')}: {e}")
         return activities
+
+    # =================================================================================
+    # FC9.14 — DEDICATED, EMAIL-KEYED, PERSISTENT LEARNING HISTORY
+    # `user_activities` mixed practice/zatona with high-volume agent-query logs (crowding)
+    # and keyed everything by the Firebase uid (one email → several uids → fragmentation).
+    # These dedicated collections are keyed by lower-cased userEmail so history follows the
+    # user across sign-in identities, are never touched by the demo/sandbox purge, and store
+    # the FULL record (incl. the zatona presentation). XP + streak are persisted in user_stats
+    # so points survive regardless of how the activity log is read.
+    # =================================================================================
+    @staticmethod
+    def _norm_email(email: str) -> str:
+        return (email or "").strip().lower()
+
+    def _bump_user_stats(self, email: str, xp_gained: int, when_iso: str):
+        """Persist cumulative XP + day-streak by email (so points/streak are never recomputed
+        from a crowdable log and never reset)."""
+        if self._db is None or not email:
+            return
+        try:
+            coll = self._db["user_stats"]
+            cur = coll.find_one({"userEmail": email}) or {}
+            today = (when_iso or "")[:10]
+            last = cur.get("lastActiveDate")
+            streak = int(cur.get("currentStreak", 0) or 0)
+            if last == today:
+                pass  # same day — streak unchanged
+            elif last:
+                try:
+                    d_last = datetime.date.fromisoformat(last)
+                    d_today = datetime.date.fromisoformat(today)
+                    streak = streak + 1 if (d_today - d_last).days == 1 else 1
+                except Exception:
+                    streak = max(streak, 1)
+            else:
+                streak = 1
+            new_total = int(cur.get("totalXp", 0) or 0) + int(xp_gained or 0)
+            coll.update_one(
+                {"userEmail": email},
+                {"$set": {
+                    "userEmail": email,
+                    "totalXp": new_total,
+                    "currentStreak": streak,
+                    "longestStreak": max(int(cur.get("longestStreak", 0) or 0), streak),
+                    "lastActiveDate": today,
+                    "updatedAt": when_iso,
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.error(f"[user_stats] bump failed for {email}: {e}")
+
+    async def save_practice_record(self, user_email: str, user_id: str, record: dict) -> bool:
+        if self._db is None:
+            return False
+        email = self._norm_email(user_email)
+        if not email:
+            return False
+        doc = dict(record or {})
+        doc["userEmail"] = email
+        doc["userId"] = user_id or ""
+        if not doc.get("createdAt"):
+            doc["createdAt"] = datetime.datetime.utcnow().isoformat() + "Z"
+        try:
+            self._db["practice_history"].insert_one(doc)
+            self._bump_user_stats(email, int(doc.get("xpGained") or 0), doc["createdAt"])
+            return True
+        except Exception as e:
+            logger.error(f"[practice_history] save failed for {email}: {e}")
+            return False
+
+    async def get_practice_history(self, user_email: str, limit: int = 200) -> List[dict]:
+        if self._db is None:
+            return []
+        email = self._norm_email(user_email)
+        out = []
+        try:
+            for d in self._db["practice_history"].find({"userEmail": email}).sort("createdAt", -1).limit(max(1, int(limit))):
+                d["_id"] = str(d.get("_id"))
+                out.append(d)
+        except Exception as e:
+            logger.error(f"[practice_history] read failed for {email}: {e}")
+        return out
+
+    async def save_zatona_record(self, user_email: str, user_id: str, record: dict) -> bool:
+        if self._db is None:
+            return False
+        email = self._norm_email(user_email)
+        if not email:
+            return False
+        doc = dict(record or {})
+        doc["userEmail"] = email
+        doc["userId"] = user_id or ""
+        if not doc.get("createdAt"):
+            doc["createdAt"] = datetime.datetime.utcnow().isoformat() + "Z"
+        try:
+            self._db["zatona_history"].insert_one(doc)
+            # zatona engagement also earns XP / keeps the streak alive
+            self._bump_user_stats(email, int(doc.get("xpGained") or 0), doc["createdAt"])
+            return True
+        except Exception as e:
+            logger.error(f"[zatona_history] save failed for {email}: {e}")
+            return False
+
+    async def get_zatona_history(self, user_email: str, limit: int = 200) -> List[dict]:
+        if self._db is None:
+            return []
+        email = self._norm_email(user_email)
+        out = []
+        try:
+            for d in self._db["zatona_history"].find({"userEmail": email}).sort("createdAt", -1).limit(max(1, int(limit))):
+                d["_id"] = str(d.get("_id"))
+                out.append(d)
+        except Exception as e:
+            logger.error(f"[zatona_history] read failed for {email}: {e}")
+        return out
+
+    async def get_user_stats(self, user_email: str) -> dict:
+        if self._db is None:
+            return {}
+        email = self._norm_email(user_email)
+        try:
+            s = self._db["user_stats"].find_one({"userEmail": email})
+        except Exception as e:
+            logger.error(f"[user_stats] read failed for {email}: {e}")
+            s = None
+        total = int((s or {}).get("totalXp", 0) or 0)
+        return {
+            "userEmail": email,
+            "totalXp": total,
+            "level": (total // 100) + 1,
+            "xpInLevel": total % 100,
+            "currentStreak": int((s or {}).get("currentStreak", 0) or 0),
+            "longestStreak": int((s or {}).get("longestStreak", 0) or 0),
+            "lastActiveDate": (s or {}).get("lastActiveDate"),
+        }
 
     async def save_chat_session(self, session_id: str, user_id: str, user_email: str, title: str, messages: List[dict]) -> bool:
         """Saves an entire chat session sequence using atomic serialization schemas."""

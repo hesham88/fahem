@@ -159,18 +159,18 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     if (!user?.uid) return;
     setHistoryLoading(true);
     try {
-      // FC9.14: request ONLY the learning actions — otherwise high-volume "Standard Agent Query"
-      // logs flood the 100-doc window and crowd out practice/zatona, so history reads empty and
-      // the XP sum collapses to 0 (the reported "data + points disappeared").
-      const res = await authedFetch("/api/activity?action=practice_session,practice_attempt,zatona_session,zatona,summary,summary_session&limit=200");
-      if (res.ok) {
-        const data = await res.json();
-        const activities = data.activities || [];
-        setAllActivities(activities);
-        // Filter only practice_session actions
-        const practiceRuns = activities.filter((act: any) => act.action === "practice_session");
-        setPracticeHistoryList(practiceRuns);
-      }
+      // FC9.14: read from the dedicated, email-keyed persistent stores (practice_history +
+      // zatona_history) instead of the shared, uid-keyed, agent-query-crowded user_activities.
+      // History now follows the user across sign-in identities and is never reset/crowded.
+      const [pRes, zRes] = await Promise.all([
+        authedFetch("/api/practice-history?limit=300"),
+        authedFetch("/api/zatona-history?limit=200"),
+      ]);
+      const pRecords = pRes.ok ? ((await pRes.json()).records || []).map((r: any) => ({ ...r, action: r.action || "practice_session" })) : [];
+      const zRecords = zRes.ok ? ((await zRes.json()).records || []).map((r: any) => ({ ...r, action: r.action || "zatona_session" })) : [];
+      // allActivities feeds the heatmap (practice + zatona); practiceHistoryList is the practice log.
+      setAllActivities([...pRecords, ...zRecords]);
+      setPracticeHistoryList(pRecords);
     } catch (err) {
       console.error("Failed to fetch practice history:", err);
     } finally {
@@ -2105,13 +2105,17 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                               : practiceSubject;
                             const subtopic = determineSubtopic(practiceCurrentQuestion.question, targetSubject);
 
-                            // Log standard session
-                            authedFetch("/api/activity", {
+                            // FC9.14: persist to the dedicated, email-keyed practice_history
+                            // collection (survives uid changes, never crowded/reset). The record
+                            // keeps the action/status/details shape the history + heatmap render,
+                            // plus a top-level xpGained the backend folds into persistent XP/streak.
+                            authedFetch("/api/practice-history", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
                                 action: "practice_session",
                                 status: data.isCorrect ? "correct" : "incorrect",
+                                xpGained: computedXp,
                                 details: {
                                   question: practiceCurrentQuestion.question,
                                   mode: practiceMode,
@@ -2125,28 +2129,10 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                                   rubric: data.rubric || null
                                 }
                               })
-                            }).catch(err => console.error("Failed to save practice session activity:", err));
-
-                            // Log specialized practice attempt for heatmap metrics
-                            authedFetch("/api/activity", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                action: "practice_attempt",
-                                status: data.isCorrect ? "correct" : "incorrect",
-                                details: {
-                                  question: practiceCurrentQuestion.question,
-                                  subject: targetSubject,
-                                  subtopic,
-                                  isCorrect: data.isCorrect,
-                                  xpGained: computedXp,
-                                  rubric: data.rubric || null
-                                }
-                              })
                             }).then(() => {
-                              // Reload history
+                              // Reload history from the persistent store
                               fetchPracticeHistory();
-                            }).catch(err => console.error("Failed to save practice attempt activity:", err));
+                            }).catch(err => console.error("Failed to save practice session:", err));
                           }
                         } else {
                           alert(language === "ar" ? "حدث خطأ أثناء تقييم الإجابة." : "Failed to evaluate answer.");

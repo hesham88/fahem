@@ -2621,6 +2621,70 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to retrieve user activities: {err}", exc_info=True)
             return {"activities": [], "error": str(err)}
 
+    # ---------------------------------------------------------------------------------
+    # FC9.14: dedicated, email-keyed, persistent learning history (practice + zatona) +
+    # persistent XP/streak stats. Email is the durable key (survives the multi-uid-per-email
+    # fragmentation); these collections are never crowded by agent-query logs and are only
+    # purged in the sandbox demo cleanup, so real-user history persists permanently.
+    # ---------------------------------------------------------------------------------
+    def _hist_engine():
+        try:
+            from agents.mongodb_engine import MongoDBEngine
+        except ImportError:
+            from mongodb_engine import MongoDBEngine
+        return MongoDBEngine()
+
+    @app.post("/user/practice-history")
+    async def post_practice_history(request: fastapi.Request):
+        try:
+            data = await request.json()
+            ok = await _hist_engine().save_practice_record(
+                data.get("userEmail", ""), data.get("userId", ""), data.get("record") or {}
+            )
+            return {"status": "success" if ok else "error"}
+        except Exception as err:
+            logger.error(f"[services.py] save practice-history failed: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    @app.get("/user/practice-history")
+    async def get_practice_history_ep(userEmail: str, limit: int = 200):
+        try:
+            records = await _hist_engine().get_practice_history(userEmail, limit=limit)
+            return {"records": records}
+        except Exception as err:
+            logger.error(f"[services.py] get practice-history failed: {err}", exc_info=True)
+            return {"records": [], "error": str(err)}
+
+    @app.post("/user/zatona-history")
+    async def post_zatona_history(request: fastapi.Request):
+        try:
+            data = await request.json()
+            ok = await _hist_engine().save_zatona_record(
+                data.get("userEmail", ""), data.get("userId", ""), data.get("record") or {}
+            )
+            return {"status": "success" if ok else "error"}
+        except Exception as err:
+            logger.error(f"[services.py] save zatona-history failed: {err}", exc_info=True)
+            return {"status": "error", "error": str(err)}
+
+    @app.get("/user/zatona-history")
+    async def get_zatona_history_ep(userEmail: str, limit: int = 200):
+        try:
+            records = await _hist_engine().get_zatona_history(userEmail, limit=limit)
+            return {"records": records}
+        except Exception as err:
+            logger.error(f"[services.py] get zatona-history failed: {err}", exc_info=True)
+            return {"records": [], "error": str(err)}
+
+    @app.get("/user/stats")
+    async def get_user_stats_ep(userEmail: str):
+        try:
+            stats = await _hist_engine().get_user_stats(userEmail)
+            return {"stats": stats}
+        except Exception as err:
+            logger.error(f"[services.py] get user-stats failed: {err}", exc_info=True)
+            return {"stats": {}, "error": str(err)}
+
     @app.post("/user/chat-session")
     async def post_chat_session(request: fastapi.Request):
         try:
@@ -4122,6 +4186,11 @@ def register_telemetry_route(app: fastapi.FastAPI):
                             ("demo_activities", [{"userId": uid}]),
                             ("reading_sessions", [{"userId": uid}]),
                             ("user_activities", [{"userId": uid}]),
+                            # FC9.14: dedicated history is email-keyed; purge it in SANDBOX only
+                            # (this whole block targets fahem_sandbox) so demo stays ephemeral.
+                            ("practice_history", [{"userId": uid}, {"userEmail": email}]),
+                            ("zatona_history", [{"userId": uid}, {"userEmail": email}]),
+                            ("user_stats", [{"userEmail": email}]),
                             ("notifications", [{"recipient_uid": uid}, {"userId": uid}])
                         ]
                         

@@ -89,13 +89,18 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           }
         }
 
-        // 2. Fetch user activities (for weak topics / test history)
-        // FC9.14: only the learning actions — agent-query logs must not crowd out practice/zatona.
-        const activityRes = await fetchFn("/api/activity?action=practice_session,practice_attempt,question_checked,zatona_session,zatona,summary&limit=200");
+        // 2. FC9.14: weak topics / performance trend / misconception matrix come from the
+        // dedicated, email-keyed practice_history store (persistent, never crowded/reset).
+        const activityRes = await fetchFn("/api/practice-history?limit=300");
         if (activityRes && activityRes.ok) {
           const activityData = await activityRes.json();
-          if (activityData && activityData.activities) {
-            const fetchedActivities = activityData.activities;
+          if (activityData && activityData.records) {
+            // Normalize to the {action,status,details,timestamp} shape the analytics expect.
+            const fetchedActivities = (activityData.records || []).map((r: any) => ({
+              ...r,
+              action: r.action || "practice_session",
+              timestamp: r.timestamp || r.createdAt,
+            }));
             setActivities(fetchedActivities);
 
           // Parse activities to extract weak topics & scores

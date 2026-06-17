@@ -93,12 +93,11 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
     if (!user?.uid) return;
     setHistoryLoading(true);
     try {
-      // FC9.14: filter to zatona actions so high-volume agent-query logs don't crowd the window.
-      const res = await authedFetch("/api/activity?action=zatona_session,zatona,summary,summary_session&limit=200");
+      // FC9.14: read from the dedicated, email-keyed zatona_history store.
+      const res = await authedFetch("/api/zatona-history?limit=200");
       if (res.ok) {
         const data = await res.json();
-        const activities = data.activities || [];
-        const zatonaRuns = activities.filter((act: any) => act.action === "zatona_session");
+        const zatonaRuns = (data.records || []).map((r: any) => ({ ...r, action: r.action || "zatona_session" }));
         setZatonaHistoryList(zatonaRuns);
       }
     } catch (err) {
@@ -207,13 +206,19 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
         if (data.success && data.report) {
           setZatonaResult(data.report);
 
-          // Persist the run in user activity history (fail-safe database-backed history)
-          await authedFetch("/api/activity", {
+          // FC9.14: persist to the dedicated, email-keyed zatona_history collection — the FULL
+          // result/presentation is stored and survives uid changes / is never crowded or reset.
+          await authedFetch("/api/zatona-history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               action: "zatona_session",
               status: "success",
+              xpGained: 10,
+              prompt: finalPrompt,
+              result: data.report,
+              presentation: data.report,
+              subject: finalSubject,
               details: {
                 scopeType: finalScopeType,
                 subject: finalSubject,

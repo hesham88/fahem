@@ -1731,34 +1731,26 @@ export default function Home() {
   const fetchSpaceHistory = async (userId: string) => {
     if (!userId) return;
     try {
-      // FC9.14: request only the learning + space-history actions (with a generous limit so the
-      // cumulative XP total is accurate). Previously the unfiltered read was flooded by
-      // high-volume "Standard Agent Query" logs, which crowded practice_session out of the window
-      // → nav XP/points read 0 and the Academic Spaces audit log looked empty ("data disappeared").
-      const res = await authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}&action=practice_session,practice_attempt,space_history,zatona_session,zatona,summary&limit=500`);
+      // FC9.14: XP + streak come from the persistent, EMAIL-keyed user_stats (never reset by
+      // crowding or uid fragmentation). The audit log still reads space_history from the activity
+      // log. Both fetched in parallel.
+      const [statsRes, res] = await Promise.all([
+        authedFetch(`/api/user/stats`),
+        authedFetch(`/api/activity?userId=${encodeURIComponent(userId)}&action=space_history&limit=300`),
+      ]);
+      try {
+        if (statsRes.ok) {
+          const s = (await statsRes.json()).stats || {};
+          setNavTotalXp(Number(s.totalXp) || 0);
+          setNavXp(Number(s.xpInLevel) || 0);
+          setNavLevel(Number(s.level) || 1);
+          setNavStreak(Number(s.currentStreak) || 0);
+        }
+      } catch (e) { /* non-fatal */ }
       if (res.ok) {
         const data = await res.json();
         const activities = data.activities || [];
 
-        // Compute real XP / level / day-streak for the nav meters from the activity log.
-        try {
-          const totalXp = activities
-            .filter((a: any) => a.action === "practice_session")
-            .reduce((s: number, a: any) => s + (Number(a.details?.xpGained) || 0), 0);
-          setNavTotalXp(totalXp); // FC7.37: real per-user total XP
-          setNavXp(totalXp % 100);
-          setNavLevel(Math.floor(totalXp / 100) + 1);
-          const days = new Set<string>();
-          activities.forEach((a: any) => { if (a.timestamp) days.add(new Date(a.timestamp).toISOString().slice(0, 10)); });
-          const countStreakFrom = (start: Date): number => {
-            let n = 0; const d = new Date(start);
-            while (days.has(d.toISOString().slice(0, 10))) { n++; d.setDate(d.getDate() - 1); }
-            return n;
-          };
-          let streak = countStreakFrom(new Date());
-          if (streak === 0) { const y = new Date(); y.setDate(y.getDate() - 1); streak = countStreakFrom(y); }
-          setNavStreak(streak);
-        } catch (e) { /* non-fatal */ }
         const loadedHistory = activities
           .filter((act: any) => act.action === "space_history" || act.action === "practice_session")
           .map((act: any) => {
