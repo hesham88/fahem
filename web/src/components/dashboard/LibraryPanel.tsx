@@ -2204,12 +2204,21 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
   const buildTOC = () => {
     const allPages = getAllPages(selectedBookReader!, loadedBookPages);
-    const hasChaptersWithTopics = selectedBookReader?.chapters && 
-                                  selectedBookReader.chapters.length > 0 && 
-                                  selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0);
+    // FC9.12: the reader's book object sometimes lacks the rich chapter/topic structure that
+    // dynamicBooks carries (so the TOC fell back to generic "Page N" / "Contents"). Prefer the
+    // richest available chapter source: the reader's own chapters if they have topics, else the
+    // matching dynamicBooks entry's chapters (same book, full structure), else whatever we have.
+    const readerId = (selectedBookReader as any)?._id || (selectedBookReader as any)?.id;
+    const richBook: any = (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId);
+    const sourceChapters: any[] =
+      (selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
+        ? selectedBookReader.chapters
+        : (richBook?.chapters && richBook.chapters.length > 0 ? richBook.chapters : (selectedBookReader?.chapters || []));
+    const hasChaptersWithTopics = sourceChapters.length > 0 &&
+                                  sourceChapters.some((ch: any) => ch.topics && ch.topics.length > 0);
 
-    if (hasChaptersWithTopics && selectedBookReader?.chapters) {
-      return selectedBookReader.chapters.map((ch: any, idx: number) => {
+    if (hasChaptersWithTopics) {
+      return sourceChapters.map((ch: any, idx: number) => {
         let topics = (ch.topics || []).map((top: any, tIdx: number) => ({
           id: `top-${idx}-${tIdx}`,
           titleEn: top.titleEn || top.title || `Topic ${tIdx + 1}`,
@@ -2246,8 +2255,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     const originalChapterOrder: string[] = [];
 
     // Initialize chaptersMap with defined book chapters to preserve their order and existence
-    if (selectedBookReader?.chapters && selectedBookReader.chapters.length > 0) {
-      selectedBookReader.chapters.forEach((ch: any) => {
+    if (sourceChapters.length > 0) {
+      sourceChapters.forEach((ch: any) => {
         const titleEn = ch.titleEn || ch.title || ch.title_en || ch.titleAr || "Chapter";
         const titleAr = ch.titleAr || ch.title_ar || ch.title || ch.titleEn || "الفصل";
         chaptersMap[titleEn] = {
