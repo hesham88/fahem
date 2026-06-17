@@ -910,96 +910,66 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             🎯 {language === "ar" ? "مصفوفة فجوات الفهم المعرفي وحالة المواضيع" : "Concept Misconception Risk Matrix (MongoDB Analytics)"}
           </span>
 
+          {weakTopics.length === 0 ? (
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: 0 }}>
+              {language === "ar"
+                ? "لا توجد بيانات كافية لاستخراج مصفوفة المفاهيم بعد. أكمل بعض التدريبات أو جلسات الزتونة."
+                : "Not enough activity yet to build your concept matrix. Complete a few practice or zatona sessions."}
+            </p>
+          ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-            
-            {/* Topic 1 */}
-            <div
-              style={{
-                padding: "1rem",
-                borderRadius: "14px",
-                background: "var(--surface-translucent)",
-                border: "1px solid rgba(16, 107, 163, 0.06)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
-                  📊 {language === "ar" ? "الرياضيات والنسب" : "Math: Matrices"}
-                </span>
-                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a", padding: "2px 6px", borderRadius: "6px" }}>
-                  {language === "ar" ? "آمن" : "Low Risk"}
-                </span>
-              </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                {language === "ar" ? "مفاهيم محددات المصفوفة ومعكوسها ممتازة." : "Mastered Singular Matrix inverse checks perfectly."}
-              </span>
-              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 92%</span>
-                <span>{language === "ar" ? "3 محاولات" : "3 Sessions"}</span>
-              </div>
-            </div>
-
-            {/* Topic 2 */}
-            <div
-              style={{
-                padding: "1rem",
-                borderRadius: "14px",
-                background: "var(--surface-translucent)",
-                border: "1px solid rgba(16, 107, 163, 0.06)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
-                  🧬 {language === "ar" ? "الأحياء والخلية" : "Science: Chemistry 2e"}
-                </span>
-                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(234, 179, 8, 0.12)", color: "#ca8a04", padding: "2px 6px", borderRadius: "6px" }}>
-                  {language === "ar" ? "متوسط" : "Moderate Risk"}
-                </span>
-              </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                {language === "ar" ? "فجوة بسيطة في فهم ثابت الاتزان للتفاعلات." : "Confusion spotted around chemical equilibrium rules."}
-              </span>
-              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 74%</span>
-                <span>{language === "ar" ? "5 محاولات" : "5 Sessions"}</span>
-              </div>
-            </div>
-
-            {/* Topic 3 */}
-            <div
-              style={{
-                padding: "1rem",
-                borderRadius: "14px",
-                background: "var(--surface-translucent)",
-                border: "1px solid rgba(16, 107, 163, 0.06)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
-                  📖 {language === "ar" ? "اللغة العربية وقواعدها" : "Arabic: Grammar"}
-                </span>
-                <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "rgba(220, 38, 38, 0.12)", color: "#dc2626", padding: "2px 6px", borderRadius: "6px" }}>
-                  {language === "ar" ? "مرتفع" : "High Risk"}
-                </span>
-              </div>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                {language === "ar" ? "صعوبة في تحديد مواضع إعراب جمع المذكر السالم." : "Issues parsed with complex verb modifiers rules."}
-              </span>
-              <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} 48%</span>
-                <span>{language === "ar" ? "4 محاولات" : "4 Sessions"}</span>
-              </div>
-            </div>
-
+            {/* FC9.15: real per-concept risk derived from the user's own activity aggregation
+                (same source as Weak Topics), not hardcoded subjects. */}
+            {weakTopics.slice(0, 6).map((c: any, i: number) => {
+              const acc = typeof c.accuracy === "number" ? c.accuracy : 0;
+              const sessions = Math.max(1, Math.round((c.totalQuestions || 5) / 5));
+              const risk = acc >= 80 ? "low" : acc >= 60 ? "moderate" : "high";
+              const riskBg = risk === "low" ? "rgba(34, 197, 94, 0.12)" : risk === "moderate" ? "rgba(234, 179, 8, 0.12)" : "rgba(220, 38, 38, 0.12)";
+              const riskColor = risk === "low" ? "#16a34a" : risk === "moderate" ? "#ca8a04" : "#dc2626";
+              const riskLabel = risk === "low" ? (language === "ar" ? "آمن" : "Low Risk") : risk === "moderate" ? (language === "ar" ? "متوسط" : "Moderate Risk") : (language === "ar" ? "مرتفع" : "High Risk");
+              const blurb = risk === "low"
+                ? (language === "ar" ? "إتقان جيد لهذا المفهوم." : "Solid mastery of this concept.")
+                : risk === "moderate"
+                ? (language === "ar" ? "فجوة بسيطة تحتاج مراجعة." : "Minor gap — worth a review pass.")
+                : (language === "ar" ? "ثغرة واضحة تحتاج تدريباً مركزاً." : "Clear weakness — needs focused practice.");
+              return (
+                <div
+                  key={i}
+                  style={{
+                    padding: "1rem",
+                    borderRadius: "14px",
+                    background: "var(--surface-translucent)",
+                    border: "1px solid rgba(16, 107, 163, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary)" }}>
+                      🎯 {c.name}
+                      {c.bookId && (
+                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: 600, marginInlineStart: "0.35rem" }}>
+                          {getBookTitle(c.bookId)}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: "0.7rem", fontWeight: 800, background: riskBg, color: riskColor, padding: "2px 6px", borderRadius: "6px", whiteSpace: "nowrap" }}>
+                      {riskLabel}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    {blurb}
+                  </span>
+                  <div style={{ fontSize: "0.7rem", color: "var(--primary)", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                    <span>{language === "ar" ? "دقة الإجابة:" : "Avg Accuracy:"} {acc}%</span>
+                    <span>{sessions} {language === "ar" ? "محاولة" : sessions === 1 ? "Session" : "Sessions"}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+          )}
         </div>
 
         {/* Swarm Real-Time Telemetry console */}
@@ -1025,20 +995,21 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             }}
             className="custom-scrollbar"
           >
-            <div>[SYSTEM] Inicitalizing MongoDB Insights aggregate client...</div>
-            <div style={{ color: "#a7f3d0" }}>
-              [MONGODB] pipeline: [ {`{ "$match": { "userId": "${user?.uid || "anon"}" } }`},{" "}
-              {`{ "$group": { "_id": "$topic_id", "accuracy": { "$avg": "$score" } } }`} ]
-            </div>
-            <div style={{ color: "#fef08a" }}>
-              [INSIGHTS_AGENT] Aggregating 12 historical study session attempts from MongoDB.
-            </div>
-            <div>[PRACTICE_AGENT] Feedback loop grading completed: Score 0.88 over 2 text practice inputs.</div>
-            <div style={{ color: "#38bdf8" }}>
-              [ZATONA_AGENT] Compressed Chapter 1 &apos;Matrices&apos; formula context into 4 active recall bytes.
-            </div>
-            <div style={{ color: "#fca5a5" }}>[COMPANION] User typed command &apos;/explain&apos;. Handoff activated in full screen context...</div>
-            <div>[SYSTEM] Telemetry synchronized. Metrics and Misconception Risk Matrix updated successfully.</div>
+            {/* FC9.15: honest trace built from the user's REAL fetched activities — no fabricated metrics. */}
+            {(() => {
+              const acts = activities || [];
+              const practice = acts.filter((a: any) => a.action === "practice_session" || a.action === "practice_attempt").length;
+              const zatona = acts.filter((a: any) => String(a.action || "").startsWith("zatona") || a.action === "summary").length;
+              const weakest = weakTopics[0];
+              const uidShort = (user?.uid || "anon").slice(0, 8);
+              const lines: { c: string; t: string }[] = [];
+              lines.push({ c: "#a7f3d0", t: `[MONGODB] $match { userId: "${uidShort}…" } → ${acts.length} activity docs` });
+              lines.push({ c: "#fef08a", t: `[INSIGHTS_AGENT] aggregated ${practice} practice + ${zatona} zatona sessions` });
+              if (weakest) lines.push({ c: "#fca5a5", t: `[RISK] weakest concept "${weakest.name}" @ ${weakest.accuracy}% accuracy` });
+              lines.push({ c: "#38bdf8", t: `[TOKENS] ${consumedClt}/${totalAllocatedClt} CLT consumed this window` });
+              lines.push({ c: "#94a3b8", t: acts.length === 0 ? "[SYSTEM] no activity yet — telemetry idle" : "[SYSTEM] telemetry synchronized over real user_activities" });
+              return lines.map((l, i) => (<div key={i} style={{ color: l.c }}>{l.t}</div>));
+            })()}
           </div>
         </div>
       </section>

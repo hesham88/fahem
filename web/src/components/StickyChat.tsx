@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { auth, storage } from "../lib/firebase";
 import { authedFetch } from "../lib/authedFetch";
+import { stopAllAudio, registerActiveAudio } from "../lib/ttsBus";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useTranslation } from "../context/LanguageContext";
@@ -734,11 +735,9 @@ export default function StickyChat() {
       return;
     }
 
-    if ((window as any)._activeAudio) {
-      (window as any)._activeAudio.pause();
-      (window as any)._activeAudio = null;
-    }
-    window.speechSynthesis.cancel();
+    // FC9.8: stop any other playback (page read / practice / other companion msg)
+    // before starting this one — guarantees no two voices overlap.
+    stopAllAudio();
 
     const cleanText = text
       .replace(/\[\^.*?\]/g, "")
@@ -892,7 +891,8 @@ export default function StickyChat() {
           const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
           const audio = new Audio(audioUrl);
           (window as any)._activeAudio = audio;
-          
+          registerActiveAudio(audio); // FC9.8
+
           audio.onended = () => {
             if (speakingMsgIdRef.current === messageId) {
               setSpeakingMsgId(null);
@@ -1431,12 +1431,13 @@ export default function StickyChat() {
     }
   }, [language, messages.length]);
 
-  // Automatically trigger dynamic capabilities-grounded streaming welcome message
-  useEffect(() => {
-    if ((user || demoMode) && messages.length === 1 && messages[0]?.id === "welcome") {
-      triggerDynamicWelcome(language);
-    }
-  }, [user, demoMode, language]);
+  // FC9.1: The static template (`ct("welcome")`) + quick-action chips are now the REAL
+  // first message. We no longer auto-stream an LLM welcome on every mount/refresh/language
+  // switch — that burned the user's tokens on a repetitive, identical greeting every page
+  // load. The companion's first live response now happens on the user's first prompt, and
+  // the chat/session name is derived from that prompt's intent (agent route, FC7.39).
+  // `triggerDynamicWelcome` is retained (callable from an explicit "introduce yourself"
+  // action) but is no longer auto-invoked.
 
   // Sync authentication state
   useEffect(() => {
@@ -1983,9 +1984,8 @@ export default function StickyChat() {
     ]);
     setSessionLogs([]);
     setShowHistory(false);
-    if (user) {
-      triggerDynamicWelcome(language);
-    }
+    // FC9.1: new chats also start from the static template (no auto LLM welcome) —
+    // the companion responds live on the user's first prompt.
   };
 
   const getMentionOptions = () => {

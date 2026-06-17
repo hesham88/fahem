@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../../lib/firebase";
 import { authedFetch } from "../../lib/authedFetch";
+import { stopAllAudio, registerActiveAudio } from "../../lib/ttsBus";
 import { Dropdown } from "../ui/Dropdown";
 
 
@@ -2515,6 +2516,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
 
     try {
+      // FC9.8: stop any other playback (companion / practice / a previous page read)
+      // before starting this read — guarantees no two voices overlap.
+      stopAllAudio();
       setIsReadingPage(true);
       setAudioIsPaused(false);
       setAudioCurrentTime(0);
@@ -2540,6 +2544,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
           const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
           const audio = new Audio(audioUrl);
           activeAudioRef.current = audio;
+          registerActiveAudio(audio); // FC9.8
 
           // Wire up event listeners
           audio.onloadedmetadata = () => {
@@ -3326,7 +3331,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                             const cAr = (p.contentAr || "").toLowerCase();
                             const chEn = (p.chapterTitleEn || "").toLowerCase();
                             const chAr = (p.chapterTitleAr || "").toLowerCase();
-                            return tEn.includes(search) || tAr.includes(search) || cEn.includes(search) || cAr.includes(search) || chEn.includes(search) || chAr.includes(search);
+                            // FC9.11: also search rendered math/LaTeX formulas so queries like
+                            // "vector" / "latex" that appear in formula strings are found.
+                            const fStr = ((p.formulas || []) as any[]).join(" ").toLowerCase();
+                            return tEn.includes(search) || tAr.includes(search) || cEn.includes(search) || cAr.includes(search) || chEn.includes(search) || chAr.includes(search) || fStr.includes(search);
                           });
 
                           if (filteredPages.length === 0) {
@@ -3473,19 +3481,33 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                         {(() => {
                           const chapters = buildTOC();
                           const searchQuery = tocSearch.trim().toLowerCase();
-                          
+
+                          // FC9.11: search page CONTENT too — not just chapter/topic titles —
+                          // so queries like "vector" or "latex" that live in the body text of a
+                          // page surface their chapter/topic. The whole book's pages are already
+                          // loaded in `loadedBookPages`, so we can map pageNum -> content once.
+                          const pageContentMap: Record<number, string> = {};
+                          if (searchQuery) {
+                            getAllPages(selectedBookReader!, loadedBookPages).forEach((p: any) => {
+                              pageContentMap[p.pageNum] = `${p.contentEn || ""} ${p.contentAr || ""} ${(p.formulas || []).join(" ")}`.toLowerCase();
+                            });
+                          }
+
                           const filteredChapters = chapters.map((ch: any) => {
-                            const isChMatch = ch.titleEn.toLowerCase().includes(searchQuery) || ch.titleAr.toLowerCase().includes(searchQuery);
-                            const matchingTopics = ch.topics.filter((top: any) => 
-                              top.titleEn.toLowerCase().includes(searchQuery) || top.titleAr.toLowerCase().includes(searchQuery)
-                            );
-                            
-                            if (isChMatch || matchingTopics.length > 0) {
-                              return {
-                                ...ch,
-                                topics: searchQuery ? matchingTopics : ch.topics,
-                                isMatch: true
-                              };
+                            if (!searchQuery) return { ...ch, isMatch: true };
+
+                            const chTitleMatch = ch.titleEn.toLowerCase().includes(searchQuery) || ch.titleAr.toLowerCase().includes(searchQuery);
+                            const matchingTopics = ch.topics.filter((top: any) => {
+                              const titleMatch = top.titleEn.toLowerCase().includes(searchQuery) || top.titleAr.toLowerCase().includes(searchQuery);
+                              const contentMatch = (pageContentMap[top.pageNum] || "").includes(searchQuery);
+                              return titleMatch || contentMatch;
+                            });
+
+                            if (matchingTopics.length > 0) {
+                              return { ...ch, topics: matchingTopics, isMatch: true };
+                            }
+                            if (chTitleMatch) {
+                              return { ...ch, topics: ch.topics, isMatch: true };
                             }
                             return null;
                           }).filter(Boolean) as any[];
@@ -3514,13 +3536,22 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                               }}>
                                 <button
                                   onClick={() => {
-                                    if (!searchQuery) {
-                                      setExpandedChapters(prev => ({
-                                        ...prev,
-                                        [ch.id]: !isExpanded
-                                      }));
+                                    // FC9.11: separate fold from navigation. Clicking a chapter
+                                    // header toggles its fold; it only jumps to the chapter's
+                                    // first page when EXPANDING (collapsing no longer yanks the
+                                    // reader to that chapter — the old behavior felt broken).
+                                    if (searchQuery) {
+                                      if (ch.topics && ch.topics.length > 0) {
+                                        setReaderCurrentPage(ch.topics[0].pageNum);
+                                      }
+                                      return;
                                     }
-                                    if (ch.topics && ch.topics.length > 0) {
+                                    const willExpand = !isExpanded;
+                                    setExpandedChapters(prev => ({
+                                      ...prev,
+                                      [ch.id]: willExpand
+                                    }));
+                                    if (willExpand && ch.topics && ch.topics.length > 0) {
                                       setReaderCurrentPage(ch.topics[0].pageNum);
                                     }
                                   }}

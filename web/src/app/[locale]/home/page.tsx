@@ -61,7 +61,6 @@ import {
   FiUserPlus,
   FiUserMinus,
   FiSend,
-  FiUser,
   FiX,
   FiMenu,
   FiAward,
@@ -780,10 +779,12 @@ export default function Home() {
     return language === "ar" ? "🥉 طالب واعد" : "🥉 Bright Spark";
   };
   const activeXp = resolvedXp;
-  const activeLevel = Math.floor(activeXp / 1000) + 1;
+  // FC9.5: per-level span unified to 100 XP across every counter (nav meter, Insights,
+  // Practice HUD) — was /1000 here while the HUD + navLevel already used /100.
+  const activeLevel = Math.floor(activeXp / 100) + 1;
   const activeStreak = resolvedStreak;
-  const nextLevelXp = activeLevel * 1000;
-  const xpProgressPercent = (activeXp % 1000) / 10;
+  const nextLevelXp = activeLevel * 100;
+  const xpProgressPercent = (activeXp % 100);
   const consumedClt = realTokenStats?.used?.daily ?? 0;
   const totalAllocatedClt = Math.round((realTokenStats?.limit?.weekly ?? (userProfile?.totalAllocatedClt || 250000)) / 7);
   const dailyUsed = consumedClt;
@@ -2441,15 +2442,23 @@ export default function Home() {
     if (activeTab !== "social" || !chatRecipient || !user) return;
 
     const intervalId = setInterval(async () => {
+      // FC9.7: skip the poll while the tab is backgrounded — no waste, and we refresh
+      // immediately on the next tick when the user returns.
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
         const res = await authedFetch(`/api/chat/message?senderId=${encodeURIComponent(user.uid)}&recipientId=${encodeURIComponent(chatRecipient.userId)}`);
         if (res.ok) {
           const data = await res.json();
           const fetchedMsgs = data.messages || [];
-          
+
           setChatMessages(prev => {
-            if (prev.length !== fetchedMsgs.length || JSON.stringify(prev) !== JSON.stringify(fetchedMsgs)) {
-              return fetchedMsgs;
+            // FC9.7: the server is authoritative, but never let a poll clobber an
+            // optimistic message that hasn't been persisted/echoed back yet — keep any
+            // local `_optimistic` rows that the server response doesn't yet include.
+            const pendingOptimistic = prev.filter((m: any) => m._optimistic && !fetchedMsgs.some((f: any) => (f._clientId && f._clientId === m._clientId) || (f.senderId === m.senderId && f.content === m.content)));
+            const merged = pendingOptimistic.length > 0 ? [...fetchedMsgs, ...pendingOptimistic] : fetchedMsgs;
+            if (prev.length !== merged.length || JSON.stringify(prev) !== JSON.stringify(merged)) {
+              return merged;
             }
             return prev;
           });
@@ -2457,7 +2466,7 @@ export default function Home() {
       } catch (err) {
         console.error("Error silently syncing chat messages:", err);
       }
-    }, 3000);
+    }, 1200);
 
     return () => clearInterval(intervalId);
   }, [activeTab, chatRecipient, user]);
@@ -2609,6 +2618,18 @@ export default function Home() {
   const groundedLogsEndRef = useRef<HTMLDivElement>(null);
   const onboardingEndRef = useRef<HTMLDivElement>(null);
   const onboardingScrollContainerRef = useRef<HTMLDivElement>(null);
+  // FC9.6: scroll the main content (and window) to the top whenever the active tab
+  // changes, so navigation always lands at the beginning of the page rather than
+  // wherever the previous tab was scrolled.
+  const mainContentRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    try {
+      mainContentRef.current?.scrollTo({ top: 0, left: 0 });
+      window.scrollTo(0, 0);
+    } catch {
+      /* no-op */
+    }
+  }, [activeTab]);
 
   // Real-time Multi-Agent Telemetry State (MongoDB Engine)
   const [activeDbAgent, setActiveDbAgent] = useState<string>("idle");
@@ -2737,13 +2758,16 @@ export default function Home() {
     const msgContent = chatInput.trim();
     setChatInput("");
     
-    // Optimistic update
+    // FC9.7: optimistic update — show the sent message instantly, tagged so the
+    // background poll won't clobber it before the server echoes it back.
     const tempMsg = {
       senderId: user.uid,
       senderName: userProfile?.name || user.email?.split("@")[0] || "Me",
       recipientId: chatRecipient.userId,
       content: msgContent,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      _optimistic: true,
+      _clientId: `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     };
     setChatMessages((prev) => [...prev, tempMsg]);
 
@@ -6651,39 +6675,9 @@ export default function Home() {
               <span>{language === "ar" ? "التواصل والدردشة" : "Social Network"}</span>
             </button>
 
-            {userProfile && (
-              <button
-                onClick={() => {
-                  const targetUsername = userProfile.username || user?.email?.split("@")[0] || `user_${user?.uid?.slice(0, 6)}`;
-                  router.push(`/${language}/profile/${targetUsername}`);
-                }}
-                className="sidebar-nav-btn"
-                type="button"
-              >
-                <FiUser />
-                <span>{language === "ar" ? "ملفي الشخصي المعزز" : "My Public Profile"}</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={`sidebar-nav-btn ${activeTab === "settings" ? "active" : ""}`}
-              type="button"
-            >
-              <FiSettings />
-              <span>{language === "ar" ? "الإعدادات والخصوصية" : "Account Settings"}</span>
-            </button>
-
-            <a 
-              href="https://github.com/hesham88/fahem" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="sidebar-nav-btn"
-              style={{ textDecoration: "none", color: "inherit" }}
-            >
-              <FiGithub />
-              <span>{t("nav_github")}</span>
-            </a>
+            {/* FC9.9: "My Public Profile" (header already links the profile), "Account Settings"
+                (gear) and the GitHub link were removed from the nav list and relocated to the
+                footer controls row below as compact icon buttons. */}
           </nav>
 
 
@@ -6730,6 +6724,28 @@ export default function Home() {
             >
               ?
             </button>
+
+            {/* FC9.9: Account Settings (gear) — relocated from the nav list */}
+            <button
+              onClick={() => setActiveTab("settings")}
+              type="button"
+              title={language === "ar" ? "الإعدادات والخصوصية" : "Account Settings"}
+              className={activeTab === "settings" ? "active" : ""}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "8px", border: "1px solid var(--card-border)", background: activeTab === "settings" ? "var(--primary)" : "var(--card-bg)", color: activeTab === "settings" ? "#fff" : "var(--primary)", cursor: "pointer", outline: "none" }}
+            >
+              <FiSettings style={{ fontSize: "1.05rem" }} />
+            </button>
+
+            {/* FC9.9: GitHub — relocated from the nav list */}
+            <a
+              href="https://github.com/hesham88/fahem"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="GitHub"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "8px", border: "1px solid var(--card-border)", background: "var(--card-bg)", color: "var(--primary)", cursor: "pointer", outline: "none", textDecoration: "none" }}
+            >
+              <FiGithub style={{ fontSize: "1.05rem" }} />
+            </a>
           </div>
 
           {/* Profile Card & Token Telemetry */}
@@ -6852,7 +6868,7 @@ export default function Home() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="main-content" style={{ position: "relative", zIndex: 2 }}>
+      <main ref={mainContentRef} className="main-content" style={{ position: "relative", zIndex: 2 }}>
         {/* Judge Sandbox Persona Switcher */}
 
 
@@ -6959,6 +6975,7 @@ export default function Home() {
           <PracticePanel
             language={language}
             dynamicBooks={dynamicBooks}
+            dynamicSubjects={dynamicSubjects}
             renderSpaceSelectorBar={renderSpaceSelectorBar}
             renderSpaceHistory={renderSpaceHistory}
             addSpaceHistory={addSpaceHistory}
@@ -6997,6 +7014,7 @@ export default function Home() {
             zatonaLoading={zatonaLoading}
             setZatonaLoading={setZatonaLoading}
             dynamicBooks={dynamicBooks}
+            dynamicSubjects={dynamicSubjects}
             renderSpaceSelectorBar={renderSpaceSelectorBar}
             renderSpaceHistory={renderSpaceHistory}
             addSpaceHistory={addSpaceHistory}

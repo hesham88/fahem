@@ -22,6 +22,15 @@ def get_active_db(client):
     return client[db_target_var.get()]
 
 
+def _pooled_client():
+    """FC9.12 (perf): process-wide pooled MongoClient (see services._pooled_client).
+    Guardrails run on every AI request, so a fresh client+handshake per call here was a
+    hot-path latency tax. `.close()` on the returned client is a no-op, so the existing
+    client.close() calls stay safe."""
+    from tools import get_cached_mongodb_client
+    return get_cached_mongodb_client()
+
+
 # Configure basic logging for auditing visibility
 try:
     logging.basicConfig(level=logging.INFO)
@@ -211,7 +220,7 @@ def _check_demo_session_budget(session_id: str, tier) -> tuple[bool, str]:
             tier_int = 0
         limit = DEMO_SESSION_TOKEN_LIMITS.get(tier_int, DEMO_SESSION_TOKEN_LIMITS[0])
         uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
-        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+        client = _pooled_client()
         db = client["fahem_sandbox"]  # demo sessions live only in the sandbox
         used = 0
         for doc in db["token_telemetry"].find({"sandboxSessionId": session_id}, {"totalTokens": 1}):
@@ -249,7 +258,7 @@ def check_token_credits(uid: str, role: str) -> tuple[bool, str]:
         from datetime import datetime, timedelta
         
         uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
-        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+        client = _pooled_client()
         db = get_active_db(client)
         
         # 1. Load System Config defaults
@@ -454,7 +463,7 @@ def before_agent_callback(*args, **kwargs) -> Optional[Content]:
                     from agents.tools import get_mongodb_uri
                 uri = get_mongodb_uri()
                 if uri:
-                    client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+                    client = _pooled_client()
                     try:
                         try:
                             from agent import get_active_db
@@ -893,7 +902,7 @@ def after_tool_callback(*args, **kwargs) -> Optional[dict]:
                     from pymongo import MongoClient
                     from datetime import datetime, timedelta
                     uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
-                    client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+                    client = _pooled_client()
                     db = get_active_db(client)
                     config_doc = db["config"].find_one() or {}
                     weekly_limit = config_doc.get("weeklyAllocationLimit", 250000)

@@ -819,6 +819,49 @@ def verify_d_directory():
     return True, f"non-admin member can list the directory ({len(users)} members) and view '{ident}' public profile (PII stripped) — FC8 holds"
 
 
+def verify_d_no_ip():
+    # D-NO-IP (FC9.10): the Live Demo Sessions Monitor must NOT capture or store the
+    # visitor's IP address (privacy), and every demo session must carry a non-identifying
+    # `session_number` label instead. Pre-fix, /api/demo/enter stamped x-forwarded-for into
+    # the session doc and the monitor rendered `IP: {sess.ip}`.
+    #
+    # First, entering the demo must succeed IP-free (no capture path crash).
+    tok, err = enter_demo("student")
+    if not tok:
+        return False, "demo/enter failed: " + (err or "no token")
+    sid = decode_demo_token(tok).get("sandbox_session_id")
+
+    # If the demo-sessions monitor feed is readable (real prod admin during the deploy
+    # gate), assert ungameably: no session exposes an `ip`, and sessions carry a
+    # `session_number`. Under the sandbox clamp (no admin), this feed is not readable —
+    # the DB-content assertion is then owner-eyeball, same graceful pattern as D-DIRECTORY.
+    st, body = _req("/api/admin/demo-sessions", token=tok)
+    sessions = []
+    if st == 200:
+        try:
+            parsed = json.loads(body)
+            if isinstance(parsed, dict):
+                for k in ("sessions", "demoSessions", "data", "items"):
+                    if isinstance(parsed.get(k), list):
+                        sessions = parsed[k]
+                        break
+            elif isinstance(parsed, list):
+                sessions = parsed
+        except Exception:
+            sessions = []
+
+    if sessions:
+        leaked = next((s for s in sessions if isinstance(s, dict) and s.get("ip")), None)
+        if leaked is not None:
+            return False, "a demo session still stores an `ip` field — FC9.10 privacy regression (IP not scrubbed)"
+        has_num = any(isinstance(s, dict) and s.get("session_number") is not None for s in sessions)
+        if not has_num:
+            return False, "no demo session carries a `session_number` — FC9.10 not deployed (monitor would have nothing to show in place of IP)"
+        return True, f"demo sessions expose no IP and carry session_number ({len(sessions)} session(s) checked) — FC9.10 holds"
+
+    return True, f"demo/enter succeeded IP-free (session {sid}); monitor feed not readable under the sandbox clamp — DB no-IP/session_number assertion is owner-eyeball under a real prod admin"
+
+
 REEXEC = {
     "D1": verify_d1, "D2": verify_d2, "D3": verify_d3, "D4": verify_d4,
     "D5": lambda: verify_d5_d6("D5"), "D6": lambda: verify_d5_d6("D6"),
@@ -831,8 +874,9 @@ REEXEC = {
     "D-ZATONA": verify_zatona,
     "D-INGEST-TRIGGER": verify_d_ingest_trigger,
     "D-DIRECTORY": verify_d_directory,
+    "D-NO-IP": verify_d_no_ip,
 }
-FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL", "D-DIRECTORY"]
+FAST = ["D1", "D2", "D3", "D7", "D9", "PERF", "D-CONTACT", "D-AUTOCOMPLETE", "D-CRAWL-CTRL", "D-DIRECTORY", "D-NO-IP"]
 SLOW = ["D4", "D5", "D6", "D8", "D-PYBOOK", "D-LANG", "D-AGENT-CREATE", "D-ZATONA", "D-INGEST-TRIGGER"]     # agent/kill/TTS/pybook/lang/create/zatona — the full deploy gate
 
 

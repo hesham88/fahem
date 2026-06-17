@@ -109,10 +109,43 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
   handleStartStudy,
   t,
 }) => {
-  const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  // FC9.3: books and chapters are independently foldable. Each book is an umbrella that
+  // folds/unfolds its chapters; each chapter folds/unfolds its topics. Both use a Set so
+  // multiple can be open at once (the old single-open `expandedModule` allowed only one
+  // chapter open and books were always expanded).
+  const [expandedBooks, setExpandedBooks] = useState<Set<string>>(new Set());
+  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
+  const toggleBook = (key: string) => {
+    setExpandedBooks((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleChapter = (key: string) => {
+    setExpandedChapters((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
   const [modulesCollapsed, setModulesCollapsed] = useState<boolean>(false);
   const [curricula, setCurricula] = useState<any[]>([]);
   const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>("");
+
+  // FC9.3: when the selected subject changes, default the first book of that subject
+  // open (and collapse chapters) so the user immediately sees something to fold.
+  useEffect(() => {
+    const books = dynamicBooks ? dynamicBooks.filter((b: any) => b.subject_id === selectedSubjectId) : [];
+    if (books.length > 0) {
+      const firstKey = String(books[0]._id || books[0].id || 0);
+      setExpandedBooks(new Set([firstKey]));
+    } else {
+      setExpandedBooks(new Set());
+    }
+    setExpandedChapters(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubjectId, dynamicBooks]);
 
   useEffect(() => {
     const fetchCurricula = async () => {
@@ -355,6 +388,8 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                 const bookTitle = language === "ar"
                   ? (book.title_ar || book.titleAr || book.title)
                   : (book.title_en || book.titleEn || book.title);
+                const bookKey = String(book._id || book.id || bIdx);
+                const isBookExpanded = expandedBooks.has(bookKey);
 
                 return (
                   <div
@@ -368,12 +403,18 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                       "--subject-color": activeSubjectColor,
                     } as React.CSSProperties}
                   >
-                    {/* Book Subtitle */}
-                    <div
+                    {/* FC9.3: Book umbrella header — click to fold/unfold its chapters */}
+                    <button
+                      type="button"
+                      onClick={() => toggleBook(bookKey)}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "0.5rem",
+                        width: "100%",
+                        textAlign: language === "ar" ? "right" : "left",
+                        cursor: "pointer",
+                        border: "none",
                         background: `color-mix(in srgb, var(--subject-color) 8%, transparent)`,
                         borderInlineStart: "4px solid var(--subject-color)",
                         padding: "0.5rem 1rem",
@@ -381,18 +422,24 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                         marginBottom: "0.25rem",
                       }}
                     >
-                      <SubjectsBookCover 
-                        src={book.coverThumbUrl || book.coverUrl} 
-                        alt={bookTitle} 
-                        subjectColor={activeSubjectColor} 
-                        subjectIcon={selectedSubjectObj?.icon || "📖"} 
+                      <SubjectsBookCover
+                        src={book.coverThumbUrl || book.coverUrl}
+                        alt={bookTitle}
+                        subjectColor={activeSubjectColor}
+                        subjectIcon={selectedSubjectObj?.icon || "📖"}
                       />
-                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--foreground)" }}>
+                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--foreground)", flex: 1 }}>
                         {bookTitle}
                       </span>
-                    </div>
+                      {chapters.length > 0 && (
+                        <span style={{ fontSize: "0.7rem", color: "var(--subject-color)", fontWeight: 700 }}>
+                          {chapters.length} {language === "ar" ? "فصل" : "ch."}
+                        </span>
+                      )}
+                      <span style={{ fontSize: "0.8rem", color: "var(--subject-color)", transition: "transform 0.2s", transform: isBookExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+                    </button>
 
-                    {chapters.length === 0 ? (
+                    {!isBookExpanded ? null : chapters.length === 0 ? (
                       <div style={{ padding: "1rem", fontStyle: "italic", fontSize: "0.85rem", color: "#6a7c88", textAlign: "center" }}>
                         {language === "ar" ? "لا توجد فصول دراسية مدخلة بعد" : "No chapters available yet"}
                       </div>
@@ -400,7 +447,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                       <div style={{ maxHeight: "55vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.6rem", paddingInlineEnd: "4px" }}>
                       {chapters.map((ch: any, cIdx: number) => {
                         const chapterKey = `${book._id || bIdx}-${cIdx}`;
-                        const isExpanded = expandedModule === chapterKey;
+                        const isExpanded = expandedChapters.has(chapterKey);
                         const chapterTitle = language === "ar" 
                           ? (ch.title_ar || ch.titleAr || ch.title || `الفصل ${cIdx + 1}`)
                           : (ch.titleEn || ch.title || `Chapter ${cIdx + 1}`);
@@ -415,7 +462,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                               style={{
                                 border: "1px solid var(--card-border)",
                                 borderRadius: "var(--border-radius-sm)",
-                                background: "#ffffff",
+                                background: "var(--card-bg)",
                                 overflow: "hidden",
                                 display: "flex",
                                 justifyContent: "space-between",
@@ -459,12 +506,12 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                             style={{
                               border: "1px solid var(--card-border)",
                               borderRadius: "var(--border-radius-sm)",
-                              background: "#ffffff",
+                              background: "var(--card-bg)",
                               overflow: "hidden",
                             }}
                           >
                             <button
-                              onClick={() => setExpandedModule(isExpanded ? null : chapterKey)}
+                              onClick={() => toggleChapter(chapterKey)}
                               style={{
                                 width: "100%",
                                 padding: "1rem",
@@ -508,7 +555,7 @@ export const SubjectsPanel: React.FC<SubjectsPanelProps> = ({
                                         justifyContent: "space-between",
                                         alignItems: "center",
                                         padding: "0.5rem 0.75rem",
-                                        background: "#ffffff",
+                                        background: "var(--card-bg)",
                                         border: "1px solid rgba(0,0,0,0.03)",
                                         borderRadius: "8px",
                                         boxShadow: "0 1px 2px rgba(0,0,0,0.01)",

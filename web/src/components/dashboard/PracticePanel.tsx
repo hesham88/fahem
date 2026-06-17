@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FiCpu, FiClock, FiRefreshCw } from "react-icons/fi";
 import { authedFetch } from "../../lib/authedFetch";
+import { stopAllAudio, registerActiveAudio } from "../../lib/ttsBus";
 
 const SUBTOPIC_REGISTRY: { [subject: string]: string[] } = {
   Math: ["Matrices", "Determinants", "Cramer's Rule", "Probability", "Statistics", "Linear Algebra"],
@@ -58,6 +59,7 @@ interface Book {
 interface PracticePanelProps {
   language: string;
   dynamicBooks: Book[];
+  dynamicSubjects?: any[];
   renderSpaceSelectorBar: (tab: "practice" | "plan" | "timetable" | "zatona") => React.ReactNode;
   renderSpaceHistory: () => React.ReactNode;
   addSpaceHistory: (actionEn: string, actionAr: string) => void;
@@ -74,6 +76,7 @@ interface PracticePanelProps {
 export const PracticePanel: React.FC<PracticePanelProps> = ({
   language,
   dynamicBooks,
+  dynamicSubjects,
   renderSpaceSelectorBar,
   renderSpaceHistory,
   addSpaceHistory,
@@ -89,6 +92,17 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   const [practiceSelectedChapters, setPracticeSelectedChapters] = useState<string[]>([]);
   const [practiceCustomConcepts, setPracticeCustomConcepts] = useState<string>("");
   const [practiceSubject, setPracticeSubject] = useState<string>("Math");
+  // FC9.2: when real Course Subjects are available, default the scope to the first
+  // real subject (the hardcoded "Math" default would otherwise not match any option).
+  useEffect(() => {
+    if (dynamicSubjects && dynamicSubjects.length > 0) {
+      const names = dynamicSubjects.map((s: any) => s.name || s.name_en || s.name_ar).filter(Boolean);
+      if (!names.includes(practiceSubject)) {
+        setPracticeSubject(names[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicSubjects]);
   const [practiceMode, setPracticeMode] = useState<"mcq" | "text" | "oral">("mcq");
   const [practiceSessionType, setPracticeSessionType] = useState<"infinite" | "quiz">("infinite");
   const [practiceQuizQuestionsCount, setPracticeQuizQuestionsCount] = useState<number>(5);
@@ -182,42 +196,78 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
   // Aggregate user practice achievements dynamically into the mastery heatmap list
   const subtopicMastery = useMemo(() => {
     const registry: { [subtopic: string]: { correct: number; total: number; subject: string } } = {};
-    
-    // Add all registered subtopics as unattempted initially
-    Object.entries(SUBTOPIC_REGISTRY).forEach(([subject, subtopics]) => {
-      subtopics.forEach((subtopic) => {
-        registry[subtopic] = { correct: 0, total: 0, subject };
+
+    // FC9.13: seed the heatmap from the REAL system structure — every Course Subject →
+    // its books → chapters → topics — instead of a hardcoded Math/Science/Arabic/General
+    // registry of fake topics. Each topic (or a chapter with no topics) becomes a node,
+    // grouped under its real subject name.
+    const subjectNameById: { [id: string]: string } = {};
+    (dynamicSubjects || []).forEach((s: any) => {
+      subjectNameById[s._id] = s.name || s.name_en || s.name_ar || "";
+    });
+
+    let seededFromReal = false;
+    (dynamicBooks || []).forEach((book: any) => {
+      const subjectName = subjectNameById[book.subject_id] || book.subject || "General";
+      const chapters = book.chapters || [];
+      chapters.forEach((ch: any, ci: number) => {
+        const topics = ch.topics || [];
+        if (topics.length === 0) {
+          const chTitle = (language === "ar"
+            ? (ch.titleAr || ch.title_ar || ch.title)
+            : (ch.titleEn || ch.title)) || `Chapter ${ci + 1}`;
+          if (!registry[chTitle]) registry[chTitle] = { correct: 0, total: 0, subject: subjectName };
+          seededFromReal = true;
+        } else {
+          topics.forEach((top: any, ti: number) => {
+            const tTitle = (language === "ar"
+              ? (top.titleAr || top.title_ar || top.title)
+              : (top.titleEn || top.title)) || `Topic ${ti + 1}`;
+            if (!registry[tTitle]) registry[tTitle] = { correct: 0, total: 0, subject: subjectName };
+            seededFromReal = true;
+          });
+        }
       });
     });
 
-    // Loop through all activities to aggregate
-    allActivities.forEach((act: any) => {
-      if (act.action === "practice_session" || act.action === "practice_attempt") {
-        const question = act.details?.question || "";
-        const givenSubject = act.details?.subject || "General";
-        const isCorrect = !!(act.details?.isCorrect || act.status === "correct");
-        
-        // Find subtopic - if details has subtopic, use it. Otherwise determine on client
-        let subtopic = act.details?.subtopic;
-        if (!subtopic) {
-          subtopic = determineSubtopic(question, givenSubject);
-        }
+    // Fallback only if no real ingested structure exists yet, so the panel is never empty.
+    if (!seededFromReal) {
+      Object.entries(SUBTOPIC_REGISTRY).forEach(([subject, subtopics]) => {
+        subtopics.forEach((subtopic) => {
+          registry[subtopic] = { correct: 0, total: 0, subject };
+        });
+      });
+    }
 
-        // Aggregate!
-        if (registry[subtopic]) {
-          registry[subtopic].total += 1;
-          if (isCorrect) {
-            registry[subtopic].correct += 1;
-          }
-        } else {
-          // If we got some other custom subtopic, dynamic registration
-          registry[subtopic] = {
-            correct: isCorrect ? 1 : 0,
-            total: 1,
-            subject: givenSubject
-          };
-        }
+    // FC9.13: aggregate BOTH practice and zatona activity onto the real subject/chapter/topic
+    // nodes. Practice contributes correct/total accuracy; zatona contributes engagement (and a
+    // comprehension signal when present) so a topic the user only did zatona on is no longer
+    // shown as "Unattempted".
+    const PRACTICE = new Set(["practice_session", "practice_attempt"]);
+    const ZATONA = new Set(["zatona_session", "zatona", "summary", "summary_session"]);
+    allActivities.forEach((act: any) => {
+      const isPractice = PRACTICE.has(act.action);
+      const isZatona = ZATONA.has(act.action);
+      if (!isPractice && !isZatona) return;
+
+      const d = act.details || {};
+      const givenSubject = d.subject || "General";
+      // FC9.13: resolve the node by the most specific real anchor available —
+      // subtopic → topic → chapter — before falling back to a heuristic from the question.
+      let node = d.subtopic || d.topic || d.chapter;
+      if (!node) node = determineSubtopic(d.question || "", givenSubject);
+
+      // Practice has an explicit correctness; zatona counts as engagement, and as "correct"
+      // only when it carries a positive comprehension/score signal.
+      const isCorrect = isPractice
+        ? !!(d.isCorrect || act.status === "correct")
+        : (d.isCorrect === true || act.status === "correct" || (typeof d.score === "number" && d.score >= 70));
+
+      if (!registry[node]) {
+        registry[node] = { correct: 0, total: 0, subject: givenSubject };
       }
+      registry[node].total += 1;
+      if (isCorrect) registry[node].correct += 1;
     });
 
     // Convert registry back into an array for easy rendering
@@ -240,7 +290,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
         status
       };
     });
-  }, [allActivities]);
+  }, [allActivities, dynamicBooks, dynamicSubjects, language]);
 
   const filteredHeatmapData = useMemo(() => {
     if (heatmapSubjectFilter === "All") {
@@ -248,6 +298,16 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     }
     return subtopicMastery.filter(item => item.subject.toLowerCase() === heatmapSubjectFilter.toLowerCase());
   }, [subtopicMastery, heatmapSubjectFilter]);
+
+  // FC9.13: the filter chips are the REAL subjects present in the heatmap, not a hardcoded
+  // Math/Science/Arabic/General list.
+  const heatmapSubjects = useMemo(() => {
+    const names: string[] = [];
+    subtopicMastery.forEach((i) => {
+      if (i.subject && !names.includes(i.subject)) names.push(i.subject);
+    });
+    return ["All", ...names];
+  }, [subtopicMastery]);
 
   const [practiceLoading, setPracticeLoading] = useState<boolean>(false);
   const [practiceCurrentQuestion, setPracticeCurrentQuestion] = useState<any>(null);
@@ -515,13 +575,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
       return;
     }
 
-    if ((window as any)._activeAudioPractice) {
-      (window as any)._activeAudioPractice.pause();
-      (window as any)._activeAudioPractice = null;
-    }
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    // FC9.8: stop any other playback (page read / companion / other question)
+    // before starting this one — guarantees no two voices overlap.
+    stopAllAudio();
 
     const cleanText = text
       .replace(/\*\*|__/g, "")
@@ -611,6 +667,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
           const audioUrl = `data:${data.mimeType || "audio/wav"};base64,${data.audioContent}`;
           const audio = new Audio(audioUrl);
           (window as any)._activeAudioPractice = audio;
+          registerActiveAudio(audio); // FC9.8
 
           audio.onended = () => {
             if (speakingTypeRef.current === type) {
@@ -916,10 +973,25 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                   onChange={(e) => setPracticeSubject(e.target.value)}
                   style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700 }}
                 >
-                  <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
-                  <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
-                  <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
-                  <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
+                  {/* FC9.2: read the user's real Course Subjects (same source as SubjectsPanel),
+                      not a hardcoded Math/Science/Arabic/General list. The value is the subject
+                      name itself — a strictly better grounding string for the generator (which
+                      keys on text). Falls back to the generic list only if no real subjects. */}
+                  {dynamicSubjects && dynamicSubjects.length > 0 ? (
+                    dynamicSubjects.map((s: any) => {
+                      const label = language === "ar" ? (s.name_ar || s.name || s.name_en) : (s.name || s.name_en || s.name_ar);
+                      return (
+                        <option key={s._id || label} value={s.name || s.name_en || label}>{label}</option>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
+                      <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
+                      <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
+                      <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
+                    </>
+                  )}
                 </select>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -1318,9 +1390,9 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                 </div>
               </div>
 
-              {/* Subject Category Selectors */}
+              {/* Subject Category Selectors — FC9.13: real subjects from the user's structure */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                {["All", "Math", "Science", "Arabic", "General"].map((sub) => {
+                {heatmapSubjects.map((sub) => {
                   const isActive = heatmapSubjectFilter === sub;
                   return (
                     <button
@@ -1338,11 +1410,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
                         transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                       }}
                     >
-                      {sub === "All" && (language === "ar" ? "الكل" : "All")}
-                      {sub === "Math" && (language === "ar" ? "رياضيات" : "Math")}
-                      {sub === "Science" && (language === "ar" ? "علوم" : "Science")}
-                      {sub === "Arabic" && (language === "ar" ? "عربي" : "Arabic")}
-                      {sub === "General" && (language === "ar" ? "عام" : "General")}
+                      {sub === "All" ? (language === "ar" ? "الكل" : "All") : sub}
                     </button>
                   );
                 })}

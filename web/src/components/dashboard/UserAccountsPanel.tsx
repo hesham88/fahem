@@ -1089,7 +1089,7 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                   <tr style={{ borderBottom: "2px solid var(--card-border)", color: "var(--primary)", fontWeight: 700, textAlign: language === "ar" ? "right" : "left" }}>
                     <th style={{ padding: "0.5rem" }}>{language === "ar" ? "البريد التجريبي" : "Demo Session / Email"}</th>
                     <th style={{ padding: "0.5rem" }}>{language === "ar" ? "الشخصية" : "Persona / Tier"}</th>
-                    <th style={{ padding: "0.5rem" }}>{language === "ar" ? "العنوان الرقمي" : "IP / User Agent"}</th>
+                    <th style={{ padding: "0.5rem" }}>{language === "ar" ? "رقم الجلسة" : "Session #"}</th>
                     <th style={{ padding: "0.5rem" }}>{language === "ar" ? "المدة المستغرقة" : "Duration"}</th>
                     <th style={{ padding: "0.5rem" }}>{language === "ar" ? "الميزانية الممنوحة" : "Budget Cap"}</th>
                     <th style={{ padding: "0.5rem", textAlign: "center" }}>{language === "ar" ? "الحالة" : "Status"}</th>
@@ -1115,8 +1115,9 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                           </span>
                         </div>
                       </td>
+                      {/* FC9.10: privacy — show a non-identifying session number, never the IP. */}
                       <td style={{ padding: "0.75rem 0.5rem", color: "#4f6371", fontSize: "0.75rem", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sess.ua}>
-                        <strong>IP: {sess.ip}</strong><br/>
+                        <strong>#{sess.session_number ?? "—"}</strong><br/>
                         <span style={{ fontSize: "0.65rem", color: "#8a9ca8" }}>{sess.ua}</span>
                       </td>
                       <td style={{ padding: "0.75rem 0.5rem", fontFamily: "monospace", fontWeight: 700 }}>

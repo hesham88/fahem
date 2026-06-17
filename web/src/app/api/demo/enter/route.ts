@@ -106,19 +106,25 @@ export async function POST(req: NextRequest) {
 
     const token = signDemoToken(payload);
 
-    // Record demo signup/session in audit store
-    const ip = req.headers.get("x-forwarded-for") || (req as any).ip || "127.0.0.1";
+    // FC9.10: privacy — do NOT capture or store the visitor's IP address. The Live
+    // Demo Sessions Monitor identifies sessions by a non-identifying sequential
+    // session number instead. (User-agent is retained for basic diagnostics.)
     const ua = req.headers.get("user-agent") || "unknown";
+
+    // Monotonic session number used purely as a human-friendly label in the monitor.
+    const anyDbCounter = db as any;
+    anyDbCounter.demo_session_counter = (anyDbCounter.demo_session_counter || 0) + 1;
+    const sessionNumber = anyDbCounter.demo_session_counter;
 
     const sessionDoc = {
       _id: "demo_session_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
       sandbox_session_id: sandboxSessionId,
+      session_number: sessionNumber,
       uid: uid,
       email: email,
       verified: isVerified,
       tier: tier,
       persona: role,
-      ip: ip,
       ua: ua,
       started_at: Math.floor(Date.now() / 1000),
       last_active_at: Math.floor(Date.now() / 1000),
@@ -139,7 +145,7 @@ export async function POST(req: NextRequest) {
       userId: uid,
       action: "enter_demo",
       timestamp: new Date().toISOString(),
-      details: { email, tier, role, sandboxSessionId, ip }
+      details: { email, tier, role, sandboxSessionId, session_number: sessionNumber }
     });
     
     // Create or append to demo_sessions if we can model it in db

@@ -24,6 +24,7 @@ interface ZatonaPanelProps {
   zatonaLoading: boolean;
   setZatonaLoading: (val: boolean) => void;
   dynamicBooks: Book[];
+  dynamicSubjects?: any[];
   renderSpaceSelectorBar: (tab: "practice" | "plan" | "timetable" | "zatona") => React.ReactNode;
   renderSpaceHistory: () => React.ReactNode;
   addSpaceHistory: (actionEn: string, actionAr: string) => void;
@@ -45,6 +46,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   zatonaLoading,
   setZatonaLoading,
   dynamicBooks,
+  dynamicSubjects,
   renderSpaceSelectorBar,
   renderSpaceHistory,
   addSpaceHistory,
@@ -54,6 +56,16 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
   // Zatona Selector States
   const [scopeType, setScopeType] = useState<"text" | "subject" | "book">("text");
   const [selectedSubject, setSelectedSubject] = useState<string>("Math");
+  // FC9.2: default scope to the first real Course Subject when available.
+  useEffect(() => {
+    if (dynamicSubjects && dynamicSubjects.length > 0) {
+      const names = dynamicSubjects.map((s: any) => s.name || s.name_en || s.name_ar).filter(Boolean);
+      if (!names.includes(selectedSubject)) {
+        setSelectedSubject(names[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicSubjects]);
   const [selectedBookId, setSelectedBookId] = useState<string>("");
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [customConcepts, setCustomConcepts] = useState<string>("");
@@ -320,9 +332,11 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
       {/* Top Space Bar Swapper */}
       {renderSpaceSelectorBar("zatona")}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "1.5rem" }} className="grid-cols-1">
-        
-        {/* Left Side: Summary prompt generator & Material selectors */}
+      {/* FC9.4: stack the Summary Engine above the Presentation, both full-width and centered
+          in the reading column (was a 1.2fr/1fr side-by-side split). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "1000px", margin: "0 auto" }}>
+
+        {/* Top: Summary prompt generator & Material selectors */}
         <div
           className="panel-card"
           style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}
@@ -414,10 +428,22 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
               onChange={(e) => setSelectedSubject(e.target.value)}
               style={{ padding: "0.6rem", borderRadius: "6px", border: "1px solid var(--card-border)", fontSize: "0.85rem", background: "var(--card-bg)", fontWeight: 700, outline: "none" }}
             >
-              <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
-              <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
-              <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
-              <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
+              {/* FC9.2: read the user's real Course Subjects, not a hardcoded list. */}
+              {dynamicSubjects && dynamicSubjects.length > 0 ? (
+                dynamicSubjects.map((s: any) => {
+                  const label = language === "ar" ? (s.name_ar || s.name || s.name_en) : (s.name || s.name_en || s.name_ar);
+                  return (
+                    <option key={s._id || label} value={s.name || s.name_en || label}>{label}</option>
+                  );
+                })
+              ) : (
+                <>
+                  <option value="Math">{language === "ar" ? "الرياضيات" : "Mathematics"}</option>
+                  <option value="Science">{language === "ar" ? "العلوم والفيزياء" : "Science & Physics"}</option>
+                  <option value="Arabic">{language === "ar" ? "اللغة العربية" : "Arabic Linguistics"}</option>
+                  <option value="General">{language === "ar" ? "ثقافة عامة" : "General Knowledge"}</option>
+                </>
+              )}
             </select>
           )}
 
@@ -558,7 +584,7 @@ export const ZatonaPanel: React.FC<ZatonaPanelProps> = ({
           </button>
         </div>
 
-        {/* Right Side: Report Presentation Viewer */}
+        {/* Bottom: Report Presentation Viewer (FC9.4 — stacked under the Summary Engine) */}
         <div
           className="panel-card"
           style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}
