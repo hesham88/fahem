@@ -2205,73 +2205,154 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const buildTOC = () => {
     const allPages = getAllPages(selectedBookReader!, loadedBookPages);
     // FC9.12: the reader's book object sometimes lacks the rich chapter/topic structure that
-    // dynamicBooks carries (so the TOC fell back to generic "Page N" / "Contents"). Prefer the
-    // richest available chapter source: the reader's own chapters if they have topics, else the
-    // matching dynamicBooks entry's chapters (same book, full structure), else whatever we have.
+    // dynamicBooks carries. Prefer the richest available chapter source: the matched dynamicBooks entry
+    // (with its full database chapters), or the reader's own chapters.
     const readerId = (selectedBookReader as any)?._id || (selectedBookReader as any)?.id;
     const readerTitle = ((selectedBookReader as any)?.title || (selectedBookReader as any)?.titleEn || "").toString().trim().toLowerCase();
     const richBook: any =
       (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId)
-      || (readerTitle ? (dynamicBooks || []).find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null);
+      || (readerTitle ? (dynamicBooks || []).find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null)
+      || (readerTitle ? (dynamicBooks || []).find((b: any) => (b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) : null);
     const sourceChapters: any[] =
       (richBook?.chapters && richBook.chapters.length > 0)
         ? richBook.chapters
         : ((selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
           ? selectedBookReader.chapters
           : (selectedBookReader?.chapters || []));
-    const hasChaptersWithTopics = sourceChapters.length > 0 &&
-                                  sourceChapters.some((ch: any) => ch.topics && ch.topics.length > 0);
 
-    if (hasChaptersWithTopics) {
-      return sourceChapters.map((ch: any, idx: number) => {
-        let topics = (ch.topics || []).map((top: any, tIdx: number) => ({
-          id: `top-${idx}-${tIdx}`,
-          titleEn: top.titleEn || top.title || `Topic ${tIdx + 1}`,
-          titleAr: top.titleAr || top.title_ar || top.title || `موضوع ${tIdx + 1}`,
-          pageNum: top.pageNum || top.page_number || top.pageNumber || 1
-        }));
-        // FC9.12: some chapters arrive with NO topics (e.g. this book's "Section N"). Rather than
-        // render an empty expandable box (the broken-looking fold), backfill their sub-pages from
-        // the page list by chapter title so they fold to real pages.
-        if (topics.length === 0) {
-          const chTitleEn = ch.titleEn || ch.title || "";
-          topics = allPages
-            .filter((p: any) => (p.chapterTitleEn || "") === chTitleEn && chTitleEn)
-            .map((p: any) => ({
-              id: `top-${idx}-${p.pageNum}`,
+    const isMainChapter = (title: string): boolean => {
+      if (!title) return false;
+      const t = title.trim().toLowerCase();
+      const isChPattern = /^(chapter|chap|الفصل|باب)\s+\d+/i.test(t);
+      if (isChPattern) return true;
+
+      const mainTitles = [
+        "book cover", "cover", "غلاف الكتاب", "غلاف",
+        "contents", "المحتويات", "الفهرس", "فهرس",
+        "preface", "المقدمة", "تمهيد", "مقدمة",
+        "answer key", "مفاتيح الإجابات", "حلول", "الأجوبة",
+        "index", "كشاف"
+      ];
+      return mainTitles.includes(t);
+    };
+
+    if (sourceChapters.length > 0) {
+      const nestedChapters: any[] = [];
+      let currentMain: any = null;
+
+      sourceChapters.forEach((ch: any, idx: number) => {
+        const titleEn = ch.titleEn || ch.title || ch.title_en || ch.titleAr || `Section ${idx + 1}`;
+        const titleAr = ch.titleAr || ch.title_ar || ch.title || ch.titleEn || `القسم ${idx + 1}`;
+        const start = ch.start_page ?? ch.startPage ?? ch.page_start ?? null;
+        const end = ch.end_page ?? ch.endPage ?? ch.page_end ?? null;
+
+        let isContained = false;
+        if (currentMain && start !== null && end !== null) {
+          const mainStart = currentMain.startPage;
+          const mainEnd = currentMain.endPage;
+          if (mainStart !== null && mainEnd !== null) {
+            isContained = (start >= mainStart && end <= mainEnd);
+          }
+        }
+
+        const isMain = isMainChapter(titleEn) || isMainChapter(titleAr) || !isContained;
+
+        if (isMain || !currentMain) {
+          currentMain = {
+            id: `ch-${idx}`,
+            titleEn,
+            titleAr,
+            pageNum: start || ch.pageNum || ch.page_number || ch.pageNumber || 1,
+            startPage: start,
+            endPage: end,
+            topics: []
+          };
+          nestedChapters.push(currentMain);
+        } else {
+          currentMain.topics.push({
+            id: `top-${idx}`,
+            titleEn,
+            titleAr,
+            pageNum: start || ch.pageNum || ch.page_number || ch.pageNumber || currentMain.pageNum
+          });
+        }
+      });
+
+      // Check if there are leading pages before the first chapter start page
+      const firstChStart = sourceChapters[0] ? (sourceChapters[0].start_page ?? sourceChapters[0].startPage ?? sourceChapters[0].page_start ?? 1) : 1;
+      const leadingPages = allPages.filter((p: any) => {
+        const pNum = p.page_number ?? p.pageNum ?? 1;
+        return pNum < firstChStart;
+      });
+
+      if (leadingPages.length > 0) {
+        const coverCh = {
+          id: `ch-cover-prepended`,
+          titleEn: "Book Cover",
+          titleAr: "غلاف الكتاب",
+          pageNum: leadingPages[0].pageNum,
+          topics: leadingPages.map((p: any) => ({
+            id: `top-cover-${p.pageNum}`,
+            titleEn: p.titleEn || `Page ${p.pageNum}`,
+            titleAr: p.titleAr || `صفحة ${p.pageNum}`,
+            pageNum: p.pageNum
+          }))
+        };
+        nestedChapters.unshift(coverCh);
+      }
+
+      // Populate topics for main chapters that have no sub-topics
+      nestedChapters.forEach((ch: any, idx: number) => {
+        if (ch.topics.length === 0) {
+          const originalCh = sourceChapters.find((sc: any) => {
+            const scEn = sc.titleEn || sc.title || sc.title_en || sc.titleAr || "";
+            return scEn === ch.titleEn;
+          });
+          const startPage = originalCh?.page_start ?? originalCh?.start_page ?? originalCh?.startPage ?? ch.pageNum;
+          const endPage = originalCh?.page_end ?? originalCh?.end_page ?? originalCh?.endPage ?? startPage;
+
+          const rangePages = allPages.filter((p: any) => {
+            const pNum = p.page_number ?? p.pageNum ?? 1;
+            return pNum >= startPage && pNum <= endPage;
+          });
+
+          if (rangePages.length > 0) {
+            ch.topics = rangePages.map((p: any) => ({
+              id: `top-dynamic-${idx}-${p.pageNum}`,
               titleEn: p.titleEn || `Page ${p.pageNum}`,
               titleAr: p.titleAr || `صفحة ${p.pageNum}`,
               pageNum: p.pageNum
             }));
+          } else {
+            ch.topics = [{
+              id: `top-fallback-${idx}-${startPage}`,
+              titleEn: language === "ar" ? `صفحة ${startPage}` : `Page ${startPage}`,
+              titleAr: `صفحة ${startPage}`,
+              pageNum: startPage
+            }];
+          }
         }
-        // A landing page for chapters that still have no sub-topics (header navigates directly).
-        const chPage = ch.pageNum || ch.page_number || ch.pageNumber || ch.startPage || (topics[0] ? topics[0].pageNum : null);
-        return {
-          id: `ch-${idx}`,
-          titleEn: ch.titleEn || ch.title || `Chapter ${idx + 1}`,
-          titleAr: ch.titleAr || ch.title_ar || ch.title || `الفصل ${idx + 1}`,
-          pageNum: chPage,
-          topics
-        };
       });
+
+      // Deduplicate topics in each chapter by title to avoid redundant items
+      nestedChapters.forEach((ch: any) => {
+        const uniqueTopics: any[] = [];
+        const seenTitles = new Set<string>();
+        ch.topics.forEach((t: any) => {
+          const title = (t.titleEn || "").trim().toLowerCase();
+          if (!seenTitles.has(title)) {
+            seenTitles.add(title);
+            uniqueTopics.push(t);
+          }
+        });
+        ch.topics = uniqueTopics;
+      });
+
+      return nestedChapters;
     }
 
     const chaptersMap: Record<string, { titleEn: string; titleAr: string; pages: any[] }> = {};
     const originalChapterOrder: string[] = [];
-
-    // Initialize chaptersMap with defined book chapters to preserve their order and existence
-    if (sourceChapters.length > 0) {
-      sourceChapters.forEach((ch: any) => {
-        const titleEn = ch.titleEn || ch.title || ch.title_en || ch.titleAr || "Chapter";
-        const titleAr = ch.titleAr || ch.title_ar || ch.title || ch.titleEn || "الفصل";
-        chaptersMap[titleEn] = {
-          titleEn,
-          titleAr,
-          pages: []
-        };
-        originalChapterOrder.push(titleEn);
-      });
-    }
 
     allPages.forEach((p: any) => {
       const chTitleEn = p.chapterTitleEn || "General";
@@ -2293,6 +2374,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         id: `ch-${idx}`,
         titleEn: ch.titleEn,
         titleAr: ch.titleAr,
+        pageNum: sortedPages[0]?.pageNum || 9999,
         topics: sortedPages.map((p: any) => ({
           id: `top-${idx}-${p.pageNum}`,
           titleEn: p.titleEn || `Page ${p.pageNum}`,
@@ -2301,21 +2383,42 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }))
       };
     }).filter(ch => ch.topics.length > 0)
-    .sort((a, b) => {
-      const aIdx = originalChapterOrder.indexOf(a.titleEn);
-      const bIdx = originalChapterOrder.indexOf(b.titleEn);
-      if (aIdx !== -1 && bIdx !== -1) {
-        return aIdx - bIdx;
-      }
-      if (aIdx !== -1) return -1;
-      if (bIdx !== -1) return 1;
+    .sort((a, b) => a.pageNum - b.pageNum);
 
-      const aMinPage = a.topics[0]?.pageNum || 9999;
-      const bMinPage = b.topics[0]?.pageNum || 9999;
-      return aMinPage - bMinPage;
+    const nestedFallbackChapters: any[] = [];
+    let fallbackMain: any = null;
+
+    sortedChapters.forEach((ch: any, idx: number) => {
+      const isMain = isMainChapter(ch.titleEn) || isMainChapter(ch.titleAr);
+
+      if (isMain || !fallbackMain) {
+        fallbackMain = {
+          id: `ch-fallback-${idx}`,
+          titleEn: ch.titleEn,
+          titleAr: ch.titleAr,
+          pageNum: ch.pageNum,
+          topics: [...ch.topics]
+        };
+        nestedFallbackChapters.push(fallbackMain);
+      } else {
+        fallbackMain.topics.push(...ch.topics);
+      }
     });
 
-    return sortedChapters;
+    nestedFallbackChapters.forEach((ch: any) => {
+      const uniqueTopics: any[] = [];
+      const seenTitles = new Set<string>();
+      ch.topics.forEach((t: any) => {
+        const title = (t.titleEn || "").trim().toLowerCase();
+        if (!seenTitles.has(title)) {
+          seenTitles.add(title);
+          uniqueTopics.push(t);
+        }
+      });
+      ch.topics = uniqueTopics;
+    });
+
+    return nestedFallbackChapters;
   };
 
   const [showReaderSidebar, setShowReaderSidebar] = useState(true);
