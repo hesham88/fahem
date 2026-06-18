@@ -44,6 +44,8 @@ temp_test_book_1.pdf
 
 # Ignore scratchpad / experimental scripts
 scratches/
+scratch/
+**/scratch/
 
 # Ignore user screenshots and logos
 screenshots/
