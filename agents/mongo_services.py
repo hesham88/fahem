@@ -231,6 +231,7 @@ class MongoSessionService(BaseSessionService):
                 return None
             doc.pop("_id", None)
             session = Session.model_validate(doc)
+            self._prune_session_events(session)
         except Exception as e:
             logger.error(f"[MongoSessionService] Failed to get session from DB: {e}")
             return None
@@ -297,6 +298,65 @@ class MongoSessionService(BaseSessionService):
             logger.error(f"[MongoSessionService] Failed to list sessions: {e}")
             return ListSessionsResponse(sessions=[])
 
+    def _prune_session_events(self, session: Session, current_invocation_id: Optional[str] = None) -> None:
+        """Prunes heavy text payloads from previous turns' tool/function responses to prevent token budget bloating."""
+        if not current_invocation_id:
+            for event in reversed(session.events):
+                if event.invocation_id:
+                    current_invocation_id = event.invocation_id
+                    break
+        
+        if not current_invocation_id:
+            return
+
+        def truncate_string(val: str, max_len: int = 50) -> str:
+            if len(val) > max_len:
+                return val[:max_len] + f"... [pruned {len(val) - max_len} chars to save token budget]"
+            return val
+
+        def prune_recursive(data: Any, tool_name: str) -> Any:
+            if isinstance(data, dict):
+                new_dict = {}
+                for k, v in data.items():
+                    if isinstance(v, str):
+                        if tool_name == "rag_tool" and k == "text":
+                            new_dict[k] = "[Text content pruned to save token budget. Already read by the model in previous turn.]"
+                        elif tool_name == "search_tool" and k in ("snippet", "summary"):
+                            new_dict[k] = "[Search result pruned to save token budget.]"
+                        else:
+                            new_dict[k] = truncate_string(v, 50)
+                    else:
+                        new_dict[k] = prune_recursive(v, tool_name)
+                return new_dict
+            elif isinstance(data, list):
+                return [prune_recursive(item, tool_name) for item in data]
+            elif isinstance(data, str):
+                return truncate_string(data, 50)
+            else:
+                return data
+
+        for event in session.events:
+            # Aggressively prune any event that is not part of the active, current invocation
+            if event.invocation_id != current_invocation_id:
+                # Clear extremely heavy grounding/search metadata
+                event.grounding_metadata = None
+                event.citation_metadata = None
+                
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if part.function_response:
+                            tool_name = part.function_response.name or ""
+                            if part.function_response.response:
+                                part.function_response.response = prune_recursive(
+                                    part.function_response.response, tool_name
+                                )
+                        if part.tool_response:
+                            tool_name = getattr(part.tool_response, "tool_type", "") or ""
+                            if part.tool_response.response:
+                                part.tool_response.response = prune_recursive(
+                                    part.tool_response.response, tool_name
+                                )
+
     @override
     async def append_event(self, session: Session, event: Event) -> Event:
         if not self.client:
@@ -308,6 +368,10 @@ class MongoSessionService(BaseSessionService):
         # Process superclass modifications (temp states, state updates, append events)
         event = await super().append_event(session=session, event=event)
         session.last_update_time = event.timestamp
+
+        # Prune previous events before saving to MongoDB
+        if event.invocation_id:
+            self._prune_session_events(session, event.invocation_id)
 
         # Extract and update user/app states persisted in separate collections
         if event.actions.state_delta:

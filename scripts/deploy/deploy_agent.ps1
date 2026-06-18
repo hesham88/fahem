@@ -58,6 +58,10 @@ try {
     # Push to agents directory so gcloud uses agents/.gcloudignore and does not ignore untracked files
     Push-Location $AgentsDir
 
+    # Ensure Cloud Build region defaults to us-east4 to avoid global build pool charges
+    Write-Host "Setting default Cloud Build region to us-east4..." -ForegroundColor Yellow
+    gcloud config set builds/region us-east4
+
     # Execute the gcloud deploy in a single, robust line with no backticks, using correct --vpc-egress argument and 2Gi Memory limits to avoid OOM
     gcloud run deploy fahem-agent --source . --region us-east4 --vpc-connector fahem-connector --vpc-egress private-ranges-only --memory 2Gi --no-cpu-throttling --set-secrets='GEMINI_API_KEY=fahem_gemini_api_key:latest,MONGODB_URI=fahem_mongodb_uri:latest' --quiet
     
