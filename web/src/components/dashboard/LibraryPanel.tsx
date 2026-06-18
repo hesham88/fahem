@@ -2214,9 +2214,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
       (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId)
       || (readerTitle ? (dynamicBooks || []).find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null);
     const sourceChapters: any[] =
-      (selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
-        ? selectedBookReader.chapters
-        : (richBook?.chapters && richBook.chapters.length > 0 ? richBook.chapters : (selectedBookReader?.chapters || []));
+      (richBook?.chapters && richBook.chapters.length > 0)
+        ? richBook.chapters
+        : ((selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
+          ? selectedBookReader.chapters
+          : (selectedBookReader?.chapters || []));
     const hasChaptersWithTopics = sourceChapters.length > 0 &&
                                   sourceChapters.some((ch: any) => ch.topics && ch.topics.length > 0);
 
@@ -3966,11 +3968,41 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                   </div>
 
                   {loadingBookPages ? (
-                    <div style={{ padding: "4rem", textAlign: "center" }}>
-                      <div className="pulse-icon" style={{ fontSize: "2rem", marginBottom: "1rem" }}>📖</div>
-                      <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                        {language === "ar" ? "جاري استرجاع وفهرسة صفحات الكتاب دراسياً..." : "Retrieving and indexing book pages..."}
-                      </p>
+                    <div 
+                      className="pulse-animation" 
+                      style={{ 
+                        padding: "2rem", 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        gap: "1.5rem", 
+                        background: "var(--card-bg)", 
+                        borderRadius: "24px",
+                        border: "1px solid var(--card-border)" 
+                      }}
+                    >
+                      {/* Premium Header/Title Shimmer */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ height: "24px", width: "35%", background: "var(--surface-subtle)", borderRadius: "6px" }} />
+                        <div style={{ height: "32px", width: "120px", background: "var(--surface-subtle)", borderRadius: "8px" }} />
+                      </div>
+                      <hr style={{ border: 0, borderTop: "1px solid var(--card-border)", margin: "0.5rem 0" }} />
+                      
+                      {/* Document Body Lines Simulating Paragraphs */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                        <div style={{ height: "16px", width: "100%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "98%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "95%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "92%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "60%", background: "var(--surface-subtle)", borderRadius: "4px", marginBottom: "1rem" }} />
+
+                        <div style={{ height: "16px", width: "100%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "97%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "85%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                        <div style={{ height: "16px", width: "40%", background: "var(--surface-subtle)", borderRadius: "4px" }} />
+                      </div>
+                      
+                      {/* Big Interactive Skeleton Block */}
+                      <div style={{ height: "140px", width: "100%", background: "var(--surface-subtle)", borderRadius: "16px", marginTop: "1rem" }} />
                     </div>
                   ) : isCoverPage ? (
                     /* Beautiful full-size cover poster with stage and grade metadata, and CTA */
@@ -5009,7 +5041,64 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
             {/* Book Catalog Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.5rem" }}>
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                // Modern shimmering premium skeleton cards (renders 6 skeleton books)
+                Array.from({ length: 6 }).map((_, sIdx) => (
+                  <div
+                    key={`skeleton-card-${sIdx}`}
+                    className="pulse-animation"
+                    style={{
+                      background: "var(--card-bg)",
+                      borderRadius: "20px",
+                      border: "1px solid var(--card-border)",
+                      padding: "1.25rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1rem",
+                      boxShadow: "var(--shadow-sm)",
+                      height: "360px"
+                    }}
+                  >
+                    {/* Fake book cover */}
+                    <div
+                      style={{
+                        height: "200px",
+                        background: "var(--surface-subtle)",
+                        borderRadius: "14px",
+                        width: "100%"
+                      }}
+                    />
+                    {/* Fake subject / metadata tag */}
+                    <div
+                      style={{
+                        height: "20px",
+                        background: "var(--surface-subtle)",
+                        borderRadius: "6px",
+                        width: "40%"
+                      }}
+                    />
+                    {/* Fake title line 1 */}
+                    <div
+                      style={{
+                        height: "24px",
+                        background: "var(--surface-subtle)",
+                        borderRadius: "6px",
+                        width: "90%"
+                      }}
+                    />
+                    {/* Fake title line 2 */}
+                    <div
+                      style={{
+                        height: "16px",
+                        background: "var(--surface-subtle)",
+                        borderRadius: "6px",
+                        width: "60%",
+                        marginTop: "-0.25rem"
+                      }}
+                    />
+                  </div>
+                ))
+              ) : filtered.length === 0 ? (
                 <div style={{
                   gridColumn: "1 / -1",
                   display: "flex",

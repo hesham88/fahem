@@ -2142,7 +2142,7 @@ export default function StickyChat() {
       }
       if (/^\[[pP]\d+\]$/.test(part)) {
         const pageNum = parseInt(part.slice(2, -1), 10) || 1;
-        const bookId = selectedBookIds.length > 0 ? selectedBookIds[0] : "";
+        const bookId = selectedBookIds.length > 0 ? selectedBookIds[0] : (bookContext?.book_id || bookContext?.book?._id || bookContext?.book?.id || "");
         return (
           <a
             key={pIdx}
@@ -2821,6 +2821,7 @@ User Question: ${queryText}`;
         },
         body: JSON.stringify({
           prompt: promptPayload,
+          user_query: queryText,
           language: lockedLanguage !== "auto" ? lockedLanguage : ((bookContext && bookContext.translationLanguage && bookContext.translationLanguage !== "Original") ? bookContext.translationLanguage : language),
           sessionId: currentSessionId || undefined,
           selected_book_ids: selectedBookIds,

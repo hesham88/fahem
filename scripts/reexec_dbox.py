@@ -506,6 +506,7 @@ def verify_d_crawl_ctrl():
     tok, err = enter_demo("admin")
     if not tok:
         return False, f"Could not enter demo as admin: {err}"
+    time.sleep(2.5)  # Allow demo session token to propagate across Atlas replicas to avoid replication lag race conditions
 
     st, resp = _req("/api/admin/crawl", "POST", {}, token=tok)
     if st == 403:

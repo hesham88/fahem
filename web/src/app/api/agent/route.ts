@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
     if (ctx instanceof Response) return ctx;
 
     const body = await req.json();
-    const { prompt, language, sessionId, onboarding, recaptchaToken, selected_book_ids, selected_text, book_id, page } = body;
+    const { prompt, language, sessionId, onboarding, recaptchaToken, selected_book_ids, selected_text, book_id, page, user_query } = body;
     const userId = ctx.uid;
     const userEmail = ctx.email || "anonymous@fahem.ai";
 
@@ -563,9 +563,19 @@ export async function POST(req: NextRequest) {
             }
 
             // B. Prepare updated messages list
+            let chatHistoryUserMessage = user_query || prompt || "";
+            if (!user_query && prompt) {
+              const userQuestionMatch = prompt.match(/User Question:\s*([\s\S]+)$/i);
+              if (userQuestionMatch) {
+                chatHistoryUserMessage = userQuestionMatch[1].trim();
+              } else {
+                chatHistoryUserMessage = prompt.replace(/^\[Context Reference:[^\]]+\]\s*/i, "").trim();
+              }
+            }
+
             const newMessages = [
               ...existingMessages,
-              { role: "user", content: prompt, timestamp: new Date().toISOString() },
+              { role: "user", content: chatHistoryUserMessage, timestamp: new Date().toISOString() },
               { role: "assistant", content: finalResponseText || "No response generated.", timestamp: new Date().toISOString() }
             ];
 
@@ -574,7 +584,7 @@ export async function POST(req: NextRequest) {
             // system/context/intent markers. We name it not only on the very first message but whenever the
             // session is still on a placeholder title ("Untitled Chat"/"New Chat"/empty) — many sessions were
             // created with a placeholder and never renamed. A real user-chosen title is always preserved.
-            const cleanPromptForTitle = (prompt || "")
+            const cleanPromptForTitle = (chatHistoryUserMessage || "")
               .replace(/\[(?:Grounded Web Search Request|Context Reference|Page Content|SYSTEM[^\]]*|INTENT[^\]]*)\][^\n]*/gi, "")
               .replace(/\s+/g, " ")
               .trim();
@@ -654,7 +664,7 @@ export async function POST(req: NextRequest) {
                 userEmail,
                 action: onboarding ? "Onboarding Agent Query" : "Standard Agent Query",
                 status: "SUCCESS",
-                details: prompt.substring(0, 150)
+                details: chatHistoryUserMessage.substring(0, 150)
               }, ctx);
             } catch (err) {
               console.warn("Failed to log user activity:", err);
