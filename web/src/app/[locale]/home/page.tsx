@@ -863,7 +863,24 @@ export default function Home() {
       const pageToChapterMap: Record<number, number> = {};
       const discoveredTitles: Record<number, string> = {};
 
-      const hasDefinedChapters = book.chapters && Array.isArray(book.chapters) && book.chapters.length > 0;
+      const readerId = (book._id || book.id || "").toString().trim().toLowerCase();
+      const readerTitle = (book.title || book.titleEn || "").toString().trim().toLowerCase();
+      
+      const allAvailableBooks = [...(dynamicBooks || []), ...(customUploadedBooks || [])];
+      const richBook = allAvailableBooks.find((b: any) => {
+        const bId = (b._id || b.id || "").toString().trim().toLowerCase();
+        return bId === readerId;
+      })
+        || (readerTitle ? allAvailableBooks.find((b: any) => {
+          const bTitle = (b.title || b.titleEn || b.name || "").toString().trim().toLowerCase();
+          return bTitle === readerTitle && b.chapters && Array.isArray(b.chapters) && b.chapters.length > 0;
+        }) : null)
+        || book;
+
+      const chaptersToUse = (richBook?.chapters && Array.isArray(richBook.chapters) && richBook.chapters.length > 0)
+        ? richBook.chapters
+        : (book.chapters && Array.isArray(book.chapters) && book.chapters.length > 0 ? book.chapters : []);
+      const hasDefinedChapters = chaptersToUse.length > 0;
 
       // Default common Computer Science / Python chapters if we can't find running header titles
       const fallbackChapterTitlesEn: Record<number, string> = {
@@ -981,20 +998,35 @@ export default function Home() {
         let fallbackChapterTitleAr = "";
 
         if (hasDefinedChapters) {
-          // Find matching chapter inside the book's chapters array dynamically
+          // Find matching chapter with the shortest range to handle nested chapters beautifully
           let matchedChapter: any = null;
-          matchedIndex = book.chapters.findIndex((ch: any) => {
+          let minRangeLength = Infinity;
+          let bestIdx = -1;
+
+          chaptersToUse.forEach((ch: any, idx: number) => {
             const start = ch.page_start ?? ch.start_page ?? 1;
             const end = ch.page_end ?? ch.end_page ?? 99999;
-            return pageNum >= start && pageNum <= end;
+            if (pageNum >= start && pageNum <= end) {
+              const rangeLength = Math.max(0, end - start);
+              if (rangeLength < minRangeLength) {
+                minRangeLength = rangeLength;
+                bestIdx = idx;
+                matchedChapter = ch;
+              }
+            }
           });
-          if (matchedIndex !== -1) {
-            matchedChapter = book.chapters[matchedIndex];
+
+          if (bestIdx !== -1) {
+            matchedIndex = bestIdx;
           } else {
             matchedIndex = 0;
           }
-          fallbackChapterTitleEn = matchedChapter ? (matchedChapter.title || matchedChapter.title_en || matchedChapter.title_ar || matchedChapter.titleAr || `Chapter ${matchedIndex + 1}`) : `Section ${pageNum}`;
-          fallbackChapterTitleAr = matchedChapter ? (matchedChapter.title_ar || matchedChapter.titleAr || matchedChapter.title || matchedChapter.title_en || `القسم ${matchedIndex + 1}`) : `القسم ${pageNum}`;
+          fallbackChapterTitleEn = matchedChapter 
+            ? (matchedChapter.title || matchedChapter.titleEn || matchedChapter.title_en || matchedChapter.title_ar || matchedChapter.titleAr || `Chapter ${matchedIndex + 1}`) 
+            : `Section ${pageNum}`;
+          fallbackChapterTitleAr = matchedChapter 
+            ? (matchedChapter.title_ar || matchedChapter.titleAr || matchedChapter.title || matchedChapter.title_en || matchedChapter.titleEn || `القسم ${matchedIndex + 1}`) 
+            : `القسم ${pageNum}`;
         } else {
           // Dynamic chapter clustering
           const chNum = pageToChapterMap[pageNum] || 1;

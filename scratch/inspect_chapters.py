@@ -14,8 +14,8 @@ def main():
             print(f"Title: {title}")
             print(f"Subject: {book.get('subject_id')}")
             print(f"Chapters count: {len(book.get('chapters', []))}")
-            for i, ch in enumerate(book.get("chapters", [])):
-                print(f"  Chapter {i+1}: {ch}")
+            for i, ch in enumerate(book.get("chapters", [])[:60]):
+                print(f"  Chapter {i+1}: {ch.get('title')} | start: {ch.get('page_start')} | end: {ch.get('page_end')}")
             print("-" * 40)
 
 if __name__ == "__main__":

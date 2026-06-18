@@ -2205,20 +2205,24 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const buildTOC = () => {
     const allPages = getAllPages(selectedBookReader!, loadedBookPages);
     // FC9.12: the reader's book object sometimes lacks the rich chapter/topic structure that
-    // dynamicBooks carries. Prefer the richest available chapter source: the matched dynamicBooks entry
+    // dynamicBooks or customUploadedBooks carries. Prefer the richest available chapter source: the matched dynamic/uploaded book entry
     // (with its full database chapters), or the reader's own chapters.
     const readerId = (selectedBookReader as any)?._id || (selectedBookReader as any)?.id;
     const readerTitle = ((selectedBookReader as any)?.title || (selectedBookReader as any)?.titleEn || "").toString().trim().toLowerCase();
+    
+    const allAvailableBooks = [...(dynamicBooks || []), ...(customUploadedBooks || [])];
     const richBook: any =
-      (dynamicBooks || []).find((b: any) => (b._id || b.id) === readerId)
-      || (readerTitle ? (dynamicBooks || []).find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null)
-      || (readerTitle ? (dynamicBooks || []).find((b: any) => (b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) : null);
+      allAvailableBooks.find((b: any) => (b._id || b.id) === readerId)
+      || (readerTitle ? allAvailableBooks.find((b: any) => ((b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) && (b.chapters || []).some((c: any) => c.topics && c.topics.length > 0)) : null)
+      || (readerTitle ? allAvailableBooks.find((b: any) => (b.title || b.titleEn || b.name || "").toString().trim().toLowerCase() === readerTitle) : null);
+      
     const sourceChapters: any[] =
       (richBook?.chapters && richBook.chapters.length > 0)
         ? richBook.chapters
         : ((selectedBookReader?.chapters && selectedBookReader.chapters.some((ch: any) => ch.topics && ch.topics.length > 0))
           ? selectedBookReader.chapters
           : (selectedBookReader?.chapters || []));
+
 
     const isMainChapter = (title: string): boolean => {
       if (!title) return false;
