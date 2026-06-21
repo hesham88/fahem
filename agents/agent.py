@@ -153,6 +153,10 @@ async def rag_tool(query: str, scope: Optional[dict] = None, k: int = 8) -> List
         mdb = get_active_db(client)
         
         from tools import get_gemini_api_key
+        # FC11.6/grounding: get_gemini_embedding_v2 was never imported here, so embedding the query
+        # raised NameError → rag_tool silently fell back to a citation-less local search (D5/D6/
+        # D-PYBOOK red; the demo never grounded → companion looped). Import it so $vectorSearch runs.
+        from ingestion_v2.utils import get_gemini_embedding_v2
         api_key = get_gemini_api_key()
         query_vector = get_gemini_embedding_v2(query, api_key)
         
