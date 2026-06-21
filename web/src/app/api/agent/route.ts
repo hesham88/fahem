@@ -360,6 +360,9 @@ export async function POST(req: NextRequest) {
           let hasStartedFinalOutput = false;
           let currentActiveAgent = "";
           let capturedIntent: any = null;
+          // FC11: the top page retrieved by rag_tool this turn, used to guarantee a grounded
+          // citation even when the model omits the [pN] token (which it does ~50% of the time).
+          let topGroundedCite = "";
 
           while (true) {
             const { done, value } = await reader.read();
@@ -429,6 +432,19 @@ export async function POST(req: NextRequest) {
                         if (resp && resp.action && resp.target &&
                             (resp.type === "write" || resp.action === "navigate" || String(resp.action).startsWith("create_"))) {
                           capturedIntent = { type: resp.type || "write", action: resp.action, target: resp.target };
+                        }
+                        // FC11: remember the top rag_tool hit (it returns a score-sorted list of
+                        // {text, book_id, page_number}). Used only as a fallback citation below.
+                        if (!topGroundedCite) {
+                          const arr = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.result) ? resp.result : null);
+                          if (arr && arr.length > 0) {
+                            const top = arr[0] || {};
+                            const pn = (top.page_number ?? top.pageNumber);
+                            if (pn !== undefined && pn !== null) {
+                              const bid = (top.book_id ?? top.bookId);
+                              topGroundedCite = bid ? `[${bid}:p${pn}]` : `[p${pn}]`;
+                            }
+                          }
                         }
                       }
                     }
@@ -514,6 +530,20 @@ export async function POST(req: NextRequest) {
                 }
               }
             } catch (e) {}
+          }
+
+          // FC11: deterministic citation guarantee — if the turn grounded via rag_tool but the model
+          // omitted any citation, append a REAL [book_id:pN] from the top retrieved page so grounded
+          // answers always carry a clickable source (the [pN] token is otherwise ~50% LLM-stochastic).
+          // Matches both the bare [pN] and the preferred [book_id:pN] deep-link form.
+          const CITE_RE = /\[(?:[^\[\]]*:)?\s*p\s*\d+\]/i;
+          if (topGroundedCite && finalResponseText.trim() && !CITE_RE.test(finalResponseText)) {
+            if (!hasStartedFinalOutput) {
+              controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));
+              hasStartedFinalOutput = true;
+            }
+            controller.enqueue(encoder.encode(` ${topGroundedCite}`));
+            finalResponseText += ` ${topGroundedCite}`;
           }
 
           // Deterministic intent injection: if a create/navigate tool returned an intent but the
