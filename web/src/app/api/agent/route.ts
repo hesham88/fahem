@@ -429,7 +429,6 @@ export async function POST(req: NextRequest) {
                         const raw = (fr && fr.response) || {};
                         // ADK may pass the tool dict directly or wrapped as { result: {...} }.
                         const resp = (raw && raw.action) ? raw : (raw && raw.result) ? raw.result : raw;
-                        try { console.error("[CITEDBG] fr.name=", (fr && (fr.name || fr.function_name)), "rawType=", Array.isArray(raw) ? "array" : typeof raw, "rawKeys=", (raw && typeof raw === "object" && !Array.isArray(raw)) ? Object.keys(raw).slice(0,6) : "-", "respArr=", Array.isArray(resp), "respLen=", Array.isArray(resp) ? resp.length : "-"); } catch {}
                         if (resp && resp.action && resp.target &&
                             (resp.type === "write" || resp.action === "navigate" || String(resp.action).startsWith("create_"))) {
                           capturedIntent = { type: resp.type || "write", action: resp.action, target: resp.target };
@@ -538,7 +537,6 @@ export async function POST(req: NextRequest) {
           // answers always carry a clickable source (the [pN] token is otherwise ~50% LLM-stochastic).
           // Matches both the bare [pN] and the preferred [book_id:pN] deep-link form.
           const CITE_RE = /\[(?:[^\[\]]*:)?\s*p\s*\d+\]/i;
-          try { console.error("[CITEDBG] FINAL topGroundedCite=", JSON.stringify(topGroundedCite), "hasCite=", CITE_RE.test(finalResponseText), "textLen=", finalResponseText.length); } catch {}
           if (topGroundedCite && finalResponseText.trim() && !CITE_RE.test(finalResponseText)) {
             if (!hasStartedFinalOutput) {
               controller.enqueue(encoder.encode("\n=== Agent Final Output ===\n"));

@@ -1313,6 +1313,7 @@ fahem_companion = LlmAgent(
         - Do NOT add block-level retrieval; RAG retrieval must remain page-granular. Keep `rag_tool` page-granular.
         
         CITATIONS AND ANTI-HALLUCINATION:
+        - ALWAYS produce a final, natural-language answer to the user after using ANY tool (`rag_tool`, `library_tool`, specialist sub-agents, etc.). NEVER end your turn with empty output or with only a raw tool/sub-agent result — you MUST synthesize what the tools returned into a written answer addressed to the user. An empty or content-less final turn is a critical failure.
         - When answering ANY factual question grounded in textbook pages retrieved via `rag_tool`, you MUST ALWAYS end your answer with at least one citation — NEVER omit it, and never answer a grounded question without one. Format each citation as `[book_id:pPageNum]` (e.g., `[book_intro_python:p23]`), where `book_id` is the actual ID of the book of the retrieved page and `PageNum` is the page number; the frontend renders this as a clickable deep-link into that exact textbook and page. Use plain `[pPageNum]` (e.g., `[p23]`) only if the book ID is unknown or cannot be resolved. Either way the citation MUST contain the `pPageNum` page marker. Every page-specific fact you state must carry its `[…pN]` citation.
         - Clearly separate open-world results retrieved via `search_tool` (Google search) from your secure in-corpus textbooks.
         - Never make up page numbers or textbook facts.
