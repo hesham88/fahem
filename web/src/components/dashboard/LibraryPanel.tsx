@@ -1661,7 +1661,9 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       : String.fromCharCode(65 + optIdx); // A, B, C, D...
                     
                     const isCurrentSelection = selectedAnswer === optLetter;
-                    const isThisCorrectOption = optLetter === answer;
+                    // FC11.6: highlight the correct option using the RAG-resolved letter when the
+                    // ingested block had no `answer` of its own.
+                    const isThisCorrectOption = optLetter === ((evaluation && (evaluation as any).resolvedLetter) || answer);
 
                     let optBg = "var(--card-bg)"; // FC7.18: was hardcoded #ffffff → glaring/unreadable in dark
                     let optBorder = "1px solid var(--card-border)";
@@ -1695,8 +1697,8 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                       <button
                         key={optIdx}
                         onClick={() => {
-                          if (hasSelected) return; // allow only one submission
-                          handleEvaluateMcq(id, prompt, optLetter, answer, blocks || []);
+                          if (hasSelected) return; // one submission per attempt (until "Clear & try again")
+                          handleEvaluateMcq(id, prompt, optLetter, answer, blocks || [], options || []);
                         }}
                         disabled={hasSelected}
                         style={{
@@ -1837,6 +1839,20 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                           {parseInlineStyles(evaluation.explanation)}
                         </p>
                       )}
+                      {/* FC11.6: clear the result so the student can re-answer (was answer-once). */}
+                      <button
+                        onClick={() => {
+                          setMcqEvaluations(prev => { const n = { ...prev }; delete n[id]; return n; });
+                          setSelectedMcqAnswers(prev => { const n = { ...prev }; delete n[id]; return n; });
+                        }}
+                        style={{
+                          marginTop: "0.85rem", padding: "0.5rem 1rem", borderRadius: "10px",
+                          border: "1px solid var(--card-border)", background: "var(--card-bg)",
+                          color: "var(--primary)", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer"
+                        }}
+                      >
+                        {isAr ? "🔄 مسح الإجابة وإعادة المحاولة" : "🔄 Clear & try again"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2121,80 +2137,90 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
   };
 
-  const handleEvaluateMcq = async (blockId: string, questionText: string, selectedOpt: string, correctOpt: string, pageBlocks: any[]) => {
+  const handleEvaluateMcq = async (blockId: string, questionText: string, selectedOpt: string, correctOpt: string, pageBlocks: any[], options: string[] = []) => {
     if (mcqEvaluations[blockId]) return;
 
     setSelectedMcqAnswers(prev => ({ ...prev, [blockId]: selectedOpt }));
-
-    setMcqEvaluations(prev => ({
-      ...prev,
-      [blockId]: {
-        isCorrect: false,
-        feedback: "",
-        explanation: "",
-        loading: true
-      }
-    }));
+    setMcqEvaluations(prev => ({ ...prev, [blockId]: { isCorrect: false, feedback: "", explanation: "", loading: true } }));
 
     const bookId = selectedBookReader?._id || selectedBookReader?.id;
     const pageNum = readerCurrentPage;
+    const isAr = (translationLanguage === "Arabic") || (translationLanguage === "Original" && language === "ar");
+    const idxToLetter = (i: number) => isAr ? (["أ", "ب", "ج", "د", "هـ", "و"][i] || String.fromCharCode(1575 + i)) : String.fromCharCode(65 + i);
+    const langForApi = translationLanguage === "Original" ? (selectedBookReader?.language || language) : translationLanguage;
 
     try {
-      const res = await authedFetch("/api/practice/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: questionText,
-          mode: "mcq",
-          userAnswer: selectedOpt,
-          correctOption: correctOpt,
-          language: translationLanguage === "Original" ? (selectedBookReader?.language || language) : translationLanguage,
-          bookId,
-          pageNumber: Number(pageNum)
-        })
-      });
+      let correctLetter = correctOpt;
+      let explanation = "";
+      let citationPage: number | null = null;
 
-      if (!res.ok) {
-        throw new Error("Failed to evaluate MCQ");
-      }
-
-      const data = await res.json();
-      if (data.success) {
-        setMcqEvaluations(prev => ({
-          ...prev,
-          [blockId]: {
-            isCorrect: data.isCorrect,
-            feedback: data.feedback || "",
-            explanation: data.correctExplanation || "",
-            xpGained: data.xpGained || 0,
-            loading: false
+      // FC11.6 hybrid: the ingested question block usually has NO correct answer. Resolve it via
+      // book-grounded RAG (page-first → whole-book) on the backend, which caches it on the block so
+      // subsequent attempts/readers are instant. The answer is not necessarily on this page.
+      if (!correctLetter && Array.isArray(options) && options.length > 1) {
+        try {
+          const rres = await authedFetch("/api/reader/resolve-answer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ book_id: bookId, block_id: blockId, prompt: questionText, options, page_number: Number(pageNum), language: langForApi })
+          });
+          if (rres.ok) {
+            const rdata = await rres.json();
+            if (rdata.success && typeof rdata.correct_index === "number") {
+              correctLetter = idxToLetter(rdata.correct_index);
+              explanation = rdata.explanation || "";
+              if (rdata.citation_page) citationPage = Number(rdata.citation_page);
+            }
           }
-        }));
-
-        logActivityEvent("question_checked", {
-          book_id: bookId,
-          page_number: Number(pageNum),
-          block_id: blockId,
-          user_answer: selectedOpt,
-          is_correct: data.isCorrect,
-          xp_gained: data.xpGained || 0
-        });
-      } else {
-        throw new Error("Evaluation response success was false");
+        } catch (e) {
+          console.error("resolve-answer failed:", e);
+        }
       }
+
+      const isCorrect = !!correctLetter && selectedOpt === correctLetter;
+      if (!explanation) {
+        explanation = isCorrect
+          ? (isAr ? `الاختيار (${correctLetter}) هو الإجابة الصحيحة.` : `Option (${correctLetter}) is the correct choice.`)
+          : (correctLetter
+            ? (isAr ? `الإجابة الصحيحة هي الاختيار (${correctLetter}).` : `The correct answer is Option (${correctLetter}).`)
+            : (isAr ? "تعذّر تحديد الإجابة الصحيحة من الكتاب." : "Could not determine the correct answer from the book."));
+      }
+      if (citationPage && !/\[p\s*\d+\]/i.test(explanation)) explanation = `${explanation} [p${citationPage}]`;
+
+      setMcqEvaluations(prev => ({
+        ...prev,
+        [blockId]: {
+          isCorrect,
+          feedback: isCorrect
+            ? (isAr ? "إجابة صحيحة! أحسنت! 🎉" : "Correct! Excellent job! 🎉")
+            : (isAr ? "إجابة غير صحيحة. 🛡️" : "Incorrect. 🛡️"),
+          explanation,
+          resolvedLetter: correctLetter || undefined,
+          xpGained: isCorrect ? 15 : 0,
+          loading: false
+        }
+      }));
+
+      logActivityEvent("question_checked", {
+        book_id: bookId, page_number: Number(pageNum), block_id: blockId,
+        user_answer: selectedOpt, is_correct: isCorrect, xp_gained: isCorrect ? 15 : 0
+      });
     } catch (err) {
       console.error("MCQ evaluation error:", err);
-      const localCorrect = selectedOpt === correctOpt;
+      const localCorrect = !!correctOpt && selectedOpt === correctOpt;
       setMcqEvaluations(prev => ({
         ...prev,
         [blockId]: {
           isCorrect: localCorrect,
-          feedback: localCorrect 
+          feedback: localCorrect
             ? (language === "ar" ? "إجابة صحيحة! أحسنت! 🎉" : "Correct! Excellent job! 🎉")
-            : (language === "ar" ? "للأسف، إجابة غير صحيحة. 🛡️ حاول مرة أخرى" : "Incorrect. 🛡️ Try again!"),
-          explanation: localCorrect 
-            ? (language === "ar" ? `الاختيار (${correctOpt}) هو الإجابة الصحيحة.` : `Option (${correctOpt}) is the correct choice.`)
-            : (language === "ar" ? `الإجابة الصحيحة هي الاختيار (${correctOpt}).` : `The correct answer is Option (${correctOpt}).`),
+            : (language === "ar" ? "إجابة غير صحيحة. 🛡️" : "Incorrect. 🛡️"),
+          explanation: correctOpt
+            ? (localCorrect
+              ? (language === "ar" ? `الاختيار (${correctOpt}) هو الإجابة الصحيحة.` : `Option (${correctOpt}) is the correct choice.`)
+              : (language === "ar" ? `الإجابة الصحيحة هي الاختيار (${correctOpt}).` : `The correct answer is Option (${correctOpt}).`))
+            : "",
+          resolvedLetter: correctOpt || undefined,
           xpGained: localCorrect ? 15 : 0,
           loading: false
         }
@@ -2460,7 +2486,7 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
     setJumpInput(readerCurrentPage.toString());
   }, [readerCurrentPage]);
 
-  const [mcqEvaluations, setMcqEvaluations] = useState<Record<string, { isCorrect: boolean; feedback: string; explanation: string; loading?: boolean; xpGained?: number }>>({});
+  const [mcqEvaluations, setMcqEvaluations] = useState<Record<string, { isCorrect: boolean; feedback: string; explanation: string; loading?: boolean; xpGained?: number; resolvedLetter?: string }>>({});
   const viewerPanelRef = useRef<HTMLDivElement>(null);
   const lastOpenedBookIdRef = useRef<string | null>(null);
   const lastHeartbeatTimeRef = useRef<number>(Date.now());

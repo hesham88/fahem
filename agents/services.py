@@ -4088,6 +4088,139 @@ def register_telemetry_route(app: fastapi.FastAPI):
             logger.error(f"[services.py] Failed to post user token policy: {err}", exc_info=True)
             return {"success": False, "error": str(err)}
 
+    @app.post("/reader/resolve-answer")
+    async def resolve_reader_answer_endpoint(payload: dict):
+        """FC11.6: resolve the correct option for an in-page interactive MCQ via book-grounded RAG
+        (page-first, then whole-book vector search), cache it on the block, and return it with a
+        short explanation + a [pN] citation. Hybrid: a cached resolution is returned immediately, so
+        each question pays the LLM cost at most once. Runs on the caller's active DB (db_target), so a
+        demo session resolves against fahem_sandbox and a real user against fahem."""
+        try:
+            import os as _os, json as _json
+            from tools import get_cached_mongodb_client, get_gemini_api_key
+            from ingestion_v2.utils import get_gemini_embedding_v2
+            from google import genai
+            from google.genai import types
+
+            book_id = payload.get("book_id")
+            block_id = payload.get("block_id")
+            prompt = (payload.get("prompt") or "").strip()
+            options = payload.get("options") or []
+            page_number = payload.get("page_number")
+            language = payload.get("language") or "en"
+            if not book_id or not block_id or not prompt or not isinstance(options, list) or len(options) < 2:
+                return {"success": False, "error": "book_id, block_id, prompt and options[] are required"}
+
+            client = get_cached_mongodb_client()
+            db = get_active_db(client)
+            pages = db["book_pages"]
+
+            def _page_text(p):
+                parts = []
+                for b in (p.get("blocks") or []):
+                    for f in ("text", "term", "caption", "prompt", "title", "label"):
+                        v = b.get(f)
+                        if isinstance(v, str) and v.strip():
+                            parts.append(v.strip())
+                    if isinstance(b.get("items"), list):
+                        parts.extend(str(x) for x in b["items"] if x)
+                return "\n".join(parts)
+
+            # 1) cache hit on the block
+            page_doc, block = None, None
+            q = {"book_id": book_id}
+            if page_number is not None:
+                try: q["page_number"] = int(page_number)
+                except Exception: pass
+            for p in pages.find(q, {"blocks": 1, "page_number": 1}):
+                for b in (p.get("blocks") or []):
+                    if b.get("id") == block_id:
+                        page_doc, block = p, b; break
+                if block: break
+            if block is None and "page_number" in q:  # fallback: scan the whole book
+                for p in pages.find({"book_id": book_id}, {"blocks": 1, "page_number": 1}):
+                    for b in (p.get("blocks") or []):
+                        if b.get("id") == block_id:
+                            page_doc, block = p, b; break
+                    if block: break
+            if block is not None and block.get("resolved_correct_index") is not None:
+                return {"success": True, "cached": True,
+                        "correct_index": int(block["resolved_correct_index"]),
+                        "explanation": block.get("resolved_explanation", ""),
+                        "citation_page": block.get("resolved_citation_page")}
+
+            # 2) RAG — page-first then whole-book vector search
+            api_key = get_gemini_api_key()
+            ctx, cited = [], []
+            if page_doc:
+                own = _page_text(page_doc)
+                if own:
+                    ctx.append(f"[Page {page_doc.get('page_number')}]\n{own[:2000]}")
+                    cited.append(page_doc.get("page_number"))
+            try:
+                qv = get_gemini_embedding_v2(prompt + " " + " ".join(map(str, options)), api_key)
+                if qv:
+                    pipeline = [
+                        {"$vectorSearch": {
+                            "index": _os.environ.get("VECTOR_INDEX_NAME", "vector_index_book_pages"),
+                            "path": "embedding", "queryVector": qv, "numCandidates": 60, "limit": 4,
+                            "filter": {"book_id": {"$in": [book_id]}}}},
+                        {"$project": {"page_number": 1, "blocks": 1, "score": {"$meta": "vectorSearchScore"}}}
+                    ]
+                    for r in pages.aggregate(pipeline):
+                        if r.get("page_number") in cited:
+                            continue
+                        t = _page_text(r)
+                        if t:
+                            ctx.append(f"[Page {r.get('page_number')}]\n{t[:1500]}")
+                            cited.append(r.get("page_number"))
+            except Exception as _ve:
+                logger.warning(f"[resolve-answer] vector search failed (using page context only): {_ve}")
+
+            context = "\n\n".join(ctx[:5])[:8000]
+            opts_str = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
+            lang_name = "Arabic" if str(language).lower().startswith("ar") else "English"
+            gprompt = (
+                "You are grading a textbook multiple-choice question using the provided book context.\n"
+                f"Question: {prompt}\nOptions (index: text):\n{opts_str}\n\nBook context:\n{context or '(none found)'}\n\n"
+                f'Respond ONLY with JSON: {{"correct_index": <0-based int>, "explanation": '
+                f'"<1-2 sentences in {lang_name}, cite the page as [pN]>", "citation_page": <int page number>}}. '
+                "Pick the single best-supported option; if the context is insufficient, use your best subject knowledge."
+            )
+            gclient = genai.Client(api_key=api_key) if api_key else genai.Client()
+            resp = gclient.models.generate_content(
+                model=_os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite"),
+                contents=[gprompt],
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0),
+            )
+            raw = (resp.text or "{}").strip()
+            if raw.startswith("```"):
+                raw = raw.strip("`")
+                raw = raw[raw.find("{"): raw.rfind("}") + 1] if "{" in raw else raw
+            data = _json.loads(raw)
+            ci = int(data.get("correct_index", -1))
+            if ci < 0 or ci >= len(options):
+                return {"success": False, "error": "could not resolve a valid option"}
+            explanation = str(data.get("explanation", ""))[:600]
+            citation_page = data.get("citation_page") or (cited[0] if cited else None)
+
+            # 3) cache on the block (best-effort)
+            try:
+                if page_doc:
+                    pages.update_one(
+                        {"_id": page_doc["_id"], "blocks.id": block_id},
+                        {"$set": {"blocks.$.resolved_correct_index": ci,
+                                  "blocks.$.resolved_explanation": explanation,
+                                  "blocks.$.resolved_citation_page": citation_page}})
+            except Exception as _ce:
+                logger.warning(f"[resolve-answer] cache write failed: {_ce}")
+
+            return {"success": True, "cached": False, "correct_index": ci,
+                    "explanation": explanation, "citation_page": citation_page}
+        except Exception as e:
+            logger.error(f"[resolve-answer] error: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
     @app.get("/admin/demo-sessions")
     async def get_demo_sessions_endpoint():
         try:

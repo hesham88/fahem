@@ -263,7 +263,14 @@ def verify_d7():
     nonempty = [t for t in titles if t]
     if not nonempty:
         return False, "no chapter titles present in the books payload — D7 unverifiable (chapters missing)"
-    if len(nonempty) > 1 and len(set(nonempty)) == 1:
+    # Generic front-matter titles that legitimately repeat across DISTINCT books (e.g. every OpenStax
+    # book opens with a "Contents"/TOC chapter). The "all books share the same first chapter" signal
+    # is meant to catch real cross-book contamination (one book's chapters bleeding into others) — the
+    # Python-specific guard above already enforces that. Don't flag identical generic titles as a leak.
+    GENERIC_FIRST_CH = {"contents", "table of contents", "toc", "introduction", "preface", "index",
+                        "foreword", "acknowledgements", "acknowledgments", "about", "about the book", "cover"}
+    if (len(nonempty) > 1 and len(set(nonempty)) == 1
+            and nonempty[0] not in GENERIC_FIRST_CH):
         return False, f"every book shows the SAME first chapter '{nonempty[0]}' — D7 contamination"
     if not nonpy_ok:
         return False, "no non-Python book with its own real chapter title found — D7 not proven"
