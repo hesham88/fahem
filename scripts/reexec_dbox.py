@@ -52,7 +52,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 BASE = os.environ.get("FAHEM_BASE", "https://fahem.pro").rstrip("/")
 PYBOOK = re.compile(r"statements?\s*(&|and)\s*programming", re.I)
-CITE = re.compile(r"\[p\s*\d+\]", re.I)
+# Match both the bare page citation [pN] and the platform's PREFERRED deep-link form [book_id:pN]
+# (the agent is instructed to emit [book_id:pPageNum]); the old bare-only pattern false-failed on it.
+CITE = re.compile(r"\[(?:[^\[\]]*:)?\s*p\s*\d+\]", re.I)
 DEFLECT = re.compile(r"which book|don'?t have|do not have|no book|empty librar|0 books|cannot find|i first need to know", re.I)
 # Known fabricated/flat page counts (async_crawler hardcodes 220/150; the reported flat 380; r7 page_count=10).
 FAB_PAGECOUNTS = {10, 150, 220, 380}
