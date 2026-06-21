@@ -16,6 +16,10 @@ export async function POST(req: NextRequest) {
     const chosenPersona = (body.persona || "student").trim() as Role;
 
     let email = typedEmail || null;
+    // FC11.12: the email the visitor actually provided (typed or verified). `email` below gets
+    // reassigned to a seeded persona address for unauthenticated sessions, so capture the real
+    // entered email separately for the admin Sessions Monitor (null = unspecified → shared label).
+    let enteredEmail: string | null = typedEmail || null;
     let isVerified = false;
     let tier = 0; // Tier-0 default (unverified/anonymous)
     let uid = "demo_anon_" + Math.random().toString(36).substring(2, 10);
@@ -30,6 +34,7 @@ export async function POST(req: NextRequest) {
       // User is verified via Firebase auth
       isVerified = true;
       email = authCtx.email;
+      enteredEmail = authCtx.email;  // FC11.12: verified real email
       uid = authCtx.uid;
 
       const domain = email ? email.split("@")[1] : null;
@@ -122,6 +127,7 @@ export async function POST(req: NextRequest) {
       session_number: sessionNumber,
       uid: uid,
       email: email,
+      entered_email: enteredEmail,  // FC11.12: what the visitor provided (null = unspecified)
       verified: isVerified,
       tier: tier,
       persona: role,

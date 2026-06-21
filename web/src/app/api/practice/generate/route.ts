@@ -224,6 +224,19 @@ You MUST respond with a JSON object strictly matching this schema:
     }
 
     const questionData = JSON.parse(responseText.trim());
+
+    // FC11.7: the model biases the correct MCQ option to a fixed slot (observed: always the 2nd
+    // choice). Shuffle the options so the correct position is uniformly random per question.
+    // Correctness is matched by the `correctOption` STRING downstream, so reordering is safe.
+    if (resolvedMode === "mcq" && Array.isArray(questionData.options) && questionData.options.length > 1) {
+      const opts = [...questionData.options];
+      for (let i = opts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [opts[i], opts[j]] = [opts[j], opts[i]];
+      }
+      questionData.options = opts;
+    }
+
     // FC9.15: surface the source chapter so the practice record / analytics can pinpoint the topic.
     return new Response(JSON.stringify({ success: true, sourceChapter, ...questionData }), {
       status: 200,

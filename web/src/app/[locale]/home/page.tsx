@@ -7146,7 +7146,7 @@ export default function Home() {
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>
               <img src="/brand/social_facebook.png" alt="Facebook" width="22" height="22" style={{ objectFit: "contain" }} />
             </a>
-            <a href="mailto:contact@fahem.pro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email" 
+            <a href="mailto:support@fahem.pro" target="_blank" rel="noopener noreferrer" className="social-icon-link" aria-label="Email"
                style={{ display: "inline-flex", opacity: 0.7, transition: "all 0.3s ease", transform: "scale(1)" }}
                onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.opacity = "1"; }}
                onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "0.7"; }}>

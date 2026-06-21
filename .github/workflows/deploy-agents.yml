@@ -74,8 +74,17 @@ jobs:
           # (belt-and-suspenders with the CLOUD_RUN_JOB detection in utils.is_mongodb_enabled) — the
           # worker must never fall back to the local-JSON/offline path and silently skip DB persistence.
           # The API service runs as the default compute SA; allow it to trigger job executions.
+          # FC11.3: dispatch passes per-book overrides (INGEST_PAYLOAD) → requires
+          # run.jobs.runWithOverrides, which roles/run.invoker does NOT include (the old grant here
+          # left every dispatch 403'ing → silent fallback to the fragile in-Service thread). A custom
+          # least-privilege role carries exactly the run.jobs run/runWithOverrides/get permissions.
+          # Create is idempotent (|| true covers "already exists" and provisioned-out-of-band).
+          gcloud iam roles create fahemJobRunner --project=fahem-88d40 \
+            --title="Fahem Job Runner" \
+            --description="Run the ingestion worker Cloud Run Job with payload overrides" \
+            --permissions=run.jobs.run,run.jobs.runWithOverrides,run.jobs.get || true
           gcloud run jobs add-iam-policy-binding fahem-ingest-worker \
             --region us-east4 \
             --member="serviceAccount:1061555578804-compute@developer.gserviceaccount.com" \
-            --role="roles/run.invoker"
+            --role="projects/fahem-88d40/roles/fahemJobRunner"
 

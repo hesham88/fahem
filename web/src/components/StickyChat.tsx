@@ -953,21 +953,45 @@ export default function StickyChat() {
 
   const parseIntentFromText = (text: string) => {
     if (!text) return { cleanText: "", intent: null };
-    
-    // Search for [INTENT: <json>]
-    const intentMatch = text.match(/\[INTENT:\s*(\{[\s\S]*?\})\s*\]/);
-    if (intentMatch) {
-      try {
-        const jsonStr = intentMatch[1];
-        const intent = JSON.parse(jsonStr) as IntentPayload;
-        // Strip the [INTENT: ...] pattern from display
-        const cleanText = text.replace(/\[INTENT:\s*\{[\s\S]*?\}\s*\]/g, "").trim();
-        return { cleanText, intent };
-      } catch (err) {
-        console.error("Failed to parse intent JSON:", err);
+
+    // FC11.8: the intent JSON can be deeply NESTED (e.g. an assignment whose target carries a
+    // `questions` array). The old non-greedy single-brace regex (`\{[\s\S]*?\}`) truncated at the
+    // first inner `}`, so the JSON.parse failed and the whole `[INTENT:{…}]` token LEAKED as raw
+    // text (navigate intents with a flat target happened to work). Instead brace-balance from the
+    // first `{` after the marker to its matching `}` (string-aware), and strip every intent token so
+    // nothing leaks even if the model echoes one and the proxy appends another.
+    let working = text;
+    let firstIntent: IntentPayload | null = null;
+    // safety cap on iterations
+    for (let guard = 0; guard < 8; guard++) {
+      const marker = working.indexOf("[INTENT:");
+      if (marker === -1) break;
+      const braceStart = working.indexOf("{", marker);
+      if (braceStart === -1) break;
+      let depth = 0, end = -1, inStr = false, esc = false;
+      for (let i = braceStart; i < working.length; i++) {
+        const ch = working[i];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (ch === "\\") esc = true;
+          else if (ch === '"') inStr = false;
+        } else if (ch === '"') inStr = true;
+        else if (ch === "{") depth++;
+        else if (ch === "}") { depth--; if (depth === 0) { end = i; break; } }
       }
+      if (end === -1) break; // unterminated — leave the text intact rather than corrupt it
+      const jsonStr = working.slice(braceStart, end + 1);
+      if (!firstIntent) {
+        try { firstIntent = JSON.parse(jsonStr) as IntentPayload; }
+        catch (err) { console.error("Failed to parse intent JSON:", err); }
+      }
+      // Strip the whole token (incl. an optional trailing `]`), parsed or not, so no raw JSON shows.
+      let tokenEnd = end + 1;
+      const closeMatch = working.slice(tokenEnd).match(/^\s*\]/);
+      if (closeMatch) tokenEnd += closeMatch[0].length;
+      working = working.slice(0, marker) + working.slice(tokenEnd);
     }
-    return { cleanText: text, intent: null };
+    return { cleanText: working.trim(), intent: firstIntent };
   };
 
   const renderIntentCard = (intent: IntentPayload, msgId: string) => {
@@ -1990,34 +2014,22 @@ export default function StickyChat() {
 
   const getMentionOptions = () => {
     if (mentionType === "subject") {
-      const opts = dbSubjects.map(sub => ({
+      // FC11.9: real subjects only — no fabricated @math/@science fallbacks. Match id OR name.
+      const q = mentionSearch.toLowerCase();
+      return dbSubjects.map(sub => ({
         id: `@${sub._id || sub.id}`,
         label: `${sub.emoji || sub.icon_emoji || "📚"} ${language === "ar" ? sub.name_ar || sub.name : sub.name}`,
         desc: sub.category || ct("subject_desc_default")
-      }));
-      if (opts.length === 0) {
-        opts.push(
-          { id: "@math", label: ct("math_label"), desc: ct("math_desc") },
-          { id: "@science", label: ct("science_label"), desc: ct("science_desc") },
-          { id: "@arabic", label: ct("arabic_label"), desc: ct("arabic_desc") }
-        );
-      }
-      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+      })).filter(o => o.id.toLowerCase().includes(q) || o.label.toLowerCase().includes(q));
     }
     if (mentionType === "book") {
-      const opts = dbBooks.map(b => ({
+      // FC11.9: real books only — no fabricated #college-algebra fallbacks. Match id OR title.
+      const q = mentionSearch.toLowerCase();
+      return dbBooks.map(b => ({
         id: `#${b._id || b.id}`,
         label: `📚 ${language === "ar" ? b.title_ar || b.title : b.title}`,
         desc: b.grade || ct("book_desc_default")
-      }));
-      if (opts.length === 0) {
-        opts.push(
-          { id: "#college-algebra", label: "📚 College Algebra 2e", desc: ct("algebra_desc") },
-          { id: "#chemistry-handbook", label: "🧪 Chemistry 2e", desc: ct("chemistry_desc") },
-          { id: "#arabic-grammar", label: "✍️ كتاب النحو المبسط", desc: ct("arabic_grammar_desc") }
-        );
-      }
-      return opts.filter(o => o.id.toLowerCase().includes(mentionSearch.toLowerCase()));
+      })).filter(o => o.id.toLowerCase().includes(q) || o.label.toLowerCase().includes(q));
     }
     if (mentionType === "command") {
       const opts = [
@@ -4183,6 +4195,10 @@ User Question: ${queryText}`;
             <input
               id="sticky-chat-input"
               type="text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={inputValue}
               onChange={(e) => {
                 const val = e.target.value;

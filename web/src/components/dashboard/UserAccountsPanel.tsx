@@ -1101,7 +1101,16 @@ export const UserAccountsPanel: React.FC<UserAccountsPanelProps> = ({
                     <tr key={sess._id} style={{ borderBottom: "1px solid rgba(0,0,0,0.03)", transition: "all 0.15s" }}>
                       <td style={{ padding: "0.75rem 0.5rem" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
-                          <span style={{ fontWeight: 700 }}>{sess.email || "Anonymous Demo User"}</span>
+                          {/* FC11.12: show the email the visitor actually entered (or verified). When none
+                              was provided, all such sessions share one placeholder label. Never the seeded
+                              persona address, which used to masquerade as a real user here. */}
+                          {sess.entered_email ? (
+                            <span style={{ fontWeight: 700 }}>{sess.entered_email}</span>
+                          ) : (
+                            <span style={{ fontWeight: 700, color: "#8a9ca8" }}>
+                              guest@demo.fahem.pro <em style={{ fontWeight: 400, fontSize: "0.7rem" }}>({language === "ar" ? "غير محدد" : "unspecified"})</em>
+                            </span>
+                          )}
                           <span style={{ fontSize: "0.7rem", color: "#6a7c88", fontFamily: "monospace" }}>ID: {sess.sandbox_session_id}</span>
                         </div>
                       </td>

@@ -339,6 +339,13 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     isListeningRef.current = isListening;
   }, [isListening]);
 
+  // FC11.14: a live mirror of the answer + a snapshot taken at dictation start, so the STT handler can
+  // rebuild the full transcript from the engine's complete results list (idempotent) rather than
+  // delta-appending — which on Chrome continuous mode duplicated/jumbled words into a garbled mess.
+  const practiceAnswerRef = useRef<string>("");
+  useEffect(() => { practiceAnswerRef.current = practiceAnswer; }, [practiceAnswer]);
+  const dictationBaseRef = useRef<string>("");
+
   const [interimSpeechText, setInterimSpeechText] = useState<string>("");
 
   const [micError, setMicError] = useState<string>("");
@@ -778,21 +785,22 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
         rec.lang = localeMap[language] || "en-US";
 
         rec.onresult = (event: any) => {
+          // FC11.14: rebuild the full transcript from ALL results each event (idempotent). The prior
+          // code appended only the delta from resultIndex, which on Chrome continuous mode (results
+          // re-delivered/revised) duplicated and jumbled words into a garbled, inconsistent mess.
           let interimText = "";
-          let finalTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          let finalText = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
+              finalText += (finalText ? " " : "") + String(t).trim();
             } else {
-              interimText += event.results[i][0].transcript;
+              interimText += t;
             }
           }
-          if (finalTranscript) {
-            setPracticeAnswer((prev) => (prev ? prev + " " + finalTranscript : finalTranscript));
-            setInterimSpeechText("");
-          } else {
-            setInterimSpeechText(interimText);
-          }
+          const base = dictationBaseRef.current;
+          setPracticeAnswer(((base ? base.trim() + " " : "") + finalText).trim());
+          setInterimSpeechText(interimText);
         };
 
         rec.onerror = (event: any) => {
@@ -821,6 +829,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     if (isListeningRef.current) return;
     setMicError("");
     setInterimSpeechText("");
+    dictationBaseRef.current = practiceAnswerRef.current;  // FC11.14: preserve any existing text
     try {
       speechRecognition.start();
       setIsListening(true);
@@ -859,6 +868,7 @@ export const PracticePanel: React.FC<PracticePanelProps> = ({
     } else {
       setMicError("");
       setInterimSpeechText("");
+      dictationBaseRef.current = practiceAnswerRef.current;  // FC11.14: preserve any existing text
       try {
         speechRecognition.start();
         setIsListening(true);

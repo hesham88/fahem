@@ -4956,13 +4956,24 @@ def register_telemetry_route(app: fastapi.FastAPI):
         # in-process thread below remains the local/dev path and a fail-safe fallback so a
         # dispatch error never silently drops an ingestion.
         if os.environ.get("K_SERVICE"):
+            _bid = payload.get("book_id")
             try:
                 from ingestion_v2.job_trigger import trigger_ingest_job
                 if trigger_ingest_job(payload):
                     return
-                logger.error("[Ingestion Trigger] Cloud Run Job dispatch failed — falling back to in-process thread")
+                # FC11.3: do NOT fail silently. The in-Service thread is the fragile path FC8.5 retired
+                # (it dies on any API instance recycle). Surface the fallback prominently + per-book so
+                # an IAM/dispatch regression (e.g. the run.jobs.runWithOverrides 403) is visible, not buried.
+                logger.error(
+                    f"[Ingestion Trigger] ⚠️ Cloud Run Job dispatch FAILED for book_id={_bid} — "
+                    f"falling back to the FRAGILE in-Service thread (survives only while this instance lives). "
+                    f"Check the worker-job IAM (run.jobs.runWithOverrides)."
+                )
             except Exception as _je:
-                logger.error(f"[Ingestion Trigger] Cloud Run Job dispatch unavailable ({_je}) — falling back to in-process thread")
+                logger.error(
+                    f"[Ingestion Trigger] ⚠️ Cloud Run Job dispatch UNAVAILABLE for book_id={_bid} ({_je}) — "
+                    f"falling back to the FRAGILE in-Service thread.", exc_info=True
+                )
 
         try:
             t = threading.Thread(target=target, name=f"ingest-{payload.get('book_id')}")

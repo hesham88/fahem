@@ -56,68 +56,107 @@ def _payload(blocks: list[dict]) -> list[dict]:
     return out
 
 
+# FC11.1: a single page's translatable blocks used to be sent in ONE Gemini call. On a dense
+# page the JSON response overflowed the model output ceiling and was truncated mid-string
+# (`Invalid JSON: EOF ... column 131128`), which model_validate_json rejected deterministically
+# (the 3 retries all failed at the same point), and the all-or-nothing gate then aborted the whole
+# book. We now split a page's blocks into output-bounded sub-batches so no single request can
+# approach the ceiling, and merge the per-batch overlays by block id (ids are unique within a page).
+MAX_BATCH_CHARS = 12000   # input-char budget per request — keeps the translated output well under the ceiling
+MAX_BATCH_BLOCKS = 40     # also cap block count so very small blocks don't make a huge single request
+MAX_OUTPUT_TOKENS = 16384 # explicit output cap (defence in depth; each bounded batch stays well below this)
+
+
+def _chunk_payload(payload, max_chars=MAX_BATCH_CHARS, max_blocks=MAX_BATCH_BLOCKS):
+    """Greedily pack payload items into sub-batches bounded by serialized size and count."""
+    batches, cur, cur_chars = [], [], 0
+    for item in payload:
+        size = len(json.dumps(item, ensure_ascii=False))
+        if cur and (cur_chars + size > max_chars or len(cur) >= max_blocks):
+            batches.append(cur)
+            cur, cur_chars = [], 0
+        cur.append(item)
+        cur_chars += size
+    if cur:
+        batches.append(cur)
+    return batches
+
+
+def _translate_batch(client, model, lang_name, target_lang, batch):
+    """Translate one bounded sub-batch. Raises with the REAL reason on failure (no swallowing)."""
+    import re
+    prompt = (
+        f"Translate the user-visible text of these textbook blocks into {lang_name}.\n"
+        "Rules: keep each `id` exactly; translate ONLY the fields present on each block; "
+        "never merge, split, drop, or reorder blocks; preserve list/option order; do not "
+        "translate proper nouns or programming keywords/code identifiers.\n\n"
+        f"Blocks (JSON):\n{json.dumps(batch, ensure_ascii=False)}"
+    )
+    resp = client.models.generate_content(
+        model=model or "gemini-3.1-flash-lite",
+        contents=[prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=Translation,
+            temperature=0,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
+        ),
+    )
+    json_text = resp.text
+    if not json_text:
+        raise RuntimeError("Gemini returned empty response text")
+
+    pattern = re.compile(r'^```(?:json)?\s*(.*?)\s*```$', re.DOTALL | re.IGNORECASE)
+    match = pattern.match(json_text.strip())
+    json_text = match.group(1).strip() if match else json_text.strip()
+
+    result = Translation.model_validate_json(json_text)  # raises json_invalid/schema error verbatim
+    out = {}
+    for tb in result.blocks:
+        fields = tb.model_dump(exclude_none=True)
+        fields.pop("id", None)
+        if fields:
+            out[tb.id] = {target_lang: fields}
+    return out
+
+
 def call_gemini_translation(blocks, api_key, model, target_lang):
     """
-    Call Gemini LLM via official google-genai SDK, passing the translatable blocks,
-    and translating them into target_lang using the Translation Pydantic schema.
+    Translate a page's blocks via the google-genai SDK, chunked into output-bounded sub-batches
+    (FC11.1). Returns {"i18n": {block_id: {lang: fields}}}. Propagates a meaningful error (so the
+    worker can record the REAL cause) instead of silently returning None — except a lone block that
+    is itself untranslatable/oversized, which is passed through (left untranslated) so one bad block
+    can't fail an otherwise-good page.
     """
-    try:
-        # Initialize Google GenAI Client
-        if api_key:
-            client = genai.Client(api_key=api_key)
-        else:
-            client = genai.Client()
+    if api_key:
+        client = genai.Client(api_key=api_key)
+    else:
+        client = genai.Client()
 
-        # Prepare payload
-        payload = _payload(blocks)
-        if not payload:
-            return {"i18n": {}}
+    payload = _payload(blocks)
+    if not payload:
+        return {"i18n": {}}
 
-        lang_name = {"ar": "Arabic", "en": "English"}.get(target_lang, target_lang)
-        prompt = (
-            f"Translate the user-visible text of these textbook blocks into {lang_name}.\n"
-            "Rules: keep each `id` exactly; translate ONLY the fields present on each block; "
-            "never merge, split, drop, or reorder blocks; preserve list/option order; do not "
-            "translate proper nouns or programming keywords/code identifiers.\n\n"
-            f"Blocks (JSON):\n{json.dumps(payload, ensure_ascii=False)}"
-        )
+    lang_name = {"ar": "Arabic", "en": "English"}.get(target_lang, target_lang)
 
-        resp = client.models.generate_content(
-            model=model or "gemini-3.1-flash-lite",
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=Translation,
-                temperature=0,
-            ),
-        )
+    i18n_map = {}
+    for batch in _chunk_payload(payload):
+        try:
+            i18n_map.update(_translate_batch(client, model, lang_name, target_lang, batch))
+        except Exception as e:
+            if len(batch) == 1:
+                # A single block that won't translate (e.g. pathologically large) — pass it through
+                # untranslated rather than failing the whole page.
+                print(f"[Translation] block {batch[0].get('id')} left untranslated: {e}",
+                      file=sys.stderr, flush=True)
+                continue
+            # A multi-block batch failed — surface the real reason so execute_with_retry/the worker
+            # records it (chunking should normally keep batches well under the output ceiling).
+            raise RuntimeError(
+                f"translation batch failed ({len(batch)} blocks, lang={target_lang}): {e}"
+            ) from e
 
-        json_text = resp.text
-        if not json_text:
-            return None
-
-        import re
-        pattern = re.compile(r'^```(?:json)?\s*(.*?)\s*```$', re.DOTALL | re.IGNORECASE)
-        match = pattern.match(json_text.strip())
-        if match:
-            json_text = match.group(1).strip()
-        else:
-            json_text = json_text.strip()
-
-        result = Translation.model_validate_json(json_text)
-        
-        i18n_map = {}
-        for tb in result.blocks:
-            fields = tb.model_dump(exclude_none=True)
-            fields.pop("id", None)
-            if fields:
-                i18n_map[tb.id] = {target_lang: fields}
-                
-        return {"i18n": i18n_map}
-    except Exception as e:
-        print(f"[Translation call Exception] {e}", file=sys.stderr)
-        
-    return None
+    return {"i18n": i18n_map}
 
 def load_structured_pages(book_id, is_local):
     """
@@ -252,56 +291,98 @@ def main():
             default_target_lang = "ar"
 
     translate_start_time = time.time()
+    failed_pages = []  # FC11.2: (source_doc, err_msg) collected for a retry pass + tolerance, not an instant abort
+
+    def _record_translated(p_no, p_doc, flagged=False):
+        nonlocal translated_count
+        translated_count += 1
+        pct = 56 + int((translated_count / actual_total_pages) * 20)  # Range 56% - 76%
+        sub_pct = (translated_count / actual_total_pages) * 100.0
+        bar = make_progress_bar(sub_pct, width=20)
+
+        # Compute ETA
+        elapsed = time.time() - translate_start_time
+        avg_time = elapsed / max(translated_count, 1)
+        rem_pages = actual_total_pages - translated_count
+        eta_s = int(avg_time * rem_pages)
+        eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+
+        tag = " (flagged: kept original text)" if flagged else ""
+        log_msg = f"{bar} Translated Page {p_no}/{actual_total_pages} [ETA {eta_str}]{tag}."
+        print(f"[JOB 3: TRANSLATE] {log_msg}", flush=True)
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] {log_msg}")
+
+        # Write page back to database
+        with db_write_lock:
+            update_job_status(
+                job_id, "processing", "translate", pct, logs,
+                processed_pages=translated_count, total_pages=actual_total_pages,
+                is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
+            )
 
     # Thread Pool execution with 3 workers
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
-            executor.submit(process_translate_page_worker, p_doc, api_key, model, default_target_lang): p_doc.get("page_number", 1)
+            executor.submit(process_translate_page_worker, p_doc, api_key, model, default_target_lang): p_doc
             for p_doc in structured_pages
         }
-        
+
         for future in as_completed(futures):
-            p_num = futures[future]
+            src_doc = futures[future]
+            p_num = src_doc.get("page_number", 1)
             check_cooperative_control(job_id, is_local, logs)
-            
+
             p_no, p_doc, err_msg = future.result()
             if p_doc:
-                translated_count += 1
-                pct = 56 + int((translated_count / actual_total_pages) * 20)  # Range 56% - 76%
-                sub_pct = (translated_count / actual_total_pages) * 100.0
-                bar = make_progress_bar(sub_pct, width=20)
-                
-                # Compute ETA
-                elapsed = time.time() - translate_start_time
-                avg_time = elapsed / translated_count
-                rem_pages = actual_total_pages - translated_count
-                eta_s = int(avg_time * rem_pages)
-                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
-                
-                log_msg = f"{bar} Translated Page {p_no}/{actual_total_pages} [ETA {eta_str}]."
-                print(f"[JOB 3: TRANSLATE] {log_msg}", flush=True)
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] {log_msg}")
-                
-                # Write page back to database
-                with db_write_lock:
-                    update_job_status(
-                        job_id, "processing", "translate", pct, logs,
-                        processed_pages=translated_count, total_pages=actual_total_pages,
-                        is_completed=False, is_local=is_local, new_page_doc=p_doc, **metadata
-                    )
+                _record_translated(p_no, p_doc)
             else:
-                has_errors = True
-                logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE_ERROR] Page {p_num} translation failed: {err_msg}")
-                print(f"[JOB 3: TRANSLATE_ERROR] Page {p_num} translation failed: {err_msg}", file=sys.stderr)
-                with db_write_lock:
-                    update_job_status(job_id, "processing", "translate", 56, logs, translated_count, actual_total_pages, False, is_local, **metadata)
+                # FC11.2: collect for the retry pass instead of failing the whole book at 99.9%.
+                failed_pages.append((src_doc, err_msg))
+                logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE_ERROR] Page {p_num} translation failed (will retry): {err_msg}")
+                print(f"[JOB 3: TRANSLATE_ERROR] Page {p_num} translation failed (will retry): {err_msg}", file=sys.stderr)
 
-    if has_errors or translated_count < actual_total_pages:
-        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ❌ Job 3 failed. Page translation did not complete successfully for all pages. Downstream jobs aborted.")
+    # FC11.2: final serial retry pass on ONLY the failed pages. Transient errors clear here; the
+    # deterministic output-overflow that used to abort the book no longer reaches here (FC11.1 chunking).
+    if failed_pages:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ♻️ Retrying {len(failed_pages)} page(s) that failed the first pass...")
+        update_job_status(job_id, "processing", "translate", 72, logs, translated_count, actual_total_pages, False, is_local, **metadata)
+        still_failed = []
+        for src_doc, _prev in failed_pages:
+            check_cooperative_control(job_id, is_local, logs)
+            p_no, p_doc, err_msg = process_translate_page_worker(src_doc, api_key, model, default_target_lang)
+            if p_doc:
+                _record_translated(p_no, p_doc)
+            else:
+                still_failed.append((src_doc, err_msg))
+        failed_pages = still_failed
+
+    # FC11.2: tolerance — proceed+flag for a small residue; hard-fail only if the failure is systemic.
+    failed_count = len(failed_pages)
+    tolerance = max(2, int(actual_total_pages * 0.02))  # floor of 2, else 2% of the book
+    if failed_count > tolerance:
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ❌ Job 3 failed: {failed_count}/{actual_total_pages} pages unrecoverable (exceeds tolerance of {tolerance}). Likely systemic (credentials/model/quota). Downstream jobs aborted.")
         update_job_status(job_id, "failed", "translate", 56, logs, translated_count, actual_total_pages, False, is_local, **metadata)
         sys.exit(1)
 
-    logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ✅ All pages successfully translated and annotated. Triggering Downstream Job 4 (Assemble)...")
+    review_pages = []
+    if failed_count:
+        for src_doc, err_msg in failed_pages:
+            # Mark translated-with-empty-i18n so downstream proceeds; the reader falls back to the
+            # original-language text for these pages, and they're flagged for later review.
+            src_doc["i18n"] = src_doc.get("i18n") or {}
+            src_doc["status"] = "translated"
+            src_doc["needs_translation_review"] = True
+            src_doc["translation_review_reason"] = str(err_msg)[:300]
+            review_pages.append(src_doc.get("page_number", 1))
+            _record_translated(src_doc.get("page_number", 1), src_doc, flagged=True)
+        review_pages = sorted(review_pages)
+        logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] ⚠️ Proceeding with {failed_count} page(s) flagged needs_translation_review (readers see the original text): {review_pages}.")
+        update_job_status(job_id, "processing", "translate", 76, logs, translated_count, actual_total_pages, False, is_local, needs_translation_review=review_pages, **metadata)
+
+    done_msg = ("✅ All pages successfully translated and annotated."
+                if not review_pages
+                else f"✅ Translation complete — {len(review_pages)} page(s) flagged for review (original text shown).")
+    logs.append(f"[{time.strftime('%H:%M:%S')}] [TRANSLATE] {done_msg} Triggering Downstream Job 4 (Assemble)...")
     update_job_status(job_id, "processing", "assemble", 76, logs, translated_count, actual_total_pages, False, is_local, **metadata)
 
     # Trigger Job 4 (Assemble)
